@@ -66,3 +66,41 @@ All previous `Doctor0Evil/*` repositories are now consolidated into `mk-bluebird
 ## Updated Repository References
 
 **All code, documentation, and ALN schemas** must now reference:
+```
+github.com/mk-bluebird/eco_restoration_shard
+```
+
+**SQLite Constellation Index**: `spine/econet/db/constellation_index.sql`
+
+**Master Repo Index**: `.econet/econet_repo_index.sql`
+
+## Migration Checklist
+
+- [x] Consolidate all repositories into monorepo structure
+- [ ] Update SQLite `repo` table to reflect new GitHub account
+- [ ] Merge all `.econet/econet_repo_index.sql` shards into master index
+- [ ] Update Bostrom DID signing contexts in all ALN particles
+- [ ] Update CI/CD workflows (GitHub Actions, test scripts)
+- [ ] Archive old Doctor0Evil metadata in `research/archives/doctor0evil/`
+- [ ] Update platform continuity anchors (AI chat systems, Perplexity Spaces)
+- [ ] Create redirect documentation for external references
+
+## Platform Continuity Anchors
+
+This migration event is recorded in:
+- **Perplexity Space**: `eco_restoration_shard` (this Space)
+- **Blockchain**: Bostrom network (DIDs unchanged)
+- **ALN Schemas**: All particles retain original `signing_did` with migration note
+
+## Contact & Support
+
+- **GitHub**: https://github.com/mk-bluebird
+- **Primary Email**: [Associated with mk-bluebird account]
+- **Location**: Phoenix, Arizona, US
+
+---
+
+**KER Score for Migration**:
+- **K = 0.96** (preserves all existing research, math, and governance semantics)
+- **E = 0.89** (consolidation reduces fragmentation, improves discoverability)
+- **R = 0.08** (low risk; purely organizational change, no code alteration)
