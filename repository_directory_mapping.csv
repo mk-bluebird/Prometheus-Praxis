@@ -1,0 +1,20 @@
+old_repo,new_directory,role_band,aln_schemas_count,qpudatashards_count,migration_notes
+Doctor0Evil/EcoNetCybocinderPhoenix,apps/cybocinder-phoenix/,APP,0,0,Phoenix cybocinder dashboard
+Doctor0Evil/corridor-hud,apps/corridor-hud/,APP,0,0,Corridor visualization
+Doctor0Evil/AirGlobeEcoKernel,engines/airglobe/,ENGINE,0,0,Air-water coupling kernels
+Doctor0Evil/Cyboquatics,engines/cyboquatics/,ENGINE,0,0,Cyboquatic FOG routing
+Doctor0Evil/Eco-Sys,engines/eco-sys/,ENGINE,0,0,Ecosystem simulation
+Doctor0Evil/EcoNet-CEIM-PhoenixWater,engines/ceim-phoenix-water/,ENGINE,0,0,Phoenix water CEIM kernels
+Doctor0Evil/Sewer-FOG-Monitoring-Network,engines/fog-monitoring/,ENGINE,0,0,FOG monitoring networks
+Doctor0Evil/Paycomp,governance/paycomp/,GOV,0,0,Augmented-citizen rewards
+Doctor0Evil/ecoinfra-governance,governance/ecoinfra/,GOV,0,0,Infrastructure governance
+Doctor0Evil/ecological-orchestrator,governance/orchestrator/,GOV,0,0,Workload orchestration
+Doctor0Evil/Ant-One-Net,materials/ant-one-net/,MATERIAL,0,0,Ant-fed packaging structures
+Doctor0Evil/BugsLife,materials/bugslife/,MATERIAL,0,0,Pest-control biodegradable materials
+Doctor0Evil/EcoNet-BeeSafeAI,materials/beesafe-ai/,MATERIAL,0,0,Bee habitat protection
+Doctor0Evil/SnowGlobe,research/snowglobe/,RESEARCH,0,0,Global research aggregation
+Doctor0Evil/eco_restoration_shard,research/core/,RESEARCH,0,0,Primary restoration research
+Doctor0Evil/ALN-Blockchain,spine/aln-blockchain/,SPINE,0,0,Blockchain anchoring for ALN
+Doctor0Evil/Aletheion,spine/aletheion/,SPINE,0,0,Truth-preserving research framework
+Doctor0Evil/EcoNet,spine/econet/,SPINE,0,0,Core ecosafety & Lyapunov residual
+Doctor0Evil/aln-platform-ecosystem,spine/aln-platform/,SPINE,0,0,ALN superintelligence policy language
