@@ -1,0 +1,47 @@
+TITLE ResponseShardEcoMetrics2026v1
+ALNSPECHASHHEX 0xe0c0a1f27b9384d5
+SCHEMANAME responshard.eco.metrics.2026v1
+CATEGORY ECOSAFETY
+DESCRIPTION Minimal KER-bearing response shard linking governance, Lyapunov residuals, and eco-restoration data to Bostrom DIDs.
+
+PARTICLE ResponseShardEcoMetrics2026v1
+  ROLE QPUDATASHARD
+  VERSIONTAG v1
+  LYAPCHANNEL governance
+
+  FIELD response_id        INT       META      DESCRIPTION "Row id in response_shard."
+  FIELD shard_id           INT       META      DESCRIPTION "Foreign key into shardinstance.shardid."
+  FIELD topic_tag          STRING    META      DESCRIPTION "Topic string lane/medium/region for eco_response_shard."
+  FIELD user_did           STRING    META      DESCRIPTION "Bostrom DID anchoring authorship."
+  FIELD node_id            STRING    META      DESCRIPTION "Node identifier if present."
+  FIELD asset_type         STRING    META      DESCRIPTION "Asset type e.g., MARVault, TrayLine, CyboNode."
+  FIELD medium             STRING    META      DESCRIPTION "Physical medium water, air, soil, bio."
+  FIELD region             STRING    META      DESCRIPTION "Region label e.g., Phoenix-AZ."
+
+  FIELD lane               STRING    META      DESCRIPTION "Lane label RESEARCH, EXPPROD, PROD."
+
+  FIELD k_metric           F64       METRIC    DESCRIPTION "Windowed K from shardinstance."
+  FIELD e_metric           F64       METRIC    DESCRIPTION "Windowed E from shardinstance."
+  FIELD r_metric           F64       METRIC    DESCRIPTION "Windowed R from shardinstance."
+  FIELD vt_max             F64       METRIC    DESCRIPTION "Max Lyapunov residual V_t over shard window."
+
+  FIELD k_factor           F64       METRIC    DESCRIPTION "Meta-knowledge factor from knowledgeecoscore."
+  FIELD e_factor           F64       METRIC    DESCRIPTION "Meta-eco-impact factor from knowledgeecoscore."
+  FIELD r_factor           F64       METRIC    DESCRIPTION "Meta-risk-of-harm factor from knowledgeecoscore."
+
+  FIELD residual_score     F64       RISKCOORD DESCRIPTION "Scalar residual V_t in 0..1."
+  FIELD created_utc        DATETIME  META      DESCRIPTION "Insertion timestamp."
+
+  FIELD evidence_hex       STRING    META      DESCRIPTION "Hex-encoded evidence chain for this response row."
+  FIELD signing_hex        STRING    META      DESCRIPTION "Hex-encoded signature bound to user_did."
+
+ENDPARTICLE
+
+CORRIDORVAR residual_score
+  LYAPCHANNEL governance
+  SAFE 0.00
+  GOLD 0.20
+  HARD 0.40
+  WEIGHT 1.00
+  MANDATORY TRUE
+ENDCORRIDORVAR
