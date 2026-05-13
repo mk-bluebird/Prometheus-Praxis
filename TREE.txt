@@ -1,0 +1,65 @@
+eco_restoration_shard/
+├─ Cargo.toml
+├─ Cargo.lock
+├─ README.md
+├─ LICENSE
+├─ TREE.txt                       # human-readable overview of the repo layout
+│
+├─ eco_response_shard/            # core non-actuating library crate
+│  ├─ Cargo.toml
+│  └─ src/
+│     ├─ lib.rs                   # ResponseShard types, NonActuatingWorkload, read-only queries
+│     ├─ response_row.rs          # schema-mapped structs and row mappers
+│     ├─ views.rs                 # SQL view definitions and helpers
+│     └─ ker_invariants.rs        # pure KER checks (no I/O)
+│
+├─ eco_response_shard_cilib/      # CI-only helper crate (non-actuating)
+│  ├─ Cargo.toml
+│  └─ src/
+│     ├─ lib.rs                   # run_ci_workload, lint wiring
+│     └─ lint_responseshard.rs    # schema + corridor presence checks
+│
+├─ eco_response_shard_backfill/   # one-shot backfill binary crate
+│  ├─ Cargo.toml
+│  └─ src/
+│     └─ main.rs                  # econet-index -> eco_response_shard backfill logic
+│
+├─ qpudatashards/                 # ALN qpudatashard specs (hex-stamped)
+│  ├─ ResponseShardEcoMetrics2026v1.aln
+│  ├─ ResponseShardEcoMetricsDQ2026v1.aln
+│  ├─ PlaneWeightsShard2026v1.aln
+│  └─ templates/                  # RFC4180 CSV templates
+│     └─ ResponseShardEcoMetrics2026v1.template.csv
+│
+├─ sql/                           # SQLite schema and views for eco_response_shard
+│  ├─ ecoresponseshard_schema.sql
+│  ├─ ecoresponseshard_backfill_meta.sql
+│  └─ ecoresponseshard_views.sql  # vw_prod_hightrust_responseshard etc.
+│
+├─ .econet/                       # econet-index discovery + manifest wiring
+│  ├─ econet_repo_index.sql       # repo + repofile registration inserts
+│  ├─ econet_alnschema_index.sql  # alnschema rows for qpudatashards
+│  └─ manifest/
+│     └─ EcoRepoIndex2026v1.aln   # DID-bound repo manifest for eco_restoration_shard
+│
+├─ config/                        # CI + tool configuration (non-secret)
+│  ├─ kerdeployable.config.toml   # which invariants / PlaneWeights to apply
+│  ├─ econetrepomanifest-lint.toml
+│  └─ ci-env.example.toml         # example env for local CI mirroring
+│
+├─ research/                      # prose + notebooks (no binaries)
+│  ├─ eco_response_shard_design.md
+│  ├─ schema_evolution_notes.md
+│  └─ data_quality_kernels.md
+│
+├─ .github/
+│  └─ workflows/
+│     ├─ ci-eco-response-shard.yml        # builds, tests, lints this workspace
+│     ├─ ci-kerdeployable-replay.yml      # runs kerdeployable against proof shards (read-only)
+│     └─ ci-econetrepomanifest-lint.yml   # enforces manifest and non-actuation contracts
+│
+└─ tools/                        # OPTIONAL: local wrappers (no copies of core ecosystem tools)
+   ├─ README.md
+   └─ scripts/
+      ├─ run_kerdeployable.sh            # thin wrapper calling central ecosystem-tools binary
+      └─ run_econetrepomanifest_lint.sh  # same pattern
