@@ -1,0 +1,8 @@
+"Case ID","r_calib_prev","r_calib_next","K_prev → K_next","E_prev → E_next","R_prev → R_next","Expected outcome"
+"A1","0.10","0.10","0.90 → 0.91","0.90 → 0.91","0.12 → 0.11","Allowed (no change in r_calib, monotonicity not enforced) 6837704e-9e0e-4e23-952d-49d2b31c49c7.md"
+"A2","0.10","0.10","0.90 → 0.88","0.90 → 0.89","0.12 → 0.15","Allowed (improvements or regressions permitted when uncertainty unchanged; used to test that invariant does not over‑constrain). 6837704e-9e0e-4e23-952d-49d2b31c49c7.md"
+"B1","0.10","0.20","0.90 → 0.92","0.90 → 0.91","0.12 → 0.11","Forbidden — r_calib increased; K cannot increase, E cannot increase, R cannot decrease. 6837704e-9e0e-4e23-952d-49d2b31c49c7.md"
+"B2","0.10","0.20","0.90 → 0.90","0.90 → 0.88","0.12 → 0.14","Allowed — K flat, E decreased, R increased under higher uncertainty. 6837704e-9e0e-4e23-952d-49d2b31c49c7.md"
+"B3","0.20","0.40","0.92 → 0.92","0.91 → 0.91","0.12 → 0.12","Borderline; design choice: you can either allow (all equal) or require a small penalty, but the minimal invariant considers this Allowed because no metric moves in the wrong direction. 6837704e-9e0e-4e23-952d-49d2b31c49c7.md"
+"C1","0.30","0.10","0.88 → 0.90","0.86 → 0.90","0.15 → 0.12","Allowed — uncertainty decreased; K/E may improve, R may decrease. 6837704e-9e0e-4e23-952d-49d2b31c49c7.md"
+"C2","0.30","0.10","0.88 → 0.85","0.86 → 0.80","0.15 → 0.20","Allowed (even if K/E drop, invariant only constrains worsening when r_calib increases). 6837704e-9e0e-4e23-952d-49d2b31c49c7.md"
