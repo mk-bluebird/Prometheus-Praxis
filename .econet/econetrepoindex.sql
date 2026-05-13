@@ -7,35 +7,49 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS econetrepoindex (
     reponame         TEXT PRIMARY KEY,
     githubslug       TEXT NOT NULL,
-    roleband         TEXT NOT NULL,           -- SPINE, RESEARCH, ENGINE, MATERIAL, GOV, APP
-    visibility       TEXT NOT NULL,           -- Public, Private
-    languageprimary  TEXT NOT NULL,           -- Rust for eco_response_shard
+    roleband         TEXT NOT NULL,   -- SPINE, RESEARCH, ENGINE, MATERIAL, GOV, APP
+    visibility       TEXT NOT NULL,   -- Public, Private
+    languageprimary  TEXT NOT NULL,   -- Rust for eco_response_shard
     description      TEXT,
-    ecosafetybinding TEXT NOT NULL,           -- frozen ecosafety grammar, e.g. cyboquatic-ecosafety-core2026v1
-    shardprotocol    TEXT NOT NULL,           -- e.g. EcoNetSchemaShard2026v1
-    lanedefault      TEXT NOT NULL,           -- RESEARCH, EXPPROD, PROD
-    kertargetk       REAL NOT NULL,
-    kertargete       REAL NOT NULL,
-    kertargetr       REAL NOT NULL,
+    ecosafetybinding TEXT NOT NULL,   -- frozen ecosafety grammar, e.g. cyboquatic-ecosafety-core2026v1
+    shardprotocol    TEXT NOT NULL,   -- e.g. EcoNetSchemaShard2026v1
+    lanedefault      TEXT NOT NULL,   -- RESEARCH, EXPPROD, PROD
+
+    -- Repo-level KER targets in 0..1 with research-safe minima/maxima.
+    kertargetk       REAL NOT NULL CHECK (
+                         kertargetk BETWEEN 0.0 AND 1.0
+                         AND kertargetk >= 0.90
+                     ),
+    kertargete       REAL NOT NULL CHECK (
+                         kertargete BETWEEN 0.0 AND 1.0
+                         AND kertargete >= 0.85
+                     ),
+    kertargetr       REAL NOT NULL CHECK (
+                         kertargetr BETWEEN 0.0 AND 1.0
+                         AND kertargetr <= 0.20
+                     ),
+
     nonactuatingonly INTEGER NOT NULL CHECK (nonactuatingonly IN (0,1)),
-    didowner         TEXT NOT NULL,           -- Bostrom DID of repo owner
-    evidencehex      TEXT                     -- hex-stamp of this manifest row
+    didowner         TEXT NOT NULL,   -- Bostrom DID of repo owner
+    signingdid       TEXT,            -- DID used to sign this manifest row
+    evidencehex      TEXT,            -- hex-stamp of this manifest row
+    manifestschema_version INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS econetlayer (
     layerid     INTEGER PRIMARY KEY AUTOINCREMENT,
     reponame    TEXT NOT NULL REFERENCES econetrepoindex(reponame) ON DELETE CASCADE,
-    layername   TEXT NOT NULL,               -- e.g. RESPONSE_INDEX, RESEARCH_SHARDS
-    layertier   TEXT NOT NULL,               -- GRAMMARCLIENT, INDEX, RESEARCH, GOV, OTHER
-    languages   TEXT NOT NULL,               -- comma-separated: Rust
+    layername   TEXT NOT NULL,        -- e.g. RESPONSE_INDEX, RESEARCH_EXPORTS
+    layertier   TEXT NOT NULL,        -- GRAMMARCLIENT, INDEX, RESEARCH, GOV, OTHER
+    languages   TEXT NOT NULL,        -- comma-separated: Rust
     description TEXT,
-    contracts   TEXT                         -- invariants: "NonActuatingWorkload; NoCorridorNoBuild"
+    contracts   TEXT                  -- invariants: "NonActuatingWorkload; NoCorridorNoBuild"
 );
 
 CREATE TABLE IF NOT EXISTS econetrolehint (
     hintid   INTEGER PRIMARY KEY AUTOINCREMENT,
     reponame TEXT NOT NULL REFERENCES econetrepoindex(reponame) ON DELETE CASCADE,
-    key      TEXT NOT NULL,                  -- e.g. "shardtypes", "primaryparticles", "pilotdomains"
+    key      TEXT NOT NULL,           -- e.g. "shardtypes", "primaryparticles", "pilotdomains"
     value    TEXT NOT NULL
 );
 
@@ -54,6 +68,7 @@ INSERT OR REPLACE INTO econetrepoindex (
     kertargetr,
     nonactuatingonly,
     didowner,
+    signingdid,
     evidencehex
 ) VALUES (
     'eco_response_shard',
@@ -69,6 +84,7 @@ INSERT OR REPLACE INTO econetrepoindex (
     0.91,
     0.12,
     1,
+    'bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7',
     'bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7',
     '0xRESPONSESPECHEX2026ABCD'
 );
@@ -86,7 +102,7 @@ INSERT INTO econetlayer (
     'ResponseShardIndex',
     'INDEX',
     'Rust',
-    'Backfill and index layer that reads econet-index SQLite, projects shardinstance/knowledgeecoscore into response_shard, and never actuates hardware.',
+    'Backfill and index layer that reads econet-index SQLite (econet-index.sqlite), projects shardinstance/knowledgeecoscore into eco_response_shard, and never actuates hardware.',
     'NonActuatingWorkload; NoFFIActuators; NoCorridorWeakening'
 ),
 (
