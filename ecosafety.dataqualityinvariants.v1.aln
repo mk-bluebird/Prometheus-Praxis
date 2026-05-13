@@ -1,0 +1,60 @@
+TITLE ecosafety.dataqualityinvariants.v1
+VERSION 1.0.0
+CATEGORY ECOSAFETY
+SUMMARY Data-quality monotonicity invariants for K,E,R under rcalib, rsigma.
+
+meta
+  ownerrepo        string  ecosafety-core
+  registryversion  string  2026v1
+  issuedutc        string  2026-05-12T00:00:00Z
+  maintainerdid    string  bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+endmeta
+
+enum Lane2026v1
+  RESEARCH
+  EXPPROD
+  PROD
+endenum
+
+record DataQualityStep2026v1
+  shardid        uint64
+  lane           Lane2026v1
+  -- previous window
+  tprev_utc      datetime
+  k_prev         float64
+  e_prev         float64
+  r_prev         float64
+  rcalib_prev    float64  -- RiskCoord 0..1
+  rsigma_prev    float64  -- RiskCoord 0..1
+  -- next window
+  tnext_utc      datetime
+  k_next         float64
+  e_next         float64
+  r_next         float64
+  rcalib_next    float64
+  rsigma_next    float64
+endrecord
+
+section invariants
+  -- Invariant: uncertainty cannot make K,E look better or R look smaller.
+  invariant DataQualityMonotonicity2026v1(dq: DataQualityStep2026v1)
+    requires dq.lane in [RESEARCH, EXPPROD, PROD]
+
+    let rcalib_worsened =
+      dq.rcalib_next  >= dq.rcalib_prev + 1e-9
+
+    let rsigma_worsened =
+      dq.rsigma_next  >= dq.rsigma_prev + 1e-9
+
+    let uncertainty_worsened =
+      rcalib_worsened or rsigma_worsened
+
+    ensures
+      if uncertainty_worsened then
+        dq.k_next <= dq.k_prev + 1e-12 and
+        dq.e_next <= dq.e_prev + 1e-12 and
+        dq.r_next >= dq.r_prev - 1e-12
+      else
+        true
+  endinvariant
+endsection
