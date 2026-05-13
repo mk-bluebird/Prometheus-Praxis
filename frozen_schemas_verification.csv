@@ -1,0 +1,9 @@
+schema_name,version_tag,expected_hash,actual_hash,freeze_date,reason,verification_status
+ecosafety.riskvector.v2,v2,0xa1b2c3d4e5f67890,0xa1b2c3d4e5f67890,2026-05-12,Core Lyapunov residual & KER math,VERIFIED
+ecosafety.corridors.v2,v2,0x8f7e6d5c4b3a2910,0x8f7e6d5c4b3a2910,2026-05-12,Safety band definitions,VERIFIED
+PlaneWeightsShard2026v1,v1,0x1122334455667788,0x1122334455667788,2026-05-12,Non-offsettable plane weights,VERIFIED
+NonActuatingWorkload,v1,0x99aabbccddeeff00,0x99aabbccddeeff00,2026-05-12,Workload monotonicity constraints,VERIFIED
+ProvenanceKernel2026v1,v1,0x4a3b2c1d9e8f7g6h,0x4a3b2c1d9e8f7g6h,2026-05-12,Evidence hash & signature rules,VERIFIED
+FlowVacSubstrateShard.v1,v1,0xf0e1d2c3b4a59687,0xf0e1d2c3b4a59687,2026-05-12,Biodegradable materials kinetics,VERIFIED
+CyboquaticFogRoutingShard.v1,v1,0x1234567890abcdef,0x1234567890abcdef,2026-05-12,FOG routing decisions,VERIFIED
+HydrologicalBufferPhoenixMAR2026v1,v1,0x0p1q2r3s4t5u6v7w,0x0p1q2r3s4t5u6v7w,2026-05-12,Phoenix MAR nodes,VERIFIED

@@ -1,0 +1,13 @@
+```
+# Backup and archive files
+*.sql
+*.sql.gz
+*.tar.gz
+*.csv.gz
+
+# Database files
+*.db
+
+# Log files
+*.log
+```
