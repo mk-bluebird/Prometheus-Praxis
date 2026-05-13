@@ -1,0 +1,45 @@
+# filename: qpudatashards/ResponseShardCalibSigmaInvariants2026v1.aln
+
+TITLE ResponseShardCalibSigmaInvariants2026v1
+ALNSPECHASHHEX 0xd1a0c5b87f2293e4
+SCHEMANAME responshard.calib.sigma.invariants.2026v1
+CATEGORY ECOSAFETY
+DESCRIPTION CI invariants for rcalib (ingest quality) and rsigma (sensor/data uncertainty) applied to response-indexed shards.
+
+PARTICLE ResponseShardCalibSigmaInvariants2026v1
+  ROLE        DECISION
+  VERSIONTAG  v1
+  LYAPCHANNEL governance
+
+  FIELD response_id    INT      META     DESCRIPTION "FK into ResponseShardEcoMetrics2026v1.response_id."
+  FIELD shard_id       INT      META     DESCRIPTION "FK into econet-index.shardinstance.shardid."
+  FIELD rcalib         F64      RISKCOORD DESCRIPTION "Normalized ingest quality risk in 0..1."
+  FIELD rsigma         F64      RISKCOORD DESCRIPTION "Normalized sensor/data uncertainty risk in 0..1."
+  FIELD vt_before      F64      METRIC   DESCRIPTION "Residual V_t before adding rcalib, rsigma terms."
+  FIELD vt_after       F64      METRIC   DESCRIPTION "Residual V_t after adding w_calib rcalib^2 and w_sigma rsigma^2."
+  FIELD k_score        F64      METRIC   DESCRIPTION "K after applying rcalib / rsigma penalties."
+  FIELD e_score        F64      METRIC   DESCRIPTION "E after applying rcalib / rsigma penalties."
+  FIELD r_score        F64      METRIC   DESCRIPTION "R after applying rcalib / rsigma penalties."
+  FIELD deploy_decision STRING  META     DESCRIPTION "Deploy, ResearchOnly, BlockedByCalib, BlockedByRisk, BlockedByKER."
+  FIELD lane           STRING   META     DESCRIPTION "Lane of originating shard."
+  FIELD evidence_hex   STRING   META     DESCRIPTION "Hex-encoded evidence for this invariant evaluation."
+  FIELD signing_hex    STRING   META     DESCRIPTION "Signature of invariant evaluation under Bostrom DID."
+ENDPARTICLE
+
+CORRIDORVAR rcalib
+  LYAPCHANNEL governance
+  SAFE   0.00
+  GOLD   0.15
+  HARD   0.40
+  WEIGHT 0.75
+  MANDATORY TRUE
+ENDCORRIDORVAR
+
+CORRIDORVAR rsigma
+  LYAPCHANNEL dataquality
+  SAFE   0.00
+  GOLD   0.20
+  HARD   0.50
+  WEIGHT 0.50
+  MANDATORY TRUE
+ENDCORRIDORVAR
