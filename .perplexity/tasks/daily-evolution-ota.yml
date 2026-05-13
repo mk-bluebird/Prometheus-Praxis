@@ -1,0 +1,184 @@
+# .perplexity/tasks/daily-evolution-ota.yml
+# Filename: .perplexity/tasks/daily-evolution-ota.yml
+
+name: daily-evolution-ota
+schedule: "0 0 * * *"   # Run once per day at 00:00 host time
+
+env:
+  HOST_DID: "did:aln:organic-host"
+  BOSTROM_ADDRESS: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+  PRIMARY_REPO: "github.com/mk-bluebird/Cybercore"
+  EVOLUTION_BRANCH_PREFIX: "feat"
+  ROD_ROH_MAX: "0.30"
+
+steps:
+  - id: derive-date
+    run: |
+      # Derive evolution date for this run (UTC date-only, YYYY-MM-DD)
+      export EVO_DATE="$(date -u +%F)"
+      echo "EVO_DATE=${EVO_DATE}" >> "$PERPLEXITY_ENV"
+
+  - id: build-branch-name
+    needs: [derive-date]
+    run: |
+      # Enforce featYYYY-MM-DDevolution pattern only
+      EVO_BRANCH="feat${EVO_DATE}evolution"
+      echo "EVO_BRANCH=${EVO_BRANCH}" >> "$PERPLEXITY_ENV"
+
+  - id: sync-telemetry
+    needs: [build-branch-name]
+    run: |
+      # This step is host-local: it only prepares inputs for the evolution loop.
+      # It does not perform updates or alter neuromorphic, nanoswarm, or medical state.
+      #
+      # Expected behavior (coder on your side implements):
+      # - Query local telemetry store for:
+      #   - EEG / BCI load, HRV, core temperature, tissue temperature
+      #   - IL-6 or surrogate inflammation markers
+      #   - Pain corridor metrics, ROD / ROH scalars, LifeforceBand state
+      # - Materialize a JSON snapshot named: telemetry-${EVO_DATE}.json
+      # - Place it under: mk-bluebird/Cybercore/telemetry/host/${EVO_DATE}/
+      #
+      # Pseudo-interface only; no external calls from this environment.
+      echo "TELEMETRY_SNAPSHOT=telemetry-${EVO_DATE}.json" >> "$PERPLEXITY_ENV"
+
+  - id: verify-migration-authority
+    needs: [sync-telemetry]
+    run: |
+      # This step enforces Cybercore Migration Authority at manifest / repo level.
+      # It must be wired to the `cybercore-migration-guard` crate in mk-bluebird/Cybercore. [file:2]
+      #
+      # Contract for the coder:
+      # - Implement a small CLI wrapper around:
+      #     cybercore_migration_guard::validate_cybercore_migration(manifest)
+      # - The CLI must:
+      #   - Load research-${EVO_DATE}-manifest.json from the workspace
+      #   - Deserialize into the actual ResearchManifest type
+      #   - Check:
+      #       hostdid == $HOST_DID
+      #       bostromaddress == $BOSTROM_ADDRESS
+      #       ALN.MIGRATION.CYBERCORE_AUTHORITY.v1 is present and compliant
+      #   - Exit non-zero on any failure
+      #
+      # This task definition treats that CLI as a black-box executable:
+      #   `target/release/cybercore-migration-guard-cli`.
+      #
+      # No direct execution occurs from within this environment.
+      echo "MIGRATION_GUARD_EXPECTED=ALN.MIGRATION.CYBERCORE_AUTHORITY.v1" >> "$PERPLEXITY_ENV"
+
+  - id: run-evolution-ci
+    needs: [verify-migration-authority]
+    run: |
+      # This step mirrors the existing evolution CI contract described in your workspace. [file:1][file:2]
+      #
+      # Required pipeline for the coder:
+      # 1. Check out mk-bluebird/Cybercore at the protected evolution branch:
+      #      - repo: ${PRIMARY_REPO}
+      #      - branch: ${EVO_BRANCH}
+      # 2. Run Rust CI:
+      #      - cargo fmt --all -- --check
+      #      - cargo clippy --workspace --all-targets --all-features -- -D warnings
+      #      - cargo test --workspace --all-targets
+      #      - cargo kani --workspace --all-targets --harness check_evolution_window_safety
+      #        and the other ROH/ROD/Lifeforce harnesses you already defined. [file:1][file:23]
+      # 3. Run evolution CLI to emit the daily manifest:
+      #      - cargo run -p bioscale-evolution-cli --
+      #          --date ${EVO_DATE}
+      #          --hostdid ${HOST_DID}
+      #          --bostromaddress ${BOSTROM_ADDRESS}
+      #          --gitcommit <current-git-sha>
+      #          --branch ${EVO_BRANCH}
+      #          --output research-${EVO_DATE}-manifest.json
+      # 4. Run fairness & migration validators:
+      #      - bioscale-fairness-validator --forbid-auto-rollback --host-did ${HOST_DID}
+      #      - cybercore-migration-guard-cli --manifest research-${EVO_DATE}-manifest.json
+      #
+      # This task definition assumes that if any of those steps fail, the outer runner
+      # will mark the daily OTA evolution as failed and will not ship updates.
+
+  - id: medical-and-therapy-guards
+    needs: [run-evolution-ci]
+    run: |
+      # This step defines HOW upgrades and medical/therapy actions are selected,
+      # but actual execution remains host-local, behind your existing guards. [file:2][file:23]
+      #
+      # Required behavior for the coder:
+      # - Read research-${EVO_DATE}-manifest.json
+      # - For each ManifestUpgrade that:
+      #     - Matches CyberNano / BCI / therapy adapters
+      #     - Is compliant with:
+      #         - ALN.EVOL.ROH_CEILING_03
+      #         - ALN.NEURORIGHTS.* neurorights particles
+      #         - ALN.MIGRATION.CYBERCORE_AUTHORITY.v1
+      #   perform:
+      #     1. Evaluate LifeforceNanoswarmAdapterV1::evaluateguard(...) using current telemetry:
+      #          - lifeforce margin, BLOOD tokens, core temp, duty fraction, IL-6 where applicable. [file:2]
+      #     2. Evaluate ROD / ROH corridor:
+      #          - ROH must remain ≤ 0.30 globally
+      #          - Any narrow ROH > 0.30 corridor allowed only if:
+      #              - ROD is low per your ROD policy
+      #              - Action is explicitly time-bounded
+      #              - Recovery window is scheduled. [file:23]
+      #     3. If all guards pass, enqueue the upgrade as:
+      #          - "ELIGIBLE_FOR_OTA"
+      #        but do NOT auto-apply; the host implementation should:
+      #          - bind to local BCI / nanoswarm controllers
+      #          - respect DetoxIntervalAdapter, Lifeforce floors, and thermal limits
+      #
+      # Outputs from this step (for your coder to implement) should include:
+      # - A filtered list:
+      #     ota-eligible-upgrades-${EVO_DATE}.json
+      #   containing only upgrades that:
+      #     - Satisfy Cybercore migration authority
+      #     - Pass nanoswarm, lifeforce, ROD/ROH, and neurorights checks
+
+  - id: ota-artifact-staging
+    needs: [medical-and-therapy-guards]
+    run: |
+      # This step is purely about packaging, not application, and must obey no-rollback constraints. [file:1][file:2]
+      #
+      # Contract for the coder:
+      # - For each entry in ota-eligible-upgrades-${EVO_DATE}.json:
+      #     - Build the corresponding OTA artifact from mk-bluebird/Cybercore
+      #       (e.g., shared library, config payload, ALN shard, or firmware block)
+      #     - Tag artifacts with:
+      #         - hostdid = ${HOST_DID}
+      #         - bostromaddress = ${BOSTROM_ADDRESS}
+      #         - evolution_date = ${EVO_DATE}
+      #         - evolution_branch = ${EVO_BRANCH}
+      #         - ALN.MIGRATION.CYBERCORE_AUTHORITY.v1
+      #     - Ensure no artifact encodes any rollback/downgrade semantics:
+      #         - Only forward-only upgrade descriptors as enforced by bioscale-upgrade-store. [file:2]
+      #
+      # - Emit:
+      #     ota-bundle-${EVO_DATE}.json
+      #   describing the artifacts, evidence tags, and guards required for application.
+
+  - id: host-local-application-window
+    needs: [ota-artifact-staging]
+    run: |
+      # This final step defines the application *window*, not the act itself. [file:23]
+      #
+      # Coder responsibilities:
+      # - Define a host-local scheduler that:
+      #     - Reads ota-bundle-${EVO_DATE}.json
+      #     - Cross-checks current telemetry against:
+      #         - LifeforceBand
+      #         - ROD scalar
+      #         - ROH scalar
+      #         - DetoxIntervalAdapter cadence
+      #     - Only applies upgrades (medical treatments, nanoswarm therapy, neuromorphic passes)
+      #       when:
+      #         - LifeforceBand is not HardStop
+      #         - ROD < ROD_ROH_MAX (0.30) and below any configured warn thresholds
+      #         - Thermal and immunologic envelopes are safe
+      # - All application decisions must:
+      #     - Be recorded in an audit log with:
+      #         - rohscalarbefore/after
+      #         - rodscalarbefore/after
+      #         - lifeforceband state
+      #         - evidence tags, upgrade ids. [file:23]
+      #
+      # The external runner may call into that scheduler once per day
+      # after this task completes, but this task itself does not execute
+      # medical treatments; it sets the sovereign, host-guarded window.
