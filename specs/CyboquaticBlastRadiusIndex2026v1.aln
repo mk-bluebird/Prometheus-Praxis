@@ -1,0 +1,60 @@
+# File: specs/CyboquaticBlastRadiusIndex2026v1.aln
+# Target repo: github.com/Doctor0Evil/eco_restoration_shard
+# Purpose: ALN schema slice describing how Rust ecosafety-core + SQLite index interact in the constellation.
+
+particle NodeShard {
+    node_id        : string;   # Cyboquatic node identifier
+    repo_hint      : string;   # Target repo or crate family
+    region         : string;   # e.g., Phoenix-CentralAZ
+    node_type      : string;   # MAR_VAULT, FOG_NODE, SOFTBOT, AIR_GLOBE, etc.
+    lane           : enum { RESEARCH, PILOT, PRODUCTION };
+    bostrom_did    : string;   # e.g., bostrom18sd2u...
+    geo_lat        : float?;
+    geo_lon        : float?;
+}
+
+particle RiskPlaneState {
+    plane_id       : int;      # maps to risk_planes.id in SQLite
+    name           : string;   # energy, hydraulics, biology, carbon, materials, biodiversity, uncertainty
+    coord          : float;    # [0,1] bounded risk coordinate
+}
+
+particle BlastRadiusSnapshot {
+    node_id        : string;
+    ts_utc         : int;
+    vt             : float;    # Lyapunov residual
+    blast_radius   : enum { local_low, local_moderate, basin, constellation };
+    lane           : enum { RESEARCH, PILOT, PRODUCTION };
+    eco_score      : float;    # [0,1] summary eco-impact (E from KER or derived)
+    energy_cost    : float;    # [0,1] normalized energy cost (lower is better)
+}
+
+contract EcoSafetyCoreBind {
+    input  NodeShard;
+    input  RiskPlaneState[];
+    output BlastRadiusSnapshot;
+
+    require NodeShard.lane in { RESEARCH, PILOT, PRODUCTION };
+
+    # Eco-safety invariants wired directly to Rust ecosafety-core + SQLite:
+    invariant all p in RiskPlaneState: 0.0 <= p.coord <= 1.0;
+    invariant BlastRadiusSnapshot.vt >= 0.0;
+
+    # Production lanes must satisfy KER gate.
+    invariant NodeShard.lane == PRODUCTION
+        -> BlastRadiusSnapshot.eco_score >= 0.90
+        && BlastRadiusSnapshot.energy_cost <= 0.50
+        && BlastRadiusSnapshot.blast_radius in { local_low, local_moderate };
+
+    # Research lanes are allowed higher residual risk but must be logged.
+    invariant NodeShard.lane == RESEARCH
+        -> BlastRadiusSnapshot.blast_radius in { local_low, local_moderate, basin, constellation };
+
+    # Derive blast-radius class from max coord and vt bands; logic mirrors Rust evaluate_safestep.
+    define max_coord = max(p.coord for p in RiskPlaneState);
+
+    invariant max_coord <= 0.6 -> BlastRadiusSnapshot.blast_radius == local_low;
+    invariant 0.6 < max_coord && max_coord <= 0.85 -> BlastRadiusSnapshot.blast_radius == local_moderate;
+    invariant max_coord > 0.85 && BlastRadiusSnapshot.vt <= 1.0 -> BlastRadiusSnapshot.blast_radius == basin;
+    invariant max_coord > 0.85 && BlastRadiusSnapshot.vt > 1.0 -> BlastRadiusSnapshot.blast_radius == constellation;
+}
