@@ -1,0 +1,60 @@
+# kerdeployable / econetrepomanifest-lint placement and integration
+
+1. Source of truth
+   - Both `kerdeployable` and `econetrepomanifest-lint` are built from a central,
+     dedicated repository (e.g., `ecosystem-tools`) that is versioned and released
+     independently of `eco_restoration_shard`.
+   - `eco_restoration_shard` does NOT vendor these tools as sub-crates and does
+     NOT include their sources under this repo.
+
+2. Installation layout (outside this repo)
+   - On CI agents and trusted developer machines, the ecosystem tools are installed
+     into a standard location on PATH, for example:
+       - `/opt/ecosystem-tools/bin/kerdeployable`
+       - `/opt/ecosystem-tools/bin/econetrepomanifest-lint`
+   - The GitHub Actions runners for `mk-bluebird` images should preinstall these
+     binaries, or the workflows should fetch specific released versions by hash.
+
+3. Integration from eco_response_shard
+   - Under `eco_restoration_shard/tools/scripts/`, provide only thin wrappers:
+       - `run_kerdeployable.sh`
+           - Validates required env (e.g., DB path, config path).
+           - Invokes `/opt/ecosystem-tools/bin/kerdeployable` with `--config config/kerdeployable.config.toml`.
+           - Exits with the underlying tool’s status code.
+       - `run_econetrepomanifest_lint.sh`
+           - Invokes `/opt/ecosystem-tools/bin/econetrepomanifest-lint` with
+             `--manifest .econet/manifest/EcoRepoIndex2026v1.aln`
+             and `--config config/econetrepomanifest-lint.toml`.
+
+4. CI wiring
+   - `.github/workflows/ci-kerdeployable-replay.yml`:
+       - Uses a fixed ecosystem-tools version (pinned by release tag or hash).
+       - Runs `tools/scripts/run_kerdeployable.sh` against read-only SQLite snapshots.
+   - `.github/workflows/ci-econetrepomanifest-lint.yml`:
+       - Runs `tools/scripts/run_econetrepomanifest_lint.sh`.
+   - These jobs never build kerdeployable or the manifest-linter from this repo,
+     which keeps the eco_response_shard workspace strictly non-actuating and
+     minimizes transitive dependencies.
+
+5. Justification
+   - Centralizing `kerdeployable` and `econetrepomanifest-lint` in a dedicated
+     `ecosystem-tools` repo:
+       - Simplifies versioning: all ecosafety repos consume the same vetted tool
+         binaries, upgraded via explicit release steps.
+       - Keeps `eco_restoration_shard` small, reproducible, and focused on data
+         schemas and non-actuating queries.
+       - Avoids accidental introduction of actuator-facing crates into this
+         workspace through transitive dependencies.
+
+6. KER assessment for this layout
+   - Knowledge-factor K ≈ 0.95:
+       - Directory and tooling structure matches the econet-index / ecosafety
+         blueprint (separate discovery, manifests, qpudatashards, SQL).
+   - Eco-impact E ≈ 0.91:
+       - Clear separation of non-actuating research artifacts from central
+         actuation-adjacent verification tools reduces accidental coupling and
+         makes CI easier to reason about.
+   - Risk-of-harm R ≈ 0.12:
+       - No kerdeployable or manifest-lint sources live here; only prebuilt
+         binaries with pinned versions are invoked via wrappers, reducing the
+         attack surface and the chance of in-repo changes altering safety behavior.
