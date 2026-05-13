@@ -1,0 +1,8 @@
+"Condition","Decision","Notes"
+"rcalib > RCALIB_HARD_MAX","BlockedByCalib","Ingest quality too poor for any deployment.6837704e-9e0e-4e23-952d-49d2b31c49c7.md"
+"rsigma > RSIGMA_HARD_MAX","BlockedByRisk","Sensor/model uncertainty too high.6837704e-9e0e-4e23-952d-49d2b31c49c7.md"
+"lane IN (EXPPROD, PROD) and Dcombined < lane_min_Dcombined(lane)","BlockedByCalib","Data trust too low for this lane.eco.txt"
+"lane = PROD and (K < 0.90 or E < 0.90 or R > 0.13)","BlockedByKER","Classic KER gate.eco.txt"
+"lane = EXPPROD and (K < 0.85 or E < 0.85 or R > 0.18)","BlockedByKER","Looser experimental gate.eco.txt"
+"lane = RESEARCH and (rcalib or rsigma in GOLD/HARD)","ResearchOnly","Allowed but cannot drive KPIs/deployment.6837704e-9e0e-4e23-952d-49d2b31c49c7.md+1"
+"lane IN (EXPPROD, PROD) and all above pass","Deploy","Eligible for deployment/use.6837704e-9e0e-4e23-952d-49d2b31c49c7.md+1"
