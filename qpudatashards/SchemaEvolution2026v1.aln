@@ -1,0 +1,52 @@
+TITLE SchemaEvolution2026v1
+VERSION 1.0.0
+CATEGORY GOVERNANCE
+SUMMARY Schema evolution proof shard ensuring no KER regression under spec upgrades.
+
+meta
+  ownerrepo        string  eco_restoration_shard
+  registryversion  string  2026v1
+  issuedutc        string  2026-05-12T21:13:00Z
+  maintainerdid    string  bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+endmeta
+
+enum SchemaProofType2026v1
+  REPLAY_OVER_MATCHING_KEYS
+  REPLAY_OVER_ALL_SHARDS
+  WINDOWED_REPLAY_WITH_LANES
+  ANALYTIC_BOUNDS_ONLY
+endenum
+
+record SchemaEvolution2026v1
+  -- Hex-stamped ALN spec hashes for old and new schemas.
+  old_spec_hash        string   -- e.g., 0xe0c0a1f27b9384d5
+  new_spec_hash        string
+
+  -- Frozen replay dataset used for KER comparison.
+  replay_dataset_hash  string   -- hash of CSVALN/SQLite snapshot
+
+  -- Aggregate KER before upgrade (over the replay dataset).
+  K_before             float64  -- Knowledge-factor in [0,1]
+  E_before             float64  -- Eco-impact in [0,1]
+  R_before             float64  -- Risk-of-harm in [0,1]
+
+  -- Aggregate KER after upgrade (same replay dataset under new schema).
+  K_after              float64  -- Knowledge-factor in [0,1]
+  E_after              float64  -- Eco-impact in [0,1]
+  R_after              float64  -- Risk-of-harm in [0,1]
+
+  -- Proof type and evidence payload.
+  proof_type           SchemaProofType2026v1
+  evidence_hex         string   -- hex-encoded proof transcript / replay log hash
+
+  -- Optional metadata for auditability.
+  lane_scope           string?  -- e.g., RESEARCH, EXPPROD, PROD, or ALL
+  kernel_version       string?  -- residual / kerdeployable kernel id
+  comment              string?
+  issued_by_did        string   -- Bostrom DID for the evolution decision
+  issued_utc           datetime
+endrecord
+
+section schema_evolution
+  SchemaEvolution2026v1
+endsection
