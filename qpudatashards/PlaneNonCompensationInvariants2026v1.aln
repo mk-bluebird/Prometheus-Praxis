@@ -1,0 +1,48 @@
+TITLE PlaneNonCompensationInvariants2026v1
+ALNSPECHASHHEX 0x????????????????        # fill via hex-stamping
+SCHEMANAME ecosafety.plane.noncomp.invariants.2026v1
+CATEGORY ECOSAFETY
+DESCRIPTION Non-compensation invariants for non-offsettable planes (carbon, biodiversity) under KER.
+
+PARTICLE PlaneNonCompensationInvariants2026v1
+  ROLE       INVARIANT
+  VERSIONTAG v1
+  LYAPCHANNEL governance
+
+  FIELD invariant_id STRING META
+    DESCRIPTION Invariant identifier.
+
+  FIELD plane_id      STRING META
+    DESCRIPTION Plane identifier, e.g., carbon, biodiversity.
+
+  FIELD nonoffsettable BOOL META
+    DESCRIPTION TRUE if this plane is treated as non-offsettable.
+
+  FIELD r_soft        F64   RISKCOORD
+    DESCRIPTION Soft threshold for this plane above which non-compensation is enforced.
+
+  FIELD apply_lanes   STRING META
+    DESCRIPTION Comma-separated lanes where this invariant applies, e.g., "EXPPROD,PROD".
+
+  FIELD require_K_non_increase BOOL META
+    DESCRIPTION If TRUE, K_next must be <= K_prev when triggered.
+
+  FIELD require_E_non_increase BOOL META
+    DESCRIPTION If TRUE, E_next must be <= E_prev when triggered.
+
+  FIELD require_R_non_decrease BOOL META
+    DESCRIPTION If TRUE, R_next must be >= R_prev when triggered.
+
+  FIELD ownerdid     STRING META
+    DESCRIPTION Bostrom DID owning this invariant spec.
+
+  FIELD evidencehex  STRING META
+    DESCRIPTION Hex-encoded evidence chain for this invariant definition.
+
+  FIELD signinghex   STRING META
+    DESCRIPTION Hex-encoded signature bound to ownerdid.
+
+  FIELD issued_utc   DATETIME META
+    DESCRIPTION Timestamp when this invariant was issued.
+
+ENDPARTICLE
