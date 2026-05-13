@@ -1,0 +1,80 @@
+TITLE PlaneWeightsShard2026v1
+ALNSPECHASHHEX 0x????????????????  -- to be set by ProvenanceKernel
+SCHEMANAME ecosafety.planeweights.2026v1
+CATEGORY ECOSAFETY
+DESCRIPTION Per-plane weights and non-compensation flags for eco-restoration KER and Vt.
+
+PARTICLE PlaneWeightsShard2026v1
+  ROLE       QPUDATASHARD
+  VERSIONTAG v1
+  LYAPCHANNEL governance
+
+  FIELD region          STRING  META
+    DESCRIPTION Region label e.g., Phoenix-AZ.
+
+  FIELD node_family     STRING  META
+    DESCRIPTION Node family identifier e.g., CyboChannel, MARVault, TrayLine.
+
+  FIELD lane_scope      STRING  META
+    DESCRIPTION Lanes this weight set applies to e.g., RESEARCH, EXPPROD, PROD, or ALL.
+
+  -- Plane weights in the Lyapunov residual Vt
+  FIELD w_carbon        F64     METRIC
+    DESCRIPTION Weight for r_carbon in residual Vt.
+
+  FIELD w_materials     F64     METRIC
+    DESCRIPTION Weight for r_materials in residual Vt.
+
+  FIELD w_biodiv        F64     METRIC
+    DESCRIPTION Weight for r_biodiversity in residual Vt.
+
+  FIELD w_hydro         F64     METRIC
+    DESCRIPTION Weight for r_hydro (hydrology/flow) in residual Vt.
+
+  FIELD w_data          F64     METRIC
+    DESCRIPTION Weight for data-quality risk planes in residual Vt.
+
+  -- Non-offsettable flags
+  FIELD carbon_nonoffsettable     BOOL  META
+    DESCRIPTION If TRUE, r_carbon cannot be compensated by improvements in other planes.
+
+  FIELD biodiversity_nonoffsettable BOOL META
+    DESCRIPTION If TRUE, r_biodiv cannot be compensated by improvements in other planes.
+
+  -- Uncertainty caps for PROD lanes
+  FIELD r_carbon_unc_max_prod     F64   RISKCOORD
+    DESCRIPTION Max allowed uncertainty in r_carbon for PROD lane.
+
+  FIELD r_biodiv_unc_max_prod     F64   RISKCOORD
+    DESCRIPTION Max allowed uncertainty in r_biodiv for PROD lane.
+
+  FIELD r_materials_unc_max_prod  F64   RISKCOORD
+    DESCRIPTION Max allowed uncertainty in r_materials for PROD lane.
+
+  FIELD r_hydro_unc_max_prod      F64   RISKCOORD
+    DESCRIPTION Max allowed uncertainty in r_hydro for PROD lane.
+
+  FIELD r_data_unc_max_prod       F64   RISKCOORD
+    DESCRIPTION Max allowed uncertainty in data-quality planes for PROD lane.
+
+  -- Optional soft thresholds (activate non-compensation)
+  FIELD r_carbon_soft             F64   RISKCOORD
+    DESCRIPTION Soft threshold for non-compensation activation for r_carbon.
+
+  FIELD r_biodiv_soft             F64   RISKCOORD
+    DESCRIPTION Soft threshold for non-compensation activation for r_biodiv.
+
+  -- Provenance
+  FIELD ownerdid       STRING  META
+    DESCRIPTION Bostrom DID owning this weight configuration.
+
+  FIELD evidencehex    STRING  META
+    DESCRIPTION Hex-encoded evidence for this weights shard (e.g., calibration study).
+
+  FIELD signinghex     STRING  META
+    DESCRIPTION Hex-encoded signature bound to ownerdid.
+
+  FIELD issued_utc     DATETIME META
+    DESCRIPTION Timestamp when this plane weights shard was issued.
+
+ENDPARTICLE
