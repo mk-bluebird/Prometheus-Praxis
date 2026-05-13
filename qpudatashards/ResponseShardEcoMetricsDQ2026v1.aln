@@ -1,0 +1,98 @@
+TITLE ResponseShardEcoMetricsDQ2026v1
+ALNSPECHASHHEX 0x????????????????  -- to be set by ProvenanceKernel
+SCHEMANAME responseshard.eco.metrics.dq.2026v1
+CATEGORY ECOSAFETY
+DESCRIPTION Response shard with explicit data-quality planes and adjusted K/E.
+
+PARTICLE ResponseShardEcoMetricsDQ2026v1
+  ROLE       QPUDATASHARD
+  VERSIONTAG v1
+  LYAPCHANNEL governance
+
+  FIELD responseid      INT     META
+    DESCRIPTION Row id in responseshard.
+
+  FIELD shardid         INT     META
+    DESCRIPTION Foreign key into shardinstance.shardid.
+
+  FIELD topictag        STRING  META
+    DESCRIPTION Topic string lane|medium|region for ecoresponseshard.
+
+  FIELD userdid         STRING  META
+    DESCRIPTION Bostrom DID anchoring authorship.
+
+  FIELD nodeid          STRING  META
+    DESCRIPTION Node identifier if present.
+
+  FIELD assettype       STRING  META
+    DESCRIPTION Asset type e.g., MARVault, TrayLine, CyboNode.
+
+  FIELD medium          STRING  META
+    DESCRIPTION Physical medium water, air, soil, bio.
+
+  FIELD region          STRING  META
+    DESCRIPTION Region label e.g., Phoenix-AZ.
+
+  FIELD lane            STRING  META
+    DESCRIPTION Lane label RESEARCH, EXPPROD, PROD.
+
+  -- Raw KER from shardinstance
+  FIELD k_raw           F64     METRIC
+    DESCRIPTION Windowed K from shardinstance.
+
+  FIELD e_raw           F64     METRIC
+    DESCRIPTION Windowed E from shardinstance.
+
+  FIELD r_raw           F64     METRIC
+    DESCRIPTION Windowed R from shardinstance.
+
+  FIELD vtmax           F64     METRIC
+    DESCRIPTION Max Lyapunov residual Vt over shard window.
+
+  -- Meta-KER factors (kept separate to avoid double counting)
+  FIELD kfactor         F64     METRIC
+    DESCRIPTION Meta-knowledge factor from knowledgeecoscore (no ingest penalties).
+
+  FIELD efactor         F64     METRIC
+    DESCRIPTION Meta-eco-impact factor from knowledgeecoscore (no ingest penalties).
+
+  FIELD rfactor         F64     METRIC
+    DESCRIPTION Meta-risk-of-harm factor from knowledgeecoscore.
+
+  -- Data quality planes
+  FIELD ingestwindowid  INT     META
+    DESCRIPTION Foreign key to IngestRcalibPhoenix2026v1.
+
+  FIELD rcalib          F64     RISKCOORD
+    DESCRIPTION Data-quality calibration risk in [0,1].
+
+  FIELD rsigma          F64     RISKCOORD
+    DESCRIPTION Aggregate uncertainty risk in [0,1].
+
+  FIELD D_sensor        F64     METRIC
+    DESCRIPTION Sensor trust metric in [0,1].
+
+  FIELD D_data          F64     METRIC
+    DESCRIPTION Data trust metric 1 - rcalib.
+
+  FIELD D_combined      F64     METRIC
+    DESCRIPTION Combined trust D_sensor * D_data in [0,1].
+
+  -- Adjusted K/E after data-quality penalties
+  FIELD k_adj           F64     METRIC
+    DESCRIPTION K after applying DataQualityPenaltyKernel2026v1.
+
+  FIELD e_adj           F64     METRIC
+    DESCRIPTION E after applying DataQualityPenaltyKernel2026v1.
+
+  -- Residual and provenance
+  FIELD residualscore   F64     RISKCOORD
+    DESCRIPTION Scalar residual Vt in 0..1.
+
+  FIELD evidencehex     STRING  META
+    DESCRIPTION Hex-encoded evidence chain for this response row.
+
+  FIELD signinghex      STRING  META
+    DESCRIPTION Hex-encoded signature bound to userdid.
+
+ENDPARTICLE
