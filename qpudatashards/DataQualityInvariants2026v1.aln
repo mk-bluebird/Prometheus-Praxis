@@ -1,0 +1,42 @@
+TITLE DataQualityInvariants2026v1
+ALNSPECHASHHEX 0x????????????????        # fill via hex-stamping
+SCHEMANAME ecosafety.dataquality.invariants.2026v1
+CATEGORY ECOSAFETY
+DESCRIPTION Uncertainty monotonicity invariants for rcalib and rsigma under KER.
+
+PARTICLE DataQualityInvariants2026v1
+  ROLE       INVARIANT
+  VERSIONTAG v1
+  LYAPCHANNEL dataquality
+
+  FIELD invariant_id STRING META
+    DESCRIPTION Invariant identifier.
+
+  FIELD coord_id     STRING META
+    DESCRIPTION Risk coordinate, e.g., rcalib, rsigma.
+
+  FIELD apply_lanes  STRING META
+    DESCRIPTION Comma-separated lanes where this invariant applies, e.g., "RESEARCH,EXPPROD,PROD".
+
+  FIELD require_K_non_increase BOOL META
+    DESCRIPTION If TRUE, K_next must be <= K_prev when coord worsens.
+
+  FIELD require_E_non_increase BOOL META
+    DESCRIPTION If TRUE, E_next must be <= E_prev when coord worsens.
+
+  FIELD require_R_non_decrease BOOL META
+    DESCRIPTION If TRUE, R_next must be >= R_prev when coord worsens.
+
+  FIELD ownerdid     STRING META
+    DESCRIPTION Bostrom DID owning this invariant spec.
+
+  FIELD evidencehex  STRING META
+    DESCRIPTION Hex-encoded evidence chain for this invariant definition.
+
+  FIELD signinghex   STRING META
+    DESCRIPTION Hex-encoded signature bound to ownerdid.
+
+  FIELD issued_utc   DATETIME META
+    DESCRIPTION Timestamp when this invariant was issued.
+
+ENDPARTICLE
