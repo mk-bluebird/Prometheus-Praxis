@@ -1,0 +1,29 @@
+eco_restoration_shard/
+  Cargo.toml
+  db/
+    db_eco_github_migration.sql
+    db_definition_registry2026v1.sql
+    tasks_eco_restoration_shard_next_steps.sql
+  aln/
+    DefinitionRegistry2026v1.aln
+    HydrologicalBufferPhoenix2026v1.aln
+    BiodiversityPlaneDefinition2026v1.aln
+    CarbonPlaneDefinition2026v1.aln
+  src/
+    lib.rs
+    main.rs
+    ecoconstellation_index.rs      # discovery spine access
+    planes/
+      mod.rs
+      biodiversity.rs              # shard generator kernels for biodiversity
+      carbon.rs                    # shard generator kernels for carbon
+    shards/
+      hydrological_buffer.rs       # generator kernel for HydrologicalBufferPhoenix2026v1
+      definition_registry.rs       # helpers for DefinitionRegistry2026v1
+  qpudatashards/
+    particles/
+      HydrologicalBufferPhoenix2026v1.aln
+      BiodiversityPlaneShardSample2026v1.csv
+      CarbonPlaneShardSample2026v1.csv
+  doc/
+    eco_restoration_shard_tree.txt
