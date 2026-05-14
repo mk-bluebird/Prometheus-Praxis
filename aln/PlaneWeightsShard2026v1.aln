@@ -1,0 +1,29 @@
+# filename alnPlaneWeightsShard2026v1.aln
+# destination aln-platform-ecosystem/alnPlaneWeightsShard2026v1.aln
+
+TITLE PlaneWeightsShard2026v1
+VERSION 1
+CATEGORY ECOSAFETY
+
+SUMMARY
+Plane weights and non-offsettable flags for ecosafety Lyapunov residual.
+
+fields
+  contractid      string   # e.g. PhoenixEcosafetyContinuity2026v1
+  planeid         string   # e.g. energy, hydrologyMAR, biodiversity, carbon
+  weight          f32      # w_j >= 0
+  nonoffsettable  bool     # true means plane cannot be offset by other planes
+  softband        f32      # soft corridor band for r_j
+  hardband        f32      # hard corridor band for r_j
+  uncertaintycap  f32      # max tolerated uncertainty on r_j
+  versiontag      string   # PlaneWeightsShard2026v1
+  proofrefhex     string   # hex link to ecosafety proof bundle
+
+rows
+  contractid=PhoenixEcosafetyContinuity2026v1
+  planeid=energy            weight=0.7  nonoffsettable=false softband=0.10 hardband=0.20 uncertaintycap=0.15 versiontag=PlaneWeightsShard2026v1 proofrefhex=ec01
+  planeid=hydrologyMAR      weight=1.0  nonoffsettable=true  softband=0.10 hardband=0.13 uncertaintycap=0.10 versiontag=PlaneWeightsShard2026v1 proofrefhex=ec01
+  planeid=biodiversity      weight=1.0  nonoffsettable=true  softband=0.10 hardband=0.13 uncertaintycap=0.10 versiontag=PlaneWeightsShard2026v1 proofrefhex=ec01
+  planeid=materials         weight=0.8  nonoffsettable=false softband=0.10 hardband=0.15 uncertaintycap=0.10 versiontag=PlaneWeightsShard2026v1 proofrefhex=ec01
+  planeid=dataquality       weight=0.6  nonoffsettable=false softband=0.05 hardband=0.10 uncertaintycap=0.10 versiontag=PlaneWeightsShard2026v1 proofrefhex=ec01
+  planeid=topology          weight=0.5  nonoffsettable=false softband=0.05 hardband=0.10 uncertaintycap=0.10 versiontag=PlaneWeightsShard2026v1 proofrefhex=ec01
