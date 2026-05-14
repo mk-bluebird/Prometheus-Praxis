@@ -6,17 +6,13 @@ name = "eco_restoration_shard"
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
+description = "Non-actuating RESEARCH-band shard index and research harness for the EcoNet constellation."
 repository = "https://github.com/mk-bluebird/eco_restoration_shard"
-description = "Eco restoration shard index and research harness for the EcoNet constellation."
+publish = false
 
-[lib]
-name = "eco_restoration_shard"
-path = "src/lib.rs"
-crate-type = ["rlib"]
-
-[[bin]]
-name = "eco_restoration_shard_cli"
-path = "src/main.rs"
+[workspace]
+members = [ "." ]
+resolver = "2"
 
 [features]
 default = ["non_actuating"]
@@ -34,3 +30,20 @@ clap = { version = "4.5", features = ["derive"] }
 
 [dev-dependencies]
 tempfile = "3.10"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+# Non-actuating crate: disallow spawning external commands and processes via CI-enforced Clippy config.
+# Additional API-specific restrictions are configured in clippy.toml and CI, not here.
+
+[lib]
+name = "eco_restoration_shard"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[[bin]]
+name = "eco_restoration_shard_cli"
+path = "src/main.rs"
+required-features = ["non_actuating"]
