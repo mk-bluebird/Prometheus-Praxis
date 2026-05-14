@@ -1,0 +1,20 @@
+Field: shardinstance.evidencehex
+
+Definition:
+  evidencehex is a hex-encoded content hash over the canonical shard payload.
+  The payload consists of:
+    1. The ALN header and schema row (particle metadata).
+    2. The CSV body rows sorted by primary index (e.g., time, nodeid).
+    3. Normalized line endings (LF) and UTF-8 encoding.
+
+Hashing algorithm:
+  - Algorithm: SHA-256
+  - Input: canonical byte sequence of the shard payload
+  - Output: 32-byte digest, encoded as 64 lowercase hex characters
+
+Usage:
+  - On emission, the producer computes SHA-256 over the canonicalized payload
+    and stores the resulting hex string in shardinstance.evidencehex.
+  - Consumers and agents re-compute the hash over the local payload and
+    compare it against evidencehex. Any mismatch indicates tampering
+    or non-canonical formatting and must mark the shard as non-deployable.
