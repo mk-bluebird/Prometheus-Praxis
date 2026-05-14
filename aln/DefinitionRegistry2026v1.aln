@@ -1,0 +1,44 @@
+TITLE DefinitionRegistry2026v1
+VERSION 1
+CATEGORY GOVERNANCE
+
+SUMMARY
+Canonical registry particle for ALN definitions mirrored into SQL and Rust.
+
+fields
+  particlename    string   # HydrologicalBufferPhoenix2026v1
+  category        string   # ECOSAFETY, HYDROLOGY, BIODIVERSITY, etc.
+  primaryplane    string   # hydrologyMAR, biodiversity, carbon, energy, etc.
+  role            string   # QPUDATASHARD, SUBSTRATE, CORRIDOR, GOVERNANCE
+  lyapchannel     string   # hydraulics, materials, topology, dataquality, etc.
+  alnfile         string   # repo-relative path to ALN file
+  sqlfile         string   # repo-relative path to SQL mirror (optional)
+  rustmodule      string   # Rust module path implementing mirror (optional)
+  repotarget      string   # eco_restoration_shard, Eco-Fort, etc.
+  shardprotocol   string   # EcoNetSchemaShard2026v1, PlaneWeightsShard2026v1, etc.
+  versiontag      string   # 2026v1, 2026v2, etc.
+  description     string   # short human-readable summary
+  evidencehex     string   # hash over ALN+SQL+Rust bundle
+  signingdid      string   # Bostrom DID of author
+  created_utc     datetime # registration time
+  updated_utc     datetime # last update
+  active          bool     # true if definition is current
+
+rows
+  particlename=HydrologicalBufferPhoenix2026v1
+  category=HYDROLOGY
+  primaryplane=hydrologyMAR
+  role=QPUDATASHARD
+  lyapchannel=hydraulics
+  alnfile=aln/HydrologicalBufferPhoenix2026v1.aln
+  sqlfile=db/db_hydrobuffer_phoenix2026v1.sql
+  rustmodule=eco_restoration_shard::hydrobuffer
+  repotarget=eco_restoration_shard
+  shardprotocol=EcoNetSchemaShard2026v1
+  versiontag=2026v1
+  description=Hydrological buffer corridor definition for Phoenix MAR plane.
+  evidencehex=deadbeef00112233
+  signingdid=bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+  created_utc=2026-05-14T00:00:00Z
+  updated_utc=2026-05-14T00:00:00Z
+  active=true
