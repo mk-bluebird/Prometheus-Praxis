@@ -1,0 +1,26 @@
+# filename clippy_research_ci.toml
+# destination eco_restoration_shard/clippy_research_ci.toml
+
+# 49. CI static analysis strategy (non-actuating)
+
+[lints]
+unsafe_code = "forbid"
+missing_docs = "warn"
+panic = "warn"
+unwrap_used = "warn"
+expect_used = "warn"
+indexing_slicing = "warn"
+
+# CI pipeline steps (documentation, not executed here):
+#   1. Run cargo geiger to detect unsafe usage in crate graph.
+#   2. Run cargo clippy with this config to surface panics and missing docs.
+#   3. Run a custom static scanner that:
+#        - Fails if 'std::process::Command' appears in source.
+#        - Fails if common outbound networking APIs appear
+#          (e.g., 'reqwest::', 'hyper::', 'std::net::TcpStream').
+#
+# Example CI commands:
+#   - cargo geiger --all-features
+#   - cargo clippy --all-features -- -D unsafe-code
+#   - rg 'std::process::Command' src
+#   - rg 'TcpStream' src
