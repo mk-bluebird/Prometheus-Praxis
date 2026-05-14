@@ -1,0 +1,18 @@
+TITLE VirtaSysIdentityInterface2026v1
+VERSION 1
+CATEGORY GOV
+
+SUMMARY
+Non-actuating identity and shard metadata interface for Virta-Sys.
+
+fields
+  requestid         string
+  operation         string   # e.g. ResolveRepo, ResolveIdentity, ListShards
+  githubslug        string   # optional
+  legacy_login      string   # optional
+  current_login     string   # optional
+  bostrom_address   string   # optional
+  shardid           int32    # optional
+  response_json     string   # JSON-encoded summary of resolved entities
+  issued_utc        string
+  proofrefhex       string
