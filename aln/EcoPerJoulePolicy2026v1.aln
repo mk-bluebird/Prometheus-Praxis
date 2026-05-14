@@ -1,0 +1,53 @@
+TITLE EcoPerJoulePolicy2026v1
+VERSION 2026v1
+CATEGORY ECOSAFETY
+ROLE POLICY
+LYAPCHANNEL energy
+
+SCHEMA EcoPerJoulePolicy2026v1 {
+    FIELD policy_id          : string;
+    FIELD energy_source      : string;      # e.g., solar, wind, hydro, grid_mixed
+    FIELD eco_per_joule      : f64;         # kg CO2 offset per joule
+    FIELD restoration_radius_m : f64;       # meters of restoration influence radius
+    FIELD region             : string;      # e.g., Phoenix-AZ
+    FIELD lane               : string;      # RESEARCH, EXPPROD, PROD
+    FIELD kfactor            : f64;         # knowledge factor 0..1
+    FIELD efactor            : f64;         # eco-impact factor 0..1
+    FIELD rfactor            : f64;         # risk-of-harm factor 0..1
+    FIELD evidencehex        : string;      # shard-level hexstamp
+    FIELD signingdid         : string;      # Bostrom DID
+}
+
+PARTICLE EcoPerJoulePolicy2026v1 {
+    ROLE        POLICY;
+    LYAPCHANNEL energy;
+    HASKERFIELDS 1;
+    HASRISKFIELDS 1;
+
+    FIELDORDER policy_id,
+               energy_source,
+               eco_per_joule,
+               restoration_radius_m,
+               region,
+               lane,
+               kfactor,
+               efactor,
+               rfactor,
+               evidencehex,
+               signingdid;
+}
+
+CSV EcoPerJoulePolicy2026v1 {
+    DELIM ,;
+    HEADER policy_id,
+           energy_source,
+           eco_per_joule,
+           restoration_radius_m,
+           region,
+           lane,
+           kfactor,
+           efactor,
+           rfactor,
+           evidencehex,
+           signingdid;
+}
