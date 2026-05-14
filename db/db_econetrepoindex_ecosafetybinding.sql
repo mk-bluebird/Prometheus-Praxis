@@ -1,0 +1,60 @@
+-- filename db_econetrepoindex_ecosafetybinding.sql
+-- destination Eco-Fort/db/db_econetrepoindex_ecosafetybinding.sql
+
+PRAGMA foreign_keys = ON;
+
+-------------------------------------------------------------------------------
+-- 38. ecosafetybinding semantics and CI checks
+-------------------------------------------------------------------------------
+-- econetrepoindex schema (excerpt, frozen across repos):
+--   econetrepoindex(
+--     reponame         TEXT PRIMARY KEY,
+--     githubslug       TEXT NOT NULL,
+--     roleband         TEXT NOT NULL,
+--     visibility       TEXT NOT NULL,
+--     languageprimary  TEXT NOT NULL,
+--     description      TEXT,
+--     ecosafetybinding TEXT NOT NULL,
+--     shardprotocol    TEXT NOT NULL,
+--     lanedefault      TEXT NOT NULL,
+--     kertargetk       REAL NOT NULL,
+--     kertargete       REAL NOT NULL,
+--     kertargetr       REAL NOT NULL,
+--     nonactuatingonly INTEGER NOT NULL CHECK (nonactuatingonly IN (0,1))
+--   );
+--
+-- ecosafetybinding:
+--   - Absolute path or canonical identifier of the ecosafety grammar file
+--     this repo is bound to, e.g. 'EcosafetyGrammar2026v1.aln'.
+--   - For ENGINE repos, CI must verify:
+--       * The file exists in aln-platform-ecosystem or Eco-Fort.
+--       * Its spechashhex matches the canonical entry in alnschema.
+--       * The repo depends on this grammar via declared imports.
+--
+-- Relationship to EcosafetyGrammar2026v1.aln:
+--   - EcosafetyGrammar2026v1.aln defines:
+--       * Risk planes and coordinates.
+--       * Lyapunov residual formula.
+--       * Corridor bands and KER thresholds.
+--   - econetrepoindex.ecosafetybinding must point to this file name (or a
+--     future compatible version) for any repo claiming adherence.
+
+-- CI validator checklist (for each repo):
+--   1. Resolve ecosafetybinding:
+--        SELECT ecosafetybinding FROM econetrepoindex WHERE reponame = ?;
+--   2. Verify binding in alnschema:
+--        SELECT 1
+--        FROM alnschema
+--        WHERE schemaname = ecosafetybinding
+--          AND spechashhex = ?; -- expected canonical hash
+--   3. Ensure imports:
+--        - Parse repo manifest (Cargo.toml, etc.) and verify dependency
+--          on the ecosafety spine crate that carries EcosafetyGrammar2026v1.
+--   4. Enforce non-actuating constraint:
+--        - If nonactuatingonly = 1, scan source tree to ensure
+--          absence of forbidden APIs (e.g., process spawning, direct
+--          actuator drivers) and enforce that only NonActuatingWorkload
+--          traits are implemented in kernels.
+--   5. KER targets:
+--        - Check that knowledgeecoscore entries for this repo reach
+--          at least kertargetk, kertargete, kertargetr.
