@@ -1,0 +1,62 @@
+30. Synchronizing constellation index across Eco-Fort and aln-platform-ecosystem
+
+Options:
+
+1. ALN shard export from eco_restoration_shard
+  - eco_restoration_shard periodically emits an ALN shard
+    (e.g., EcoConstellationIndexShard2026v1.aln) that encodes:
+      - repo rows (name, githubslug, roleband, visibility, lastupdatedutc)
+      - successor chains
+      - lane defaults and nonactuatingonly flags
+  - Eco-Fort and aln-platform-ecosystem treat this ALN shard as the
+    single source of truth, loading it into their own SQLite views via:
+      - A small Rust loader that parses ALN and upserts rows into local
+        read-only tables (e.g., repo_view, reporoleband_view).
+  - Advantages:
+      - Strongly typed, schema-versioned interchange.
+      - Easy to sign and hash for integrity.
+      - Non-actuating: only metadata distribution, no controllers.
+
+2. ATTACH DATABASE pattern
+  - Downstream repos mount the canonical index DB file directly:
+      ATTACH DATABASE 'ecoconstellationindex.db' AS ecoidx;
+      CREATE VIEW repo_view AS SELECT * FROM ecoidx.repo;
+  - Advantages:
+      - Zero duplication: one physical DB file.
+      - Immediate consistency.
+  - Constraints:
+      - Requires file-level access to the canonical DB artifact.
+      - Must remain read-only; writers stay confined to eco_restoration_shard
+        and governance tooling.
+
+3. Federated query protocol (JSON over HTTP)
+  - eco_restoration_shard exposes a small read-only JSON API:
+      GET /repos
+      GET /repos/{name}
+      GET /successors/{repoid}
+  - Eco-Fort and aln-platform-ecosystem fetch snapshots and materialize
+    local views.
+  - Advantages:
+      - Simple for agents and tools.
+      - Easy to cache and replicate.
+  - Constraints:
+      - Requires network connectivity.
+      - Still non-actuating: endpoint returns metadata only.
+
+Preferred approach:
+
+  - Use an ALN shard export (Option 1) as the canonical interchange format:
+      - ALN shard lives in Eco-Fort as a schema, ensuring frozen grammar.
+      - eco_restoration_shard emits updates as new shardinstance rows with
+        evidencehex and signingdid.
+      - Eco-Fort and aln-platform-ecosystem load these shards into their
+        local SQLite via a non-actuating Rust loader.
+
+  - Supplement with ATTACH DATABASE (Option 2) in environments where the
+    canonical DB file can be shared read-only (e.g., local developer machines
+    and CI runners).
+
+  - Reserve JSON over HTTP (Option 3) for agent-facing dashboards and tools
+    that cannot directly access SQLite, ensuring that all responses are
+    derived from the same ALN shard and DB file to maintain a single
+    source of truth without introducing actuation paths.
