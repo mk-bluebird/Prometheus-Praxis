@@ -1,40 +1,91 @@
 -- filename: tasks_eco_restoration_shard_next_steps.sql
 -- destination: eco_restoration_shard/db/tasks_eco_restoration_shard_next_steps.sql
---
--- NOTE TO CODER:
--- - Continue to avoid installing Rustup/Cargo.
--- - Use only sqlite3 and shell tools.
--- - These tasks assume eco_constellation.db already contains:
+
+-- NOTE:
+-- - Non-actuating, governance-only tasks.
+-- - Use sqlite3 + shell; no Rustup/Cargo required.
+-- - Assumes eco_constellation.db already contains:
 --     * eco_identity_* and eco_github_* tables with Bostrom/mk-bluebird
 --     * repo + reporoleband with eco_restoration_shard as RESEARCH
 --     * eco_repo_identity_binding + v_eco_restoration_identity
--- - All actions below remain non-actuating and governance-only.
 
 PRAGMA foreign_keys = ON;
 
-----------------------------------------------------------------------
--- 1. Create a per-repo master index shard (.econet-eco-repo-index.sql)
---    for eco_restoration_shard, using the shared econetrepoindex schema.
---
--- Goal:
--- - Give eco_restoration_shard a self-describing manifest that agents
---   and CI can read to understand roleband, nonactuating status,
---   lane defaults, and KER targets.
---
--- ACTION 1.a (schema): add econetrepoindex + econetlayer tables
---                     into eco_constellation.db if not present.
-----------------------------------------------------------------------
+-------------------------------------------------------------------------------
+-- 0. definition_registry for eco_restoration_shard
+-------------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS definition_registry (
+    defid         INTEGER PRIMARY KEY AUTOINCREMENT,
+    particlename  TEXT NOT NULL,
+    primaryplane  TEXT NOT NULL,   -- biodiversity, carbon, etc.
+    alnfile       TEXT NOT NULL,   -- path to ALN definition
+    sqlfile       TEXT NOT NULL,   -- path to SQL mirror
+    rustmodule    TEXT NOT NULL,   -- Rust module path
+    repotarget    TEXT NOT NULL,   -- e.g. eco_restoration_shard
+    shardprotocol TEXT NOT NULL,   -- e.g. DefinitionRegistry2026v1
+    versiontag    TEXT NOT NULL,   -- e.g. 2026v1
+    description   TEXT,
+    created_utc   TEXT NOT NULL,
+    updated_utc   TEXT NOT NULL,
+    UNIQUE (particlename, primaryplane, repotarget)
+);
+
+INSERT OR IGNORE INTO definition_registry (
+    particlename,
+    primaryplane,
+    alnfile,
+    sqlfile,
+    rustmodule,
+    repotarget,
+    shardprotocol,
+    versiontag,
+    description,
+    created_utc,
+    updated_utc
+)
+VALUES
+    (
+        'BiodiversityPlaneDefinition2026v1',
+        'biodiversity',
+        'aln/BiodiversityPlaneDefinition2026v1.aln',
+        'db/db_biodiversity_plane_definition2026v1.sql',
+        'eco_restoration_shard::planes::biodiversity',
+        'eco_restoration_shard',
+        'DefinitionRegistry2026v1',
+        '2026v1',
+        'Definition registry entry for biodiversity plane in eco_restoration_shard.',
+        '2026-05-14T00:00:00Z',
+        '2026-05-14T00:00:00Z'
+    ),
+    (
+        'CarbonPlaneDefinition2026v1',
+        'carbon',
+        'aln/CarbonPlaneDefinition2026v1.aln',
+        'db/db_carbon_plane_definition2026v1.sql',
+        'eco_restoration_shard::planes::carbon',
+        'eco_restoration_shard',
+        'DefinitionRegistry2026v1',
+        '2026v1',
+        'Definition registry entry for carbon plane in eco_restoration_shard.',
+        '2026-05-14T00:00:00Z',
+        '2026-05-14T00:00:00Z'
+    );
+
+-------------------------------------------------------------------------------
+-- 1. Master index shard: econetrepoindex + econetlayer
+-------------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS econetrepoindex (
     reponame         TEXT PRIMARY KEY,
     githubslug       TEXT NOT NULL,
-    roleband         TEXT NOT NULL,  -- SPINE, RESEARCH, ENGINE, MATERIAL, GOV, APP
-    visibility       TEXT NOT NULL,  -- Public, Private
+    roleband         TEXT NOT NULL,
+    visibility       TEXT NOT NULL,
     languageprimary  TEXT NOT NULL,
     description      TEXT,
-    ecosafetybinding TEXT NOT NULL,  -- e.g. 'EcosafetyGrammar2026v1.aln'
-    shardprotocol    TEXT NOT NULL,  -- e.g. 'EcoNetSchemaShard2026v1'
-    lanedefault      TEXT NOT NULL,  -- RESEARCH, EXPPROD, PROD
+    ecosafetybinding TEXT NOT NULL,
+    shardprotocol    TEXT NOT NULL,
+    lanedefault      TEXT NOT NULL,
     kertargetk       REAL NOT NULL,
     kertargete       REAL NOT NULL,
     kertargetr       REAL NOT NULL,
@@ -46,10 +97,10 @@ CREATE TABLE IF NOT EXISTS econetlayer (
     reponame    TEXT NOT NULL REFERENCES econetrepoindex(reponame)
                     ON DELETE CASCADE,
     layername   TEXT NOT NULL,
-    layertier   TEXT NOT NULL,   -- GRAMMAR, KERNEL, EDGESCRIPT, UI, GOVERNANCE, MATERIAL, OTHER
-    languages   TEXT NOT NULL,   -- e.g. 'Rust,C', 'CPP,Lua'
+    layertier   TEXT NOT NULL,
+    languages   TEXT NOT NULL,
     description TEXT,
-    contracts   TEXT             -- e.g. 'NonActuatingWorkload,SafeKernel'
+    contracts   TEXT
 );
 
 CREATE TABLE IF NOT EXISTS econetlayerlanepolicy (
@@ -57,7 +108,7 @@ CREATE TABLE IF NOT EXISTS econetlayerlanepolicy (
     reponame    TEXT NOT NULL REFERENCES econetrepoindex(reponame)
                     ON DELETE CASCADE,
     layername   TEXT NOT NULL,
-    laneallowed TEXT NOT NULL,   -- RESEARCH, EXPPROD, PROD
+    laneallowed TEXT NOT NULL,
     kermink     REAL,
     kermine     REAL,
     kermaxr     REAL
@@ -70,16 +121,6 @@ CREATE TABLE IF NOT EXISTS econetrolehint (
     key       TEXT NOT NULL,
     value     TEXT NOT NULL
 );
-
-----------------------------------------------------------------------
--- ACTION 1.b (data): register eco_restoration_shard in econetrepoindex
---                    and describe its internal layers.
---
--- Assumptions:
--- - eco_restoration_shard is RESEARCH, Public, Rust-first.
--- - It is strictly non-actuating (research-only).
--- - Use KER targets aligned with RESEARCH band (looser than PROD).
-----------------------------------------------------------------------
 
 INSERT OR REPLACE INTO econetrepoindex (
     reponame,
@@ -111,8 +152,8 @@ INSERT OR REPLACE INTO econetrepoindex (
     1
 );
 
--- Describe layers (you can refine these later as the repo evolves).
-DELETE FROM econetlayer WHERE reponame = 'eco_restoration_shard';
+DELETE FROM econetlayer
+WHERE reponame = 'eco_restoration_shard';
 
 INSERT INTO econetlayer (
     reponame, layername, layertier, languages, description, contracts
@@ -134,7 +175,8 @@ INSERT INTO econetlayer (
         'NonActuatingWorkload,SafeKernel'
     );
 
-DELETE FROM econetlayerlanepolicy WHERE reponame = 'eco_restoration_shard';
+DELETE FROM econetlayerlanepolicy
+WHERE reponame = 'eco_restoration_shard';
 
 INSERT INTO econetlayerlanepolicy (
     reponame, layername, laneallowed, kermink, kermine, kermaxr
@@ -156,7 +198,8 @@ INSERT INTO econetlayerlanepolicy (
         0.25
     );
 
-DELETE FROM econetrolehint WHERE reponame = 'eco_restoration_shard';
+DELETE FROM econetrolehint
+WHERE reponame = 'eco_restoration_shard';
 
 INSERT INTO econetrolehint (
     reponame, key, value
@@ -167,22 +210,13 @@ INSERT INTO econetrolehint (
     ('eco_restoration_shard', 'band', 'RESEARCH'),
     ('eco_restoration_shard', 'nonactuating', 'true');
 
-----------------------------------------------------------------------
--- 2. Wire eco_restoration_shard into shardinstance and knowledgeecoscore
---
--- Goal:
--- - Prepare this repo to log KER-scored research shards in a way that
---   EcoNet, Eco-Fort, ecological-orchestrator, and Paycomp can consume.
--- - All still non-actuating: we only register shard metadata and scores.
---
--- If shardinstance / knowledgeecoscore already exist (from earlier
--- constellation spine work), this section will be a no-op. Otherwise,
--- it creates minimal compatible versions for this repo.
-----------------------------------------------------------------------
+-------------------------------------------------------------------------------
+-- 2. Shardinstance and knowledgeecoscore wiring
+-------------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS shardinstance (
     shardid       INTEGER PRIMARY KEY AUTOINCREMENT,
-    repofileid    INTEGER,   -- can be NULL here if repofile is not yet populated
+    repofileid    INTEGER,
     particleid    INTEGER,
     nodeid        TEXT,
     assettype     TEXT,
@@ -190,7 +224,7 @@ CREATE TABLE IF NOT EXISTS shardinstance (
     region        TEXT,
     tstartutc     TEXT,
     tendutc       TEXT,
-    lane          TEXT,      -- RESEARCH, EXPPROD, PROD
+    lane          TEXT,
     kmetric       REAL,
     emetric       REAL,
     rmetric       REAL,
@@ -225,12 +259,6 @@ CREATE TABLE IF NOT EXISTS knowledgeecoscore (
 CREATE INDEX IF NOT EXISTS idx_kerscore_scope
     ON knowledgeecoscore (scopetype, scoperefid);
 
-----------------------------------------------------------------------
--- ACTION 2.a: Seed a REPO-level knowledgeecoscore entry for
---             eco_restoration_shard so Paycomp / EcoNet-CERG can
---             see that this repo is an eco-helpful research source.
-----------------------------------------------------------------------
-
 WITH repo_row AS (
     SELECT repoid
     FROM repo
@@ -257,13 +285,9 @@ SELECT
     'bostrom'
 FROM repo_row;
 
-----------------------------------------------------------------------
--- 3. Define a local view for eco_restoration_shard research shards
---
--- Goal:
--- - Give agents a one-stop view that joins repo metadata, identity,
---   shardinstance KER metrics, and knowledgeecoscore for this repo.
-----------------------------------------------------------------------
+-------------------------------------------------------------------------------
+-- 3. View: v_eco_restoration_shard_research
+-------------------------------------------------------------------------------
 
 DROP VIEW IF EXISTS v_eco_restoration_shard_research;
 
@@ -309,74 +333,55 @@ LEFT JOIN knowledgeecoscore AS kes
     ON kes.scopetype = 'REPO'
    AND kes.scoperefid = r.repoid;
 
-----------------------------------------------------------------------
+-------------------------------------------------------------------------------
 -- 4. Coder checklist (shell + sqlite3 only)
---
--- Run these commands manually in your /workspace/eco_restoration_shard:
---
--- 4.1 Load the new tasks file:
---     sqlite3 db/eco_constellation.db \
---       ".read db/tasks_eco_restoration_shard_next_steps.sql"
---
--- 4.2 Verify econetrepoindex + econetlayer entries:
---     sqlite3 db/eco_constellation.db "
---       SELECT reponame, roleband, lanedefault, nonactuatingonly
---       FROM econetrepoindex
---       WHERE reponame = 'eco_restoration_shard';
---     "
---
---     sqlite3 db/eco_constellation.db "
---       SELECT layername, layertier, languages, contracts
---       FROM econetlayer
---       WHERE reponame = 'eco_restoration_shard';
---     "
---
--- 4.3 Verify knowledgeecoscore for this repo:
---     sqlite3 db/eco_constellation.db "
---       SELECT scopetype, kfactor, efactor, rfactor, issuedby
---       FROM knowledgeecoscore
---       WHERE scopetype = 'REPO'
---         AND scoperefid = (
---           SELECT repoid FROM repo
---           WHERE name = 'eco_restoration_shard'
---         );
---     "
---
--- 4.4 (Optional, when shards exist) Insert a test RESEARCH shard:
---     sqlite3 db/eco_constellation.db "
---       INSERT INTO shardinstance (
---         nodeid, assettype, medium, region,
---         tstartutc, tendutc,
---         lane, kmetric, emetric, rmetric,
---         vtmax, kerdeployable, evidencehex, signingdid
---       ) VALUES (
---         'PHX-RESEARCH-NODE-01',
---         'EcoResearchNode',
---         'water',
---         'Phoenix-AZ',
---         '2026-01-01T00:00:00Z',
---         '2026-01-31T23:59:59Z',
---         'RESEARCH',
---         0.92, 0.88, 0.18,
---         0.25,
---         0,
---         'deadbeefcafebabe0011223344556677',
---         'bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7'
---       );
---     "
---
---     sqlite3 db/eco_constellation.db "
---       SELECT shardid, nodeid, kmetric, emetric, rmetric,
---              canonical_name, signing_addr
---       FROM v_eco_restoration_shard_research
---       ORDER BY shardid DESC
---       LIMIT 5;
---     "
---
--- 4.5 Commit the updated db/*.sql and, if you track it, the
---     db/eco_constellation.db file to:
---       https://github.com/mk-bluebird/eco_restoration_shard
---
---     This will allow other constellation repos to attach this DB
---     and discover eco_restoration_shard’s role, KER scores, and
---     identity mappings without any Rust/Cargo tooling.
+-------------------------------------------------------------------------------
+-- sqlite3 db/eco_constellation.db ".read db/tasks_eco_restoration_shard_next_steps.sql"
+-- sqlite3 db/eco_constellation.db "
+--   SELECT reponame, roleband, lanedefault, nonactuatingonly
+--   FROM econetrepoindex
+--   WHERE reponame = 'eco_restoration_shard';
+-- "
+-- sqlite3 db/eco_constellation.db "
+--   SELECT layername, layertier, languages, contracts
+--   FROM econetlayer
+--   WHERE reponame = 'eco_restoration_shard';
+-- "
+-- sqlite3 db/eco_constellation.db "
+--   SELECT scopetype, kfactor, efactor, rfactor, issuedby
+--   FROM knowledgeecoscore
+--   WHERE scopetype = 'REPO'
+--     AND scoperefid = (
+--       SELECT repoid FROM repo
+--       WHERE name = 'eco_restoration_shard'
+--     );
+-- "
+-- Optional test shard:
+-- sqlite3 db/eco_constellation.db "
+--   INSERT INTO shardinstance (
+--     nodeid, assettype, medium, region,
+--     tstartutc, tendutc,
+--     lane, kmetric, emetric, rmetric,
+--     vtmax, kerdeployable, evidencehex, signingdid
+--   ) VALUES (
+--     'PHX-RESEARCH-NODE-01',
+--     'EcoResearchNode',
+--     'water',
+--     'Phoenix-AZ',
+--     '2026-01-01T00:00:00Z',
+--     '2026-01-31T23:59:59Z',
+--     'RESEARCH',
+--     0.92, 0.88, 0.18,
+--     0.25,
+--     0,
+--     'deadbeefcafebabe0011223344556677',
+--     'bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7'
+--   );
+-- "
+-- sqlite3 db/eco_constellation.db "
+--   SELECT shardid, nodeid, kmetric, emetric, rmetric,
+--          canonical_name, signing_addr
+--   FROM v_eco_restoration_shard_research
+--   ORDER BY shardid DESC
+--   LIMIT 5;
+-- "
