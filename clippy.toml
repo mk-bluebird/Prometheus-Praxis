@@ -1,0 +1,27 @@
+# filename clippy.toml
+# destination eco_restoration_shard/clippy.toml
+
+# 42. Clippy configuration aligned with ecosafety
+
+# Allow some research-only flexibility: unused variables and imports are fine
+# in non-actuating research code that explores ideas and metrics.
+warn-unused = false
+
+[lints]
+# Core ecosafety constraints
+# Forbid any unsafe blocks anywhere in this crate.
+unsafe_code = "forbid"
+
+# Documentation is required for public items so research artifacts
+# remain explainable and auditable.
+missing_docs = "warn"
+
+# Panic- and abort-related lints: keep them under control.
+# These do not make panics impossible but surface them clearly.
+panic = "warn"
+unwrap_used = "warn"
+expect_used = "warn"
+indexing_slicing = "warn"
+
+# Pedantic and nursery lints can be enabled selectively in CI.
+# Here we keep them off by default to avoid over-constraining research code.
