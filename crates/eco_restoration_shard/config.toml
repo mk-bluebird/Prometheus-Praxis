@@ -1,0 +1,33 @@
+# filename config.toml
+# destination eco_restoration_shard/config.toml
+
+[workspace]
+members = [
+  "eco_restoration_shard"
+]
+
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+
+[workspace.metadata]
+non_actuating = true
+
+[workspace.dependencies]
+rusqlite = { version = "0.31", features = ["bundled"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+# Forbid invoking external commands and other potentially actuating paths.
+# This is advisory; code must still avoid such APIs explicitly.
+allow_disallowed_methods = "deny"
+
+[patch.crates-io]
+# Prevent accidental linkage to ENGINE-band crates by never patching them in.
+# Governance: ENGINE-band crates must live outside this workspace.
