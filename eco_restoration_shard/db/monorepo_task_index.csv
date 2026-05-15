@@ -1,0 +1,14 @@
+task_id,category,scope,title,logicalname,file_path
+1,GOVERNANCE_DB,PHOENIX-AZ,Register eco_restoration_shard repo and files in repo/repofile index,restoration.repoindex.phoenix,db/db_repo_index.sql
+2,GOVERNANCE_DB,PHOENIX-AZ,Create local DefinitionRegistry slice for restoration artifacts,restoration.definitionregistry.phoenix,db/db_definition_registry_restoration.sql
+3,GOVERNANCE_DB,PHOENIX-AZ,Finalize restoration-aware blastradius grammar for Phoenix,restoration.blastradius.phoenix.2026v1,db/db_restoration_blastradius_phoenix.sql
+4,GOVERNANCE_DB,PHOENIX-AZ,Finalize eco-per-joule policy grammar for Phoenix energy planes,energy.ecoperjoule.policy.phoenix.2026v1,db/db_ecoperjoule_policy_energy.sql
+5,GOVERNANCE_DB,PHOENIX-AZ,Integrate MT6883 continuity and neuroethic radii into lane and blast grammar,mt6883.lane.continuity.phoenix.2026v1,db/db_mt6883_lane_continuity.sql
+6,GOVERNANCE_DB,PHOENIX-AZ,Populate restoration_identity_binding for all Phoenix governance artifacts,restoration.identitybinding.phoenix.2026v1,db/db_restoration_identity_binding.sql
+7,TOOLING,PHOENIX-AZ,Harden non-actuating C++ governance tool for restoration, energy, and MT6883,restoration.energy.mt6883.tool.cpp.phoenix,src/tools/restoration_energy_mt6883_tool.cpp
+8,TOOLING,PHOENIX-AZ,Add JSON output mode to C++ governance tool,restoration.energy.mt6883.tool.cpp.jsonmode,src/tools/restoration_energy_mt6883_tool.cpp
+9,TOOLING,GLOBAL_PATTERN,Create Rust governance spine client for eco_restoration_shard,restoration.governance.spine.client.rust,src/lib/governance_spine_client.rs
+10,CI,CONSTELLATION,Enforce DefinitionRegistry registration for all governance artifacts,ci.definitionregistry.enforcement.phoenix,.github/workflows/ci_definitionregistry.yml
+11,CI,CONSTELLATION,Enforce identity bindings for governance artifacts,ci.identitybinding.enforcement.phoenix,.github/workflows/ci_identity_binding.yml
+12,AGENT_API,CONSTELLATION,Publish agent-facing governance views for Phoenix,agent.views.phoenix.2026v1,db/db_agent_views_phoenix.sql
+13,DOCS,CONSTELLATION,Author monorepo governance blueprint documentation,docs.monorepo.governance.blueprint,docs/monorepo_governance_blueprint.md
