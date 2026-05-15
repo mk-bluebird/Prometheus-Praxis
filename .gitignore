@@ -1,13 +1,65 @@
 ```
-# Backup and archive files
-*.sql
-*.sql.gz
-*.tar.gz
-*.csv.gz
+# Dependencies
+target/
 
-# Database files
-*.db
+# Compiled files
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
 
-# Log files
+# Logs
 *.log
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# Python specific
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git*
+!/.gitignore
+.DS_Store
+Thumbs.db
+
+# Rust specific
+Cargo.lock
+*.rs.bk
+$CARGO_HOME/
+.cargo/
+
+# Build directories
+build/
+dist/
 ```
