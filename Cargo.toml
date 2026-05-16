@@ -3,10 +3,12 @@
 
 [workspace]
 members = [
-    "eco_response_shard",          # core library (non-actuating)
-    "eco_response_shard_cilib",    # CI helpers (non-actuating)
-    "eco_response_shard_backfill", # one-time backfill binary
-    "eco_restoration_shard",       # restoration governance/tooling crate (non-actuating)
+    "eco_response_shard",              # core library (non-actuating)
+    "eco_response_shard_cilib",        # CI helpers (non-actuating)
+    "eco_response_shard_backfill",     # one-time backfill binary
+    "eco_restoration_shard",           # restoration governance/tooling crate (non-actuating)
+    "crates/eco-ledger-particles",     # regional eco-ledger particles (non-actuating)
+    "crates/hydrology-constraints",    # hydrology/gw-risk constraint catalog (non-actuating)
 ]
 
 resolver = "2"
