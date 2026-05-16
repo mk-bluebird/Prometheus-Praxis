@@ -1,0 +1,13 @@
+# config/config.toml
+[database]
+url = "postgres://econet:econet@localhost/econet"
+
+[ecowealth]
+ecoper_joule_enabled = true
+restore_radius_enabled = true
+plane_weights_cache_seconds = 3600
+large_particle_summary_level_default = "statistical"
+
+[governance]
+spine_endpoint = "https://governance.eco/spine"
+lane_policy_refresh_seconds = 900
