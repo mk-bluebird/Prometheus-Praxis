@@ -1,0 +1,33 @@
+// filename: proto/eco_oracle.proto
+// destination: ecorestorationshard/proto/eco_oracle.proto
+
+syntax = "proto3";
+
+package bostrom.eco.v1;
+
+// MsgRegisterEcoOracle registers a new eco-oracle under governance.
+message MsgRegisterEcoOracle {
+  string proposer_address        = 1; // Governance proposer.
+  string oracle_address          = 2; // Oracle operator Bostrom address.
+  string geographic_region       = 3; // e.g. "Phoenix-AZ-US".
+  repeated string measurement_types = 4; // e.g. ["groundwater_pfbs", "air_pm2_5"].
+  string stake_denom             = 5; // e.g. "boot".
+  string stake_amount            = 6; // decimal string amount.
+  string reputation_record_cid   = 7; // CID with oracle performance history.
+  bool   validator_required      = 8; // Must be a validator if true.
+  bool   bonded_entity_required  = 9; // Must be bonded in eco-oracle module.
+}
+
+// On-chain oracle registry entry.
+message EcoOracle {
+  string   oracle_address        = 1;
+  string   geographic_region     = 2;
+  repeated string measurement_types = 3;
+  string   stake_denom           = 4;
+  string   stake_amount          = 5;
+  string   reputation_record_cid = 6;
+  string   continuity_grade      = 7; // A, B, C based on performance.
+  bool     is_validator          = 8;
+  bool     is_bonded_entity      = 9;
+  string   status                = 10; // ACTIVE, JAILED, RETIRED.
+}
