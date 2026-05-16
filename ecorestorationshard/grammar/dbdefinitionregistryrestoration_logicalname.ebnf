@@ -1,0 +1,67 @@
+-- filename: dbdefinitionregistryrestoration_logicalname.ebnf
+-- destination: ecorestorationshard/grammar/dbdefinitionregistryrestoration_logicalname.ebnf
+
+logical-name =
+    restoration-name
+  | energy-name
+  | mt6883-name
+  | agent-view-name
+  ;
+
+restoration-name =
+    "restoration"
+    "." subsystem
+    "." region-code
+    "." year "v" version-major
+  ;
+
+energy-name =
+    "energy"
+    "." subsystem
+    "." region-code
+    "." year "v" version-major
+  ;
+
+mt6883-name =
+    "mt6883"
+    "." subsystem
+    "." region-code
+    "." year "v" version-major
+  ;
+
+agent-view-name =
+    "agent.views"
+    "." region-code
+    "." year "v" version-major
+  ;
+
+subsystem =
+    identifier                  (* e.g. "blastradius", "ecoperjoule.policy", "lane.continuity" *)
+  ;
+
+region-code =
+    identifier                  (* e.g. "phoenix", "phoenix-az", "central-az" *)
+  ;
+
+year =
+    digit digit digit digit     (* Gregorian year, e.g. 2026 *)
+  ;
+
+version-major =
+    digit+                      (* monotone version integer, e.g. 1, 2, 3 *)
+  ;
+
+identifier =
+    ident-char , { ident-char }
+  ;
+
+ident-char =
+    'a'..'z'
+  | 'A'..'Z'
+  | '0'..'9'
+  | '_'
+  | '-'
+  | '.'
+  ;
+
+digit = '0'..'9' ;
