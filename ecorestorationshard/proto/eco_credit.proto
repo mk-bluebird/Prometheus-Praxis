@@ -1,0 +1,44 @@
+// filename: proto/eco_credit.proto
+// destination: ecorestorationshard/proto/eco_credit.proto
+syntax = "proto3";
+
+package bostrom.eco.v1;
+
+// -----------------------------------------------------------------------------
+// 16. EcoCreditToken and MsgMintEcoCredit
+// -----------------------------------------------------------------------------
+
+// Non-transferable eco credit accounting, denomination "ecocredit".
+// Transfer restrictions are enforced in the Cosmos SDK module, not in protobuf:
+// - Send / Transfer / IBC send for "ecocredit" MUST always fail.
+// - Only burn, mint (by oracle), and module-account internal moves are allowed.
+message EcoCreditBalance {
+  string address        = 1; // Bostrom address.
+  string denom          = 2; // Must be "ecocredit".
+  string amount         = 3; // Decimal string.
+}
+
+// MsgMintEcoCredit is emitted only by verified eco-oracle contracts.
+message MsgMintEcoCredit {
+  string              oracle_address   = 1; // Contract or module account performing mint.
+  string              recipient        = 2; // Bostrom address or eco-DAO address.
+  string              denom            = 3; // Must be "ecocredit".
+  string              amount           = 4; // Decimal string amount to mint.
+  string              project_id       = 5; // External or on-chain project identifier.
+  double              co2e_kg          = 6; // Verified CO2-equivalent reduction (kg).
+  string              proof_of_impact  = 7; // CID of audit report or dataset.
+  BCIChallengeSignature host_bci_attestation = 8; // Optional; host approval when direct.
+}
+
+// MsgBurnEcoCredit burns non-transferable ecocredit, for gas or healthcare unlocks.
+message MsgBurnEcoCredit {
+  string address = 1; // Owner address.
+  string denom   = 2; // Must be "ecocredit".
+  string amount  = 3; // Decimal string.
+
+  // Handler MUST:
+  // - Reduce EcoCreditBalance by amount.
+  // - Apply effect depending on context:
+  //   * If used as eco-gas, mark corresponding tx as discounted.
+  //   * If used for healthcare, unlock configured healthcare upgrade path.
+}
