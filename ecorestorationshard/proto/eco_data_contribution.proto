@@ -1,0 +1,40 @@
+// filename: proto/eco_data_contribution.proto
+// destination: ecorestorationshard/proto/eco_data_contribution.proto
+syntax = "proto3";
+
+package bostrom.eco.v1;
+
+import "eco_campaign.proto"; // For BCIChallengeSignature.
+
+// -----------------------------------------------------------------------------
+// 22. MsgPublishDataContribution
+// -----------------------------------------------------------------------------
+
+// Access policy enumeration for contributed datasets.
+enum DataAccessPolicy {
+  DATA_ACCESS_POLICY_UNSPECIFIED            = 0;
+  DATA_ACCESS_OPEN_CLIMATE_RESEARCH         = 1; // Open for academic climate research.
+  DATA_ACCESS_OPEN_ECOLOGICAL_RESEARCH      = 2; // Open for ecological restoration research.
+  DATA_ACCESS_RESTRICTED_HEALTHCARE         = 3; // Restricted to healthcare upgrades.
+  DATA_ACCESS_CUSTOM_POLICY                  = 4; // Custom, see policy_note.
+}
+
+// Data contribution credit metadata.
+message DataContributionCredit {
+  string credit_id             = 1; // Unique ID for the credit.
+  string owner_address         = 2; // Bostrom address of credit owner.
+  string denom                 = 3; // "datacredit" or module-specific.
+  string amount                = 4; // Decimal string amount.
+  bool   healthcare_gas_only   = 5; // True if usable only for healthcare gas discounts.
+}
+
+// MsgPublishDataContribution registers a large dataset and mints credit.
+message MsgPublishDataContribution {
+  string                dataset_cid            = 1; // CID of dataset (content-addressed).
+  bytes                 data_schema_hash      = 2; // Hash of schema description.
+  bytes                 statistical_commitment = 3; // Homomorphic hash / commitment.
+  string                contributor_address   = 4; // Bostrom address of contributor.
+  BCIChallengeSignature brain_bound_signature = 5; // Host brain-bound signature over dataset_cid.
+  DataAccessPolicy      access_policy         = 6; // Policy classification.
+  string                policy_note           = 7; // Human-readable policy explanation.
+}
