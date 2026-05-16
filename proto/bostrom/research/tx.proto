@@ -1,0 +1,27 @@
+// filename: proto/bostrom/research/tx.proto
+// destination: eco_restoration_shard/proto/bostrom/research/tx.proto
+// repo-target: github.com/mk-bluebird/eco_restoration_shard
+
+syntax = "proto3";
+
+package bostrom.research;
+
+option go_package = "github.com/mk-bluebird/eco_restoration_shard/x/research/types";
+
+message BCIChallengeSignature {
+  bytes public_key = 1;
+  bytes signature = 2;
+}
+
+message MsgSubmitManifest {
+  string creator = 1;
+  ResearchManifest manifest = 2;
+  BCIChallengeSignature host_approval_proof = 3;
+}
+
+message ResearchManifest {
+  string logicalname = 1;
+  string license = 2;
+  repeated string dependencies = 3;
+  string description = 4;
+}
