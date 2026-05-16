@@ -1,0 +1,21 @@
+// filename: proto/eco_credit_bridge.proto
+// destination: ecorestorationshard/proto/eco_credit_bridge.proto
+syntax = "proto3";
+
+package bostrom.eco.v1;
+
+// -----------------------------------------------------------------------------
+// 24. MsgCrossChainEcoCreditBridge
+// -----------------------------------------------------------------------------
+
+// MsgCrossChainEcoCreditBridge locks foreign eco-credit and mints ecocredit on Bostrom.
+message MsgCrossChainEcoCreditBridge {
+  string source_chain_id        = 1; // Identifier of source chain.
+  bytes  lock_tx_proof          = 2; // Proof of lock (e.g. IBC / light-client proof bytes).
+  string foreign_denom          = 3; // Denom on source chain.
+  string amount                 = 4; // Decimal string amount to bridge.
+  string host_bostrom_address   = 5; // Recipient address on Bostrom.
+  int64  time_lock_seconds      = 6; // Additional timelock on bridged credit.
+  int64  timeout_height         = 7; // IBC-style timeout height.
+  int64  timeout_timestamp_sec  = 8; // IBC-style timeout timestamp (UTC).
+}
