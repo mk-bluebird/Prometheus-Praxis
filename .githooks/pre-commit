@@ -1,0 +1,49 @@
+# filename: .git/hooks/pre-commit
+# destination: eco_restoration_shard/.git/hooks/pre-commit
+# repo-target: github.com/mk-bluebird/eco_restoration_shard
+#!/usr/bin/env bash
+set -euo pipefail
+
+changed_cargo_files=$(git diff --cached --name-only --diff-filter=ACM | grep 'Cargo.toml' || true)
+
+if [ -z "${changed_cargo_files}" ]; then
+  exit 0
+fi
+
+license_changed=0
+
+for file in ${changed_cargo_files}; do
+  if [ ! -f "${file}" ]; then
+    continue
+  fi
+
+  tmp_before=$(mktemp)
+  tmp_after=$(mktemp)
+
+  git show HEAD:"${file}" 2>/dev/null | grep '^license' > "${tmp_before}" || true
+  grep '^license' "${file}" > "${tmp_after}" || true
+
+  if ! diff -q "${tmp_before}" "${tmp_after}" >/dev/null 2>&1; then
+    echo "Detected license change in ${file}"
+    license_changed=1
+  fi
+
+  rm -f "${tmp_before}" "${tmp_after}"
+done
+
+if [ "${license_changed}" -eq 0 ]; then
+  exit 0
+fi
+
+echo "License change requires BCI approval."
+if ! command -v bostrom-bci-challenge >/dev/null 2>&1; then
+  echo "bostrom-bci-challenge not found; aborting commit."
+  exit 1
+fi
+
+if ! bostrom-bci-challenge --context "git-license-change"; then
+  echo "BCI challenge not approved; aborting commit."
+  exit 1
+fi
+
+exit 0
