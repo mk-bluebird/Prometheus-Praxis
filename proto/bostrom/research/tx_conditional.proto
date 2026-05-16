@@ -1,0 +1,41 @@
+// filename: proto/bostrom/research/tx_conditional.proto
+// destination: eco_restoration_shard/proto/bostrom/research/tx_conditional.proto
+// repo-target: github.com/mk-bluebird/eco_restoration_shard
+
+syntax = "proto3";
+
+package bostrom.research;
+
+option go_package = "github.com/mk-bluebird/eco_restoration_shard/x/research/types";
+
+message BCIChallengeSignature {
+  bytes public_key = 1;
+  bytes signature = 2;
+}
+
+message MsgConditionalSubmitManifest {
+  string bostrom_address = 1;
+  string host_did_attestation = 2;
+  ResearchManifest manifest = 3;
+  BCIChallengeSignature host_approval_proof = 4;
+  bytes zk_proof = 5;
+  int64 confirmation_deadline = 6; // block height or timestamp
+}
+
+message MsgConditionalSubmitManifestResponse {
+  string manifest_id = 1;
+}
+
+message MsgConfirmManifest {
+  string manifest_id = 1;
+  BCIChallengeSignature confirmation_signature = 2;
+}
+
+message MsgConfirmManifestResponse {}
+
+message ResearchManifest {
+  string logicalname = 1;
+  string license = 2;
+  repeated string dependencies = 3;
+  string description = 4;
+}
