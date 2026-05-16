@@ -1,0 +1,45 @@
+// filename: proto/eco_campaign.proto
+// destination: ecorestorationshard/proto/eco_campaign.proto
+syntax = "proto3";
+
+package bostrom.eco.v1;
+
+// Common brain-bound attestation type reused across messages.
+message BCIChallengeSignature {
+  bytes  challenge_hash = 1; // Hash of challenge payload reviewed by host.
+  bytes  signature      = 2; // Signature by brain-bound key.
+  string algo           = 3; // Signature scheme identifier.
+}
+
+// -----------------------------------------------------------------------------
+// 15. MsgCreateEcoCampaign
+// -----------------------------------------------------------------------------
+
+// Individual eco-action proposal within a campaign.
+message EcoActionProposal {
+  string proposal_id       = 1;  // Local identifier within campaign.
+  string region_code       = 2;  // Region label, e.g. "Phoenix-AZ-US".
+  double target_latitude   = 3;  // Target GPS latitude.
+  double target_longitude  = 4;  // Target GPS longitude.
+  string action_type       = 5;  // e.g. "reforestation", "canal_clean", "mar_recharge".
+  string oracle_contract   = 6;  // Address / identifier of required oracle.
+  string oracle_condition  = 7;  // Human-readable condition; machine rules live in contract.
+  string budget_denom      = 8;  // Must be "boot" for this stack.
+  string budget_amount     = 9;  // Decimal string amount of boot budget.
+  string notes             = 10; // Optional narrative for auditors.
+}
+
+// MsgCreateEcoCampaign bundles eco-actions into a smart-contract-managed campaign.
+message MsgCreateEcoCampaign {
+  string              campaign_id          = 1;  // Caller-chosen unique ID.
+  string              creator_address      = 2;  // Bech32 Bostrom address of initiator.
+  repeated EcoActionProposal proposals    = 3;  // Array of eco-action proposals.
+  BCIChallengeSignature bci_attestation   = 4;  // Brain-bound approval.
+  string              campaign_metadata_cid = 5; // Optional CID for extended manifest.
+
+  // On-chain handler requirements (documented, not enforced by protobuf):
+  // - Msg must be signed by creator_address using the brain-bound key.
+  // - Handler instantiates a smart-contract campaign that:
+  //   * Tracks proposal completion via oracle callbacks.
+  //   * Mints EcoCampaignCredit tokens to creator_address as actions complete.
+}
