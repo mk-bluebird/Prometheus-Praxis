@@ -7,10 +7,26 @@ members = [
     "eco_response_shard_cilib",        # CI helpers (non-actuating)
     "eco_response_shard_backfill",     # one-time backfill binary
     "eco_restoration_shard",           # restoration governance/tooling crate (non-actuating)
+
     "crates/eco-ledger-particles",     # regional eco-ledger particles (non-actuating)
     "crates/hydrology-constraints",    # hydrology/gw-risk constraint catalog (non-actuating)
+    "crates/sensor-telemetry",         # ecological sensor/telemetry particles (non-actuating)
+    "crates/sensor-health",            # sensor health and trust weights (non-actuating)
+    "crates/zoning-shards",            # urban zoning and land-use shards (non-actuating)
+    "crates/eco-wealth-portfolio",     # non-financial eco-wealth portfolio views (non-actuating)
+    "crates/community-governance",     # community stewardship and governance roles (non-actuating)
+    "crates/education-prompts",        # education and apprenticeship prompt shards (non-actuating)
+    "crates/eco-pricing",              # ecological cost and co-benefit pricing shards (non-actuating)
+    "crates/disaster-scenarios",       # disaster and extreme-event scenarios library (non-actuating)
+    "crates/cross-constellation-index",# cross-constellation interoperability index (non-actuating)
+    "crates/ecoper-joule",             # ecoper-joule asset plane (non-actuating)
+    "crates/restoration-radius",       # restoration radius and MAR assets (non-actuating)
+    "crates/plane-weights",            # plane weights and nonoffsettable bands (non-actuating)
+    "crates/blastradius",              # blastradius and neighbouring-zone assets (non-actuating)
+    "crates/lane-governance",          # lane governance and KER trajectory assets (non-actuating)
+    "crates/topology-risk",            # topology risk and alignment assets (non-actuating)
+    "crates/large-particle-registry",  # large-particle file summaries and registries (non-actuating)
 ]
-
 resolver = "2"
 
 [workspace.package]
