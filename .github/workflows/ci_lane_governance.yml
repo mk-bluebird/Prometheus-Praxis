@@ -1,0 +1,38 @@
+name: lane-governance-ci
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+env:
+  LANE_CONFIG: "config/lanes/lane_config.toml"
+
+jobs:
+  lane-governance-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build workspace
+        run: cargo build --workspace --all-targets
+
+      - name: Run tests
+        run: cargo test --workspace
+
+      - name: Compute lane trends (T06)
+        run: cargo run -p lane-governance --bin lane_trend_cli -- \
+             --lane-config $LANE_CONFIG \
+             --output target/lane_status.json
+
+      - name: Enforce K/E/R bands and b<=0
+        run: |
+          cargo run -p lane-governance --bin lane_gate_cli -- \
+            --lane-status target/lane_status.json \
+            --fail-on-violation
