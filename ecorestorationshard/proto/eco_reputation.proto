@@ -1,0 +1,28 @@
+// filename: proto/eco_reputation.proto
+// destination: ecorestorationshard/proto/eco_reputation.proto
+syntax = "proto3";
+
+package bostrom.eco.v1;
+
+import "eco_campaign.proto"; // For BCIChallengeSignature.
+
+// -----------------------------------------------------------------------------
+// 23. MsgSelfHealEcoReputation
+// -----------------------------------------------------------------------------
+
+// Evidence that a blacklisted pattern originated from an external agent.
+message QuarantineEvidence {
+  string quarantine_report_cid = 1; // CID of detailed incident report.
+  bytes  pattern_hash          = 2; // Hash of blacklisted pattern.
+  bytes  external_agent_key    = 3; // Public key / identifier of attacker.
+  bytes  external_agent_proof  = 4; // Proof that attacker injected pattern.
+  string notes                 = 5; // Governance notes for validators.
+}
+
+// MsgSelfHealEcoReputation restores r_axis after sabotage.
+message MsgSelfHealEcoReputation {
+  string                host_address                 = 1; // Host Bostrom address.
+  bytes                 challenged_tx_hash           = 2; // Hash of sabotaged transaction.
+  QuarantineEvidence    quarantine_evidence          = 3; // Evidence of external sabotage.
+  BCIChallengeSignature brain_bound_recovery_attestation = 4; // Host consent to recovery.
+}
