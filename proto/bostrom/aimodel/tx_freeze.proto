@@ -1,0 +1,22 @@
+// filename: proto/bostrom/aimodel/tx_freeze.proto
+// destination: eco_restoration_shard/proto/bostrom/aimodel/tx_freeze.proto
+// repo-target: github.com/mk-bluebird/eco_restoration_shard
+
+syntax = "proto3";
+
+package bostrom.aimodel;
+
+option go_package = "github.com/mk-bluebird/eco_restoration_shard/x/aimodel/types";
+
+message SabotageProof {
+  repeated string sabotage_tx_hashes = 1;
+  bytes zk_proof_of_bias = 2;
+}
+
+message MsgFreezeAIModel {
+  string proposer = 1;
+  string model_id = 2;
+  SabotageProof proof_of_model_guilt = 3;
+}
+
+message MsgFreezeAIModelResponse {}
