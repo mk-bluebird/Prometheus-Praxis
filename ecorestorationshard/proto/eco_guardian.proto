@@ -1,0 +1,28 @@
+// filename: proto/eco_guardian.proto
+// destination: ecorestorationshard/proto/eco_guardian.proto
+syntax = "proto3";
+
+package bostrom.eco.v1;
+
+import "eco_campaign.proto"; // For BCIChallengeSignature.
+
+// -----------------------------------------------------------------------------
+// 25. MsgApproveEcoGuardian
+// -----------------------------------------------------------------------------
+
+// Limits on delegated eco-reporting by guardian agent.
+message EcoGuardianLimits {
+  uint32 max_daily_claims      = 1; // Maximum MsgReportEcoRestoration per 24h.
+  string max_claim_amount      = 2; // Maximum total claim amount per day (denom "boot").
+  uint32 required_oracle_quorum = 3; // Minimum oracle signatures per claim.
+}
+
+// MsgApproveEcoGuardian appoints a constrained AI-chat guardian.
+message MsgApproveEcoGuardian {
+  string                host_address             = 1; // Host Bostrom address.
+  bytes                 guardian_pubkey         = 2; // Guardian AI-agent public key.
+  EcoGuardianLimits     limits                  = 3; // Hard bounds for reporting.
+  string                delegation_ticket_id    = 4; // ID from MsgDelegateCyberneticPower.
+  bool                  require_eco_intent_bci  = 5; // Must be false only for this eco scope.
+  BCIChallengeSignature brain_bound_approval    = 6; // Host brain-bound approval over guardian+limits.
+}
