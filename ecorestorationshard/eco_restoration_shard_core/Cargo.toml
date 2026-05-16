@@ -1,0 +1,38 @@
+# filename: eco_restoration_shard_core/Cargo.toml
+# destination: ecorestorationshard/eco_restoration_shard_core/Cargo.toml
+# repo-target: github.com/mk-bluebird/eco_restoration_shard
+
+[package]
+name = "eco_restoration_shard_core"
+version = "0.1.0"
+edition = "2021"
+authors = ["bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"]
+license = "MIT"
+description = "Rust governance spine client for the eco_restoration_shard Phoenix governance DB"
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+readme = "README.md"
+
+[lib]
+name = "eco_restoration_shard_core"
+path = "src/lib.rs"
+
+[[bin]]
+name = "restorationindextool"
+path = "src/bin/restorationindextool.rs"
+
+[features]
+default = ["sqlite"]
+sqlite = []
+
+[dependencies]
+rusqlite = { version = "0.31", features = ["bundled"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+tokio = { version = "1.37", features = ["rt-multi-thread", "macros"] }
+clap = { version = "4.5", features = ["derive"] }
+time = "0.3"
+
+[dev-dependencies]
+assert_cmd = "2.0"
+tempfile = "3.10"
