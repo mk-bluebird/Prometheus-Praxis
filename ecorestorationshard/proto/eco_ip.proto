@@ -1,0 +1,51 @@
+// filename: proto/eco_ip.proto
+// destination: ecorestorationshard/proto/eco_ip.proto
+syntax = "proto3";
+
+package bostrom.eco.v1;
+
+// -----------------------------------------------------------------------------
+// 19. MsgRegisterEcoIP
+// -----------------------------------------------------------------------------
+
+// License types prioritized for ecological and open research use.
+enum EcoLicenseType {
+  ECO_LICENSE_UNSPECIFIED          = 0;
+  ECO_LICENSE_OPEN_SOURCE_ECO      = 1; // OSI-style, eco-priority terms.
+  ECO_LICENSE_NON_COMMERCIAL_ATTR  = 2; // Non-commercial, attribution required.
+  ECO_LICENSE_COMMERCIAL_ECO_TRUST = 3; // Commercial terms with eco trust conditions.
+}
+
+// Registry entry for eco IP.
+message EcoIPRecord {
+  string          inventor_address   = 1; // Inventor Bostrom address.
+  bytes           ip_hash            = 2; // Hash of IP description / patent text.
+  string          title              = 3; // IP title.
+  EcoLicenseType  license_type       = 4; // License classification.
+  string          royalty_recipient  = 5; // Inventor or eco-trust address.
+  double          royalty_percentage = 6; // Percentage (0–100) for derivatives.
+  bool            brain_bound_approval_ok = 7; // Derived from brain_bound_approval verification.
+}
+
+// Brain-bound approval for IP registration.
+message BrainBoundApproval {
+  BCIChallengeSignature bci_attestation = 1; // Host approval over ip_hash and title.
+}
+
+// MsgRegisterEcoIP registers eco IP derived from AI-assisted research.
+message MsgRegisterEcoIP {
+  string            inventor_address    = 1; // Bostrom address of inventor.
+  bytes             ip_hash             = 2; // Hash of IP descriptor.
+  string            title               = 3; // Human-readable title.
+  BrainBoundApproval brain_bound_approval = 4; // Host brain-bound approval.
+  EcoLicenseType    license_type        = 5; // License classification.
+  string            royalty_recipient   = 6; // Must equal inventor_address or eco-trust.
+  double            royalty_percentage  = 7; // Percentage (0–100).
+
+  // Handler MUST:
+  // - Verify brain_bound_approval.bci_attestation against inventor_address.
+  // - Ensure royalty_recipient == inventor_address or a registered eco-trust.
+  // - Insert EcoIPRecord into module registry keyed by ip_hash.
+  // - Enforce that derivative modules referencing this ip_hash automatically
+  //   route royalty_percentage of rewards to royalty_recipient.
+}
