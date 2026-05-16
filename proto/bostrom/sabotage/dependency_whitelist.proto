@@ -1,0 +1,17 @@
+// filename: proto/bostrom/sabotage/dependency_whitelist.proto
+// destination: eco_restoration_shard/proto/bostrom/sabotage/dependency_whitelist.proto
+// repo-target: github.com/mk-bluebird/eco_restoration_shard
+
+syntax = "proto3";
+
+package bostrom.sabotage;
+
+option go_package = "github.com/mk-bluebird/eco_restoration_shard/x/sabotage/types";
+
+message MsgSetDependencyWhitelist {
+  string bostrom_address = 1;
+  bytes merkle_root = 2;
+  string versiontag = 3;
+}
+
+message MsgSetDependencyWhitelistResponse {}
