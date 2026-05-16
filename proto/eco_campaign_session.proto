@@ -1,0 +1,36 @@
+// filename: proto/eco_campaign_session.proto
+// destination: ecorestorationshard/proto/eco_campaign_session.proto
+
+syntax = "proto3";
+
+package bostrom.eco.v1;
+
+import "eco_campaign.proto";
+
+// Capabilities enum for delegated power.
+enum CyberneticCapability {
+  CYBERNETIC_CAPABILITY_UNSPECIFIED = 0;
+  CYBERNETIC_CAPABILITY_ECO_CAMPAIGN_EXECUTION = 1;
+}
+
+// MsgDelegateCyberneticPower with constrained capabilities.
+message MsgDelegateCyberneticPower {
+  string host_address          = 1;
+  bytes  session_pubkey        = 2; // Session key public key.
+  repeated CyberneticCapability capabilities = 3;
+  int64  expires_at_block      = 4;
+  string delegation_ticket_id  = 5;
+  bool   require_eco_intent_bci = 6;
+  BCIChallengeSignature brain_bound_signature = 7;
+}
+
+// MsgCreateEcoCampaign with plan hash binding.
+message MsgCreateEcoCampaign {
+  string host_address          = 1;
+  string campaign_id           = 2;
+  string region                = 3;
+  string plan_hash_hex         = 4; // Hash of full campaign plan.
+  string description           = 5;
+  string eco_scope             = 6;
+  string session_ticket_id     = 7; // From MsgDelegateCyberneticPower.
+}
