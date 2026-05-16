@@ -1,0 +1,33 @@
+// filename: proto/eco_gas_discount.proto
+// destination: ecorestorationshard/proto/eco_gas_discount.proto
+syntax = "proto3";
+
+package bostrom.eco.v1;
+
+// -----------------------------------------------------------------------------
+// 21. MsgSetEcoGasDiscount
+// -----------------------------------------------------------------------------
+
+// Per-message-type gas discount rule, conditioned on host r_axis.
+message EcoGasDiscountRule {
+  string message_type          = 1; // Fully-qualified Cosmos msg type, e.g. "bostrom.eco.v1.MsgReportEcoRestoration".
+  double discount_percentage   = 2; // 0.0–100.0; applied to gas price/amount.
+  double minimum_host_r_axis   = 3; // Minimum r_axis required for discount, e.g. 500.0.
+}
+
+// Evidence describing expected validation load impact and safety.
+message ValidationLoadEvidence {
+  string  load_model_cid       = 1; // CID of model / analysis doc.
+  double  expected_gas_delta   = 2; // Expected net gas consumption change per block (relative).
+  double  expected_cpu_delta   = 3; // Expected validator CPU load delta (relative).
+  double  safety_margin_risk   = 4; // Residual risk estimate for economic safety (0–1).
+  string  notes                = 5; // Human-readable explanation for governance.
+}
+
+// Governance proposal to set eco gas discounts.
+message MsgSetEcoGasDiscount {
+  string                   proposer_address     = 1; // Governance proposer (Bostrom address).
+  repeated EcoGasDiscountRule rules            = 2; // Table of message_type→discount rules.
+  ValidationLoadEvidence   validation_evidence = 3; // Economic / load safety evidence.
+  string                   policy_id           = 4; // Logical ID in DefinitionRegistry.
+}
