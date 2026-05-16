@@ -1,0 +1,37 @@
+// filename: proto/eco_evidence.proto
+// destination: ecorestorationshard/proto/eco_evidence.proto
+syntax = "proto3";
+
+package bostrom.eco.v1;
+
+// -----------------------------------------------------------------------------
+// 17. MsgAggregateEcoEvidence
+// -----------------------------------------------------------------------------
+
+// Individual oracle evidence item.
+message AggregatedEvidence {
+  string oracle_address       = 1; // Oracle contract or signer address.
+  bytes  oracle_signature     = 2; // Signature over measurement JSON CID and context.
+  string measurement_cid      = 3; // CID for JSON measurement payload.
+  bytes  zk_proof             = 4; // ZK proof of correctness wrt oracle program.
+  string zk_scheme            = 5; // Identifier of ZK scheme.
+  string eco_dimension        = 6; // e.g. "co2e", "water_quality", "biodiversity".
+  double value                = 7; // Aggregated measurement value.
+}
+
+// MsgAggregateEcoEvidence allows an AI agent to submit batched eco evidence.
+message MsgAggregateEcoEvidence {
+  string                 aggregator_address     = 1; // AI-agent temporary key.
+  string                 host_bostrom_address  = 2; // Host's Bostrom address.
+  repeated AggregatedEvidence evidence_array   = 3; // Batched evidence per oracle.
+  uint32                 quorum_threshold      = 4; // Minimum distinct oracles required.
+  BCIChallengeSignature  brain_bound_attestation = 5; // Host authorization of aggregation.
+  bytes                  no_blacklist_proof    = 6; // Merkle or other commitment to clean patterns.
+
+  // Handler MUST:
+  // - Verify quorum_threshold <= distinct oracle_address count.
+  // - Verify each oracle_signature and zk_proof.
+  // - Verify brain_bound_attestation against host_bostrom_address.
+  // - Verify no_blacklist_proof against decentralized pattern registry.
+  // - Compute Δr (ResponsibilityScalar increment) and mint it under host_bostrom_address.
+}
