@@ -1,5 +1,5 @@
-# filename .github/workflows/update_repo_lastupdatedutc.yml
-# destination eco_restoration_shard/.github/workflows/update_repo_lastupdatedutc.yml
+# filename: .github/workflows/update_repo_lastupdatedutc.yml
+# destination: eco_restoration_shard/.github/workflows/update_repo_lastupdatedutc.yml
 
 name: Update repo.lastupdatedutc
 
@@ -15,17 +15,22 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Compute timestamp and write lane-status shard
         run: |
-          TS="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          TS="$(date -u +"%Y%m%dT%H%M%SZ")"
           REPO_NAME="eco_restoration_shard"
           OUTPUT_DIR="lane-status"
           mkdir -p "${OUTPUT_DIR}"
-          cat > "${OUTPUT_DIR}/lane_status_update_${TS}.sql" <<EOF
+          FILE_PATH="${OUTPUT_DIR}/lane_status_update_${TS}.sql"
+
+          cat > "${FILE_PATH}" <<EOF
           PRAGMA foreign_keys = ON;
           UPDATE repo
           SET lastupdatedutc = '${TS}'
