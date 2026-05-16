@@ -1,0 +1,26 @@
+// filename: proto/eco_session.proto
+// destination: ecorestorationshard/proto/eco_session.proto
+syntax = "proto3";
+
+package bostrom.eco.v1;
+
+// -----------------------------------------------------------------------------
+// 20. MsgSessionContribution
+// -----------------------------------------------------------------------------
+
+// Proof that an AI-chat session produced a valuable, neurorights-compliant output.
+message MsgSessionContribution {
+  string                session_id             = 1; // Unique session identifier.
+  string                host_address           = 2; // Host Bostrom address.
+  bytes                 chat_transcript_hash   = 3; // Hash of full chat transcript.
+  string                output_artifact_cid    = 4; // CID of primary output artifact.
+  string                model_id               = 5; // AI model identifier/version.
+  BCIChallengeSignature bci_attestation        = 6; // Host review of output.
+  bytes                 no_blacklist_proof     = 7; // Merkle proof root or commitment.
+
+  // no_blacklist_proof semantics:
+  // - Commitment to a Merkle tree over normalized output chunks.
+  // - Each leaf encodes (chunk_hash, pattern_ok_flag).
+  // - Root is checked against a decentralized pattern registry to ensure
+  //   the output did not match any registered blacklist pattern at submission time.
+}
