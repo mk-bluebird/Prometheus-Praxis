@@ -1,65 +1,34 @@
 ```
-# Dependencies
-target/
-
-# Compiled files
-*.o
-*.obj
-*.a
-*.so
-*.dylib
-*.dll
-*.exe
-
-# Logs
-*.log
+# Database files
+*.sqlite3
 
 # Environment
 .env
 .env.local
 *.env.*
 
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+
 # Editors
 .vscode/
 .idea/
-*.swp
-*.swo
 
-# Coverage
-coverage/
-htmlcov/
-.coverage
-
-# Python specific
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-env/
-venv/
+# Dependencies
+node_modules/
 .venv/
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-.git*
-!/.gitignore
+venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+dist/
+build/
+target/
+.gradle/
+
+# OS generated files
 .DS_Store
 Thumbs.db
-
-# Rust specific
-Cargo.lock
-*.rs.bk
-$CARGO_HOME/
-.cargo/
-
-# Build directories
-build/
-dist/
 ```
