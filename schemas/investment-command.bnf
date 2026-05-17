@@ -1,0 +1,56 @@
+<investment-command> ::= "invest" <whitespace> <proposal-body>
+
+<proposal-body> ::= <id-clause>
+                    <whitespace> "for" <whitespace> <portfolio-clause>
+                    <whitespace> "in" <whitespace> <region-clause>
+                    <whitespace> "lane" <whitespace> <lane-spec>
+                    <whitespace> <amount-clause>
+                    <whitespace> <eco-rationale-clause>
+                    [<whitespace> <constraint-section>]
+                    [<whitespace> <evidence-section>]
+
+<id-clause> ::= "proposal" <whitespace> <proposal-id>
+<proposal-id> ::= <alnum-dash>+
+
+<portfolio-clause> ::= "portfolio" <whitespace> <portfolio-id>
+<portfolio-id> ::= <alnum-dash>+
+
+<region-clause> ::= <region-code>
+<region-code> ::= <alpha> <alpha> [ "-" <alnum-dash>+ ]
+
+<lane-spec> ::= "RESEARCH" | "EXPPROD" | "PROD"
+
+<amount-clause> ::= <number> <whitespace> <unit>
+<unit> ::= "ECO_WEALTH_POINTS" | "TCO2E" | "KWH_EQ" | "USD_INDEXED"
+
+<eco-rationale-clause> ::= "because" <whitespace> <free-text>
+
+<constraint-section> ::= <plane-constraints> [<whitespace> <lane-constraints>]
+
+<plane-constraints> ::= "planes" <whitespace> <plane-constraint-list>
+<plane-constraint-list> ::= <plane-constraint> | <plane-constraint> "," <plane-constraint-list>
+<plane-constraint> ::= <plane-id> ":" <direction> [ "@" <band-range> ] [ "!" "nooffset" ]
+<plane-id> ::= <alnum-dash>+
+<direction> ::= "HIGHER_IS_WORSE" | "LOWER_IS_WORSE"
+<band-range> ::= "[" <number> "," <number> "]"
+
+<lane-constraints> ::= "lanes" <whitespace> <lane-constraint-body>
+<lane-constraint-body> ::= "allow" ":" <lane-list>
+                           [ ";" "forbid-planes" ":" <plane-id-list> ]
+                           [ ";" "nonactuating-only" ]
+<lane-list> ::= <lane-spec> | <lane-spec> "," <lane-list>
+<plane-id-list> ::= <plane-id> | <plane-id> "," <plane-id-list>
+
+<evidence-section> ::= "evidence" <whitespace> <hex-string>
+                       [<whitespace> "aux" <whitespace> <hex-string>]
+                       <whitespace> "sign" <whitespace> <did>
+<hex-string> ::= "0x" <hex-digit>+
+<did> ::= <non-space>+
+
+<whitespace> ::= (" " | "\t" | "\n")+
+<alnum-dash> ::= (<alpha> | <digit> | "-" | "_")+
+<alpha> ::= "A" | ... | "Z" | "a" | ... | "z"
+<digit> ::= "0" | ... | "9"
+<hex-digit> ::= <digit> | "a" | ... | "f" | "A" | ... | "F"
+<free-text> ::= <free-text-char>+
+<free-text-char> ::= any character except newline
