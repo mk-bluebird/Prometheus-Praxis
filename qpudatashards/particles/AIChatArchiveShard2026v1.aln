@@ -1,0 +1,31 @@
+PARTICLE AIChatArchiveShard2026v1 :
+  ROLE        GOVERNANCE
+  CATEGORY    AI_CHAT
+  VERSIONTAG  2026v1
+  TITLE       "AI Chat Archive Shard"
+  DESCRIPTION "Append-only archive of prompt/response pairs with hash-chained integrity."
+
+FIELDS:
+  archive_id           : string     # stream id
+  seq_no               : i64        # monotonically increasing
+  parent_hash_hex      : string     # hash of previous record
+  record_hash_hex      : string     # hash of this record payload
+
+  prompt_hash_hex      : string     # hash of canonical prompt JSON
+  response_hash_hex    : string     # hash of canonical response JSON
+  pair_hash_hex        : string     # hash(prompt_hash || response_hash)
+
+  occurrence_count     : i64        # number of times this pair observed
+  first_seen_utc       : datetime
+  last_seen_utc        : datetime
+
+  # Optional metadata (lane, region, KER snapshot)
+  lane                 : string?    # RESEARCH|EXPPROD|PROD_VIEW
+  region_code          : string?
+  k_snapshot           : f64?
+  e_snapshot           : f64?
+  r_snapshot           : f64?
+
+  evidencehex          : string
+  signing_did          : string
+END
