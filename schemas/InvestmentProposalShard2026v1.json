@@ -1,0 +1,171 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "InvestmentProposalShard2026v1",
+  "type": "object",
+  "required": [
+    "proposal_id",
+    "steward_did",
+    "region_code",
+    "ts_created_utc",
+    "principal_amount",
+    "principal_unit",
+    "lane_requested",
+    "eco_rationale",
+    "ker_snapshot_before",
+    "ker_targets_after",
+    "non_offsettable_constraints",
+    "lane_constraints",
+    "evidencehex",
+    "signing_did"
+  ],
+  "properties": {
+    "particle": {
+      "type": "string",
+      "const": "InvestmentProposalShard2026v1"
+    },
+    "proposal_id": {
+      "type": "string",
+      "pattern": "^[A-Z0-9_\\-]{8,64}$"
+    },
+    "steward_did": {
+      "type": "string",
+      "minLength": 8
+    },
+    "region_code": {
+      "type": "string",
+      "minLength": 2
+    },
+    "ts_created_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ts_valid_until_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "portfolio_id": {
+      "type": "string"
+    },
+    "principal_amount": {
+      "type": "number",
+      "minimum": 0
+    },
+    "principal_unit": {
+      "type": "string",
+      "enum": ["ECO_WEALTH_POINTS", "TCO2E", "KWH_EQ", "USD_INDEXED"]
+    },
+    "lane_requested": {
+      "type": "string",
+      "enum": ["RESEARCH", "EXPPROD", "PROD"]
+    },
+    "lane_floor": {
+      "type": "string",
+      "enum": ["RESEARCH", "EXPPROD", "PROD"]
+    },
+    "planes_focus": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "eco_rationale": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ker_snapshot_before": {
+      "type": "object",
+      "required": ["k", "e", "r", "vt"],
+      "properties": {
+        "k": { "type": "number", "minimum": 0, "maximum": 1 },
+        "e": { "type": "number", "minimum": 0, "maximum": 1 },
+        "r": { "type": "number", "minimum": 0, "maximum": 1 },
+        "vt": { "type": "number", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "ker_targets_after": {
+      "type": "object",
+      "required": ["k_min", "e_min", "r_max"],
+      "properties": {
+        "k_min": { "type": "number", "minimum": 0, "maximum": 1 },
+        "e_min": { "type": "number", "minimum": 0, "maximum": 1 },
+        "r_max": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "non_offsettable_constraints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["plane_id", "hard_direction", "no_compensation"],
+        "properties": {
+          "plane_id": { "type": "string" },
+          "hard_direction": { "type": "string", "enum": ["HIGHER_IS_WORSE", "LOWER_IS_WORSE"] },
+          "no_compensation": { "type": "boolean" },
+          "min_band": { "type": "number" },
+          "max_band": { "type": "number" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "lane_constraints": {
+      "type": "object",
+      "required": ["allowed_lanes", "forbidden_planes"],
+      "properties": {
+        "allowed_lanes": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["RESEARCH", "EXPPROD", "PROD"] }
+        },
+        "forbidden_planes": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "requires_nonactuating_only": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "cashflow_constraints": {
+      "type": "object",
+      "properties": {
+        "lockup_days_min": { "type": "integer", "minimum": 0 },
+        "lockup_days_max": { "type": "integer", "minimum": 0 },
+        "max_loss_fraction": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "risk_preferences": {
+      "type": "object",
+      "properties": {
+        "max_risk_plane": { "type": "number", "minimum": 0, "maximum": 1 },
+        "max_vt": { "type": "number", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "ai_chat_hints": {
+      "type": "object",
+      "properties": {
+        "topic_tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "priority_band": {
+          "type": "string",
+          "enum": ["HIGH", "MEDIUM", "LOW"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "evidencehex": {
+      "type": "string"
+    },
+    "auxhashhex": {
+      "type": "string"
+    },
+    "signing_did": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}
