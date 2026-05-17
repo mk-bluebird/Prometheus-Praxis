@@ -1,0 +1,49 @@
+# filename: eco-fort/config.toml
+# destination: eco-fort/config.toml
+
+[paths]
+# Path to the EcoFort constellation DB containing definitionregistry, planeweights, shardinstance, etc.
+# Linked to Eco-Fort db schema docs in ConstellationEcosafetyBible2026v1.md.
+constellation_db = "db/constellation.db"
+
+# Path to definitionregistry SQL table (inside constellation_db).
+# This table indexes frozen grammar artifacts and ALN specs.
+definitionregistry_table = "definitionregistry"
+
+# Path to plane weights SQL table (inside constellation_db).
+# Mirrors PlaneWeightsShard2026v1.aln and feeds residual / KER math.
+planeweights_table = "planeweights"
+
+# Path to corridor definition table for risk coordinates.
+corridordefinition_table = "corridordefinition"
+
+# Path to ALN schema directory for grammar particles.
+# Used at compile time by alncore-aware crates to resolve ALN specs.
+aln_schema_dir = "aln/"
+
+[compile_time]
+# Enable compile-time resolution of definitionregistry and planeweights for ecosafety-core and related crates.
+# Crates read these paths via build.rs or env! macros.
+enable_definitionregistry_resolution = true
+enable_planeweights_resolution = true
+
+# Default KER context identifier bound to this EcoFort workspace.
+kercontext = "PhoenixEcoSafetySpine2026v1"
+
+[eco_wealth]
+# Default EcoWealth kernel spec name and version.
+ecowealth_kernel_id = "EcoWealthKernel2026v1"
+# Sensor trust plane spec used for r_calib / r_sigma integration.
+sensor_trust_plane_id = "SensorTrustPlane2026v1"
+
+[topology]
+# Lane governance topology policy ALN id.
+lane_governance_topology_policy = "LaneGovernanceTopology2026v1"
+
+# Maximum allowed r_topology for lane promotion (SAFE band).
+# Value is interpreted via corridordefinition for topology plane.
+promotion_r_topology_max = 0.2
+
+# Minimum r_topology for forced downgrade (HARD band).
+# Value is interpreted via corridordefinition for topology plane.
+downgrade_r_topology_min = 0.8
