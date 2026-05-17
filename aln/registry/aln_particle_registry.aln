@@ -1,0 +1,14 @@
+particle aln.particle.registry.v1
+meta
+  id aln.particle.registry.v1
+  kind registry
+  version v1
+end
+
+fields
+  particlename string
+  role_plane   string
+  repo_target  string
+  relpath      string
+  evidence_tag string
+end
