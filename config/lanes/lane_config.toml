@@ -1,0 +1,76 @@
+[T02_ecoper_joule]
+lane = "EXPPROD"
+k_min = 0.94
+e_min = 0.91
+r_min = 0.13
+require_hydrology = false
+require_sensor_health = true
+require_topology = false
+
+[T03_eco_wealth_portfolio]
+lane = "EXPPROD"
+k_min = 0.95
+e_min = 0.90
+r_min = 0.13
+require_hydrology = false
+require_sensor_health = false
+require_topology = false
+
+[T04_hydro_radius]
+lane = "EXPPROD"
+k_min = 0.94
+e_min = 0.91
+r_min = 0.13
+require_hydrology = true
+require_sensor_health = false
+require_topology = false
+
+[T05_blastradius]
+lane = "EXPPROD"
+k_min = 0.94
+e_min = 0.90
+r_min = 0.13
+require_hydrology = false
+require_sensor_health = false
+require_topology = false
+
+[T07_topology_fixes]
+lane = "RESEARCH"
+k_min = 0.90
+e_min = 0.88
+r_min = 0.10
+require_topology = true
+
+[T08_sensor_health]
+lane = "EXPPROD"
+k_min = 0.94
+e_min = 0.91
+r_min = 0.13
+require_sensor_health = true
+
+[T09_knowledge_multiplier]
+lane = "RESEARCH"
+k_min = 0.90
+e_min = 0.88
+r_min = 0.10
+
+[T10_pricing]
+lane = "EXPPROD"
+k_min = 0.94
+e_min = 0.90
+r_min = 0.13
+require_hydrology = true
+require_sensor_health = true
+
+[T11_cross_sync]
+lane = "EXPPROD"
+k_min = 0.94
+e_min = 0.90
+r_min = 0.13
+require_topology = true
+
+[T12_summary_engine]
+lane = "EXPPROD"
+k_min = 0.93
+e_min = 0.90
+r_min = 0.13
