@@ -1,0 +1,50 @@
+# filename: daily_evolution_daemon.toml
+# destination: eco_restoration_shard/config/daily_evolution_daemon.toml
+
+[daemon]
+# Stable identifier for joining to definitionregistry and kerresidual.
+name = "daily_evolution_daemon"
+region = "Phoenix-AZ"
+plane_contract_id = "KER_CORE_2026V1"
+
+# Maximum number of evolution windows evaluated per day.
+max_evolution_windows_per_day = 64
+# Maximum number of shards promoted per day across all lanes.
+max_promotions_per_day = 8
+# Maximum number of MT6883 healthcare courses evaluated per day.
+max_healthcare_courses_per_day = 16
+
+# Global rate limit for RoH-bearing evaluations, to bound thermodynamic and
+# cognitive load on hosts.
+max_roh_evaluations_per_day = 256
+
+[rate_limits.lane_governance]
+# Number of lane decisions computed per day.
+max_lane_decisions_per_day = 128
+# Number of evidence windows considered per kernel per day.
+max_evidence_windows_per_kernel = 4
+
+[rate_limits.placement]
+# Maximum number of placement verdicts emitted per day.
+max_placement_verdicts_per_day = 64
+
+[rate_limits.mt6883]
+# Maximum detox episodes evaluated per MT6883 citizen per day.
+max_detox_episodes_per_citizen = 3
+# Maximum treatment courses updated per MT6883 citizen per day.
+max_course_updates_per_citizen = 6
+
+[guards]
+# Hard ceiling on risk of harm; must match RoH kernel ceiling.
+roh_ceiling = 0.3
+# Minimum knowledge factor for any shard considered for evolution.
+min_knowledge_factor = 0.8
+# Minimum eco-impact band for promotions.
+min_eco_impact = 0.7
+# Maximum allowed topology misalignment.
+max_r_topology = 0.4
+
+[logging]
+# Path relative to repo root for daemon logs.
+log_path = "logs/daily_evolution_daemon.log"
+log_level = "info"
