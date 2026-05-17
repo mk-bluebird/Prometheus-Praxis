@@ -1,0 +1,63 @@
+PARTICLE InvestmentProposalShard2026v1 :
+  ROLE        GOVERNANCE
+  CATEGORY    ECO_WEALTH
+  VERSIONTAG  2026v1
+  TITLE       "Investment Proposal Shard"
+  DESCRIPTION "Lane-bounded eco-wealth investment proposals with KER and plane constraints."
+
+FIELDS:
+  proposal_id           : string     # unique ID
+  steward_did           : string     # augmented-citizen DID
+  region_code           : string     # region key
+  ts_created_utc        : datetime
+  ts_valid_until_utc    : datetime?
+
+  portfolio_id          : string?    # optional portfolio reference
+
+  principal_amount      : f64
+  principal_unit        : string     # ECO_WEALTH_POINTS|TCO2E|KWH_EQ|USD_INDEXED
+
+  lane_requested        : string     # RESEARCH|EXPPROD|PROD
+  lane_floor            : string?    # optional floor
+  planes_focus          : string[]?  # targeted planes, e.g. ["CARBON","BIODIVERSITY"]
+
+  eco_rationale         : string
+
+  ker_k_before          : f64        # 0..1
+  ker_e_before          : f64        # 0..1
+  ker_r_before          : f64        # 0..1
+  ker_vt_before         : f64        # >=0
+
+  ker_k_min_after       : f64        # 0..1
+  ker_e_min_after       : f64        # 0..1
+  ker_r_max_after       : f64        # 0..1
+
+  # Non-offsettable plane constraints
+  nonoffset_plane_id    : string[]   # plane IDs
+  nonoffset_direction   : string[]   # HIGHER_IS_WORSE|LOWER_IS_WORSE
+  nonoffset_flag        : bool[]     # true => non-compensable
+  nonoffset_min_band    : f64[]?     # optional corridor bands
+  nonoffset_max_band    : f64[]?
+
+  # Lane constraints
+  lane_allowed          : string[]   # allowed lanes
+  lane_forbidden_planes : string[]   # planes that must not be touched
+  lane_nonactuating_only: bool?      # forbid actuator binding
+
+  # Cashflow constraints (optional)
+  lockup_days_min       : i64?
+  lockup_days_max       : i64?
+  max_loss_fraction     : f64?       # 0..1
+
+  # Risk preferences (optional)
+  max_risk_plane        : f64?       # max R on any plane
+  max_vt                : f64?       # max residual
+
+  # AI-chat hints (optional)
+  topic_tags            : string[]?
+  priority_band         : string?    # HIGH|MEDIUM|LOW
+
+  evidencehex           : string
+  auxhashhex            : string?
+  signing_did           : string
+END
