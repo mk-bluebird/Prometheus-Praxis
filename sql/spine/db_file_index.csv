@@ -1,0 +1,9 @@
+repo_target,filename,destination,role_plane
+eco_restoration_shard,dbdefinitionregistry.sql,eco_restoration_shard/sql/spine/dbdefinitionregistry.sql,spine
+eco_restoration_shard,dbvshard_views.sql,eco_restoration_shard/sql/eco_wealth/dbvshard_views.sql,eco_wealth
+eco_restoration_shard,daily_evolution_daemon.toml,eco_restoration_shard/config/daily_evolution_daemon.toml,ker_residual
+eco_restoration_shard,kerresidual/Cargo.toml,eco_restoration_shard/crates/kerresidual/Cargo.toml,ker_residual
+eco_restoration_shard,bioscale-fairness-validator/Cargo.toml,eco_restoration_shard/crates/bioscale-fairness-validator/Cargo.toml,healthcare_mt6883
+eco_restoration_shard,ker_ci.yml,eco_restoration_shard/.github/workflows/ker_ci.yml,ker_residual
+eco_restoration_shard,dbmigration_audit.csv.sql,eco_restoration_shard/sql/spine/dbmigration_audit.csv.sql,spine
+eco_restoration_shard,aln_particle_registry.aln,eco_restoration_shard/aln/registry/aln_particle_registry.aln,spine
