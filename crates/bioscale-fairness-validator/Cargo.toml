@@ -1,0 +1,23 @@
+# filename: Cargo.toml
+# destination: eco_restoration_shard/crates/bioscale-fairness-validator/Cargo.toml
+
+[package]
+name = "bioscale-fairness-validator"
+version = "0.1.0"
+edition = "2021"
+description = "Bioscale fairness validator for MT6883 healthcare corridors and eco-wealth rewards."
+license = "MIT"
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+readme = "README.md"
+keywords = ["healthcare", "fairness", "ker", "mt6883"]
+
+[lib]
+name = "bioscale_fairness_validator"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+kerresidual = { path = "../kerresidual" }
+
+[features]
+default = []
