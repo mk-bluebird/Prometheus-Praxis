@@ -1,0 +1,47 @@
+aln filename StewardEcoWealthStatement2026v1.aln
+destination qpudatashards/StewardEcoWealthStatement2026v1.aln
+
+PARTICLE StewardEcoWealthStatement2026v1
+ROLE      ECOWEALTH
+CATEGORY  PORTFOLIO
+VERSIONTAG 2026v1
+
+FIELDS
+  stewarddid              string
+  regioncode              string
+  lane                    string   # dominant lane
+  windowstartutc          datetime
+  windowendutc            datetime
+
+  kmean                   f64
+  kmin                    f64
+  kmax                    f64
+  emean                   f64
+  emin                    f64
+  emax                    f64
+  rmean                   f64
+  rmax                    f64
+  vtmaxwindow             f64
+
+  kdelta                  f64      # kend - kstart
+  edelta                  f64
+  rdelta                  f64
+
+  ecounitraw              f64
+  mk_education            f64
+  delta_e_phys            f64
+  ecounit_after_education f64
+  representation_weight   f64
+  ecounit_final           f64
+
+  ecowealthkernelid       string
+  planecontractid         string
+  corridorsetid           string
+  lanepolicyid            string
+
+  vshardkerwindowhash     string
+  shardlisthash           string
+  evidencehex             string
+  signingdid              string
+  createdutc              datetime
+END
