@@ -1,0 +1,43 @@
+PARTICLE RestorationBondShard2026v1 :
+  ROLE        GOVERNANCE
+  CATEGORY    ECO_WEALTH
+  VERSIONTAG  2026v1
+  TITLE       "Restoration Bond contract shard"
+  DESCRIPTION "Staking, principal, and dynamic collateral rules for eco-restoration bonds."
+
+FIELDS:
+  bond_id                : string
+  steward_did            : string
+  region_code            : string
+  ts_issued_utc          : datetime
+  ts_maturity_utc        : datetime
+
+  principal_amount       : f64
+  principal_unit         : string     # ECO_WEALTH_POINTS|TCO2E|...
+
+  collateral_amount      : f64
+  collateral_unit        : string
+  staking_ratio          : f64        # collateral/principal
+
+  # KER targets and volatility parameters
+  ker_k_target           : f64
+  ker_e_target           : f64
+  ker_r_target_max       : f64
+
+  ker_volatility_k       : f64        # empirical σ_K over window
+  ker_volatility_e       : f64        # empirical σ_E
+  ker_volatility_r       : f64        # empirical σ_R
+
+  # Dynamic staking rule parameters
+  base_ratio             : f64        # baseline collateral ratio
+  vol_sensitivity        : f64        # α
+  regime_state           : string     # NORMAL|STRESSED|CRITICAL
+
+  # Default tracking
+  default_probability_1y : f64?       # modelled
+  default_event          : bool
+  default_ts_utc         : datetime?
+
+  evidencehex            : string
+  signing_did            : string
+END
