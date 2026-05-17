@@ -1,0 +1,22 @@
+# 18. PlaneWeightsShard2026v1 entry for w_trust
+# filename: aln-specs/PlaneWeightsShard2026v1.aln
+# destination: aln-specs/PlaneWeightsShard2026v1.aln
+
+schema,version,title,description,category
+PlaneWeightsShard2026v1,v1,Plane Weights and Non-offsettable Planes,Per-plane weights and non-compensation flags for the Lyapunov residual,ECOSAFETY
+
+field,name,datatype,units,required,description
+1,planeid,string,,true,Logical plane identifier e.g. energy,hydrology,materials,topology,trust
+2,planecode,string,,true,Short code for plane e.g. ENERGY,HYDROLOGY,TOPOLOGY,TRUST
+3,contractid,int,,true,Foreign key into planeweights_contract
+4,weight,double,,true,Lyapunov weight w_j for this plane
+5,nonoffsettable,bool,,true,If true plane cannot be compensated by others
+6,softband,double,,true,Optional soft band for plane-level indicators
+7,hardband,double,,true,Hard band for plane-level indicators
+8,signingdid,string,,true,Bostrom DID of governance signer
+9,evidencehex,string,,true,Hex commitment over this record
+
+record
+planeid,planecode,contractid,weight,nonoffsettable,softband,hardband,signingdid,evidencehex
+data_quality_trust,TRUST,1,0.05,false,0.3,0.7,bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7,abcd1234deadbeef
+endrecord
