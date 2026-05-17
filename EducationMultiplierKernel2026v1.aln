@@ -1,0 +1,44 @@
+PARTICLE EducationMultiplierKernel2026v1 :
+  ROLE        GOVERNANCE
+  CATEGORY    EDUCATION
+  VERSIONTAG  2026v1
+  TITLE       Education multiplier and penalty kernel
+  DESCRIPTION Binds steward education engagement to bounded eco-wealth multipliers.
+
+FIELDS:
+  steward_did         : string   # Bostrom DID of steward
+  region_code         : string   # region, e.g., "Phoenix-AZ"
+  ker_context         : string   # KER context label
+  epoch_start_utc     : datetime
+  epoch_end_utc       : datetime
+
+  # Baseline physical eco-impact and KER for the steward/region window
+  e_phys_baseline     : f64      # baseline E_phys in 0..1 (physics-only)
+  e_phys_current      : f64      # current E_phys in 0..1
+  k_metric_window     : f64      # knowledge-factor window K
+  r_metric_window     : f64      # risk-of-harm window R
+
+  # Education engagement inputs (normalized elsewhere into 0..1)
+  edu_hours_norm      : f64      # normalized education hours
+  edu_quality_norm    : f64      # normalized quality score
+  edu_recency_norm    : f64      # normalized recency score
+
+  # Derived education score and multiplier
+  edu_score_raw       : f64      # pre-corridor score, unbounded
+  edu_score_norm      : f64      # normalized 0..1 via corridor
+  mk_raw              : f64      # uncapped multiplier
+  mk_applied          : f64      # final multiplier after caps [M_min, M_max]
+
+  # Delta-E-phys and penalty flag
+  delta_e_phys        : f64      # e_phys_current - e_phys_baseline
+  mk_penalty_active   : bool     # true when ΔE_phys < 0 and penalty applied
+  mk_effective        : f64      # signed multiplier actually applied
+
+  # Resulting adjusted eco-impact (for reward, not safety gates)
+  e_effective_reward  : f64      # E used in rewards, not in kerdeployable
+
+  # Evidence and governance fields
+  evidencehex         : string
+  signing_did         : string
+  notes               : string
+END
