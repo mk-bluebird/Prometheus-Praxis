@@ -1,0 +1,49 @@
+name: per-crate-lane-governance
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  per-crate-governance:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        crate:
+          - T02_ecoper_joule
+          - T03_eco_wealth_portfolio
+          - T04_hydro_radius
+          - T05_blastradius
+          - T07_topology_fixes
+          - T08_sensor_health
+          - T09_knowledge_multiplier
+          - T10_pricing
+          - T11_cross_sync
+          - T12_summary_engine
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build crate
+        run: cargo build -p ${{ matrix.crate }}
+
+      - name: Run crate tests
+        run: cargo test -p ${{ matrix.crate }}
+
+      - name: Compute lane trends for crate
+        run: |
+          cargo run -p lane-governance --bin lane_trend_cli -- \
+            --crate ${{ matrix.crate }} \
+            --output target/${{ matrix.crate }}_lane_status.json
+
+      - name: Enforce crate-specific lane gates
+        run: |
+          cargo run -p lane-governance --bin lane_gate_cli -- \
+            --lane-status target/${{ matrix.crate }}_lane_status.json \
+            --crate ${{ matrix.crate }} \
+            --fail-on-violation
