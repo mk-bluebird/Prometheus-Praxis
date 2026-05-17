@@ -1,0 +1,48 @@
+<request> ::= <show_cmd>
+            | <list_cmd>
+            | <explain_cmd>
+            | <compare_cmd>
+            | <plan_cmd>
+            | <ker_cmd>
+
+<show_cmd> ::= "Show" <resource> "for" <scope>
+<list_cmd> ::= "List" <resource> ["for" <scope>]
+<explain_cmd> ::= "Explain" <concept> ["for" <scope>]
+<compare_cmd> ::= "Compare" <resource> "between" <scope> "and" <scope>
+<plan_cmd> ::= "Propose" <plan_type> "for" <scope>
+<ker_cmd> ::= "Show KER for" <scope>
+             | "Show residual for" <scope>
+
+<resource> ::= "eco-wealth"
+             | "KER"
+             | "residual"
+             | "corridors"
+             | "shards"
+             | "lanes"
+             | "materials"
+             | "nodes"
+
+<scope> ::= <region>
+          | <lane>
+          | <asset_id>
+          | <topic>
+
+<region> ::= <identifier>
+<lane> ::= "RESEARCH" | "PILOT" | "PROD" | "SIM" | "EXP"
+<asset_id> ::= <identifier>
+<topic> ::= <identifier>
+
+<plan_type> ::= "ResearchPlan"
+              | "RefactorPlan"
+              | "KernelPilot"
+
+<concept> ::= "lane rules"
+            | "Lyapunov residual"
+            | "KER thresholds"
+            | "HydroRadius"
+            | "AtmosphericCorridor"
+
+<identifier> ::= <alpha_num_seq>
+
+<alpha_num_seq> ::= <alpha_num> | <alpha_num> <alpha_num_seq>
+<alpha_num> ::= "a" | ... | "z" | "A" | ... | "Z" | "0" | ... | "9" | "-" | "_"
