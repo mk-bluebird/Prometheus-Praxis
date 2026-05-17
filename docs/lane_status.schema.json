@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LaneStatus",
+  "type": "object",
+  "properties": {
+    "lane_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "lane_name": {
+      "type": "string"
+    },
+    "kernel_region": {
+      "type": "string"
+    },
+    "ker_current": {
+      "type": "object",
+      "properties": {
+        "k": { "type": "number" },
+        "e": { "type": "number" },
+        "r": { "type": "number" }
+      },
+      "required": ["k", "e", "r"]
+    },
+    "ker_threshold": {
+      "type": "object",
+      "properties": {
+        "k_min": { "type": "number" },
+        "e_min": { "type": "number" },
+        "r_max": { "type": "number" }
+      },
+      "required": ["k_min", "e_min", "r_max"]
+    },
+    "residual_trend": {
+      "type": "object",
+      "properties": {
+        "b_slope": { "type": "number" },
+        "window_start": { "type": "string", "format": "date-time" },
+        "window_end": { "type": "string", "format": "date-time" }
+      },
+      "required": ["b_slope", "window_start", "window_end"]
+    },
+    "violations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "violation_id": { "type": "string", "format": "uuid" },
+          "violation_type": { "type": "string" },
+          "details": { "type": "string" }
+        },
+        "required": ["violation_id", "violation_type", "details"]
+      }
+    },
+    "telemetry_window_hash": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "lane_id",
+    "lane_name",
+    "kernel_region",
+    "ker_current",
+    "ker_threshold",
+    "residual_trend",
+    "violations",
+    "telemetry_window_hash"
+  ]
+}
