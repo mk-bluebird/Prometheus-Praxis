@@ -1,0 +1,36 @@
+# 19. SensorTrustPlane2026v1.aln
+# filename: aln-specs/SensorTrustPlane2026v1.aln
+# destination: aln-specs/SensorTrustPlane2026v1.aln
+
+schema,version,title,description,category
+SensorTrustPlane2026v1,v1,Sensor Trust Plane,Data-quality and calibration trust coordinates and corridors,ECOSAFETY
+
+field,name,datatype,units,required,description
+1,coordid,string,,true,Stable identifier for trust coordinate e.g. r_calib,r_sigma
+2,coordcode,string,,true,Machine code for coordinate R_CALIB,R_SIGMA
+3,lyapchannel,string,,true,Lyapunov channel label e.g. dataquality
+4,safe_band,double,,true,Safe upper bound for r in 0..1
+5,gold_band,double,,true,Gold upper bound for r in 0..1
+6,hard_band,double,,true,Hard upper bound for r in 0..1
+7,weight,double,,true,Residual weight w_j for this coordinate
+8,mandatory,bool,,true,If true coordinate must be present for checksafestep
+9,D_sensor_min,double,,true,Minimum combined trust factor D_sensor when r is at safe band
+10,D_sensor_max,double,,true,Maximum combined trust factor D_sensor when r is at 0
+11,signingdid,string,,true,Bostrom DID of signer
+12,evidencehex,string,,true,Hex commitment for this record
+
+# r_calib corridor and mapping contribution
+record
+coordid,coordcode,lyapchannel,safe_band,gold_band,hard_band,weight,mandatory,D_sensor_min,D_sensor_max,signingdid,evidencehex
+r_calib,R_CALIB,dataquality,0.3,0.6,0.9,0.03,true,0.5,1.0,bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7,deadbeefcafe0001
+endrecord
+
+# r_sigma corridor and mapping contribution
+record
+coordid,coordcode,lyapchannel,safe_band,gold_band,hard_band,weight,mandatory,D_sensor_min,D_sensor_max,signingdid,evidencehex
+r_sigma,R_SIGMA,dataquality,0.3,0.6,0.9,0.02,true,0.5,1.0,bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7,deadbeefcafe0002
+endrecord
+
+# Mapping D_sensor as function of r_calib, r_sigma:
+#   D_sensor = 1 - max(r_calib, r_sigma)
+# encoded by downstream kerresidual / eco-wealth kernels using these bands.
