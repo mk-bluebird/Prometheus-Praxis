@@ -1,0 +1,34 @@
+PARTICLE AIChatEmergencyFetchPolicy2026v1 :
+  ROLE        GOVERNANCE
+  CATEGORY    AI_CHAT
+  VERSIONTAG  2026v1
+  TITLE       "AI-chat emergency fetch policy"
+  DESCRIPTION "Defines non-life-safety emergency refetch rules for eco-wealth dashboards."
+
+FIELDS:
+  policy_id           : string      # e.g. "ECO_WEALTH_EMERGENCY_FETCH_V1"
+  scopetype           : string      # PORTFOLIO|REGION|STEWARD
+  scope_ref           : string      # id within scope
+  max_cache_age_sec   : i64         # normal cache TTL
+  emergency_age_sec   : i64         # hard upper bound on staleness
+  vt_drift_threshold  : f64         # max allowed |ΔVt| from last verified state
+  r_drift_threshold   : f64         # max allowed |ΔR| on any plane
+
+  # Trigger conditions (non-life-safety)
+  trigger_plane       : string[]    # planes monitored
+  trigger_lane        : string[]    # lanes monitored
+  trigger_delta_e_min : f64?        # minimum |ΔE| to trigger
+  trigger_delta_k_min : f64?        # minimum |ΔK| to trigger
+
+  # Budget semantics
+  dp_budget_exempt    : bool        # true => exempt from DP budget
+  max_emergency_calls : i64         # per 24h window
+  cooldown_sec        : i64
+
+  # Safety constraints
+  nonactuating_only   : bool        # must not alter controllers
+  uses_last_verified  : bool        # must compare against vshardker reference window
+
+  evidencehex         : string
+  signing_did         : string
+END
