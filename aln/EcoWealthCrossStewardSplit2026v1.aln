@@ -1,0 +1,95 @@
+-- 41. Cross-steward split rule for T03
+-- filename: aln/EcoWealthCrossStewardSplit2026v1.aln
+-- destination: aln-platform-ecosystem/aln/EcoWealthCrossStewardSplit2026v1.aln
+
+TITLE EcoWealthCrossStewardSplit2026v1
+VERSION 1.0.0
+CATEGORY GOVERNANCE
+
+SUMMARY
+Defines a domain-specific expression language for cross-steward eco-wealth
+split rules so that T03 can automatically compute per-steward allocations
+from a total reward, with KER- and corridor-aware guards.[file:7][file:11]
+END
+
+meta
+  registryversion string 2026v1
+  maintainerdid   string bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+endmeta
+
+-- Expression language:
+--
+--   expr   ::= term (('+' | '-') term)*
+--   term   ::= factor (('*' | '/') factor)*
+--   factor ::= number
+--            | ident
+--            | 'max' '(' expr ',' expr ')'
+--            | 'min' '(' expr ',' expr ')'
+--            | '(' expr ')'
+--
+-- idents are drawn from a fixed environment for T03:
+--   TOTAL_EW        : total eco-wealth to split (scalar)
+--   K_i, E_i, R_i   : steward i KER factors (per window)
+--   W_i             : steward i weight from contract (dimensionless)
+--   RISK_CAP        : global risk ceiling for this split
+-- No side effects, no conditionals; guards are applied outside expr.[file:7]
+
+record EcoWealthSplitRule2026v1
+  ruleid          uint64
+  contractid      uint64        -- FK into eco_wealth contract table
+  -- Steward selection; T03 will apply rule per steward in this set.
+  steward_set_id  string        -- logical grouping (e.g. Phoenix-Canal-Stewards)
+  -- Expression strings; parsed by T03's DSL interpreter.
+  -- MUST be valid under the grammar above and reference only allowed idents.
+  share_expr      string        -- e.g. "W_i * K_i * E_i"
+  -- Optional normalization expression; if empty, T03 normalizes by sum of
+  -- share_expr across stewards.
+  normalize_expr  string        -- e.g. "share_i / SUM_share"
+  -- Hard guard: if true, split MUST NOT be executed.
+  -- Example: "R_i > RISK_CAP" or "K_i < 0.90".
+  forbid_expr     string
+  -- Soft guard: if true, T03 emits advisory but may still execute if
+  -- ecosafety core approves (non-actuating).
+  warn_expr       string
+endrecord
+
+record EcoWealthSplitExample2026v1
+  example_id      uint64
+  ruleid          uint64
+  description     string
+  -- Example environment for documentation/testing; not used in production.
+  total_ew        float64
+  w_i             float64
+  k_i             float64
+  e_i             float64
+  r_i             float64
+  expected_share  float64
+endrecord
+
+section invariants
+
+  -- INV-1: Expression safety
+  --   - share_expr, normalize_expr, forbid_expr, warn_expr MUST:
+  --       * parse under the grammar;
+  --       * reference only TOTAL_EW, W_i, K_i, E_i, R_i, RISK_CAP,
+  --         numeric literals, and 'SUM_share' inside normalize_expr.[file:7]
+  --   - No conditionals or function calls beyond max/min.
+
+  -- INV-2: Normalization
+  --   - For a given split event, T03 computes:
+  --       raw_i = eval(share_expr, env_i)
+  --       SUM_share = Σ_j max(raw_j, 0)
+  --   - If normalize_expr is empty:
+  --       share_i = TOTAL_EW * max(raw_i,0) / SUM_share
+  --       (if SUM_share == 0, all share_i = 0).[file:7]
+  --   - If normalize_expr is present:
+  --       share_i = TOTAL_EW * eval(normalize_expr, env_i ∪ {SUM_share}).
+
+  -- INV-3: Guard semantics
+  --   - If eval(forbid_expr, env_i) == true for ANY steward i in the set,
+  --     T03 MUST NOT execute this rule; it emits a quarantine or revert
+  --     recommendation to eco_wealth_ledger instead.[file:11]
+  --   - If eval(warn_expr, env_i) == true for any i, T03 MUST emit an
+  --     advisory but may continue if ecosafety gates (Vt, KER) pass.
+
+endsection
