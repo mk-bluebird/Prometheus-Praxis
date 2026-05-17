@@ -1,0 +1,47 @@
+PARTICLE LaneGovernanceTopology2026v1
+ROLE GOVERNANCE
+CATEGORY LANE_TOPOLOGY
+VERSIONTAG 2026v1
+TITLE Lane governance rules for topology risk r_topology
+DESCRIPTION Encodes promotion/downgrade rules based on r_topology SAFE/HARD bands over sliding windows.
+
+FIELDS
+policyid            string   LaneGovernanceTopology2026v1
+kercontext          string   PhoenixEcoSafetySpine2026v1
+planeid             string   topology
+corridorid          string   TopologyRiskCorridor2026v1
+
+# Window configuration (number of consecutive windows).
+promotion_window_count   i64   # e.g. 4
+downgrade_window_count   i64   # e.g. 2
+
+# Band labels must match corridordefinition entries for topology plane.
+safe_band_label          string   SAFE
+hard_band_label          string   HARD
+
+# Promotion rule: require r_topology <= SAFE band for promotion_window_count windows.
+promotion_rule           string   # informal: "rtopology <= SAFE for N windows"
+
+# Downgrade rule: trigger when r_topology >= HARD band for downgrade_window_count windows.
+downgrade_rule           string   # informal: "rtopology >= HARD for M windows"
+
+# Evidence and signatures.
+evidencehex              string
+signingdid               string
+
+END
+
+ROW
+policyid=LaneGovernanceTopology2026v1,
+kercontext=PhoenixEcoSafetySpine2026v1,
+planeid=topology,
+corridorid=TopologyRiskCorridor2026v1,
+promotion_window_count=4,
+downgrade_window_count=2,
+safe_band_label=SAFE,
+hard_band_label=HARD,
+promotion_rule=rtopology<=SAFE for 4 consecutive windows,
+downgrade_rule=rtopology>=HARD for 2 consecutive windows,
+evidencehex=hex-LaneGovernanceTopology2026v1-proof,
+signingdid=bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+END
