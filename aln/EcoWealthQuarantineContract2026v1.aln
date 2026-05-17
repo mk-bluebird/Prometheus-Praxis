@@ -1,0 +1,134 @@
+-- filename: aln/EcoWealthQuarantineContract2026v1.aln
+-- destination: aln-platform-ecosystem/aln/EcoWealthQuarantineContract2026v1.aln
+-- Purpose:
+--   Defines eco-wealth quarantine semantics, propagation delays, and KerBlock
+--   invariants for Paycomp and lane-promotion modules.[file:11]
+
+TITLE EcoWealthQuarantineContract2026v1
+VERSION 1.0.0
+CATEGORY GOVERNANCE
+
+SUMMARY
+Contract for quarantining eco-wealth flows when risk signals, governance
+flags, or data-quality evidence indicate potential harm. Encodes how
+quarantine status propagates across Paycomp and lane promotion within a
+single KerBlock, with bounded propagation delay and no rollback of KER or
+lane safety invariants.[file:11]
+END
+
+meta
+  registryversion string 2026v1
+  maintainerdid   string bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+  specbinding     string EcoWealthQuarantineContract2026v1.sql
+endmeta
+
+enum QuarantineCause2026v1
+  RISK_SPIKE          -- sudden increase in R or Vt
+  DATA_QUALITY        -- rcalib, rsigma breaches
+  GOVERNANCE_ORDER    -- external governance trigger
+  SENSOR_CONFLICT     -- conflicting telemetry sources
+  ROH_VIOLATION       -- Rule-of-History chain break
+  OTHER
+endenum
+
+enum QuarantineScope2026v1
+  STEWARD     -- quarantine a specific steward DID
+  SHARD       -- quarantine a specific shardinstance
+  REGION      -- quarantine a region (all shards)
+  CONTRACT    -- quarantine a planeweights / eco-wealth contract
+endenum
+
+enum QuarantineSeverity2026v1
+  SOFT        -- allow accrual, block outflows
+  HARD        -- freeze both accrual and outflows
+endenum
+
+record EcoWealthQuarantineRule2026v1
+  contractid         uint64          -- foreign key to planeweightscontract / eco-wealth policy
+  ruleid             uint64          -- rule identifier within contract
+  scope              QuarantineScope2026v1
+  severity           QuarantineSeverity2026v1
+  cause              QuarantineCause2026v1
+  -- Hard bound: all Paycomp and lane modules MUST apply quarantine within this delay.
+  max_propagation_s  uint32          -- seconds, KerBlock-aligned; typically <= 60
+  -- KerBlock invariants:
+  --   - If trigger condition becomes true at block B_k, then all affected
+  --     flows and lane promotions in B_{k+1} MUST observe the quarantined
+  --     status (no late promotions past this bound).[file:11]
+  apply_to_paycomp   bool            -- if true, Paycomp blocks payouts for scope
+  apply_to_lane      bool            -- if true, lane promotions are disallowed for scope
+  -- Optional relaxation conditions:
+  auto_clear_s       uint32          -- minimum duration quarantine must hold before auto-clear; 0 = manual only
+  require_roh_anchor bool            -- require a governance RoH anchor to clear
+  notes              string
+endrecord
+
+record EcoWealthQuarantineState2026v1
+  -- Logical identity of the quarantined object:
+  scope              QuarantineScope2026v1
+  steward_id         string optional  -- for STEWARD scope
+  shardid            uint64 optional  -- for SHARD scope
+  region             string optional  -- for REGION scope
+  contractid         uint64 optional  -- for CONTRACT or inherited planeweights
+  -- Status:
+  active             bool
+  severity           QuarantineSeverity2026v1
+  cause              QuarantineCause2026v1
+  ruleid             uint64          -- origin rule
+  -- KerBlock timing:
+  kerblock_id        string          -- KerBlock identifier when quarantine was first asserted
+  ts_asserted_utc    datetime
+  -- Propagation bookkeeping:
+  --   - first_observed_in_paycomp: KerBlock in which Paycomp began enforcing.
+  --   - first_observed_in_lane:    KerBlock in which lane module began enforcing.
+  first_observed_in_paycomp string optional
+  first_observed_in_lane    string optional
+  -- Clearance:
+  ts_cleared_utc     datetime optional
+  cleared_by_did     string  optional
+  rohanchorhex       string  optional  -- RoH proof of clearance action
+endrecord
+
+section invariants
+
+  -- INV-1: Bounded propagation delay within KerBlock+1.
+  -- For any EcoWealthQuarantineState with active=true and kerblock_id = B_k:
+  --
+  --   If apply_to_paycomp=true in the corresponding rule:
+  --     then first_observed_in_paycomp MUST be either B_k or B_{k+1},
+  --     and Paycomp MUST reject or hold all matching flows for all
+  --     KerBlocks B_j with j >= index(B_k).[file:11]
+  --
+  --   If apply_to_lane=true:
+  --     then first_observed_in_lane MUST be either B_k or B_{k+1},
+  --     and lane promotion logic MUST reject all promotions whose
+  --     evidence window intersects [ts_asserted_utc, ts_cleared_utc)
+  --     for the quarantined scope.
+
+  -- INV-2: No retroactive relaxation.
+  -- Once active=true for a given scope and KerBlock B_k:
+  --
+  --   - No Paycomp KerBlock B_j with j >= index(B_k) may process a
+  --     payout that would have been blocked under the quarantine rule.
+  --   - No lane promotion KerBlock B_j with j >= index(B_k) may
+  --     accept a promotion that would have been rejected under
+  --     the quarantine rule.[file:11]
+  --
+  -- This is enforced by requiring:
+  --   - Paycomp and lane modules to re-evaluate quarantine state for
+  --     all relevant scopes at the start of each KerBlock.
+  --   - All eco_wealth_ledger and lanestatusshard writes to include
+  --     the KerBlock id and a reference to the current quarantine
+  --     state used for the decision.
+
+  -- INV-3: RoH-coupled clearance.
+  -- If require_roh_anchor=true on the originating rule:
+  --
+  --   ts_cleared_utc MUST NOT be set unless:
+  --     - rohanchorhex is present and valid under RoH contract, and
+  --     - cleared_by_did has a governance role in Ocu-Trust / GOV band.
+  --
+  -- Clearing quarantine does not retroactively change past Paycomp
+  -- or lane decisions; it only allows future KerBlocks to proceed.[file:11]
+
+endsection
