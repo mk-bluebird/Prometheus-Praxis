@@ -1,0 +1,58 @@
+# 43. eco_wealth crate manifest
+# filename: eco_wealth/Cargo.toml
+# destination: eco_wealth/Cargo.toml
+
+[package]
+name = "eco_wealth"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+authors = ["EcoNet Spine <ecosafety-core@econet>"]
+description = "Eco-wealth governance, split rules, and light-client ledger logic under the frozen ecosafety grammar."
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+readme = "README.md"
+
+[lib]
+name = "eco_wealth"
+path = "src/lib.rs"
+crate-type = ["rlib", "cdylib"]
+
+[features]
+# Minimal, nostd-compatible core for TEE / light clients:
+core-light = [
+    "alloc",
+]
+# Full governance node: SQLite, serde, and EcoNet discovery spine.
+governance-full = [
+    "std",
+    "serde",
+    "serde_json",
+    "rusqlite",
+]
+# Default to governance node on servers.
+default = ["governance-full"]
+
+[dependencies]
+# Common dependencies
+serde = { version = "1.0", features = ["derive"], optional = true }
+serde_json = { version = "1.0", optional = true }
+
+# SQLite for governance node; not used in core-light.[file:11]
+rusqlite = { version = "0.31", features = ["bundled"], optional = true }
+
+# For nostd / TEE builds.[file:7]
+alloc = { package = "alloc-no-std", version = "0.1", optional = true }
+
+# EcoNet discovery spine + KER types (placeholder names; must point at
+# existing spine crates in mk-bluebird/eco_restoration_shard).[file:11]
+econet-index = { path = "../econet-index", optional = true }
+ecosafety-core = { path = "../ecosafety-core", optional = true }
+
+[dev-dependencies]
+serde_json = "1.0"
+rusqlite = { version = "0.31", features = ["bundled"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = "z"
