@@ -1,0 +1,74 @@
+aln EcoWealthLanePolicy2026v1
+version 1.0.0
+controllerid ECO-EcoWealth-LanePolicy-2026v1
+owneralnid bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+network ALN-MAINNET
+issuedutc 2026-05-02T21:00:00Z
+
+record EcoWealthLanePolicy2026v1Record
+    laneid                  string   # RESEARCH, EXPPROD, PROD
+    kmin_base               float64  # base minimum K for lane
+    emin_base               float64  # base minimum E for lane
+    rmax_base               float64  # base maximum R for lane
+    f_E_coeff_a             float64  # tightening coefficient for E (per quarter)
+    f_R_coeff_b             float64  # tightening coefficient for R (per quarter)
+    max_delta_emin_per_q    float64  # maximum allowed increase in emin per quarter
+    max_delta_rmax_per_q    float64  # maximum allowed decrease in rmax per quarter
+    vt_trend_floor          float64  # minimum nonpositive residual trend (e.g. 0.0)
+    window_len_days         int64    # evidence window length in days
+    min_windows             int64    # minimum number of windows before promotion
+    evidencehex             string   # hexstamp of policy evidence
+    signingdid              string   # DID of lane governor
+endrecord
+
+section default_lanes
+    EcoWealthLanePolicy2026v1Record
+        laneid               RESEARCH
+        kmin_base            0.00
+        emin_base            0.00
+        rmax_base            1.00
+        f_E_coeff_a          0.00
+        f_R_coeff_b          0.00
+        max_delta_emin_per_q 0.00
+        max_delta_rmax_per_q 0.00
+        vt_trend_floor       0.00
+        window_len_days      30
+        min_windows          1
+        evidencehex          ecosafety.lanepolicy.research.2026v1
+        signingdid           bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+    end
+
+    EcoWealthLanePolicy2026v1Record
+        laneid               EXPPROD
+        kmin_base            0.88
+        emin_base            0.88
+        rmax_base            0.15
+        f_E_coeff_a          0.02
+        f_R_coeff_b          0.02
+        max_delta_emin_per_q 0.03
+        max_delta_rmax_per_q 0.03
+        vt_trend_floor       0.00
+        window_len_days      60
+        min_windows          2
+        evidencehex          ecosafety.lanepolicy.expprod.2026v1
+        signingdid           bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+    end
+
+    EcoWealthLanePolicy2026v1Record
+        laneid               PROD
+        kmin_base            0.90
+        emin_base            0.90
+        rmax_base            0.13
+        f_E_coeff_a          0.01
+        f_R_coeff_b          0.01
+        max_delta_emin_per_q 0.02
+        max_delta_rmax_per_q 0.02
+        vt_trend_floor       0.00
+        window_len_days      90
+        min_windows          3
+        evidencehex          ecosafety.lanepolicy.prod.2026v1
+        signingdid           bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+    end
+endsection
+
+end
