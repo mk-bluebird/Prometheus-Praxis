@@ -1,0 +1,16 @@
+aln filename RegionRepresentationShard2026v1.aln
+destination aln/RegionRepresentationShard2026v1.aln
+
+PARTICLE RegionRepresentationShard2026v1
+ROLE      GOVERNANCE
+CATEGORY  ECOWEALTH
+VERSIONTAG 2026v1
+
+FIELDS
+  regionid             string
+  sensordensityindex   f64    # 0..1
+  representation_floor f64    # min fractional wealth share
+  max_trust_weight     f64    # cap on K-weighted trust
+  evidencehex          string
+  signingdid           string
+END
