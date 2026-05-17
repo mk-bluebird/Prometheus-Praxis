@@ -1,0 +1,22 @@
+# filename: Cargo.toml
+# destination: eco_restoration_shard/crates/kerresidual/Cargo.toml
+
+[package]
+name = "kerresidual"
+version = "0.1.0"
+edition = "2021"
+description = "Shared Lyapunov residual and KER band spine for EcoNet constellation."
+license = "MIT"
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+readme = "README.md"
+keywords = ["ecosafety", "ker", "residual", "lyapunov"]
+
+[lib]
+name = "kerresidual"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+
+[features]
+default = []
