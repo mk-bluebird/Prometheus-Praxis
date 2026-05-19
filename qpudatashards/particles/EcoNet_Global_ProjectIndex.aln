@@ -1,0 +1,70 @@
+# EcoNet Global Project Index qpudatashard (ALN-compatible)
+# Each record describes an EcoNet-aligned project or dataset, with pointers into this repo.
+
+[PROJECT]
+project_id      = "ECONET-AZ-WATER-0001"
+name            = "Arizona Gila & Lake Pleasant Water Quality 2024-2026"
+domain          = "surface_water"
+region          = "CentralAZ"
+geo_center_lat  = 33.53
+geo_center_lon  = -112.28
+primary_shard   = "qpudatashards/particles/ArizonaGilaLakePleasantWaterQuality2024-2026v1.csv"
+schema_ref      = "schemas/eco_qpudatashard.schema.json"
+eco_help_vector = "mass_load_reduction;PFBS;Ecoli;nutrients;salinity"
+eco_solve_offset= "0.67_Karma_per_metric_ton_salt_or_equivalent_load_avoided"
+karma_weight    = 0.88
+tools_cpp       = "cpp/EcoWaterMonitor"
+tools_ai        = "agents/agent_manifest.yaml"
+source_refs     = "CAPAnnualReport2024;ADEQ2026CWA;USBR_SalinityProgram"
+hex_proof       = "0xa1b2c3d4e5f678901122334455667788"
+
+[PROJECT]
+project_id      = "ECONET-AZ-KARMA-0001"
+name            = "EcoNet Central AZ Karma Window Template"
+domain          = "karma_engine"
+region          = "CentralAZ"
+geo_center_lat  = 33.53
+geo_center_lon  = -112.28
+primary_shard   = "qpudatashards/particles/EcoNetCentralAZKarmaWindowTemplate.csv"
+schema_ref      = "schemas/eco_karma_window.schema.json"
+eco_help_vector = "risk_normalized_Kn_for_PFBS;Ecoli;salinity"
+eco_solve_offset= "false_positive_reduction_for_eco_stakeholders"
+karma_weight    = 0.91
+tools_cpp       = "cpp/EcoKarmaEngine"
+tools_ai        = "agents/agent_manifest.yaml"
+source_refs     = "ArizonaGilaLakePleasantWaterQuality2024-2026v1.csv"
+hex_proof       = "0x11223344556677889900aabbccddeeff"
+
+[PROJECT]
+project_id      = "ECONET-BIO-TRAYS-0001"
+name            = "Biodegradable Tray EcoDegradation Kernel Stack"
+domain          = "materials_biodegradable"
+region          = "PhoenixAZ"
+geo_center_lat  = 33.45
+geo_center_lon  = -112.07
+primary_shard   = "qpudatashards/particles/BioPackPhoenixTrays2026v1.csv"
+schema_ref      = "schemas/eco_qpudatashard.schema.json"
+eco_help_vector = "EDSK;MSTK;MRK;DPCK;ERLK"
+eco_solve_offset= "hard_gates_on_t90;rtox;rmicro;rworm;rbee_before_energy_optimization"
+karma_weight    = 0.92
+tools_cpp       = "cpp/EcoTrayKernelCore"
+tools_ai        = "agents/agent_manifest.yaml"
+source_refs     = "plastic-silverware-and-foam-pl-Oo_ixrFMRLSArSNXRrBgZw.md"
+hex_proof       = "0x7ac1d4e2b59f8830c4a2ee1179aa33dd55bf2211"
+
+[PROJECT]
+project_id      = "ECONET-FOG-0001"
+name            = "Cyboquatic Oil-Desiccator FOG Management"
+domain          = "waste_FOG"
+region          = "Urban_Kitchens"
+geo_center_lat  = 33.60
+geo_center_lon  = -112.38
+primary_shard   = "qpudatashards/particles/FogKitchenDesiccatorPhoenix2026v1.csv"
+schema_ref      = "schemas/eco_qpudatashard.schema.json"
+eco_help_vector = "FOG_removal_70to90_percent;sewer_blockage_reduction"
+eco_solve_offset= "karma_reward_for_grease_mass_avoided_in_sewers"
+karma_weight    = 0.90
+tools_cpp       = "cpp/EcoFogDesiccatorCore"
+tools_ai        = "agents/agent_manifest.yaml"
+source_refs     = "industrial-grade-kitchen-waste-24kdH6AxSIq46RvUDDJkFA.md"
+hex_proof       = "0x5fd1c8e0b47aa2199c33ee4417aa99dd22cc7711"
