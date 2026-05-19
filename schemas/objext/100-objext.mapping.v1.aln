@@ -1,0 +1,135 @@
+TITLE schemas/objext/100-objext.mapping.v1.aln
+-- destination: ecorestorationshard/schemas/objext/100-objext.mapping.v1.aln
+-- repo-target: github.com/mk-bluebird/eco_restoration_shard
+
+header OBJEXT.Mapping v1.0.0
+
+record ObjextSession
+    session_id     string          -- stable ID per 100-object generation
+    user_id        string?         -- optional DID or internal user key
+    source         string          -- channel: web, ios, android, terminal, cli
+    created_at     datetime        -- RFC3339
+    input_summary  string          -- short summary of original user input
+    profile        string          -- research | exam | code-audit | governance | offline
+    shard_id       string          -- e.g. OBJEXT-MAP-V1
+end
+
+record ObjextObject
+    session_id        string       -- FK -> ObjextSession.session_id
+    section_index     u8           -- 1..10
+    obj_index         u8           -- 1..100, unique within session
+    obj_type          string       -- topic|question|quiz|definition|task
+    title             string
+    prompt            string
+    complexity_reason string
+    priority          u8           -- 1..5 (1 = highest)
+    tags              liststring
+end
+
+record ObjextSqliteMapping
+    db_path        string          -- e.g. ./data/objext.db
+    session_table  string          -- e.g. objext_session
+    object_table   string          -- e.g. objext_object
+end
+
+row SQLITE_MAPPING
+    db_path        ./data/objext.db
+    session_table  objext_session
+    object_table   objext_object
+end
+
+record ObjextPattern
+    pattern_id    string    -- OBJEXT-RES-100, OBJEXT-EXAM-100, OBJEXT-CODE-100
+    description   string
+    profile       string    -- research|exam|code-audit|governance|offline
+    min_objects   u8        -- 100
+    max_objects   u8        -- 100
+    section_size  u8        -- 10
+    allowed_types liststring
+end
+
+row PATTERN_OBJEXT_RES_100
+    pattern_id    OBJEXT-RES-100
+    description   High-detail research objects (topics+questions+tasks)
+    profile       research
+    min_objects   100
+    max_objects   100
+    section_size  10
+    allowed_types topic,question,task,definition
+end
+
+row PATTERN_OBJEXT_EXAM_100
+    pattern_id    OBJEXT-EXAM-100
+    description   Exam-style quiz items and definitions
+    profile       exam
+    min_objects   100
+    max_objects   100
+    section_size  10
+    allowed_types quiz,question,definition
+end
+
+row PATTERN_OBJEXT_CODEAUDIT_100
+    pattern_id    OBJEXT-CODE-100
+    description   Code review and static-analysis research objects
+    profile       code-audit
+    min_objects   100
+    max_objects   100
+    section_size  10
+    allowed_types topic,question,task
+end
+
+record ObjextBtPattern
+    code_hex    string   -- 4 bytes as hex, e.g. "77 0A 23 73"
+    pattern_id  string   -- links to ObjextPattern.pattern_id
+    direction   string   -- host-to-ai | ai-to-host
+    payload_len u16      -- logical payload length in bytes (metadata only)
+end
+
+row BT_OBJEXT_RES_100
+    code_hex    77 0A 23 73
+    pattern_id  OBJEXT-RES-100
+    direction   host-to-ai
+    payload_len 0100
+end
+
+row BT_OBJEXT_EXAM_100
+    code_hex    77 0A 23 74
+    pattern_id  OBJEXT-EXAM-100
+    direction   host-to-ai
+    payload_len 0100
+end
+
+row BT_OBJEXT_CODE_100
+    code_hex    77 0A 23 75
+    pattern_id  OBJEXT-CODE-100
+    direction   host-to-ai
+    payload_len 0100
+end
+
+ACTION objext_generate_100
+    INPUT
+        session    ObjextSession
+        pattern    ObjextPattern
+        user_input string
+    EXEC
+        CHECK pattern.min_objects 100
+        CHECK pattern.max_objects 100
+        CHECK pattern.section_size 10
+
+        SET objects []
+
+        SET objects HOSTFN_OBJEXT_BUILD_OBJECTS
+            session     session
+            pattern     pattern
+            user_input  user_input
+
+        RUN HOSTFN_OBJEXT_SAVE_SQLITE
+            mapping SQLITE_MAPPING
+            session session
+            objects objects
+
+        RETURN
+            session  session
+            objects  objects
+    end
+end
