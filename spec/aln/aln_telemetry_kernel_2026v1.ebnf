@@ -1,0 +1,66 @@
+(* Minimal domain particle that existing ecosafety code already expects:
+   - TelemetryAggregationPolicy
+   - ShardResidualSnapshot (windowed KER + Vt)
+   This makes it easy for any tool or agent framework to emit governance-
+   compatible ALN without needing the full constellation grammar.
+*)
+
+grammar = meta_block
+        | enum_def
+        | record_def
+        ;
+
+meta_block = "meta" "TelemetryKernel2026v1" "{" 
+               "ownerrepo" "text" ";"
+               "registryversion" "text" ";"
+               "issuedutc" "text" ";"
+            "}" "endmeta" ;
+
+enum_def = "enum" identifier "{" enum_body "}" "endenum" ;
+enum_body = enum_value { "," enum_value } ;
+enum_value = identifier ;
+
+record_def =
+      telemetry_policy_def
+    | shard_residual_def
+    ;
+
+telemetry_policy_def =
+    "record" "TelemetryAggregationPolicy2026v1" "{"
+        "text"   "planeid"          ";" (* energy, hydraulics, biology, etc. *)
+        "int"    "window_ms"        ";" (* fixed window length in ms *)
+        "int"    "max_lag_ms"       ";" (* allowed delay between raw and shard *)
+        "bool"   "non_actuating"    ";" (* must remain true for analytics *)
+    "}" "endrecord"
+    ;
+
+shard_residual_def =
+    "record" "ShardResidualSnapshot2026v1" "{"
+        "uint64" "shard_id"         ";"
+        "text"   "region"           ";"
+        "text"   "planeid"          ";"
+        "int"    "window_start_ms"  ";"
+        "int"    "window_end_ms"    ";"
+        "float"  "k_metric"         ";"
+        "float"  "e_metric"         ";"
+        "float"  "r_metric"         ";"
+        "float"  "vt_value"         ";"
+        "bool"   "safestep_pass"    ";"
+    "}" "endrecord"
+    ;
+
+identifier = ident_start { ident_part } ;
+ident_start = letter | "_" ;
+ident_part  = letter | digit | "_" | "-" | "." ;
+
+letter = "A" | "B" | "C" | "D" | "E" | "F" | "G"
+       | "H" | "I" | "J" | "K" | "L" | "M" | "N"
+       | "O" | "P" | "Q" | "R" | "S" | "T" | "U"
+       | "V" | "W" | "X" | "Y" | "Z"
+       | "a" | "b" | "c" | "d" | "e" | "f" | "g"
+       | "h" | "i" | "j" | "k" | "l" | "m" | "n"
+       | "o" | "p" | "q" | "r" | "s" | "t" | "u"
+       | "v" | "w" | "x" | "y" | "z"
+       ;
+
+digit  = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
