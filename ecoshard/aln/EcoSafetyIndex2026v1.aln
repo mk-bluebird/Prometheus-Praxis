@@ -1,0 +1,92 @@
+# File: ecoshard/aln/EcoSafetyIndex2026v1.aln
+# Destination: ecoshard/aln/EcoSafetyIndex2026v1.aln
+#
+# ALN schema that hex-stamps the SQLite ecosafety index and enforces
+# KER and blast-radius invariants for autonomous cross-repo orchestration.
+
+schema EcoSafetyIndex2026v1 {
+    shard EcoArtifactIndex {
+        fields {
+            repo_name         : text;
+            repo_url          : text;
+            repo_is_authority : bool;
+            project_name      : text;
+            steward_did       : text;
+            artifact_path     : text;
+            language          : text;   # rust, aln, lua, cpp, kotlin, sql, schema, doc
+            kind              : text;   # library, binary, config, schema, document
+            blast_radius      : text;   # diagnostic_only, local_actuation, city_scale
+            k_knowledge       : f64;    # 0..1
+            e_eco_impact      : f64;    # 0..1
+            r_risk_of_harm    : f64;    # 0..1
+            r_energy          : f64;    # 0..1
+            r_hydraulic       : f64;    # 0..1
+            r_biology         : f64;    # 0..1
+            r_carbon          : f64;    # 0..1
+            r_materials       : f64;    # 0..1
+            v_residual        : f64;    # >= 0
+            ker_deployable    : bool;
+            -- Hex provenance matching the SQLite `provenance_hex` field.
+            provenance_hex    : hex;
+        }
+
+        kernels {
+            risk_planes_ok() -> bool {
+                return
+                    r_energy    >= 0.0 && r_energy    <= 1.0 &&
+                    r_hydraulic >= 0.0 && r_hydraulic <= 1.0 &&
+                    r_biology   >= 0.0 && r_biology   <= 1.0 &&
+                    r_carbon    >= 0.0 && r_carbon    <= 1.0 &&
+                    r_materials >= 0.0 && r_materials <= 1.0 &&
+                    v_residual  >= 0.0;
+            }
+
+            ker_bounds_ok() -> bool {
+                return
+                    k_knowledge >= 0.0 && k_knowledge <= 1.0 &&
+                    e_eco_impact >= 0.0 && e_eco_impact <= 1.0 &&
+                    r_risk_of_harm >= 0.0 && r_risk_of_harm <= 1.0;
+            }
+
+            ker_deployable_ok() -> bool {
+                if !ker_deployable {
+                    return true;
+                }
+                return
+                    k_knowledge >= 0.90 &&
+                    e_eco_impact >= 0.90 &&
+                    r_risk_of_harm <= 0.13;
+            }
+
+            blast_radius_safe() -> bool {
+                if blast_radius == "diagnostic_only" {
+                    return true;
+                }
+                if blast_radius == "local_actuation" || blast_radius == "city_scale" {
+                    return ker_deployable_ok();
+                }
+                return false;
+            }
+
+            language_allowed() -> bool {
+                return language == "rust" ||
+                       language == "aln"  ||
+                       language == "lua"  ||
+                       language == "cpp"  ||
+                       language == "kotlin" ||
+                       language == "sql" ||
+                       language == "schema" ||
+                       language == "doc";
+            }
+        }
+
+        admissibility {
+            require risk_planes_ok();
+            require ker_bounds_ok();
+            require blast_radius_safe();
+            require language_allowed();
+
+            require repo_is_authority ==> (repo_name == "eco_restoration_shard");
+        }
+    }
+}
