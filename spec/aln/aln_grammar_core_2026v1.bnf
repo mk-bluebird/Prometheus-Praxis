@@ -1,0 +1,44 @@
+; EcoNet / Eco-Fort ALN Core Grammar 2026v1 (BNF mirror of the EBNF)
+
+<grammar> ::= <definition>*
+
+<definition> ::= <meta_block>
+               | <enum_def>
+               | <record_def>
+               | <section_def>
+
+<meta_block> ::= "meta" <identifier> "{" <meta_field>* "}" "endmeta"
+<meta_field> ::= <identifier> <identifier> ";"
+
+<enum_def>   ::= "enum" <identifier> "{" <enum_body> "}" "endenum"
+<enum_body>  ::= <enum_value> ( "," <enum_value> )*
+<enum_value> ::= <identifier>
+
+<record_def> ::= "record" <identifier> "{" <field_def>* "}" "endrecord"
+<section_def>::= "section" <identifier> <identifier> "{" <section_entry>* "}" "endsection"
+<section_entry> ::= <identifier>
+
+<field_def> ::= <type_spec> <identifier> ";"
+
+<type_spec> ::= "bool"
+              | "int"
+              | "uint64"
+              | "float"
+              | "text"
+              | "bytes"
+              | <identifier>  ; enum or record reference
+
+<identifier> ::= <ident_start> <ident_part>*
+<ident_start> ::= <letter> | "_"
+<ident_part>  ::= <letter> | <digit> | "_" | "-" | "."
+
+<letter> ::= "A" | "B" | "C" | "D" | "E" | "F" | "G"
+           | "H" | "I" | "J" | "K" | "L" | "M" | "N"
+           | "O" | "P" | "Q" | "R" | "S" | "T" | "U"
+           | "V" | "W" | "X" | "Y" | "Z"
+           | "a" | "b" | "c" | "d" | "e" | "f" | "g"
+           | "h" | "i" | "j" | "k" | "l" | "m" | "n"
+           | "o" | "p" | "q" | "r" | "s" | "t" | "u"
+           | "v" | "w" | "x" | "y" | "z"
+
+<digit>  ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
