@@ -1,0 +1,32 @@
+# filename: T08_sensor_health/Cargo.toml
+
+[package]
+name = "T08_sensor_health"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Non-actuating sensor health diagnostics for EcoNet / Cyboquatic nodes."
+publish = false
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1.0"
+
+[dev-dependencies]
+serde_json = "1.0"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+# Keep this crate non-actuating: CI should additionally enforce no process spawning or hardware IO.
+
+[lib]
+name = "t08_sensor_health"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[[bin]]
+name = "t08_sensor_health_cli"
+path = "src/main.rs"
