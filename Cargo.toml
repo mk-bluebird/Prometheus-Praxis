@@ -1,31 +1,33 @@
 # filename: Cargo.toml
-# destination: eco_restoration_shard/Cargo.toml
+# destination: <repo-root>/Cargo.toml
 
 [workspace]
 members = [
-    "eco_response_shard",              # core library (non-actuating)
-    "eco_response_shard_cilib",        # CI helpers (non-actuating)
-    "eco_response_shard_backfill",     # one-time backfill binary
-    "eco_restoration_shard",           # restoration governance/tooling crate (non-actuating)
+    # Root eco_restoration_shard crate at repo root
+    "eco_restoration_shard",
 
-    "crates/eco-ledger-particles",     # regional eco-ledger particles (non-actuating)
-    "crates/hydrology-constraints",    # hydrology/gw-risk constraint catalog (non-actuating)
-    "crates/sensor-telemetry",         # ecological sensor/telemetry particles (non-actuating)
-    "crates/sensor-health",            # sensor health and trust weights (non-actuating)
-    "crates/zoning-shards",            # urban zoning and land-use shards (non-actuating)
-    "crates/eco-wealth-portfolio",     # non-financial eco-wealth portfolio views (non-actuating)
-    "crates/community-governance",     # community stewardship and governance roles (non-actuating)
-    "crates/education-prompts",        # education and apprenticeship prompt shards (non-actuating)
-    "crates/eco-pricing",              # ecological cost and co-benefit pricing shards (non-actuating)
-    "crates/disaster-scenarios",       # disaster and extreme-event scenarios library (non-actuating)
-    "crates/cross-constellation-index",# cross-constellation interoperability index (non-actuating)
-    "crates/ecoper-joule",             # ecoper-joule asset plane (non-actuating)
-    "crates/restoration-radius",       # restoration radius and MAR assets (non-actuating)
-    "crates/plane-weights",            # plane weights and nonoffsettable bands (non-actuating)
-    "crates/blastradius",              # blastradius and neighbouring-zone assets (non-actuating)
-    "crates/lane-governance",          # lane governance and KER trajectory assets (non-actuating)
-    "crates/topology-risk",            # topology risk and alignment assets (non-actuating)
-    "crates/large-particle-registry",  # large-particle file summaries and registries (non-actuating)
+    # Top-level task crates you added
+    "T08_sensor_health",
+    "T10_pricing",
+
+    # Crates under `crates/` (paths aligned with your listing)
+    "crates/blastradius",
+    "crates/community-governance",
+    "crates/cross-constellation-index",
+    "crates/disaster-scenarios",
+    "crates/eco-ledger-particles",
+    "crates/eco-pricing",
+    "crates/eco-wealth-portfolio",
+    "crates/ecoper-joule",
+    "crates/hydrology-constraints",
+    "crates/lane-governance",
+    "crates/large-particle-registry",
+    "crates/plane-weights",
+    "crates/restoration-radius",
+    "crates/sensor-health",
+    "crates/sensor-telemetry",
+    "crates/topology-risk",
+    "crates/zoning-shards",
 ]
 resolver = "2"
 
@@ -56,15 +58,16 @@ edition     = "2021"
 license     = "MIT OR Apache-2.0"
 description = "Eco restoration shard index and research harness for the EcoNet constellation."
 repository  = "https://github.com/mk-bluebird/eco_restoration_shard"
+publish     = false
 
 [lib]
 name       = "eco_restoration_shard"
-path       = "src/lib.rs"
+path       = "eco_restoration_shard/src/lib.rs"
 crate-type = ["rlib"]
 
 [[bin]]
 name = "restoration_index_tool"
-path = "src/bin/restoration_index_tool.rs"
+path = "eco_restoration_shard/src/bin/restoration_index_tool.rs"
 
 [features]
 default       = ["non_actuating"]
