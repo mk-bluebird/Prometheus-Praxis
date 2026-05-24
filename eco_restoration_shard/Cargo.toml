@@ -15,7 +15,9 @@ publish = false
 # once their directories and Cargo.toml files exist.
 [workspace]
 members = [
-    "."
+    ".",
+    "T08_sensor_health",
+    "T10_pricing",
 ]
 resolver = "2"
 
