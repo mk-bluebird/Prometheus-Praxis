@@ -3,12 +3,12 @@
 
 [workspace]
 members = [
-    # Root eco_restoration_shard crate at repo root
+    # Root eco_restoration_shard crate (code in eco_restoration_shard/src)
     "eco_restoration_shard",
 
-    # Top-level task crates you added
-    "T08_sensor_health",
-    "T10_pricing",
+    # Task crates that live under eco_restoration_shard/
+    "eco_restoration_shard/T08_sensor_health",
+    "eco_restoration_shard/T10_pricing",
 
     # Crates under `crates/` (paths aligned with your listing)
     "crates/blastradius",
