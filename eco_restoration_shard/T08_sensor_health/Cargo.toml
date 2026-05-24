@@ -1,4 +1,4 @@
-# filename: T08_sensor_health/Cargo.toml
+# filename: eco_restoration_shard/T08_sensor_health/Cargo.toml
 
 [package]
 name = "T08_sensor_health"
@@ -9,18 +9,17 @@ description = "Non-actuating sensor health diagnostics for EcoNet / Cyboquatic n
 publish = false
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
-chrono = { version = "0.4", features = ["serde"] }
-thiserror = "1.0"
+serde  = { version = "1.0.197", features = ["derive"] }
+chrono = { version = "0.4.38", features = ["serde"] }
+thiserror = "1.0.57"
 
 [dev-dependencies]
-serde_json = "1.0"
+serde_json = "1.0.115"
 
 [lints.rust]
 unsafe_code = "forbid"
 
 [lints.clippy]
-# Keep this crate non-actuating: CI should additionally enforce no process spawning or hardware IO.
 
 [lib]
 name = "t08_sensor_health"
