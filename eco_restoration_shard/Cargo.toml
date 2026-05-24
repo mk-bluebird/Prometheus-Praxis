@@ -1,5 +1,5 @@
-# filename Cargo.toml
-# destination eco_restoration_shard/Cargo.toml
+# filename: Cargo.toml
+# destination: eco_restoration_shard/Cargo.toml
 
 [package]
 name = "eco_restoration_shard"
@@ -10,12 +10,18 @@ description = "Non-actuating RESEARCH-band shard index and research harness for 
 repository = "https://github.com/mk-bluebird/eco_restoration_shard"
 publish = false
 
+# Workspace: treat this crate as the root of the workspace.
+# Additional members (e.g., T08_sensor_health, T10_pricing) can be added here
+# once their directories and Cargo.toml files exist.
 [workspace]
-members = [ "." ]
+members = [
+    "."
+]
 resolver = "2"
 
 [features]
 default = ["non_actuating"]
+# Non-actuating feature ensures this crate stays in diagnostics / research lane.
 non_actuating = []
 
 [dependencies]
@@ -35,8 +41,8 @@ tempfile = "3.10"
 unsafe_code = "forbid"
 
 [lints.clippy]
-# Non-actuating crate: disallow spawning external commands and processes via CI-enforced Clippy config.
-# Additional API-specific restrictions are configured in clippy.toml and CI, not here.
+# Non-actuating crate: CI and clippy.toml enforce that this crate does not spawn external
+# processes or reach hardware actuators. This manifest stays minimal and research-only.
 
 [lib]
 name = "eco_restoration_shard"
