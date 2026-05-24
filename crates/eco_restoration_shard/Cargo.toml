@@ -1,5 +1,5 @@
 # filename Cargo.toml
-# destination eco_restoration_shard/Cargo.toml
+# destination crates/eco_restoration_shard/Cargo.toml
 
 [package]
 name = "eco_restoration_shard"
@@ -9,10 +9,6 @@ license = "MIT OR Apache-2.0"
 description = "Non-actuating RESEARCH-band shard index and research harness for the EcoNet constellation."
 repository = "https://github.com/mk-bluebird/eco_restoration_shard"
 publish = false
-
-[workspace]
-members = [ "." ]
-resolver = "2"
 
 [features]
 default = ["non_actuating"]
@@ -42,8 +38,3 @@ unsafe_code = "forbid"
 name = "eco_restoration_shard"
 path = "src/lib.rs"
 crate-type = ["rlib"]
-
-[[bin]]
-name = "eco_restoration_shard_cli"
-path = "src/main.rs"
-required-features = ["non_actuating"]

@@ -1,34 +1,18 @@
 ```
-# Database files
-*.sql
-
+# Compiled and build artifacts
+*.o
+*.obj
+*.out
+# Dependencies
+target/
 # Logs and temp files
 *.log
 *.tmp
-
 # Environment
 .env
 .env.local
-*.env.*
-
+.env.*
 # Editors
 .vscode/
 .idea/
-
-# Dependencies
-node_modules/
-.venv/
-venv/
-__pycache__/
-.mypy_cache/
-.pytest_cache/
-
-# Build artifacts
-dist/
-build/
-target/
-
-# OS generated files
-.DS_Store
-Thumbs.db
 ```

@@ -1,14 +1,14 @@
-# filename: Cargo.toml
-# destination: eco_restoration_shard/Cargo.toml
+# Workspace root manifest for eco_restoration_shard constellation
+# Invariant: every member path has a `Cargo.toml` and at least one target.
 
 [workspace]
 members = [
-    "eco_response_shard",          # core library (non-actuating)
-    "eco_response_shard_cilib",    # CI helpers (non-actuating)
-    "eco_response_shard_backfill", # one-time backfill binary
-    "eco_restoration_shard",       # restoration governance/tooling crate (non-actuating)
+    # Core restoration shard (root package)
+    ".",
+    # Crates with valid manifests
+    "crates/eco_restoration_shard",
+    "ecorestorationshard/eco_restoration_shard_core",
 ]
-
 resolver = "2"
 
 [workspace.package]
@@ -32,15 +32,15 @@ env_logger = "0.11.3"
 serde_json = "1.0.115"
 
 [package]
-name        = "eco_restoration_shard"
+name        = "eco_restoration_shard_root"
 version     = "0.1.0"
 edition     = "2021"
 license     = "MIT OR Apache-2.0"
-description = "Eco restoration shard index and research harness for the EcoNet constellation."
+description = "Root workspace package for eco_restoration_shard constellation."
 repository  = "https://github.com/mk-bluebird/eco_restoration_shard"
 
 [lib]
-name       = "eco_restoration_shard"
+name       = "eco_restoration_shard_root"
 path       = "src/lib.rs"
 crate-type = ["rlib"]
 
