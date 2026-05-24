@@ -1,0 +1,31 @@
+# filename: T10_pricing/Cargo.toml
+
+[package]
+name = "T10_pricing"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Non-actuating eco-aware pricing kernel for EcoNet / Cyboquatic workloads."
+publish = false
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
+
+[dev-dependencies]
+serde_json = "1.0"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+# Non-actuating; no direct IO or process spawning in this crate.
+
+[lib]
+name = "t10_pricing"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[[bin]]
+name = "t10_pricing_cli"
+path = "src/main.rs"
