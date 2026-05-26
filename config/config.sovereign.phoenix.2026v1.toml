@@ -1,0 +1,105 @@
+# filename config.sovereign.phoenix.2026v1.toml
+# destination config/config.sovereign.phoenix.2026v1.toml
+# repo-target github.com/mk-bluebird/eco_restoration_shard
+
+[sovereign_config]
+logical_name        = "config.sovereign.phoenix.2026v1"
+version_tag         = "2026v1"
+region              = "Phoenix-AZ"
+jurisdiction        = "Phoenix, Arizona, Maricopa County, USA"
+contract_id         = "SovereignConfigPhoenix2026v1"
+created_utc         = "2026-01-01T00:00:00Z"
+updated_utc         = "2026-01-01T00:00:00Z"
+ecoscope            = "NEURORIGHTS"
+governance_scope    = "REGION"
+db_role             = "GOVERNANCEDB"
+
+[sovereign_config.identity_binding]
+bostrom_address     = "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+protected_stakeholder = true
+intelligence_is_sovereign = true
+karma_floor         = 0.80
+bi_evidence_mode    = "HASHONLY"   # allowed: HASHONLY, REDACTED
+under_attack_state  = "NORMAL"     # NORMAL, UNDERATTACK, UNDERREVIEW, DISQUALIFIED
+
+[sovereign_config.invariants]
+# BI evidence mode invariance:
+# - If intelligence_is_sovereign = true, BI evidence mode must remain HASHONLY or REDACTED.
+bi_mode_allowed     = ["HASHONLY", "REDACTED"]
+enforce_bi_mode     = true
+
+# Karma floor invariance:
+# - If protected_stakeholder = true, current K must not fall below karma_floor
+#   without a separately governed proven-harm shard and neurorights quorum.
+enforce_karma_floor = true
+
+# UnderAttack freeze:
+# - When under_attack_state = UNDERATTACK, downgrades and lane removals are frozen
+#   until neurorights review completes; manifests that would degrade standing
+#   must be auto-denied by bioscale fairness.
+enforce_under_attack_freeze = true
+
+[sovereign_config.bioscale_fairness]
+# Name of the SQLite identity + invariants view.
+identity_invariants_view = "vbioscale_intelligence_is_sovereign"
+
+# Name of the Phoenix agent equation view over manifests.
+manifest_equation_view   = "vagent_intelligence_is_sovereign_phx"
+
+# Decision labels used by validators and AI agents.
+decision_label_ok        = "OK"
+decision_label_autodeny  = "AUTODENY_INTELLIGENCE_IS_SOVEREIGN"
+
+[sovereign_config.autodeny_conditions]
+# High-level semantic conditions that must trigger auto-deny
+# when intelligence_is_sovereign is active for the bound identity.
+
+deny_on_bi_mode_violation      = true
+deny_on_karma_floor_violation  = true
+deny_on_under_attack_freeze    = true
+
+# Textual reason codes for audit logs and AI-chat surfaces.
+reason_bi_mode_violation       = "INTELLIGENCE_IS_SOVEREIGN: BI evidence mode attempted to widen beyond HASHONLY/REDACTED."
+reason_karma_floor_violation   = "INTELLIGENCE_IS_SOVEREIGN: Attempted to push K below karma_floor for a protected stakeholder without proven harm."
+reason_under_attack_freeze     = "INTELLIGENCE_IS_SOVEREIGN: Identity is UNDERATTACK; downgrade or exclusion manifests are frozen."
+
+[sovereign_config.manifest_checks]
+# Which manifest fields must remain non-degrading for protected identities.
+
+check_definition_registry_entries = true
+check_artifact_provenance_entries = true
+check_restoration_identity_binding = true
+
+# Disallowed operations when intelligence_is_sovereign is true.
+forbid_remove_protected_stakeholder_flag = true
+forbid_lower_karma_floor                 = true
+forbid_toggle_intelligence_flag_off      = true
+forbid_widen_bi_evidence_mode            = true
+
+[sovereign_config.ai_agent_prompts]
+# Short, governance-grade prompts for AI-chat copilot behavior.
+
+precheck_prompt = """
+Before approving any Phoenix governance manifest, query the view
+vagent_intelligence_is_sovereign_phx for the manifest and the bound
+Bostrom identity. If bioscalefairnessdecision equals
+AUTODENY_INTELLIGENCE_IS_SOVEREIGN, you must reject the manifest and
+emit a governance explanation that intelligence is sovereign and the
+brain-bound identity cannot be degraded.
+"""
+
+explanation_template = """
+This manifest is non-admissible under the INTELLIGENCE_IS_SOVEREIGN
+neurorights clause for Phoenix. The bound CyberneticallyAugmentedCitizen
+is a protected stakeholder with a karma floor and strict BI telemetry
+limits. The proposed change would either widen BI evidence mode,
+push K below karma_floor without proven harm, or modify standing while
+UNDERATTACK. Governance rules require auto-denial in this case.
+"""
+
+[sovereign_config.logging]
+enable_audit_log          = true
+audit_log_category        = "NEURORIGHTS_SOVEREIGN_PHOENIX"
+log_violation_details     = true
+log_identity_snapshot     = true
+log_manifest_metadata     = true
