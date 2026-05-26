@@ -1,0 +1,17 @@
+# aln-specs/ecosafety.plane_weights_2026v1.aln
+schema,version,title,description,category
+ecosafety.plane_weights_2026v1,v1,Plane weights and non‑compensation flags,Weights and non‑offsettable flags for all Lyapunov planes in a region/policy,ECOSAFETY
+
+field,name,datatype,units,required,description
+1,policy_id,string,,true,Policy identifier (e.g. Phoenix-CentralAZ-2026)
+2,plane_id,string,,true,Lyapunov plane id (CARBON,BIODIVERSITY,HYDRAULICS,MATERIALS,DATA,TOPOLOGY)
+3,w_plane,double,,true,Non‑negative weight for this plane in V_t = Σ_j w_j r_j²
+4,non_offsettable,bool,,true,If true, harm in this plane cannot be compensated by improvements in others
+5,r_unc_max_prod,double,,true,Maximum allowed uncertainty in this plane for PROD lane
+6,r_safe,double,,true,Safe‑band threshold for this plane
+7,r_gold,double,,true,Gold‑band threshold for this plane
+8,r_hard,double,,true,Hard‑band threshold for this plane
+9,lyap_channel,string,,true,Lyapunov channel name (carbon,biodiversity,hydraulics,materials,data,topology)
+10,version_tag,string,,false,Optional policy version tag
+11,signing_did,string,,false,Bostrom DID of policy issuer
+12,evidence_hex,string,,false,Hex stamp of supporting analysis/governance decision
