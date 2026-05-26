@@ -1,10 +1,35 @@
+# filename: crates/disaster-scenarios/Cargo.toml
+# destination: eco_restoration_shard/crates/disaster-scenarios/Cargo.toml
+
 [package]
 name = "disaster-scenarios"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+rust-version = "1.85"
+authors = ["EcoNet Constellation"]
+license = "MIT OR Apache-2.0"
+description = "Shared, non-actuating catalog of blast radius and disaster scenarios for EcoNet hydrology, topology, and Cyboquatic analysis."
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+
+[lib]
+name = "disaster_scenarios"
+path = "src/lib.rs"
 
 [dependencies]
-serde = { version = "1", features = ["derive"] }
-uuid = { version = "1", features = ["v4", "serde"] }
+# Preserve original serde dependency, using explicit 1.x range and derive.
+serde = { version = "1.0", features = ["derive"] }
+
+# Preserve UUID with v4 + serde for stable scenario IDs when needed.
+uuid = { version = "1.8", features = ["v4", "serde"] }
+
+# Preserve time 0.3 with serde for timestamps on scenarios.
 time = { version = "0.3", features = ["serde"] }
+
+# Keep aln_core for ALN integration; version kept as originally specified.
 aln_core = "0.1"
+
+# Add JSON support for exporting catalogs to tools and CI.
+serde_json = "1.0"
+
+# Add thiserror for ergonomic, non-panicking error types.
+thiserror = "1.0"
