@@ -1,0 +1,75 @@
+# filename alnLargeParticleFileShard2026v1.aln
+# destination ecological-orchestrator/aln/alnLargeParticleFileShard2026v1.aln
+
+particle LargeParticleFileShard2026v1
+versiontag 2026v1
+category LARGEFILE
+title Large particle file manifest
+description Manifest for large immutable files split into fixed-size chunks with per-chunk hashes and a Merkle root.
+lyapchannel governance
+role GOVERNANCE
+
+record LargeParticleFile
+    fileid string!
+    assetclass string
+    logicalname string
+    region string
+    ecoscope string
+    ownerbostrom string!
+    repotarget string!
+    relpath string!
+    totallengthbytes u64!
+    chunksizebytes u32!
+    chunkcount u32!
+    filemerkleroothex string!
+    filehashalgo string! in ORGANIC256
+    contenttype string
+    createdutc datetime!
+    updatedutc datetime!
+    lane string in RESEARCH,EXPPROD,PROD
+    kerdeployable u8 in 0,1
+    evidencehex string
+    signingdid string
+
+record LargeParticleChunk
+    fileid string!
+    index u32!
+    offsetbytes u64!
+    lengthbytes u32!
+    chunkhashhex string!
+    filehashalgo string! in ORGANIC256
+    storageuri string
+    createdutc datetime!
+    updatedutc datetime!
+
+record LargeParticleIntegrityWindow
+    fileid string!
+    windowid string!
+    windowstartchunk u32!
+    windowendchunk u32!
+    windowmerkleroothex string!
+    filemerkleroothex string!
+    createdutc datetime!
+    integritygrade string in A,B,C,D
+    checkedbydid string
+    evidencehex string
+
+record LargeParticleFilePolicy
+    policyid string!
+    versiontag string!
+    defaultchunksizebytes u32!
+    minchunksizebytes u32!
+    maxchunksizebytes u32!
+    hashalgo string! in ORGANIC256
+    maxfilesizebytes u64!
+    comment string
+
+row LargeParticleFilePolicy default
+    policyid default.largeparticlefile.2026v1
+    versiontag 2026v1
+    defaultchunksizebytes 1048576
+    minchunksizebytes 262144
+    maxchunksizebytes 4194304
+    hashalgo ORGANIC256
+    maxfilesizebytes 1099511627776
+    comment Default large file policy, 1 MiB chunks, ORGANIC256 hashing.
