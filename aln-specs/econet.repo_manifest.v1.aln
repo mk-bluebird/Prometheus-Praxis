@@ -1,0 +1,20 @@
+# aln-specs/econet.repo_manifest.v1.aln
+schema,version,title,description,category
+econet.repo_manifest.v1,v1,Repo manifest for EcoNet constellation,Declares role-band, ecosafety binding, and internal layers for a repo,ECONET-GOV
+
+field,name,datatype,units,required,description
+1,repo_name,string,,true,Repository name
+2,github_slug,string,,true,GitHub slug (org/repo)
+3,role_band,string,,true,SPINE,RESEARCH,ENGINE,MATERIAL,GOV,APP
+4,visibility,string,,true,Public or Private
+5,language_primary,string,,true,Primary language
+6,description,string,,false,Human-readable description
+7,ecosafety_binding,string,,true,ALN file for frozen ecosafety grammar this repo binds to
+8,shard_protocol,string,,true,Schema standard for shards in this repo
+9,lane_default,string,,true,Default lane (RESEARCH,EXPPROD,PROD)
+10,ker_target_k,double,,true,Target minimum K for PROD artifacts
+11,ker_target_e,double,,true,Target minimum E for PROD artifacts
+12,ker_target_r,double,,true,Target maximum R for PROD artifacts
+13,non_actuating_only,bool,,true,True if repo must not contain actuator-related code
+14,signing_did,string,,false,Bostrom DID of maintainer/owner
+15,evidence_hex,string,,false,Hex stamp of manifest review evidence
