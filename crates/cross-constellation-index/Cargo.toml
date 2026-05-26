@@ -5,12 +5,12 @@
 name = "cross-constellation-index"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
 authors = ["EcoNet Constellation"]
 license = "MIT OR Apache-2.0"
 description = "Shared cross-constellation index and wiring tools for EcoNet repositories (EcoNet, DataLake, Eco-Fort, Cyboquatic, etc.)."
 repository = "https://github.com/mk-bluebird/eco_restoration_shard"
 readme = "README.md"
-rust-version = "1.82"
 
 [lib]
 name = "cross_constellation_index"
