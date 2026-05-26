@@ -1,11 +1,31 @@
+# filename: crates/eco-pricing/Cargo.toml
+# destination: eco_restoration_shard/crates/eco-pricing/Cargo.toml
+
 [package]
 name = "eco-pricing"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+rust-version = "1.85"
+authors = ["EcoNet Constellation"]
+license = "MIT OR Apache-2.0"
+description = "Non-actuating ecological pricing primitives for EcoNet: cost-per-joule, eco-wealth scores, and restoration-weighted pricing surfaces."
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+
+[lib]
+name = "eco_pricing"
+path = "src/lib.rs"
 
 [dependencies]
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 time = { version = "0.3", features = ["serde"] }
-aln_core = "0.1"
-ecospine = "0.1"
+
+# These two dependencies assume there are sibling crates in the same workspace
+# named `aln_core` and `ecospine`. If their crate directories exist in
+# `eco_restoration_shard/crates/aln_core` and
+# `eco_restoration_shard/crates/ecospine`, and are part of the workspace,
+# the following paths are correct and will preserve the workspace wiring.
+aln_core = { path = "../aln_core", version = "0.1" }
+ecospine = { path = "../ecospine", version = "0.1" }
+
+thiserror = "1.0"
