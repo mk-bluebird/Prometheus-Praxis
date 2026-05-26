@@ -4,12 +4,11 @@
 
 PRAGMA foreign_keys = ON;
 
------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 -- 1. Sovereign configuration: Phoenix region, primary Bostrom identity
 --    Mirrors config.sovereign.phoenix.2026v1.toml into SQL indices.
------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 
--- Register the TOML config file in repofile.
 INSERT OR IGNORE INTO repofile (
     repoid,
     relpath,
@@ -28,7 +27,6 @@ SELECT
 FROM repo AS r
 WHERE r.name = 'eco_restoration_shard';
 
--- Register the sovereign config logical definition in the DefinitionRegistry.
 INSERT OR IGNORE INTO definitionregistryrestoration (
     logicalname,
     versiontag,
@@ -46,10 +44,10 @@ INSERT OR IGNORE INTO definitionregistryrestoration (
 SELECT
     'config.sovereign.phoenix.2026v1' AS logicalname,
     '2026v1' AS versiontag,
-    lower(hex(randomblob(16))) AS hash,
+    LOWER(HEX(RANDOMBLOB(16))) AS hash,
     'ACTIVE' AS status,
     r.repoid AS repoid,
-    NULL AS relpathsql,
+    'db/dbconfig_intelligence_is_sovereign_phoenix.sql' AS relpathsql,
     NULL AS relpathaln,
     'config/config.sovereign.phoenix.2026v1.toml' AS relpathdoc,
     'AGENTPROMPT' AS ecoscope,
@@ -59,7 +57,6 @@ SELECT
 FROM repo AS r
 WHERE r.name = 'eco_restoration_shard';
 
--- Bind the sovereign config to the primary Phoenix Bostrom address.
 INSERT OR IGNORE INTO restorationidentitybinding (
     bostromaddress,
     logicalname,
@@ -86,28 +83,28 @@ INSERT OR IGNORE INTO restorationidentitybinding (
     '2026-01-01T00:00:00Z'
 );
 
------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 -- 2. CyberneticallyAugmentedCitizen sovereign state slice
 --    Per-identity clause flags for INTELLIGENCE_IS_SOVEREIGN in Phoenix.
------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS cyberaugcitizensovereign (
-    bostromaddress        TEXT PRIMARY KEY,
-    region                TEXT NOT NULL,
-    intelligenceissovereign INTEGER NOT NULL DEFAULT 0,   -- 1 = clause active
-    protectedstakeholder  INTEGER NOT NULL DEFAULT 0,     -- 1 = neurorights floor
-    karmafloor            REAL    NOT NULL DEFAULT 0.0,   -- minimum K without proven harm
-    bievidencemode        TEXT    NOT NULL DEFAULT 'HASHONLY', -- 'HASHONLY' or 'REDACTED'
-    underattackstate      TEXT    NOT NULL DEFAULT 'NORMAL',   -- NORMAL, UNDERATTACK, UNDERREVIEW, DISQUALIFIED
-    createdutc            TEXT    NOT NULL DEFAULT '2026-01-01T00:00:00Z',
-    updatedutc            TEXT    NOT NULL DEFAULT '2026-01-01T00:00:00Z',
-    CHECK (intelligenceissovereign IN (0,1)),
-    CHECK (protectedstakeholder IN (0,1)),
+    bostromaddress          TEXT    NOT NULL,
+    region                  TEXT    NOT NULL,
+    intelligenceissovereign INTEGER NOT NULL DEFAULT 0,
+    protectedstakeholder    INTEGER NOT NULL DEFAULT 0,
+    karmafloor              REAL    NOT NULL DEFAULT 0.0,
+    bievidencemode          TEXT    NOT NULL DEFAULT 'HASHONLY',
+    underattackstate        TEXT    NOT NULL DEFAULT 'NORMAL',
+    createdutc              TEXT    NOT NULL DEFAULT '2026-01-01T00:00:00Z',
+    updatedutc              TEXT    NOT NULL DEFAULT '2026-01-01T00:00:00Z',
+    PRIMARY KEY (bostromaddress, region),
+    CHECK (intelligenceissovereign IN (0, 1)),
+    CHECK (protectedstakeholder  IN (0, 1)),
     CHECK (bievidencemode IN ('HASHONLY','REDACTED')),
     CHECK (underattackstate IN ('NORMAL','UNDERATTACK','UNDERREVIEW','DISQUALIFIED'))
 );
 
--- Seed sovereign clause state for the Phoenix primary identity.
 INSERT OR IGNORE INTO cyberaugcitizensovereign (
     bostromaddress,
     region,
