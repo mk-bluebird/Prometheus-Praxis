@@ -1,0 +1,21 @@
+# aln-specs/ecosafety.non_actuating_workload.v1.aln
+schema,version,title,description,category
+ecosafety.non_actuating_workload.v1,v1,Non‑actuating workload declaration,Declares a pure kernel that maps telemetry/shards to RiskVector and KER window without actuation,ECOSAFETY
+
+field,name,datatype,units,required,description
+1,workload_id,string,,true,Stable identifier e.g. EnergyToMassKernels.v1.Mx
+2,impl_crate,string,,true,Rust crate implementing the workload
+3,impl_type,string,,true,Fully‑qualified Rust type implementing NonActuatingWorkload
+4,input_schema,string,,true,ALN schema name consumed as Input
+5,output_schema,string,,true,ALN schema name produced as Output (must include RiskVector)
+6,plane_channels,string,,true,Comma‑separated Lyapunov plane channels touched (hydraulics,materials,carbon,biodiversity,data,topology)
+7,lane_default,string,,true,Default lane for this workload (RESEARCH,EXPPROD,PROD)
+8,ker_band_min_k,double,,true,Minimum K factor targeted in admissible lanes
+9,ker_band_min_e,double,,true,Minimum E factor targeted in admissible lanes
+10,ker_band_max_r,double,,true,Maximum R factor allowed in admissible lanes
+11,safestep_enforced,bool,,true,True if safestep V_t+1 ≤ V_t is enforced in this workload
+12,monotonic_axes,string,,false,Harmful axes along which monotonicity is enforced (e.g. contaminant_load,time_since_maintenance)
+13,non_actuating_only,bool,,true,Must be true (this shard only describes non‑actuating workloads)
+14,version_tag,string,,false,Implementation version tag
+15,signing_did,string,,false,Bostrom DID of signer
+16,evidence_hex,string,,false,Hex stamp of review or proof bundle
