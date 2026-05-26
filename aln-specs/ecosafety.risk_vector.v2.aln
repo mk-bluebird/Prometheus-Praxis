@@ -1,0 +1,19 @@
+# aln-specs/ecosafety.risk_vector.v2.aln
+schema,version,title,description,category
+ecosafety.risk_vector.v2,v2,Expanded ecosafety risk vector,Normalized risk coordinates across ecological and governance planes,ECOSAFETY
+
+field,name,datatype,units,required,description
+1,r_energy,double,,true,Energy risk 0–1
+2,r_hydraulics,double,,true,Hydraulic risk 0–1
+3,r_biology,double,,true,Biological risk 0–1
+4,r_carbon,double,,true,Carbon risk 0–1
+5,r_materials,double,,true,Materials risk 0–1
+6,r_biodiversity,double,,true,Biodiversity risk 0–1
+7,r_data,double,,true,Data‑quality risk 0–1
+8,r_topology,double,,true,Topology/governance risk 0–1
+9,V_t,double,,true,Lyapunov residual (Σ_j w_j r_j²)
+10,k_metric,double,,true,Knowledge factor K
+11,e_metric,double,,true,Eco‑impact factor E
+12,r_metric,double,,true,Risk factor R (max_j r_j)
+13,lane,string,,true,Lane label (RESEARCH,EXPPROD,PROD)
+14,ker_deployable,bool,,true,True if window is eligible for deployment under policy
