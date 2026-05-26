@@ -1,10 +1,35 @@
+# filename: crates/cross-constellation-index/Cargo.toml
+# destination: eco_restoration_shard/crates/cross-constellation-index/Cargo.toml
+
 [package]
 name = "cross-constellation-index"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+authors = ["EcoNet Constellation"]
+license = "MIT OR Apache-2.0"
+description = "Shared cross-constellation index and wiring tools for EcoNet repositories (EcoNet, DataLake, Eco-Fort, Cyboquatic, etc.)."
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+readme = "README.md"
+rust-version = "1.82"
+
+[lib]
+name = "cross_constellation_index"
+path = "src/lib.rs"
+
+[[bin]]
+name = "cross-constellation-index"
+path = "src/main.rs"
 
 [dependencies]
-serde = { version = "1", features = ["derive"] }
-uuid = { version = "1", features = ["v4", "serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+walkdir = "2.5"
+anyhow = "1.0"
+thiserror = "1.0"
+uuid = { version = "1.7", features = ["v4", "serde"] }
 time = { version = "0.3", features = ["serde"] }
 aln_core = "0.1"
+
+[dev-dependencies]
+serde_json = "1.0"
