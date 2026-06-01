@@ -1,0 +1,16 @@
+// File: specs/aln/species-fairness-kernels.v1.aln
+
+TITLE species_fairness_kernels.v1
+TABLE species_fairness_kernels
+    // Primary key: (sko_class, jurisdiction_id, species_id).
+    sko_class           : string(64)          // "NeuralCore", "SmartCity", "XR_Stream"
+    jurisdiction_id     : string(32)          // "Phoenix_AZ_CAP", "Oslo_BlueGreen"
+    species_id          : string(128)         // normalized ID, e.g. "GilaTopminnow"
+
+    // Alpha coefficient α_{k,p} in [0,1], dimensionless.
+    alpha_kp            : float32
+
+    // Provenance & governance status.
+    provenance          : string(1024)        // citations, dataset IDs, or ALN evidence IDs
+    status              : enum("draft","validated")
+END
