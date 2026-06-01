@@ -1,5 +1,6 @@
 # filename: Cargo.toml
 # destination: <repo-root>/Cargo.toml
+# Eco Restoration Shard Workspace - Enhanced for IEEE 754 Strict Mode & Rust 2024
 
 [workspace]
 members = [
@@ -32,12 +33,12 @@ members = [
 resolver = "2"
 
 [workspace.package]
-edition      = "2021"
+edition      = "2024"
 license      = "MIT OR Apache-2.0"
 authors      = ["mk-bluebird <bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7>"]
 homepage     = "https://github.com/mk-bluebird/eco_restoration_shard"
 repository   = "https://github.com/mk-bluebird/eco_restoration_shard"
-rust-version = "1.75"
+rust-version = "1.85"
 
 [workspace.dependencies]
 rusqlite   = { version = "0.31", default-features = false, features = ["bundled"] }
@@ -48,16 +49,37 @@ thiserror  = "1.0.57"
 log        = "0.4.21"
 env_logger = "0.11.3"
 
+# Additional shared dependencies for new functionality
+tokio      = { version = "1.38", features = ["rt", "macros", "time", "io-util", "sync", "fs"] }
+petgraph   = "0.6.5"
+hex        = "0.4.3"
+ed25519-dalek = "2.1"
+
 [workspace.dev-dependencies]
 serde_json = "1.0.115"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+all = "warn"
+pedantic = "warn"
+nursery = "warn"
+
+# ============================================================================
+# Root Package Definition
+# ============================================================================
 
 [package]
 name        = "eco_restoration_shard"
 version     = "0.1.0"
-edition     = "2021"
-license     = "MIT OR Apache-2.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
 description = "Eco restoration shard index and research harness for the EcoNet constellation."
-repository  = "https://github.com/mk-bluebird/eco_restoration_shard"
 publish     = false
 
 [lib]
@@ -85,11 +107,108 @@ env_logger = { workspace = true }
 [dev-dependencies]
 serde_json = { workspace = true }
 
-[patch.crates-io]
+# ============================================================================
+# Profile Configuration - IEEE 754 Strict Mode Enforcement
+# ============================================================================
 
 [profile.dev]
+# Abort on panic for deterministic failure modes
 panic = "abort"
+# Enable overflow checks even in dev for safety-critical code
+overflow-checks = true
 
 [profile.release]
+# Abort on panic - no unwinding in production
 panic = "abort"
-lto   = true
+# Fat LTO for maximum optimization across crate boundaries
+lto = "fat"
+# Enable all overflow checks in release
+overflow-checks = true
+# Optimize for size while maintaining determinism
+opt-level = 2
+# Strip symbols for smaller binaries
+strip = "symbols"
+# Enable codegen units = 1 for maximum LTO effectiveness
+codegen-units = 1
+
+[profile.test]
+# Overflow checks in tests to catch edge cases
+overflow-checks = true
+
+[profile.bench]
+# Same optimization as release but keep debug info for profiling
+inherits = "release"
+strip = "none"
+debug = true
+
+# ============================================================================
+# Target-Specific Configuration - IEEE 754 Strict Floating-Point
+# ============================================================================
+
+# x86_64 Linux (primary development & production target)
+[target.x86_64-unknown-linux-gnu]
+rustflags = [
+    # Enable FMA and AVX2 for performance, but disable unsafe FP math
+    "-C", "target-feature=+fma,+avx2",
+    # Strictly disable fast-math optimizations that break IEEE 754
+    "-C", "llvm-args=-enable-unsafe-fp-math=false",
+    # Ensure consistent floating-point contraction behavior
+    "-C", "llvm-args=-fp-contract=off",
+]
+
+# x86_64 Windows MSVC (for cross-platform compatibility testing)
+[target.x86_64-pc-windows-msvc]
+rustflags = [
+    "-C", "target-feature=+fma,+avx2",
+    "-C", "llvm-args=-enable-unsafe-fp-math=false",
+    "-C", "llvm-args=-fp-contract=off",
+]
+
+# aarch64 Linux (for ARM server deployments, e.g., AWS Graviton)
+[target.aarch64-unknown-linux-gnu]
+rustflags = [
+    # ARM NEON equivalent optimizations with strict FP semantics
+    "-C", "target-feature=+neon",
+    "-C", "llvm-args=-enable-unsafe-fp-math=false",
+    "-C", "llvm-args=-fp-contract=off",
+]
+
+# aarch64 macOS (for Apple Silicon development machines)
+[target.aarch64-apple-darwin]
+rustflags = [
+    "-C", "target-feature=+neon",
+    "-C", "llvm-args=-enable-unsafe-fp-math=false",
+    "-C", "llvm-args=-fp-contract=off",
+]
+
+# ============================================================================
+# Workspace Metadata for Tooling Integration
+# ============================================================================
+
+[workspace.metadata.docs.rs]
+# Ensure docs.rs uses the same features
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[workspace.metadata.release]
+# Prevent accidental publishing
+publish = false
+# Require explicit version bumps
+tag-prefix = "v"
+sign-tag = true
+
+[workspace.metadata.aln]
+# ALN schema version compatibility
+min_schema_version = "1.0.0"
+# Hex anchor for constellation verification
+hex_anchor = "0xECO_2026_RESTORATION_SHARD_bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+# RoH ceiling enforcement
+roh_ceiling = 0.30
+
+# ============================================================================
+# Patches (reserved for security fixes or compatibility shims)
+# ============================================================================
+
+[patch.crates-io]
+# Example: If rusqlite needs a security patch before upstream releases
+# rusqlite = { git = "https://github.com/rusqlite/rusqlite", branch = "security-fix" }
