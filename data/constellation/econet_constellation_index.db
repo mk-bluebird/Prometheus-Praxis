@@ -1,0 +1,76 @@
+-- Repository registry
+CREATE TABLE repositories (
+    repo_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    repo_name TEXT UNIQUE NOT NULL,
+    github_url TEXT,
+    primary_language TEXT,
+    description TEXT,
+    created_at TEXT,
+    updated_at TEXT
+);
+
+-- Artifacts (files, schemas, shards)
+CREATE TABLE artifacts (
+    artifact_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    repo_id INTEGER NOT NULL,
+    artifact_path TEXT NOT NULL,
+    artifact_type TEXT,
+    language TEXT,
+    hex_stamp TEXT,
+    created_at TEXT,
+    updated_at TEXT,
+    FOREIGN KEY(repo_id) REFERENCES repositories(repo_id)
+);
+
+-- KER scores (Knowledge, Eco-impact, Risk-of-harm)
+CREATE TABLE ker_scores (
+    score_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    artifact_id INTEGER,
+    repo_id INTEGER,
+    knowledge_factor REAL CHECK(knowledge_factor >= 0.0 AND knowledge_factor <= 1.0),
+    eco_impact REAL CHECK(eco_impact >= 0.0 AND eco_impact <= 1.0),
+    risk_of_harm REAL CHECK(risk_of_harm >= 0.0 AND risk_of_harm <= 1.0),
+    evaluation_date TEXT,
+    notes TEXT,
+    FOREIGN KEY(artifact_id) REFERENCES artifacts(artifact_id),
+    FOREIGN KEY(repo_id) REFERENCES repositories(repo_id)
+);
+
+-- Blast radius (production-grade dependency tracking)
+CREATE TABLE blast_radius (
+    blast_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_artifact_id INTEGER NOT NULL,
+    target_artifact_id INTEGER,
+    target_repo_id INTEGER,
+    dependency_type TEXT,
+    impact_severity TEXT CHECK(impact_severity IN ('critical','high','medium','low')),
+    notes TEXT,
+    FOREIGN KEY(source_artifact_id) REFERENCES artifacts(artifact_id),
+    FOREIGN KEY(target_artifact_id) REFERENCES artifacts(artifact_id),
+    FOREIGN KEY(target_repo_id) REFERENCES repositories(repo_id)
+);
+
+-- Energy efficiency metrics
+CREATE TABLE energy_metrics (
+    metric_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    artifact_id INTEGER,
+    repo_id INTEGER,
+    energy_model TEXT,
+    joules_per_cycle REAL,
+    carbon_offset_kg REAL,
+    evaluation_date TEXT,
+    FOREIGN KEY(artifact_id) REFERENCES artifacts(artifact_id),
+    FOREIGN KEY(repo_id) REFERENCES repositories(repo_id)
+);
+
+-- Corridor bands (safe/gold/hard thresholds)
+CREATE TABLE corridor_bands (
+    corridor_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    parameter_name TEXT NOT NULL UNIQUE,
+    safe_min REAL,
+    gold_min REAL,
+    gold_max REAL,
+    hard_max REAL,
+    unit TEXT,
+    notes TEXT
+);
