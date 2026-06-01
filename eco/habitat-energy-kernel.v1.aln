@@ -1,0 +1,15 @@
+// File: eco/habitat-energy-kernel.v1.aln
+
+TITLE habitat_energy_kernel.v1
+TABLE habitat_energy_kernel
+    site_id                     : string(64)   // vault/site ID in hardware catalog
+    jurisdiction_id             : string(32)   // "Phoenix_AZ_CAP", etc.
+
+    // Local sensitivity terms.
+    uhi_factor_c_per_mw         : float64      // ΔT (°C) per MW sustained IT load
+    water_stress_index          : float64      // 0..1 (0=none,1=severe)
+    grid_carbon_intensity_g_per_kwh : float64  // average gCO2e/kWh
+
+    kernel_source               : string(256)  // dataset / paper / model
+    confidence_score            : float32      // 0..1
+END
