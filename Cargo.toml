@@ -1,30 +1,57 @@
 # filename: Cargo.toml
-# destination: <repo-root>/Cargo.toml
-# Eco Restoration Shard Workspace - Enhanced for IEEE 754 Strict Mode & Rust 2024
+# destination: ./Cargo.toml
+# target-repo: github.com/mk-bluebird/eco_restoration_shard
 
 [workspace]
 members = [
-    # Root eco_restoration_shard crate (code in eco_restoration_shard/src)
+    # Root eco_restoration_shard crate (code in eco_restoration_shard/)
     "eco_restoration_shard",
 
-    # Task crates that live under eco_restoration_shard/
+    # Task / tool crates under eco_restoration_shard/
     "eco_restoration_shard/T08_sensor_health",
     "eco_restoration_shard/T10_pricing",
 
-    # Crates under `crates/` (paths aligned with your listing)
+    # Crates under `crates/` (exactly matching your directory listing)
+    "crates/adaptive-corridors",
+    "crates/bioscale-fairness-validator",
+    "crates/bioscale_evolution_cli",
+    "crates/blacklist_filter",
     "crates/blastradius",
+    "crates/bostrom-cli",
+    "crates/bostrom-signer",
+    "crates/cargo-blast-radius",
     "crates/community-governance",
+    "crates/constellation-logic-auto",
     "crates/cross-constellation-index",
+    "crates/cyboquatic-ecosafety-core",
+    "crates/datalake_core",
     "crates/disaster-scenarios",
     "crates/eco-ledger-particles",
     "crates/eco-pricing",
+    "crates/eco-restoration-governance",
     "crates/eco-wealth-portfolio",
+    "crates/eco_r_axis_verifier",
+    "crates/eco_restoration_shard",
+    "crates/eco_zk_aggregate",
+    "crates/econet-index",
+    "crates/econet_blastradius_spine",
+    "crates/econet_ceim_phoenixwater",
     "crates/ecoper-joule",
+    "crates/ecorestorationshard",
+    "crates/ecosafety-core",
+    "crates/ecosafety_sqlite_index",
+    "crates/education-prompts",
+    "crates/energy-metrics",
+    "crates/federated-ker",
+    "crates/hydraulics-kernels",
     "crates/hydrology-constraints",
+    "crates/kerresidual",
     "crates/lane-governance",
     "crates/large-particle-registry",
+    "crates/neuromorphic-risk",
     "crates/plane-weights",
     "crates/restoration-radius",
+    "crates/round-trip-verify",
     "crates/sensor-health",
     "crates/sensor-telemetry",
     "crates/topology-risk",
@@ -39,48 +66,60 @@ authors      = ["mk-bluebird <bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7>"]
 homepage     = "https://github.com/mk-bluebird/eco_restoration_shard"
 repository   = "https://github.com/mk-bluebird/eco_restoration_shard"
 rust-version = "1.85"
+version      = "0.2.0"
+description  = "Eco restoration shard repository with Cyboquatic eco-machinery, KER governance, and EcoNet constellation indexing."  # aligned with prior workspace description [file:25]
 
 [workspace.dependencies]
-rusqlite   = { version = "0.31", default-features = false, features = ["bundled"] }
-serde      = { version = "1.0.197", features = ["derive"] }
-serde_json = "1.0.115"
-chrono     = { version = "0.4.38", features = ["serde"] }
-thiserror  = "1.0.57"
-log        = "0.4.21"
-env_logger = "0.11.3"
+# Core non-actuating stack (aligned with prior ecosafety / econet-index configs) [file:13][file:25]
+rusqlite        = { version = "0.31", default-features = false, features = ["bundled"] }
+serde           = { version = "1.0.197", features = ["derive"] }
+serde_json      = "1.0.115"
+chrono          = { version = "0.4.38", features = ["serde"] }
+thiserror       = "1.0.57"
+log             = "0.4.21"
+env_logger      = "0.11.3"
 
-# Additional shared dependencies for new functionality
-tokio      = { version = "1.38", features = ["rt", "macros", "time", "io-util", "sync", "fs"] }
-petgraph   = "0.6.5"
-hex        = "0.4.3"
-ed25519-dalek = "2.1"
+# Graphs, hex-stamping, signatures (used by econetrepoindex / definitionregistry lines) [file:7][file:13]
+petgraph        = "0.6.5"
+hex             = "0.4.3"
+ed25519-dalek   = "2.1"
+
+# Async stack constrained to non-actuating research (no net features enabled) [file:13][file:25]
+tokio           = { version = "1.38", features = ["rt", "macros", "time", "io-util", "sync", "fs"] }
+
+# ALN parsing / proc-macro stubs (aligned with existing aln-ast / aln-derive design) [file:25]
+serde_yaml      = "0.9"
+proc-macro2     = "1.0"
+quote           = "1.0"
+syn             = { version = "2.0", features = ["full"] }
 
 [workspace.dev-dependencies]
 serde_json = "1.0.115"
+csv        = "1.3"   # for batch / stake CSV generation and RFC4180 compliance tools [file:7]
 
 [workspace.lints.rust]
-unsafe_code = "forbid"
+unsafe_code  = "forbid"
 missing_docs = "warn"
 
 [workspace.lints.clippy]
-all = "warn"
+all      = "warn"
 pedantic = "warn"
-nursery = "warn"
+nursery  = "warn"
 
-# ============================================================================
-# Root Package Definition
-# ============================================================================
+# =============================================================================
+# Root Package Definition (eco_restoration_shard)
+# =============================================================================
 
 [package]
 name        = "eco_restoration_shard"
-version     = "0.1.0"
-edition.workspace = true
-license.workspace = true
-authors.workspace = true
-repository.workspace = true
+version     = "0.2.0"
+edition.workspace      = true
+license.workspace      = true
+authors.workspace      = true
+repository.workspace   = true
 rust-version.workspace = true
-description = "Eco restoration shard index and research harness for the EcoNet constellation."
-publish     = false
+description            = "Eco restoration shard index and research harness for the EcoNet constellation."
+publish                = false
 
 [lib]
 name       = "eco_restoration_shard"
@@ -106,109 +145,59 @@ env_logger = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
+csv        = { workspace = true }
 
-# ============================================================================
-# Profile Configuration - IEEE 754 Strict Mode Enforcement
-# ============================================================================
+# =============================================================================
+# Profile Configuration - deterministic IEEE-754 friendly settings
+# =============================================================================
 
 [profile.dev]
-# Abort on panic for deterministic failure modes
-panic = "abort"
-# Enable overflow checks even in dev for safety-critical code
-overflow-checks = true
+panic            = "abort"
+overflow-checks  = true
 
 [profile.release]
-# Abort on panic - no unwinding in production
-panic = "abort"
-# Fat LTO for maximum optimization across crate boundaries
-lto = "fat"
-# Enable all overflow checks in release
+panic           = "abort"
+lto             = "fat"
 overflow-checks = true
-# Optimize for size while maintaining determinism
-opt-level = 2
-# Strip symbols for smaller binaries
-strip = "symbols"
-# Enable codegen units = 1 for maximum LTO effectiveness
-codegen-units = 1
+opt-level       = 2
+strip           = "symbols"
+codegen-units   = 1
 
 [profile.test]
-# Overflow checks in tests to catch edge cases
 overflow-checks = true
 
 [profile.bench]
-# Same optimization as release but keep debug info for profiling
-inherits = "release"
-strip = "none"
-debug = true
+inherits   = "release"
+strip      = "none"
+debug      = true
 
-# ============================================================================
-# Target-Specific Configuration - IEEE 754 Strict Floating-Point
-# ============================================================================
+# =============================================================================
+# Target-specific rustflags (must be set via .cargo/config.toml in 2024 editions)
+# =============================================================================
+# Note: per-target rustflags are typically configured in .cargo/config.toml
+# rather than Cargo.toml; kept here as documentation for the expected setup. [file:13]
 
-# x86_64 Linux (primary development & production target)
-[target.x86_64-unknown-linux-gnu]
-rustflags = [
-    # Enable FMA and AVX2 for performance, but disable unsafe FP math
-    "-C", "target-feature=+fma,+avx2",
-    # Strictly disable fast-math optimizations that break IEEE 754
-    "-C", "llvm-args=-enable-unsafe-fp-math=false",
-    # Ensure consistent floating-point contraction behavior
-    "-C", "llvm-args=-fp-contract=off",
-]
-
-# x86_64 Windows MSVC (for cross-platform compatibility testing)
-[target.x86_64-pc-windows-msvc]
-rustflags = [
-    "-C", "target-feature=+fma,+avx2",
-    "-C", "llvm-args=-enable-unsafe-fp-math=false",
-    "-C", "llvm-args=-fp-contract=off",
-]
-
-# aarch64 Linux (for ARM server deployments, e.g., AWS Graviton)
-[target.aarch64-unknown-linux-gnu]
-rustflags = [
-    # ARM NEON equivalent optimizations with strict FP semantics
-    "-C", "target-feature=+neon",
-    "-C", "llvm-args=-enable-unsafe-fp-math=false",
-    "-C", "llvm-args=-fp-contract=off",
-]
-
-# aarch64 macOS (for Apple Silicon development machines)
-[target.aarch64-apple-darwin]
-rustflags = [
-    "-C", "target-feature=+neon",
-    "-C", "llvm-args=-enable-unsafe-fp-math=false",
-    "-C", "llvm-args=-fp-contract=off",
-]
-
-# ============================================================================
-# Workspace Metadata for Tooling Integration
-# ============================================================================
+# =============================================================================
+# Workspace metadata
+# =============================================================================
 
 [workspace.metadata.docs.rs]
-# Ensure docs.rs uses the same features
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [workspace.metadata.release]
-# Prevent accidental publishing
-publish = false
-# Require explicit version bumps
+publish   = false
 tag-prefix = "v"
-sign-tag = true
+sign-tag   = true
 
 [workspace.metadata.aln]
-# ALN schema version compatibility
 min_schema_version = "1.0.0"
-# Hex anchor for constellation verification
-hex_anchor = "0xECO_2026_RESTORATION_SHARD_bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
-# RoH ceiling enforcement
-roh_ceiling = 0.30
+hex_anchor         = "0xECO_2026_RESTORATION_SHARD_bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+roh_ceiling        = 0.30
 
-# ============================================================================
-# Patches (reserved for security fixes or compatibility shims)
-# ============================================================================
+# =============================================================================
+# Patches (reserved for security fixes / compatibility)
+# =============================================================================
 
 [patch.crates-io]
-# Example: If rusqlite needs a security patch before upstream releases
-# rusqlite = { git = "https://github.com/rusqlite/rusqlite", branch = "security-fix" }
+# Intentionally empty; fill only for audited security / compatibility patches.
