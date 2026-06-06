@@ -1,0 +1,20 @@
+-- filename: aln-specs/crypto/PQCCapabilityShard2026v1.aln
+-- destination: eco_restoration_shard/aln-specs/crypto/PQCCapabilityShard2026v1.aln
+
+schema,version,title,description,category
+PQCCapabilityShard2026v1,v1,Post-quantum capability declaration,
+"Declares PQC algorithms and lanes for a node or contract.",
+ECOSAFETY
+
+field,name,datatype,units,required,description
+1,nodeid,string,,true,"Logical node or chain module id."
+2,workloadclass,string,,true,"'edge','validator','contract_vm','gateway'."
+3,kem_algo,string,,true,"'ML-KEM-512','ML-KEM-768','hybrid','none'."
+4,sign_algo,string,,true,"'ML-DSA-65','ECDSA-P256','hybrid','none'."
+5,kem_lane,string,,true,"Lane for PQ KEM use RESEARCH,EXPPROD,PROD."
+6,sign_lane,string,,true,"Lane for PQ signatures."
+7,bandwidth_profile,string,,true,"'narrow','normal','broad'."
+8,latency_budget_ms,double,ms,true,"Allowed handshake/sign latency."
+9,nonoffsettable,bool,,true,"If true, PQC weakness cannot be offset by other planes."
+10,signingdid,string,,false,"Owner DID."
+11,evidencehex,string,,false,"Evidence of test vectors, NIST conformity."
