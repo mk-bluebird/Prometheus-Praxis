@@ -1,0 +1,16 @@
+-- filename: aln-specs/dkg/RepoParticleBinding2026v1.aln
+-- destination: eco_restoration_shard/aln-specs/dkg/RepoParticleBinding2026v1.aln
+
+schema,version,title,description,category
+RepoParticleBinding2026v1,v1,Repo-to-particle binding,
+"Links a GitHub repo and commit to a Bostrom/IPFS particle CID.",
+DKG
+
+field,name,datatype,units,required,description
+1,reponame,string,,true,"Logical repo name e.g., ecorestorationshard."
+2,githubslug,string,,true,"GitHub slug e.g., mk-bluebird/eco_restoration_shard."
+3,git_commit,string,,true,"Git commit hash."
+4,particle_cid,string,,true,"Content-addressed ID on IPFS/Bostrom."
+5,neuron_id,string,,true,"Bostrom neuron owning the link."
+6,created_utc,string,,true,"Timestamp of binding."
+7,evidencehex,string,,false,"Hex stamp of manifest and CI logs."
