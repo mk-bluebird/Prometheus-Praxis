@@ -1,0 +1,20 @@
+-- filename: aln-specs/telemetrykernel/TelemetryKernel2026v1.aln
+-- destination: eco_restoration_shard/aln-specs/telemetrykernel/TelemetryKernel2026v1.aln
+
+schema,version,title,description,category
+TelemetryKernel2026v1,v1,Telemetry aggregation and KER snapshot,
+"Declares a non-actuating telemetry aggregation kernel that maps raw edge data to KER windows.",
+ECOSAFETY
+
+field,name,datatype,units,required,description
+1,kernel_id,string,,true,"Stable kernel id e.g., SwarmNetSNN-Edge-01."
+2,implcrate,string,,true,"Rust crate implementing the kernel."
+3,impltype,string,,true,"Rust type implementing NonActuatingWorkload."
+4,inputschema,string,,true,"ALN schema for raw telemetry input."
+5,outputschema,string,,true,"ALN schema for edge_telemetry_window rows."
+6,lanedefault,string,,true,"Default lane RESEARCH,EXPPROD,PROD."
+7,planechannels,string,,true,"Planes touched: energy,hydraulics,biology."
+8,safestepenforced,bool,,true,"True if Vt(t+1) <= Vt(t) enforced."
+9,nonactuatingonly,bool,,true,"Must be true for telemetry kernels."
+10,signingdid,string,,false,"Bostrom DID of kernel maintainer."
+11,evidencehex,string,,false,"Hex stamp of tests, proofs."
