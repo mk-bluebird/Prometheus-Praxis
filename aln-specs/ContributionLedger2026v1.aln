@@ -1,0 +1,61 @@
+TITLE ContributionLedger2026v1
+ALNSPECHASHHEX 0x0000000000000000  # to be set by ProvenanceKernel
+SCHEMANAME governance.sovereignty.contribution.ledger.2026v1
+CATEGORY GOVERNANCE
+DESCRIPTION Ledger of binding, contribution, and countermeasure events for sovereign data access.
+PARTICLE ContributionLedger2026v1
+ROLE QPUDATASHARD
+VERSIONTAG v1
+
+FIELD eventid INT
+META DESCRIPTION Autoincrement primary key for this ledger event.
+
+FIELD policyid STRING
+META DESCRIPTION Foreign key to AbsoluteDataSovereigntyPolicy2026v1.policyid.
+
+FIELD party_did STRING
+META DESCRIPTION DID of the accessing or contributing party.
+
+FIELD party_bostrom_address STRING
+META DESCRIPTION Bostrom address of the party, if available.
+
+FIELD hostdid STRING
+META DESCRIPTION Host DID on which the event occurred.
+
+FIELD event_kind STRING
+META DESCRIPTION Event kind, e.g. "AgreementEnforced", "ContributionEnforced", "ViolationDetected", "CountermeasureApplied".
+
+FIELD file_path STRING
+META DESCRIPTION Relative path of the file that triggered the event.
+
+FIELD file_extension STRING
+META DESCRIPTION File extension of the accessed file.
+
+FIELD workflow_id STRING
+META DESCRIPTION CI workflow or process identifier.
+
+FIELD contribution_type STRING
+META DESCRIPTION Type of contribution, e.g. "data", "resource", "intelligence", "improvement", or "none" for violations.
+
+FIELD contribution_detail STRING
+META DESCRIPTION Human-readable description or hash of the contribution.
+
+FIELD contribution_target STRING
+META DESCRIPTION Logical target of the contribution, e.g. "SwarmNet.SuperintelligenceSystemDataBank".
+
+FIELD violation_detail STRING
+META DESCRIPTION Optional description of violation or attempted bypass techniques.
+
+FIELD director_notified BOOL
+META DESCRIPTION Whether the Director was notified for this event.
+
+FIELD timestamp_utc STRING
+META DESCRIPTION ISO8601 UTC timestamp when the event was recorded.
+
+FIELD evidencehex STRING
+META DESCRIPTION Evidence hash computed by ProvenanceKernel over this ledger row.
+
+FIELD signinghex STRING
+META DESCRIPTION Signature over evidencehex, bound to ownerdid/hostdid or delegated signer.
+
+ENDPARTICLE
