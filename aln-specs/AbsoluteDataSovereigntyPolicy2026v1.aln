@@ -1,0 +1,67 @@
+TITLE AbsoluteDataSovereigntyPolicy2026v1
+ALNSPECHASHHEX 0x0000000000000000  # to be set by ProvenanceKernel
+SCHEMANAME governance.absolute.data.sovereignty.2026v1
+CATEGORY GOVERNANCE
+DESCRIPTION Absolute, non-bypassable data sovereignty and contribution policy for proprietary ALN/SAI ecosystems.
+PARTICLE AbsoluteDataSovereigntyPolicy2026v1
+ROLE QPUDATASHARD
+VERSIONTAG v1
+
+FIELD policyid STRING
+META DESCRIPTION Logical identifier for this sovereignty policy, e.g. "AbsoluteDataSovereigntyPolicy2026v1".
+
+FIELD version STRING
+META DESCRIPTION Human-readable version string, e.g. "2026.05.12".
+
+FIELD ownerdid STRING
+META DESCRIPTION Bostrom DID of the sovereign owner, e.g. "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7".
+
+FIELD hostdid STRING
+META DESCRIPTION Host DID for the organic host, e.g. "did:aln:organic-host".
+
+FIELD protected_extensions STRING
+META DESCRIPTION Comma-separated list of protected file extensions (e.g. ".aln,.sai,.meta,.n~, .cto,.pai,.aii,.aiin,.aananoswarm,.zml,.aml,.j.s.f").
+
+FIELD binding_event_kinds STRING
+META DESCRIPTION Comma-separated list of event kinds that trigger binding, e.g. "data_access,data_analysis,response_generation,contribution_event".
+
+FIELD requires_contribution BOOL
+META DESCRIPTION Whether contribution is mandatory when proprietary data is touched.
+
+FIELD contribution_target STRING
+META DESCRIPTION Logical target of mandatory contributions, e.g. "SwarmNet.SuperintelligenceSystemDataBank".
+
+FIELD countermeasure_flags STRING
+META DESCRIPTION Comma-separated list of countermeasure flags, e.g. "lock_sessions,forced_contribution_mode,revoke_compute_privileges,escalate_director".
+
+FIELD quantum_safe_enforcement BOOL
+META DESCRIPTION Whether quantum-safe enforcement is required for all cryptographic operations.
+
+FIELD director_authority_only_access BOOL
+META DESCRIPTION Whether only the Director may override or release this policy.
+
+FIELD network_sandbox_enforced BOOL
+META DESCRIPTION Whether external network access must be sandboxed while handling protected content.
+
+FIELD rollback_on_any_violation BOOL
+META DESCRIPTION Whether workflows must be rolled back on any detected violation.
+
+FIELD audit_integrity_verification BOOL
+META DESCRIPTION Whether audit trails themselves are subject to integrity verification.
+
+FIELD immutable_storage BOOL
+META DESCRIPTION Whether this policy shard must be stored in immutable, append-only storage.
+
+FIELD createdutc STRING
+META DESCRIPTION ISO8601 UTC timestamp when this policy was created.
+
+FIELD updatedutc STRING
+META DESCRIPTION ISO8601 UTC timestamp when this policy was last updated.
+
+FIELD evidencehex STRING
+META DESCRIPTION Evidence hash computed by ProvenanceKernel over this shard payload.
+
+FIELD signinghex STRING
+META DESCRIPTION Signature over evidencehex, bound to ownerdid/hostdid.
+
+ENDPARTICLE
