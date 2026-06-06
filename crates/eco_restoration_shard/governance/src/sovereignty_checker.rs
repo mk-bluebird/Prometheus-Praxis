@@ -8,34 +8,51 @@ use anyhow::Result;
 /// Minimal view of the AbsoluteDataSovereigntyPolicy2026v1 shard.
 #[derive(Debug, Clone)]
 pub struct AbsoluteDataSovereigntyPolicy {
+    /// Logical identifier for this sovereignty policy.
     pub policy_id: String,
+    /// Bostrom DID of the sovereign owner.
     pub owner_did: String,
+    /// Host DID for the organic host or primary deployment environment.
     pub host_did: String,
+    /// Protected file extensions, including leading dots where applicable.
     pub protected_extensions: Vec<String>,
+    /// Binding event kinds that trigger policy enforcement.
     pub binding_event_kinds: Vec<String>,
+    /// Whether contribution is mandatory when protected content is touched.
     pub requires_contribution: bool,
+    /// Logical target for required contributions.
     pub contribution_target: String,
 }
 
 /// Minimal view of the CyberCoreMigrationAuthority2026v1 shard.
 #[derive(Debug, Clone)]
 pub struct CyberCoreMigrationAuthority {
+    /// Logical identifier for the migration authority clause.
     pub clause_id: String,
+    /// Bostrom DID that holds ultimate migration authority.
     pub owner_did: String,
+    /// Host DID bound to this authority.
     pub host_did: String,
+    /// Glob or pattern describing files that must embed this clause.
     pub required_files_glob: String,
+    /// Forbidden replacement patterns for ownerdid/hostdid or related markers.
     pub forbidden_substitutions: Vec<String>,
+    /// Whether governed files must contain the clause.
     pub require_clause_presence: bool,
+    /// Whether the exact owner_did literal must be present and unchanged.
     pub require_literal_ownerdid: bool,
+    /// Whether the exact host_did literal must be present and unchanged.
     pub require_literal_hostdid: bool,
+    /// Whether CI must hard-fail and lock workflows on violation.
     pub lock_on_violation: bool,
+    /// Whether violations must be escalated to the Director in real time.
     pub notify_director_on_violation: bool,
 }
 
 /// CI context for a single run.
 #[derive(Debug, Clone)]
 pub struct CiRunContext {
-    /// Unique identifier for the CI run (e.g. GitHub run ID).
+    /// Unique identifier for the CI run (for example, GitHub run ID).
     pub run_id: String,
     /// Commit hash or change set identifier.
     pub change_id: String,
@@ -65,14 +82,13 @@ pub struct SovereigntyCheckResult {
     pub details: Vec<String>,
     /// Whether CI should hard-fail this run.
     pub should_fail_pipeline: bool,
-    /// Whether terminals / sessions associated with this run should be locked.
+    /// Whether terminals or sessions associated with this run should be locked.
     pub should_lock_sessions: bool,
 }
 
 /// Non-actuating interface for enforcing data sovereignty and migration authority in CI.
 ///
-/// Implementations must be pure and side-effect free with respect to external systems:
-/// they operate only on in-memory diffs and loaded governance shards.
+/// Implementations operate only on in-memory diffs and loaded governance shards.
 pub trait SovereigntyChecker {
     /// Return the active absolute data sovereignty policy.
     fn sovereignty_policy(&self) -> &AbsoluteDataSovereigntyPolicy;
@@ -80,7 +96,7 @@ pub trait SovereigntyChecker {
     /// Return the active migration authority clause.
     fn migration_authority(&self) -> &CyberCoreMigrationAuthority;
 
-    /// Repository root path (used only for diagnostics and path normalization).
+    /// Repository root path, used for diagnostics and path normalization.
     fn repo_root(&self) -> &Path;
 
     /// Check data sovereignty constraints against the provided file diffs.
@@ -101,7 +117,7 @@ pub trait SovereigntyChecker {
     ///
     /// Responsibilities:
     /// - Enforce presence of the migration clause in required files.
-    /// - Prevent removal or substitution of `owner_did` / `host_did` literals.
+    /// - Prevent removal or substitution of `owner_did` and `host_did` literals.
     /// - Detect attempts to replace the migration authority with forbidden patterns.
     fn check_migration_authority(
         &self,
@@ -113,7 +129,7 @@ pub trait SovereigntyChecker {
     ///
     /// Implementations should:
     /// - Invoke `check_data_sovereignty` and `check_migration_authority`.
-    /// - Merge results conservatively (any violation propagates to failure).
+    /// - Merge results conservatively so any violation propagates to failure.
     fn check_all(
         &self,
         ctx: &CiRunContext,
