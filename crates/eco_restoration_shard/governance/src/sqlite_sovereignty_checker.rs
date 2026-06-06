@@ -4,6 +4,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
+use chrono::Utc;
 use rusqlite::{params, Connection};
 
 use crate::sovereignty_checker::{
@@ -15,12 +16,6 @@ use crate::sovereignty_checker::{
     SovereigntyChecker,
 };
 
-/// Concrete, non-actuating implementation of `SovereigntyChecker` backed by SQLite.
-///
-/// This skeleton assumes the presence of:
-/// - `v_active_sovereignty_policy` view from db_absolute_data_sovereignty_policy.sql
-/// - `cyber_core_migration_authority` / `v_active_cyber_core_authority` (to be added)
-/// - `contribution_ledger` and `v_contribution_summary` from db_contribution_ledger.sql
 pub struct SqliteSovereigntyChecker {
     repo_root: PathBuf,
     conn: Connection,
@@ -29,7 +24,6 @@ pub struct SqliteSovereigntyChecker {
 }
 
 impl SqliteSovereigntyChecker {
-    /// Open a read/write connection to the given SQLite DB and load active governance shards.
     pub fn new<P: AsRef<Path>>(repo_root: P, db_path: P) -> Result<Self> {
         let conn = Connection::open(db_path).context("opening governance SQLite DB")?;
 
@@ -144,7 +138,7 @@ impl SqliteSovereigntyChecker {
         violation_detail: Option<&str>,
         director_notified: bool,
     ) -> Result<()> {
-        let timestamp_utc = chrono::Utc::now().to_rfc3339();
+        let timestamp_utc = Utc::now().to_rfc3339();
         let policyid = &self.policy.policy_id;
         let file_extension = Path::new(&file.path)
             .extension()
@@ -179,7 +173,6 @@ impl SqliteSovereigntyChecker {
             "#,
         )?;
 
-        // For CI-side events, party_did can be a dedicated CI DID; here we use owner_did as a placeholder.
         stmt.execute(params![
             policyid,
             self.policy.owner_did,
@@ -248,12 +241,9 @@ impl SovereigntyChecker for SqliteSovereigntyChecker {
             let mut msg = format!("protected file touched: {}", file.path);
 
             if self.policy.requires_contribution && has_new_contents {
-                // Skeleton: record that a contribution is required; actual linkage to a
-                // ContributionLedger2026v1 "ContributionEnforced" entry can be added later.
                 msg.push_str(" (contribution required)");
             }
 
-            // For now, touching a protected file always creates a binding event.
             self.insert_ledger_event(
                 ctx,
                 file,
@@ -296,14 +286,10 @@ impl SovereigntyChecker for SqliteSovereigntyChecker {
         let mut should_fail = false;
         let mut should_lock_sessions = false;
 
-        // Skeleton: enforce literal ownerdid/hostdid retention and forbidden substitutions.
         for file in diffs {
-            // Only apply to files that match the glob pattern at the call site; this
-            // skeleton assumes the caller has already filtered diffs if desired.
             let old_text = file.old_contents.as_deref().unwrap_or("");
             let new_text = file.new_contents.as_deref().unwrap_or("");
 
-            // Check for removal of owner_did / host_did literals.
             if self.authority.require_literal_ownerdid
                 && old_text.contains(&self.authority.owner_did)
                 && !new_text.contains(&self.authority.owner_did)
@@ -352,7 +338,6 @@ impl SovereigntyChecker for SqliteSovereigntyChecker {
                 details.push(msg);
             }
 
-            // Check forbidden substitutions.
             for forbidden in &self.authority.forbidden_substitutions {
                 if !forbidden.is_empty() && new_text.contains(forbidden) {
                     ok = false;
