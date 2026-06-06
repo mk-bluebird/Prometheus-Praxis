@@ -1,0 +1,19 @@
+-- filename: aln-specs/cosmwasm/CosmWasmCapabilityInvariants2026v1.aln
+-- destination: eco_restoration_shard/aln-specs/cosmwasm/CosmWasmCapabilityInvariants2026v1.aln
+
+schema,version,title,description,category
+CosmWasmCapabilityInvariants2026v1,v1,CosmWasm capability invariants,
+"Declares runtime capability checks and fuzz invariants for CosmWasm modules.",
+ECOSAFETY
+
+field,name,datatype,units,required,description
+1,chainid,string,,true,"Cosmos chain id."
+2,module,string,,true,"'staking','bank','custom_contract'."
+3,requires_capabilities,string,,true,"Comma list e.g., 'staking,bank'."
+4,enforce_runtimecheck,bool,,true,"True if handler-level checks must run."
+5,fuzz_profile,string,,true,"'stateful_invariant','single_tx','none'."
+6,inv_total_supply,bool,,true,"Enforce supply conservation invariant."
+7,inv_capability_subset,bool,,true,"Enforce declared capabilities superset."
+8,inv_freeze_controls,bool,,true,"Enforce freeze/burn/blacklist invariants."
+9,signingdid,string,,false,"Governance DID."
+10,evidencehex,string,,false,"Proof of fuzz campaigns and audits."
