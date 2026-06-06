@@ -1,0 +1,5 @@
+"Component","K","E","R","Notes"
+"Eco-connectivity spine","0.95","0.92","0.12","Frozen math (circuit, APSP, KER) encoded as SQL evidence only.eco.txt"
+"DKG mirror + Repo bindings","0.95","0.91","0.12","Strengthens provenance and avoids data silos.eco.txt+1"
+"Terminal/DBSC/CEA spine","0.94","0.90","0.12","Hardens terminals without new control surfaces.90fa22bf-70f2-4085-9810-14954885c08e.md+1"
+"PQC & CosmWasm invariants shards","0.95","0.90","0.13","Brings quantum safety into planes/lanes explicitly.8df4d042-c25e-4f90-9a72-5da6a851bac0.md+1"
