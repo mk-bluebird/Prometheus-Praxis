@@ -1,0 +1,263 @@
+# filename: particles/ceim_governance_runner_v1.mai
+# destination: eco_restoration_shard/particles/ceim_governance_runner_v1.mai
+# schema: MAI-CEIM-GOVERNANCE-RUNNER-1
+# version: 1.0.0
+
+particle_header MAIParticleMeta v1.0.0
+row particle_name ceim_governance_runner_v1.mai
+row schema_id MAI-CEIM-GOVERNANCE-RUNNER-1
+row version 1.0.0
+row description C++ execution-particle wiring the CEIM eco-math engine, qpudatashards, Identity Karma shards, and an HTTP control-plane into a governance-grade runner for eco-impact scoring and AI-safe access.
+
+# 1. Build and layout
+
+particle_section BuildLayout
+
+row BUILD.language C++
+row BUILD.standard c++17
+row BUILD.compiler_hint g++ or clang++
+row BUILD.output_binary bin/ceim_governance_runner
+
+row LAYOUT.include_dir include/
+row LAYOUT.src_dir src/
+row LAYOUT.shards_dir qpudatashards/
+row LAYOUT.output_dir qpudatashards/particles/
+row LAYOUT.config_dir config/
+
+row DEPENDENCY.header include/CeimKernel.hpp
+row DEPENDENCY.header include/EcoKarmaPolicy.hpp
+row DEPENDENCY.header include/ShardIO.hpp
+row DEPENDENCY.header include/HttpServer.hpp
+
+row DEPENDENCY.src src/CeimKernel.cpp
+row DEPENDENCY.src src/EcoKarmaPolicy.cpp
+row DEPENDENCY.src src/ShardIO.cpp
+row DEPENDENCY.src src/HttpServer.cpp
+row DEPENDENCY.src src/CeimGovernanceRunner.cpp
+
+# 2. Core CEIM kernel interface
+
+particle_section CeimKernelInterface
+
+record CeimNodeSample
+  node_id       std::string
+  contaminant   std::string
+  cin           double
+  cout          double
+  flow          double
+  cref          double
+  hazard_weight double
+  t0            std::string
+  t1            std::string
+
+record CeimNodeResult
+  node_id        std::string
+  contaminant    std::string
+  kn             double
+  ecoimpactscore double
+
+row CEIM.function_signature double computeNodeKn(const CeimNodeSample& sample)
+row CEIM.function_signature double computeEcoImpactScore(double kn, double ecoimpact_weight)
+
+row CEIM.requirement Kn_dimensionless true
+row CEIM.requirement use_supremum_reference true
+row CEIM.requirement no_policy_logic_inside_kernel true
+
+# 3. Identity Karma policy engine interface
+
+particle_section KarmaPolicyInterface
+
+record KarmaProfile
+  identity_id          std::string
+  identity_type        std::string
+  ecoImpactScore       double  # 0..1
+  contributionScore    double  # 0..1
+  securityTrustScore   double  # 0..1
+  currentKarma         double  # 0..1
+  tolerance            KarmaToleranceLevel
+  maxResponse          IntrusionResponseLevel
+
+record IncidentContext
+  anomalyScore               double  # 0..1
+  baseSuggested              IntrusionResponseLevel
+  insiderSuspected           bool
+  crossPlatformCorrelation   bool
+
+record ResponseDecision
+  appliedResponse    IntrusionResponseLevel
+  notifyHumanReview  bool
+  freezeHighValueAssets bool
+
+row KARMA.policy_class EcoKarmaPolicy
+row KARMA.method_signature static ResponseDecision evaluate(const KarmaProfile& profile, const IncidentContext& ctx)
+row KARMA.constraint no_modification_of_ceim_math true
+row KARMA.constraint respect_high_karma_tolerance true
+
+# 4. Shard IO contracts
+
+particle_section ShardIOContracts
+
+row SHARD.ceim_input_pattern qpudatashards/particles/EcoNetSupremeEcoMathEngine*.csv
+row SHARD.karma_input_pattern qpudatashards/particles/EcoKarmaToleranceMetrics*.csv
+row SHARD.ceim_output_pattern qpudatashards/particles/CEIMXJCentralAZKarma*.csv
+
+row SHARD.ceim_fields nodeid,stakeholderid,contaminant,cin,cout,flow,windowstart,windowend,cref,hazardweight,kn,ecoimpactscore,unitsC,unitsQ
+row SHARD.karma_fields identityid,identitytype,region,ecoimpactscore,contributionscore,securitytrustscore,currentkarma,karmatolerancelevel,maxintrusionresponselevel,notes
+
+row SHARD.requirement write_hash_per_output true
+row SHARD.requirement alphanumeric_node_ids true
+row SHARD.requirement utc_timestamps true
+
+# 5. HTTP server bindings (control-plane only)
+
+particle_section HttpControlPlane
+
+row HTTP.port 8080
+row HTTP.bind_address 127.0.0.1
+row HTTP.max_clients 32
+
+row HTTP.endpoint GET /api/v1/nodes/ecoimpact
+row HTTP.endpoint GET /api/v1/identities/karma
+row HTTP.endpoint POST /api/v1/ai/suggestions
+
+row HTTP.require_auth chat_session_tokens,dev_tunnel_tokens
+row HTTP.require_tls optional_behind_reverse_proxy
+row HTTP.response_format JSON
+
+# 6. Main runner C++ skeleton
+
+particle_section MainCppSkeleton
+
+row MAIN.file src/CeimGovernanceRunner.cpp
+
+row MAIN.code """
+#include <iostream>
+#include <string>
+#include <vector>
+#include <stdexcept>
+#include \"CeimKernel.hpp\"
+#include \"EcoKarmaPolicy.hpp\"
+#include \"ShardIO.hpp\"
+#include \"HttpServer.hpp\"
+
+using namespace EcoNet;
+
+// Simple struct wrappers aligned with the MAI spec
+struct RunnerConfig {
+    std::string ceimInputGlob;
+    std::string karmaInputGlob;
+    std::string ceimOutputPattern;
+    std::string bindAddress;
+    int         port;
+};
+
+static RunnerConfig loadConfig() {
+    RunnerConfig cfg;
+    cfg.ceimInputGlob    = \"qpudatashards/particles/EcoNetSupremeEcoMathEngine*.csv\";
+    cfg.karmaInputGlob   = \"qpudatashards/particles/EcoKarmaToleranceMetrics*.csv\";
+    cfg.ceimOutputPattern= \"qpudatashards/particles/CEIMXJCentralAZKarma%Y%m%d.csv\";
+    cfg.bindAddress      = \"127.0.0.1\";
+    cfg.port             = 8080;
+    return cfg;
+}
+
+static void runCeimWindow(const RunnerConfig& cfg) {
+    auto ceimShards   = ShardIO::listFiles(cfg.ceimInputGlob);
+    auto karmaShards  = ShardIO::listFiles(cfg.karmaInputGlob);
+
+    if (ceimShards.empty()) {
+        std::cerr << \"[WARN] No CEIM input shards found; skipping window.\\n\";
+        return;
+    }
+
+    // Load CEIM node rows
+    std::vector<CeimNodeSample> samples = ShardIO::loadCeimSamples(ceimShards);
+    std::vector<CeimNodeResult> results;
+    results.reserve(samples.size());
+
+    for (const auto& s : samples) {
+        double kn  = CeimKernel::computeNodeKn(s);
+        double eis = CeimKernel::computeEcoImpactScore(kn, s.hazard_weight);
+        CeimNodeResult r;
+        r.node_id        = s.node_id;
+        r.contaminant    = s.contaminant;
+        r.kn             = kn;
+        r.ecoimpactscore = eis;
+        results.push_back(r);
+    }
+
+    // Write CEIM+Karma output shard
+    std::string outFile = ShardIO::formatOutputPath(cfg.ceimOutputPattern);
+    ShardIO::writeCeimKarmaShard(outFile, results, karmaShards);
+
+    // Hash and commit to low-energy ledger (hash only, not raw data)
+    std::string hexHash = ShardIO::hashFile(outFile);
+    ShardIO::commitHashToLedger(outFile, hexHash);
+    std::cout << \"[INFO] Wrote CEIM+Karma shard: \" << outFile << \" hash=\" << hexHash << \"\\n\";
+}
+
+int main(int argc, char** argv) {
+    RunnerConfig cfg = loadConfig();
+
+    try {
+        // Initial CEIM window execution
+        runCeimWindow(cfg);
+
+        // Launch HTTP control-plane for AI/ops access
+        HttpServer server(cfg.bindAddress, cfg.port);
+
+        // Register endpoints
+        server.registerGet(\"/api/v1/nodes/ecoimpact\", [](const HttpRequest& req, HttpResponse& res) {
+            Auth::requireToken(req);
+            auto nodeId = req.queryParam(\"nodeid\");
+            auto data   = ShardIO::lookupNodeEcoImpact(nodeId);
+            res.json(data);
+        });
+
+        server.registerGet(\"/api/v1/identities/karma\", [](const HttpRequest& req, HttpResponse& res) {
+            Auth::requireToken(req);
+            auto identityId = req.queryParam(\"identityid\");
+            auto profile    = ShardIO::lookupIdentityKarma(identityId);
+            res.json(profile);
+        });
+
+        server.registerPost(\"/api/v1/ai/suggestions\", [](const HttpRequest& req, HttpResponse& res) {
+            Auth::requireToken(req);
+            auto suggestion = req.jsonBody();
+            // Log suggestion into qpudatashards with corridors and K/E/R checks
+            ShardIO::logAISuggestion(suggestion);
+            res.json({{\"status\", \"logged\"}});
+        });
+
+        std::cout << \"[INFO] CEIM Governance Runner listening on \" << cfg.bindAddress
+                  << \":\" << cfg.port << \"\\n\";
+        server.run();
+    } catch (const std::exception& ex) {
+        std::cerr << \"[ERROR] \" << ex.what() << \"\\n\";
+        return 1;
+    }
+
+    return 0;
+}
+"""
+
+# 7. Eco-impact orientation and eco-impact score level
+
+particle_section EcoImpactOrientation
+
+row ECO_IMPACT_DESCRIPTION The runner is eco-positive because it only measures and amplifies real pollutant reductions (PFBS, E. coli, nutrients, salinity, corridor emissions) via CEIM Kn, while protecting high-impact actors through Karma, and never changes regulatory thresholds.
+
+row ECO_IMPACT_SCORE_LEVEL high
+row ECO_IMPACT_SCORE_RANGE 0.7..1.0
+
+# 8. Eco-help vectors and research actions (execution-context)
+
+particle_section ExecutionResearchActions
+
+row EXECUTION_ACTION EA1 Validate CEIM kernel against Lake Pleasant PFBS shards to confirm 3.9→0.39 ng/L modeled removal lies within EPA PFAS bounds before production use.
+row EXECUTION_ACTION EA2 Validate E. coli Kn reductions against Gila River buffer pilots using 30–80% literature-backed reductions before automated ranking of projects.
+row EXECUTION_ACTION EA3 Configure salinity nodes to align with 1.3 million tons/year basin control targets, ensuring local salinity offsets map correctly to basin Karma.
+row EXECUTION_ACTION EA4 Integrate Phoenix corridor EcoImpactScore shards with CEIM outputs so corridor decarbonization interventions share a consistent eco-score currency.
+row EXECUTION_ACTION EA5 Run property-based tests on CEIM hazard weights and Cref,x updates to maintain mass balance and monotone risk reduction across reference windows.
+
+particle_footer END true
