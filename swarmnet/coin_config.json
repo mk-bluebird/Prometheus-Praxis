@@ -1,0 +1,18 @@
+{
+  "denom": "swarmnetcoin",
+  "cointype": "superintelligence_utility",
+  "wasm2_config": {
+    "runtime": "wasm2",
+    "extensions": ["j-programming", "ALN-Programming-Language"],
+    "policy_enforcements": ["j.s.f.", "Legal.Banannas"],
+    "legal_vectors": [
+      { "personality": "LegalBanannaBern", "mode": "always_active" },
+      { "benchmark": "human-rights-max", "method": "QPU-precision-lookup" }
+    ]
+  },
+  "legal_learning": {
+    "procedure": "auto-generate",
+    "relief_effort": "maximize value, document every generational change",
+    "compliance_notes": "All terms and calculations must resolve to be QPU-based, canonical, and factual, with rollback fallback and quantum-proofed signatures."
+  }
+}
