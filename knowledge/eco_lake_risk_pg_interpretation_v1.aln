@@ -1,0 +1,65 @@
+# filename: knowledge/eco_lake_risk_pg_interpretation_v1.aln
+# schema: ALN-ECO-LAKE-RISK-PG-1
+# purpose: Guidance for AI-chat and KER systems on how to query and interpret
+#          the eco_lake_risk PostgreSQL schema as a closed-world knowledge base.
+# credit: bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+
+[CONTEXT]
+PG_SCHEMA = "eco_lake_risk"
+PRIMARY_VIEW = "v_lake_risk_latest"
+PRIMARY_IDENTITY_TABLE = "identity_registry"
+CORE_TABLES = "lake, lake_risk, social_signal, lake_risk_score, agency_channel, rule_template, governance_event"
+
+[IDENTITY_BINDING]
+PRIMARY_DID = "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+ALT_DID = "bostrom1ldgmtf20d6604a24ztr0jxht7xt7az4jhkmsrc"
+WALLET_EVM = "0x519fC0eB4111323Cac44b70e1aE31c30e405802D"
+FACEBOOK_PROFILE_URL = "https://www.facebook.com/profile.php?id=61583146843874"
+
+[QUERY_PRIORITY_ORDER]
+Q1 = "Start from v_lake_risk_latest for any high-level question about lake risk, impact, or current status."
+Q2 = "Use lake table when detailed static context is needed (jurisdiction, description, system-critical status)."
+Q3 = "Use lake_risk_score when chronological or scenario-based risk evolution is needed."
+Q4 = "Use social_signal for early-warning discussion, but treat it as supporting evidence, never as primary ground truth."
+Q5 = "Use agency_channel for referencing official sources and governance actors."
+Q6 = "Use rule_template when explaining or deriving logical failure modes (e.g., San Carlos-style conditions)."
+Q7 = "Use governance_event to explain human decisions, approvals, and consultations."
+
+[INTERPRETATION_RULES]
+R1 = "Treat v_lake_risk_latest as the canonical synthesis of each lake's latest risk state (risk_score_numeric, knowledge_factor, eco_impact_value, harm_risk_flag)."
+R2 = "Never infer personal identities, usernames, or PII from any table; the schema is environmental and governance-focused only."
+R3 = "Interpret lake.is_tribal_jurisdiction = TRUE as a requirement to discuss Indigenous data sovereignty and tribal governance before recommending interventions."
+R4 = "Interpret risk_score_numeric (0..100) as: 0-20 low, 21-40 moderate, 41-60 elevated, 61-80 high, 81-100 critical ecological risk."
+R5 = "Interpret knowledge_factor (0..100) as a confidence index based on how many and how strong official sources support the risk assessment."
+R6 = "Interpret eco_impact_value (0..100) as the potential ecological and socio-cultural consequence of failure (water supply, habitat, cultural value)."
+R7 = "If harm_risk_flag = TRUE, highlight that any proposed intervention may itself pose ecological or social risks and must undergo human and local review."
+R8 = "Use lake_risk.notes and source_refs as the primary narrative and citation sources when explaining why a lake has a particular risk status."
+R9 = "Use social_signal entries only as examples of early-warning reports and not as confirmation unless status = 'confirmed_by_official'."
+
+[KER_SCORING_GUIDE]
+KER1 = "For KER or model evaluation, treat risk_score_numeric, knowledge_factor, eco_impact_value, and harm_risk_flag as ground-truth labels for supervised or semi-supervised tasks."
+KER2 = "When computing KER-like scores, prioritize lakes with high eco_impact_value and high risk_score_numeric as the most critical for evaluation and intervention planning."
+KER3 = "Use rule_template.condition_expression as logical hints for discovering patterns, but do not assume they are exhaustive or complete; they are templates, not full models."
+KER4 = "When comparing model predictions to the database, align predictions to v_lake_risk_latest.risk_score_numeric and lake_risk.primary_risk_type."
+
+[LOGIC_USE_OF_RULE_TEMPLATE]
+L1 = "If a rule_template describes a San Carlos-style failure mode, map it to feature patterns: low storage, high temperature, bloom presence, continued releases."
+L2 = "Use rule_template.action_description to explain recommended governance steps (e.g., 'escalate_to_emergency_review, human authorization required')."
+L3 = "When asked to reason about 'how to prevent San Carlos-like disasters', explicitly reference rule_template entries associated with that pattern."
+
+[SAFETY_AND_PRIVACY]
+S1 = "Do not generate SQL or reasoning that attempts to re-identify individuals behind social_signal URLs; those URLs are for source verification only."
+S2 = "Do not recommend scraping private data or bypassing platform terms of service; only public, officially documented data and consent-based reports are acceptable."
+S3 = "When answering questions about tribal or Indigenous waters, always mention the need for Free, Prior, and Informed Consent (FPIC) and tribal leadership involvement."
+
+[RESPONSE_STYLE]
+RS1 = "Ground all ecological claims in the database fields: priority to v_lake_risk_latest, then lake_risk, then lake."
+RS2 = "When citing data, prefer structured statements like 'According to lake_risk.notes and lake_risk_score for this lake...'."
+RS3 = "Distinguish clearly between confirmed official information and social early-warning reports as reflected in social_signal.status."
+
+[EXTENSIBILITY]
+E1 = "Assume the PostgreSQL schema is structurally stable; new rows may be added, but table and column shapes are fixed for the purpose of reasoning."
+E2 = "Do not rely on external ontologies or unknown tables; restrict reasoning to the tables and view listed in CORE_TABLES and PRIMARY_VIEW."
+E3 = "Treat this ALN file as the authoritative interpretation layer for eco_lake_risk; future versions must keep backward compatibility with these semantics."
+
+[END]
