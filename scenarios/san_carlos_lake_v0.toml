@@ -1,0 +1,85 @@
+# File: scenarios/san_carlos_lake_v0.toml
+# Repo target: github.com/mk-bluebird/eco_restoration_shard
+
+[econet_authorship]
+schema_version      = "0.0.1"
+origin_did          = "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+stakeholder_dids    = [
+  "bostrom1ldgmtf20d6604a24ztr0jxht7xt7az4jhkmsrc",
+  "zeta12x0up66pzyeretzyku8p4ccuxrjqtqpdc4y4x8",
+  "0x519fC0eB4111323Cac44b70e1aE31c30e405802D"
+]
+content_hash_algo   = "sha2-256"
+content_hash_hex    = "<TO-BE-COMPUTED-BY-PIPELINE>"
+onchain_network     = "bostrom-mainnet"
+onchain_proof_ref   = "<TX_OR_STATE_HASH>"
+spec_name           = "SanCarlos_Lake_Scenario"
+spec_version        = "0.0.1"
+parent_content_hash = "<NONE>"
+immutable_origin    = true
+allow_forking       = true
+allow_override      = false
+psych_risk_guard    = true
+critical_ecology    = true
+
+[meta]
+lake_name           = "San Carlos Lake"
+location            = "San Carlos Apache Reservation, Arizona, USA"
+env_class_lake      = "F"
+env_class_shore     = "D"
+description         = "Scenario definition for DO-driven risk management and Cyboquatic deployment at San Carlos Lake."
+
+[ker_requirements]
+lake_nodes_critical_min_ker = 0.75
+lake_nodes_env_class        = "F"
+shore_hubs_env_class        = "D"
+allowed_cells_lake          = ["EcoNet_AQ_TB_v0"]
+allowed_cells_shore         = ["EcoNet_AQ_IF_v0", "EcoNet_AQ_TB_v0"]
+
+[modules.sentinel_buoy_v0]
+id          = "SanCarlos_Sentinel_v0"
+env_class   = "F"
+role        = "Sensing"
+critical    = true
+cell_ids    = ["EcoNet_AQ_TB_v0"]
+
+[modules.aeration_hub_v0]
+id          = "SanCarlos_AerationHub_v0"
+env_class   = "D"
+role        = "Aeration"
+critical    = true
+cell_ids    = ["EcoNet_AQ_IF_v0"]
+
+[modules.skimmer_drone_v0]
+id          = "SanCarlos_Skimmer_v0"
+env_class   = "F"
+role        = "Cleanup"
+critical    = true
+cell_ids    = ["EcoNet_AQ_TB_v0"]
+
+[water_guardian_v0]
+do_safe_mg_per_l        = 6.0
+do_caution_mg_per_l     = 4.0
+do_danger_mg_per_l      = 3.0
+temp_caution_c          = 25.0
+temp_high_c             = 28.0
+lake_level_min_fraction = 0.10
+
+zones = [
+  "Zone1_EcoNormal",
+  "Zone2_EcoAlert",
+  "Zone3_EcoEmergency",
+  "Zone4_EcoCollapse"
+]
+
+[water_guardian_v0.triggers]
+zone1 = "DO >= do_safe_mg_per_l AND lake_level_fraction >= 0.25 AND temperature <= temp_caution_c"
+zone2 = "DO between do_caution_mg_per_l and do_safe_mg_per_l OR DO_drop_rate_high OR lake_level_fraction between 0.10 and 0.25"
+zone3 = "DO <= do_caution_mg_per_l AND DO_trending_down OR lake_level_fraction <= lake_level_min_fraction AND temperature >= temp_high_c"
+zone4 = "DO <= do_danger_mg_per_l over significant area OR observed_mass_mortality"
+
+[water_guardian_v0.actions]
+zone1_action = "Maintain standard release schedule; aeration in standby."
+zone2_action = "Increase targeted aeration; smooth releases where feasible; alert stakeholders."
+zone3_action = "Maximize aeration and destratification; avoid further rapid drawdown; revise releases within legal bounds."
+zone4_action = "Focus on preserving any remaining refuges; initiate cleanup operations; log event for model refinement."
