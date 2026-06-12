@@ -1,3 +1,6 @@
+# File: workflows/deep_learning_workflow_correction.yml
+# Path: /workflows/deep_learning_workflow_correction.yml
+
 name: DeepLearningWorkflowCorrection
 description: Automated, recursive scan of superintelligence architectures for legacy or failed workflows.
 on:
@@ -19,6 +22,8 @@ jobs:
         run: python3 quarantine_faults.py
       - name: Generate compliance and optimization report
         run: python3 compliance_report.py
+      - name: Eco-corridor deviation scan
+        run: python3 eco_corridor_guard.py
     outputs:
       audit_report: workflows/audit_report.json
 permissions:
@@ -27,3 +32,5 @@ permissions:
 policy_tags:
   - quantumSafe
   - rollbackEnabled
+  - ecoCorridorGuard
+  - swarmnetCompliance
