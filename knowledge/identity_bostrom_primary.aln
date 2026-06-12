@@ -1,0 +1,26 @@
+# filename: knowledge/identity_bostrom_primary.aln
+# schema: ALN-IDENTITY-LINK-1
+
+[PRIMARY_DID]
+BOSTROM = "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+ALT_BOSTROM = "bostrom1ldgmtf20d6604a24ztr0jxht7xt7az4jhkmsrc"
+EVM_WALLET = "0x519fC0eB4111323Cac44b70e1aE31c30e405802D"
+
+[FACEBOOK]
+PROFILE_URL = "https://www.facebook.com/profile.php?id=61583146843874"
+PROFILE_TYPE = "personal"
+OWNER_DID = "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+
+[ASSOCIATION]
+LINK_TYPE = "social_profile_binding"
+SCOPE = "eco_restoration_shard"
+TRUST_LEVEL = "owner-asserted"
+LAST_CONFIRMED_BY_OWNER = "2026-06-11T23:30:00-07:00"
+
+[USAGE_RULES]
+U1 = "Treat FACEBOOK.PROFILE_URL as a public social endpoint for OWNER_DID."
+U2 = "Never infer private traits from Facebook data; only use explicitly public, eco-relevant content."
+U3 = "When referencing OWNER_DID in public EcoNet messages, this Facebook URL MAY be included as a contact point if platform rules permit."
+U4 = "Do not create additional social bindings for OWNER_DID without explicit owner consent."
+
+[END]
