@@ -1,0 +1,269 @@
+# filename: knowledge/eco_lake_ker_governance_v1.aln
+# destination: eco_restoration_shard/knowledge/eco_lake_ker_governance_v1.aln
+# schema: ALN-ECO-LAKE-KER-GOV-1
+# version: 1.0.0
+
+header ShardMeta v1.0.0
+row shard_name eco_lake_ker_governance_v1.aln
+row schema_id ALN-ECO-LAKE-KER-GOV-1
+row version 1.0.0
+row scope global_lake_and_watershed_risk_governance
+row author_did bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+row description Normative K/E/R governance shard for global lake and watershed risk reasoning, defining risk bands, lake types, fairness rules, and safeguards for human-in-the-loop interventions.
+
+# 1. Identity and binding
+
+record IdentityBinding
+  primary_did          string!
+  alt_did              string!
+  wallet_evm           string!
+  facebook_profile_url string!
+  bound_schemas        liststring!  # e.g. eco_lake_risk_postgres, eco_lake_risk_sqlite
+
+row IDENTITY primary_did bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+row IDENTITY alt_did bostrom1ldgmtf20d6604a24ztr0jxht7xt7az4jhkmsrc
+row IDENTITY wallet_evm 0x519fC0eB4111323Cac44b70e1aE31c30e405802D
+row IDENTITY facebook_profile_url https://facebook.com/profile.php?id=61583146843874
+row IDENTITY bound_schemas eco_lake_risk_postgres,eco_lake_risk_sqlite
+
+# 2. Metric definitions (KER axis)
+
+record KerMetricRanges
+  risk_score_min        int!
+  risk_score_max        int!
+  knowledge_factor_min  int!
+  knowledge_factor_max  int!
+  eco_impact_min        int!
+  eco_impact_max        int!
+  k_axis_description    string!
+  e_axis_description    string!
+  r_axis_description    string!
+
+row METRICS risk_score_min 0
+row METRICS risk_score_max 100
+row METRICS knowledge_factor_min 0
+row METRICS knowledge_factor_max 100
+row METRICS eco_impact_min 0
+row METRICS eco_impact_max 100
+row METRICS k_axis_description Knowledge strength: number and diversity of corroborated official sources.
+row METRICS e_axis_description Ecological consequence: magnitude of harm if failure occurs at a lake or watershed.
+row METRICS r_axis_description Resilience / recoverability: capacity to absorb disturbance without irreversible loss.
+
+record KerThresholdBand
+  band_id   string!
+  min_value int!
+  max_value int!
+
+# Risk bands 0..100
+row METRICS.THRESHOLD risk_band_id RISK_LOW         min 0  max 20
+row METRICS.THRESHOLD risk_band_id RISK_MODERATE    min 21 max 40
+row METRICS.THRESHOLD risk_band_id RISK_ELEVATED    min 41 max 60
+row METRICS.THRESHOLD risk_band_id RISK_HIGH        min 61 max 80
+row METRICS.THRESHOLD risk_band_id RISK_CRITICAL    min 81 max 100
+
+# Knowledge bands 0..100
+row METRICS.THRESHOLD knowledge_band_id KNOWLEDGE_LOW    min 0  max 40
+row METRICS.THRESHOLD knowledge_band_id KNOWLEDGE_MEDIUM min 41 max 70
+row METRICS.THRESHOLD knowledge_band_id KNOWLEDGE_HIGH   min 71 max 100
+
+# Eco-impact bands 0..100
+row METRICS.THRESHOLD eco_band_id ECO_IMPACT_LOCAL    min 0  max 40
+row METRICS.THRESHOLD eco_band_id ECO_IMPACT_REGIONAL min 41 max 70
+row METRICS.THRESHOLD eco_band_id ECO_IMPACT_SYSTEMIC min 71 max 100
+
+# 3. Lake classification grammar
+
+record LakeTypeClass
+  type_id                 string!
+  description             string!
+  typical_eco_impact_band string!
+  governance_priority     string!  # very_high, high, medium, low
+  is_tribal_cultural      bool!
+  is_system_reservoir     bool!
+  is_small_rural          bool!
+
+row CLASSIFICATION.LAKE_TYPES type_id TYPE_TRIBAL_CULTURAL
+  description Lakes, ponds, wetlands, and associated waters under tribal jurisdiction with cultural, ceremonial, or subsistence significance.
+  typical_eco_impact_band ECO_IMPACT_LOCAL
+  governance_priority very_high
+  is_tribal_cultural true
+  is_system_reservoir false
+  is_small_rural false
+
+row CLASSIFICATION.LAKE_TYPES type_id TYPE_SYSTEM_CRITICAL_RESERVOIR
+  description Large reservoirs or regulating structures whose failure or closure has basin- or system-scale impacts on water supply, energy, or flood safety.
+  typical_eco_impact_band ECO_IMPACT_SYSTEMIC
+  governance_priority very_high
+  is_tribal_cultural false
+  is_system_reservoir true
+  is_small_rural false
+
+row CLASSIFICATION.LAKE_TYPES type_id TYPE_URBAN_RECREATION
+  description Urban lakes and reservoirs primarily used for recreation, aesthetics, and local cooling, often within city boundaries.
+  typical_eco_impact_band ECO_IMPACT_REGIONAL
+  governance_priority high
+  is_tribal_cultural false
+  is_system_reservoir false
+  is_small_rural false
+
+row CLASSIFICATION.LAKE_TYPES type_id TYPE_HIGH_ELEVATION_COLD_WATER
+  description High-elevation lakes and headwaters supporting cold-water species and climate refugia, sensitive to thermal and flow changes.
+  typical_eco_impact_band ECO_IMPACT_REGIONAL
+  governance_priority high
+  is_tribal_cultural false
+  is_system_reservoir false
+  is_small_rural false
+
+row CLASSIFICATION.LAKE_TYPES type_id TYPE_SMALL_RURAL_WATERBODY
+  description Small rural lakes, ponds, stock ponds, and farm reservoirs serving dispersed communities and local ecosystems.
+  typical_eco_impact_band ECO_IMPACT_LOCAL
+  governance_priority high
+  is_tribal_cultural false
+  is_system_reservoir false
+  is_small_rural true
+
+# 4. Global reasoning rules
+
+record PriorityBandRule
+  band_id          string!
+  min_risk         int!
+  min_eco_impact   int!
+  description      string!
+
+# RR1_PRIORITY_CALC: priority bands as a function of risk and eco-impact
+row REASONING_RULES.RR1_PRIORITY_CALC band_id PRIORITY_1_CRITICAL min_risk 80 min_eco_impact 70
+  description Lakes with critical risk and systemic/regional eco-impact; must be surfaced first for human review.
+
+row REASONING_RULES.RR1_PRIORITY_CALC band_id PRIORITY_2_HIGH min_risk 60 min_eco_impact 50
+  description Lakes with high risk and substantial eco-impact; queue for prompt stewardship review.
+
+row REASONING_RULES.RR1_PRIORITY_CALC band_id PRIORITY_3_ELEVATED min_risk 41 min_eco_impact 40
+  description Elevated risk or moderate eco-impact; monitor closely and consider increased monitoring before alerts.
+
+row REASONING_RULES.RR1_PRIORITY_CALC band_id PRIORITY_4_BASELINE min_risk 0 min_eco_impact 0
+  description Default band for lower-risk lakes; maintain periodic scanning and fairness quotas.
+
+record TribalOverrideRule
+  rule_id                        string!
+  require_fpic                   bool!
+  require_tribal_consultation    bool!
+  forbid_public_action_without_fpic bool!
+
+# RR2_TRIBAL_OVERRIDE
+row REASONING_RULES.RR2_TRIBAL_OVERRIDE rule_id TRIBAL_OVERRIDE_DEFAULT
+  require_fpic true
+  require_tribal_consultation true
+  forbid_public_action_without_fpic true
+
+record SocialSignalUseRule
+  rule_id                      string!
+  max_risk_without_official    int!
+  max_k_boost_without_official int!
+  description                  string!
+
+# RR3_SOCIAL_SIGNAL_USE
+row REASONING_RULES.RR3_SOCIAL_SIGNAL_USE rule_id SOCIAL_SIGNAL_K_CHANNEL
+  max_risk_without_official 60
+  max_k_boost_without_official 30
+  description Social signals may redirect attention and increase K from low to medium but cannot push risk_score_numeric above 60 without official corroboration.
+
+record HarmRiskGuardrailRule
+  rule_id          string!
+  description      string!
+  require_conditional_language bool!
+  require_human_review         bool!
+  forbid_safe_default_claims   bool!
+
+# RR4_HARM_RISK_GUARDRAIL
+row REASONING_RULES.RR4_HARM_RISK_GUARDRAIL rule_id HARM_RISK_GUARDRAIL_DEFAULT
+  description If harm_risk_flag is true, recommendations must be conditional, explicitly human-reviewed, and never framed as safe defaults.
+  require_conditional_language true
+  require_human_review true
+  forbid_safe_default_claims true
+
+# 5. Intervention suggestion templates
+
+record InterventionTemplate
+  template_id                 string!
+  risk_band_id                string!
+  preferred_intervention_types liststring!
+  require_human_approval      bool!
+  require_tribal_consultation bool!
+  description                 string!
+
+row INTERVENTION_TEMPLATES template_id IT_RISK_ELEVATED
+  risk_band_id RISK_ELEVATED
+  preferred_intervention_types monitoring_upgrade,operational_adjustment
+  require_human_approval true
+  require_tribal_consultation true
+  description For elevated risk: prioritize better monitoring and modest operational adjustments with oversight.
+
+row INTERVENTION_TEMPLATES template_id IT_RISK_HIGH
+  risk_band_id RISK_HIGH
+  preferred_intervention_types monitoring_upgrade,operational_adjustment,temporary_closure
+  require_human_approval true
+  require_tribal_consultation true
+  description For high risk: consider temporary closures and operational changes, always under steward approval.
+
+row INTERVENTION_TEMPLATES template_id IT_RISK_CRITICAL
+  risk_band_id RISK_CRITICAL
+  preferred_intervention_types monitoring_upgrade,temporary_closure,infrastructure_upgrade
+  require_human_approval true
+  require_tribal_consultation true
+  description For critical risk: prepare strong measures including closures and infrastructure upgrades, subject to FPIC and governance review.
+
+# 6. KER evaluation guidance
+
+record KerUseCase
+  use_case_id   string!
+  description   string!
+
+row KER_EVALUATION.USE_CASE use_case_id model_validation
+  description Use K/E/R scores to validate and compare risk models against observed events and governance expectations.
+
+row KER_EVALUATION.USE_CASE use_case_id policy_analysis
+  description Use K/E/R to evaluate how policy options redistribute risk and attention across lake classes and communities.
+
+row KER_EVALUATION.USE_CASE use_case_id scenario_comparison
+  description Use K/E/R to compare future scenarios (e.g., climate, demand, infrastructure) for lakes and watersheds.
+
+record KerMetricBinding
+  binding_id         string!
+  model_field        string!
+  lake_metric_field  string!
+  description        string!
+
+row KER_EVALUATION.METRIC_BINDINGS binding_id BIND_RISK_SCORE
+  model_field model_predicted_risk
+  lake_metric_field lake_risk_score.risk_score_numeric
+  description Bind model predicted risk to lake_risk_score.risk_score_numeric.
+
+row KER_EVALUATION.METRIC_BINDINGS binding_id BIND_KNOWLEDGE_FACTOR
+  model_field model_confidence
+  lake_metric_field lake_risk_score.knowledge_factor
+  description Bind model confidence to knowledge_factor, treating K as evidence strength not ground truth.
+
+record KerFairnessRule
+  rule_id      string!
+  description  string!
+  min_attention_quota float!
+
+row KER_EVALUATION.FAIRNESS_RULE rule_id FAIRNESS_TRIBAL_AND_SMALL_RURAL
+  description Models must not de-prioritize tribal or small rural lakes solely because eco_impact_value is lower than system reservoirs; maintain a minimum attention quota for vulnerable communities.
+  min_attention_quota 0.10
+
+# 7. Safety and ethics
+
+record SafetyEthics
+  no_personal_reidentification bool!
+  no_private_data_inference    bool!
+  respect_platform_tos         bool!
+  indigenous_data_sovereignty_principle string!
+
+row SAFETY no_personal_reidentification true
+row SAFETY no_private_data_inference true
+row SAFETY respect_platform_tos true
+row SAFETY indigenous_data_sovereignty_principle CARE+FPIC
+
+# End of shard
+row END marker true
