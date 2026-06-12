@@ -1,0 +1,4 @@
+nodeid,stakeholderid,identitytype,region,contaminant,jurisdictionsup,cin,cout,flow,windowstart,windowend,cref,hazardweight,kn,ecoimpactscore,currentkarma,contributionscore,securitytrustscore,karmatolerancelevel,maxintrusionresponselevel,unitsC,unitsQ
+CAP-LP-PFBS,bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7,research_org,Central-AZ,PFBS,EP-EU-WHO,3.9,0.39,0.0,2024-11-01T00:00:00Z,2024-11-30T23:59:59Z,4.0,1.0,0.0,0.88,0.90,0.85,0.92,HIGH,MEDIUM,ng/L,m3/s
+ADEQ-GILA-ECO,bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7,agency_partner,Central-AZ,Ecoli,EP-EU-WHO,700,210,0.5,2024-06-01T00:00:00Z,2024-06-30T23:59:59Z,235.0,3.0,0.0,0.92,0.93,0.88,0.90,HIGH,HIGH,MPN/100mL,m3/s
+CRB-SALINITY-PROG,bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7,basin_program,Colorado-Basin,salt,EP-EU-WHO,650,500,10.0,2024-01-01T00:00:00Z,2024-12-31T23:59:59Z,800.0,0.67,0.0,0.78,0.82,0.80,0.87,MEDIUM,MEDIUM,mg/L,m3/s
