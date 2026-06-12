@@ -1,0 +1,8 @@
+[COM_NETWORK_COMMUNICATIONS]
+endpoint: /api/superintelligence-transact
+protocol: Web5-DID-Consensus
+
+purpose: Signaling routines, message formats, and compliance piping for agent-to-agent/Director communications.
+
+format: Packets include permission bitmask, timestamp, audit-hash, routing signature, and rollback state indicator. 
+policy: Director-authenticated review with cryptographic attestation. Non-compliant packets dropped and logged to `/logs/chmod_9000.log`.
