@@ -1,0 +1,88 @@
+# File: policy/econet_ker_policy_v0.toml
+# Repo target: github.com/mk-bluebird/eco_restoration_shard
+
+[econet_authorship]
+schema_version      = "0.0.1"
+origin_did          = "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+stakeholder_dids    = [
+  "bostrom1ldgmtf20d6604a24ztr0jxht7xt7az4jhkmsrc",
+  "zeta12x0up66pzyeretzyku8p4ccuxrjqtqpdc4y4x8",
+  "0x519fC0eB4111323Cac44b70e1aE31c30e405802D"
+]
+content_hash_algo   = "sha2-256"
+content_hash_hex    = "<TO-BE-COMPUTED-BY-PIPELINE>"
+onchain_network     = "bostrom-mainnet"
+onchain_proof_ref   = "<TX_OR_STATE_HASH>"
+spec_name           = "EcoNet_KER_Policy"
+spec_version        = "0.0.1"
+parent_content_hash = "<NONE>"
+immutable_origin    = true
+allow_forking       = true
+allow_override      = false
+psych_risk_guard    = true
+critical_ecology    = true
+
+[kpi]
+description = "Global KER evaluation policy for all EcoNet and Cyboquatic energy cells and modules."
+
+[metrics]
+# Knowledge factor: confidence in performance and reliability (0.0–1.0).
+K_min_FC     = 0.50
+K_min_DUI    = 0.40
+
+# Eco-impact value: lifecycle ecological impact (0.0–1.0; higher is better).
+E_min_all    = 0.50
+
+# Harm-risk: probability and severity of acute harm (0.0–1.0; lower is better).
+R_max_FC     = 0.15
+R_max_DUI    = 0.30
+
+# Composite KER formula weights.
+w_K          = 0.4
+w_E          = 0.4
+w_R          = 0.2
+
+[thresholds]
+# Minimum composite KER for deployment.
+ker_min_general    = 0.60
+ker_min_critical   = 0.75
+
+[environment_classes]
+F = "Freshwater and wetlands"
+C = "Coastal and brackish"
+D = "Dry / terrestrial"
+U = "Urban / indoor"
+I = "Industrial / utility"
+
+[deployment_rules]
+# Safety-first gating rules, applied before any role-aware optimization.
+
+rule_1 = "For env_class in {F, C}: reject if R > R_max_FC or K < K_min_FC or E < E_min_all."
+rule_2 = "For env_class in {D, U, I}: reject if R > R_max_DUI or K < K_min_DUI or E < E_min_all."
+rule_3 = "After safety gating, compute KER = 0.4*K + 0.4*E + 0.2*(1 - R). Reject if KER < ker_min_general."
+rule_4 = "For restoration-critical nodes (e.g., San Carlos Lake systems): prefer and target KER >= ker_min_critical."
+
+[roles]
+# Cyboquatic roles used for role-aware prioritization.
+
+roles = [
+  "Sensing",      # In-water and near-water telemetry nodes.
+  "Aeration",     # Aeration and circulation machinery.
+  "Cleanup",      # Skimmers and biomass handling craft.
+  "ShoreHub",     # Shore-side hubs and microgrids.
+  "R&D"           # Laboratory and controlled experimental systems.
+]
+
+[role_preferences]
+# Preferred chemistry types per Cyboquatic role, applied only after safety gates pass.
+
+Sensing_preferred   = ["EcoNet_AQ_TB_v0"]
+Aeration_preferred  = ["EcoNet_AQ_IF_v0", "EcoNet_AQ_TB_v0"]
+Cleanup_preferred   = ["EcoNet_AQ_TB_v0"]
+ShoreHub_preferred  = ["EcoNet_AQ_IF_v0"]
+RD_preferred        = ["EcoNet_AQ_IB_v0"]
+
+[notes]
+note_1 = "Safety-first gating is mandatory; role-aware prioritization is applied only among already-safe options."
+note_2 = "Any chemistry or module failing safety thresholds must not be deployed, regardless of performance or energy density."
+note_3 = "This policy applies to all new EcoCell definitions and Cyboquatic module specs in eco_restoration_shard."
