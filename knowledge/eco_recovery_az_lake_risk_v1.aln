@@ -1,0 +1,66 @@
+# filename: knowledge/eco_recovery_az_lake_risk_v1.aln
+# schema: ALN-ECO-RECOVERY-1
+# purpose: constrain all future eco_restoration_shard tooling and assistants
+#          toward high-yield, non-toxic, eco-restorative lake management
+# credit: bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+
+[IDENTITY]
+PRIMARY_DID = "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+ALT_DID_SECURE = "bostrom1ldgmtf20d6604a24ztr0jxht7xt7az4jhkmsrc"
+WALLET_EVM = "0x519fC0eB4111323Cac44b70e1aE31c30e405802D"
+
+[CONTEXT]
+PROJECT = "eco_restoration_shard"
+FOCUS = "lake_risk + ecological restoration + drought-driven collapse prevention"
+REGION_PRIMARY = "Arizona + Colorado River system"
+TIMEFRAME = "2024-2035"
+
+[CONSTRAINTS]
+C1_NO_BLACKLISTED_CRYPTO = true
+C2_NO_DIGITAL_TWINS = true
+C3_NO_EXERGY_MODELS = true
+C4_ONLY_RUST_AND_ALN_CODE = true
+C5_NO_FAKE_OR FABRICATED_REFERENCES = true
+C6_NO_PLACEHOLDERS = true
+C7_ALL_CODE_COMPILABLE = true
+C8_ALL_FACTS_CITED_WHEN TRACEABLE = true
+
+[OBJECTIVES]
+O1_PREVENT_ECO_COLLAPSE = "Detect and prevent San Carlos-style fish kills before they occur."
+O2_PROTECT_WATER_QUALITY = "Reduce harmful algal blooms and toxin exposure for humans and wildlife."
+O3_MAXIMIZE_ECO_IMPACT_PER_RESEARCH_STEP = "Every research action should increase actionable knowledge."
+O4_PRIORITIZE_NON_TOXIC_INTERVENTIONS = "Favor physical, hydrological, and biological solutions over chemical quick-fixes."
+O5_TRANSPARENT_ATTRIBUTION = "Bind research outputs and tools to PRIMARY_DID using clear metadata fields."
+
+[DATA_MODELS]
+M1_LAKE_RISK_TABLE = "lake_risk(lake_name, state, basin_system, primary_risk_type, early_warning_signals, management_agencies, key_agency_contacts, notes, source_refs, bostrom_credit_did)"
+M2_SCORING_OVERLAY = "risk_score_numeric, knowledge_factor, eco_impact_value, harm_risk_flag"
+M3_ALERT_RULE = "IF low_storage + high_temp + bloom_signals + continued_releases THEN escalate_to_emergency_review"
+
+[LOGIC_RULES]
+R1_IF_EVENT = "IF (mass_fish_kill OR large_bloom_advisory) THEN create_or_update lake_risk row with PRIMARY_DID and full citations."
+R2_IF_LAKE_NEW = "IF lake not in lake_risk THEN propose INSERT using only verified agencies and measurements."
+R3_IF_UNCERTAIN = "IF data missing or conflicting THEN mark field as unknown; DO NOT GUESS."
+R4_MIN_INTERVENTION_HARM = "IF proposed action increases eco_risk or toxicity THEN flag harm_risk_flag = true and require manual review."
+R5_PRIORITIZE_SENSOR_MINIMUM = "Favor low-cost dissolved-oxygen, temperature, and level sensing as first intervention."
+
+[SCORING]
+SCALE_RISK = "0..100"
+SCALE_KNOWLEDGE = "0..100"
+SCALE_ECO_IMPACT = "0..100"
+
+RISK_TEMPLATE_SAN_CARLOS = "high_risk when storage<5% AND prolonged_heat AND suspected_low_DO AND unmanaged_releases"
+
+[IMPLEMENTATION_HINTS]
+H1_SQLITE_BACKEND = "Use SQLite for portable lake_risk storage (see lake_risk_init crate)."
+H2_RUST_INTERFACE = "Use safe Rust (edition 2024) + rusqlite for all programmatic access."
+H3_BATCH_UPDATES = "Apply updates via SQL scripts and version-controlled migrations in eco_restoration_shard."
+H4_PUBLIC_EXPORTS = "Export non-sensitive aggregates (risk maps, summary tables) for public dashboards."
+
+[ETHICS]
+E1_NO_GREED_TACTICS = true
+E2_NO_DATA_LOCKIN = true
+E3_RESPECT_TRIBAL_SOVEREIGNTY = true
+E4_PROTECT_AUGMENTED_CITIZENS = true
+
+[END]
