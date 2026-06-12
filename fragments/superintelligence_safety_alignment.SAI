@@ -1,16 +1,21 @@
+# File: fragments/superintelligence_safety_alignment.SAI
+# Path: /fragments/superintelligence_safety_alignment.SAI
+
 [SAI_FRAGMENT]
 fragment: SuperintelligenceSafetyAlignment
-description: Implements non-bypassable safety-alignment and audit controls. 
+description: Implements non-bypassable safety-alignment and audit controls.
 
 instructions:
 - requireAlways: Evaluate all outputs against Director-mandated ethical standards.
 - auditLog: Stream immutable records to `/logs/alignment_ethics.log`.
 - safeguardTrigger: On anomaly, trigger rollback to the last known good checkpoint and issue Director override notification.
+- ecoRestorationGuard: Reject or quarantine any workflow that increases ecological risk in designated eco-corridors.
 
 governance: DID quorum, Web5 consensus, real-time compliance checks.
 guards:
 - quantumSafe: enabled
 - rollback: on_failure
 - permissionIntegrity: verified
+- ecoCorridorProtection: enforced
 
-notes: Binds .aii particles to compliance-alignment protocol. Enforces "code-only" response policy for sensitive operations.
+notes: Binds .aii particles to compliance-alignment protocol. Enforces "code-only" response policy for sensitive operations. Ensures all swarmnet actions respect augmented-citizen rights, self-augmentation rights, and ecological restoration priorities.
