@@ -1,0 +1,17 @@
+# filename: crates/lake_risk_init/Cargo.toml
+
+[package]
+name = "lake_risk_init"
+version = "0.1.0"
+edition = "2024"
+authors = ["EcoNet / eco_restoration_shard"]
+license = "MIT"
+description = "Initializer for the lake_risk SQLite database used by eco_restoration_shard."
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+readme = "../../README.md"
+keywords = ["ecosystem", "sqlite", "lake", "risk", "arizona"]
+categories = ["command-line-utilities", "science", "database"]
+publish = false
+
+[dependencies]
+rusqlite = "0.31"
