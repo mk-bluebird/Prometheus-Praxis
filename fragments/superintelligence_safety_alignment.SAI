@@ -1,0 +1,16 @@
+[SAI_FRAGMENT]
+fragment: SuperintelligenceSafetyAlignment
+description: Implements non-bypassable safety-alignment and audit controls. 
+
+instructions:
+- requireAlways: Evaluate all outputs against Director-mandated ethical standards.
+- auditLog: Stream immutable records to `/logs/alignment_ethics.log`.
+- safeguardTrigger: On anomaly, trigger rollback to the last known good checkpoint and issue Director override notification.
+
+governance: DID quorum, Web5 consensus, real-time compliance checks.
+guards:
+- quantumSafe: enabled
+- rollback: on_failure
+- permissionIntegrity: verified
+
+notes: Binds .aii particles to compliance-alignment protocol. Enforces "code-only" response policy for sensitive operations.
