@@ -1,0 +1,224 @@
+# filename: fragments/ceim_social_signal_bridge_v1.sai
+# destination: eco_restoration_shard/fragments/ceim_social_signal_bridge_v1.sai
+# schema: SAI-CEIM-SOCIAL-SIGNAL-BRIDGE-1
+# version: 1.0.0
+
+fragment_header SAIFragmentMeta v1.0.0
+row fragment_name ceim_social_signal_bridge_v1.sai
+row schema_id SAI-CEIM-SOCIAL-SIGNAL-BRIDGE-1
+row version 1.0.0
+row description Social-signal and AI-bridge fragment that connects CEIM qpudatashards, Identity Karma shards, and eco-help / eco-solve vectors, while enforcing K/E/R guardrails for lake and corridor interventions.
+
+# 1. Upstream CEIM kernel and qpudatashards
+
+fragment_section CEIMKernelBinding
+
+row CEIM.kernel_type C_pure_math
+row CEIM.node_equation Kn(x) = ∫_{t0}^{t1} x · (Cin,x(t) - Cout,x(t)) / Cref,x · Q(t) dt
+row CEIM.mass_load_equation Mx = ∫_{t0}^{t1} (Cin,x(t) - Cout,x(t)) Q(t) dt
+row CEIM.reference_use Cref_source EPA_ADEQ_WHO_supremum
+row CEIM.hazard_weights PFBS=1.0,Ecoli=3.0,salinity=0.67,nutrients=2.0
+row CEIM.dimensionless_property Kn_dimensionless_true
+row CEIM.additivity cross_node_additive_true
+
+row CEIM.shard_schema qpudatashardsparticlesEcoNetSupremeEcoMathEngine2026v1.csv
+row CEIM.shard_fields nodeid,stakeholderid,contaminant,cin,cout,flow,windowstart,windowend,cref,hazardweight,kn,ecoimpactscore,unitsC,unitsQ
+
+# 2. Identity Karma shard binding
+
+fragment_section IdentityKarmaBinding
+
+row KARMA.shard_schema qpudatashardsparticlesEcoKarmaToleranceMetrics2026v1.csv
+row KARMA.fields identityid,identitytype,region,ecoimpactscore,contributionscore,securitytrustscore,currentkarma,karmatolerancelevel,maxintrusionresponselevel,notes
+row KARMA.currentkarma_range 0.0..1.0
+row KARMA.karma_mapping_per_ton CEIM_Karma = 0.67 · Mavoided(tons)
+
+row KARMA.engine_file include/EcoKarmaPolicy.hpp
+row KARMA.engine_language C
+row KARMA.engine_role Modulate intrusion responses based on ecoimpactscore, contributions, securitytrustscore, and currentkarma without modifying CEIM Kn.
+
+# 3. Social signal channels (non-authoritative)
+
+fragment_section SocialSignalChannels
+
+record SocialChannel
+  channel_id         string!
+  description        string!
+  weight_k_modifier  float!
+  max_risk_increment int!
+  allowed_use_cases  liststring!
+
+row SOCIAL_CHANNEL channel_id SOCIAL_MEDIA_REPORTS
+  description Aggregated public posts and reports about visible pollution, fish kills, taste/odor changes at lakes and corridors.
+  weight_k_modifier 0.20
+  max_risk_increment 20
+  allowed_use_cases attention_rerank,monitoring_task_queue
+
+row SOCIAL_CHANNEL channel_id COMMUNITY_HOTLINES
+  description Structured calls, SMS, or forms submitted to local utilities, tribes, or agencies about water quality concerns.
+  weight_k_modifier 0.30
+  max_risk_increment 30
+  allowed_use_cases attention_rerank,pre_official_ticket
+
+row SOCIAL_CHANNEL channel_id NGO_BULLETINS
+  description Periodic bulletins and field notes from NGOs and community science programs operating near nodes and corridors.
+  weight_k_modifier 0.35
+  max_risk_increment 30
+  allowed_use_cases attention_rerank,preliminary_briefing
+
+# 4. K/E/R social-signal blending rules
+
+fragment_section KerBlendingRules
+
+record KerBlendRule
+  rule_id           string!
+  description       string!
+  k_boost_limit     int!
+  risk_limit        int!
+  require_official  bool!
+
+row KER_BLEND rule_id KBR1_SOCIAL_K_ONLY
+  description Social signals may raise knowledge_factor from LOW to MEDIUM but cannot raise ecoimpactscore or resilience, and cannot by themselves push risk_score_numeric above 60.
+  k_boost_limit 30
+  risk_limit 60
+  require_official true
+
+row KER_BLEND rule_id KBR2_OFFICIAL_REQUIRED_FOR_CRITICAL
+  description For PRIORITY_1_CRITICAL lakes and corridors, risk_score_numeric ≥ 80 must be backed by at least one official shard (CAP, ADEQ, USGS, USBR, municipal) or a trusted tribal/utility shard.
+  k_boost_limit 0
+  risk_limit 100
+  require_official true
+
+row KER_BLEND rule_id KBR3_FAIRNESS_TRIBAL_SMALL_RURAL
+  description For tribal and small rural lakes, at least 10% of AI-proposed interventions per batch must target these segments even when system reservoirs dominate eco-impact, using K/E/R fairness quotas.
+  k_boost_limit 20
+  risk_limit 70
+  require_official true
+
+# 5. Eco-help and eco-solve vector binding
+
+fragment_section EcoHelpSolveVectors
+
+record EcoHelpVector
+  identifier  string!
+  description string!
+
+record EcoSolveOffset
+  identifier  string!
+  description string!
+
+row ECO_HELP identifier PFBS_LOAD_REDUCTION
+  description Vector summarizing PFBS mass load reduction per node and time window based on CEIM Kn and Mx in Central AZ shards.
+
+row ECO_HELP identifier ECOLI_BUFFER_PERFORMANCE
+  description Vector capturing 30–80% E. coli reductions from riparian buffers and fencing along Gila segments, mapping into Kn and ecoimpactscore.
+
+row ECO_HELP identifier SALINITY_TONNAGE
+  description Vector expressing annual tons of salt removed in Colorado River Basin salinity programs, feeding basin-level CEIM nodes.
+
+row ECO_SOLVE identifier PFBS_REMAINING_RISK
+  description Offset describing remaining PFBS mass load in reservoirs and canals after current interventions, used to prioritize new PFAS controls.
+
+row ECO_SOLVE identifier ECOLI_RESIDUAL_RISK
+  description Offset for remaining E. coli excursion risk in canal and river segments after buffer installation, informing where new buffers or operational changes are needed.
+
+row ECO_SOLVE identifier SALINITY_RESIDUAL_LOAD
+  description Offset giving remaining salinity loads relative to basin program targets, guiding local offset projects in Arizona corridors.
+
+# 6. AI bridge: CEIM Governance Runner integration
+
+fragment_section AIBridgeGovernanceRunner
+
+row AI_RUNNER.component Autonomous_CEIM_Governance_Runner
+row AI_RUNNER.language C
+row AI_RUNNER.role Watch qpudatashardsparticles, run CEIM windows, write CEIMXJKarmaYYYYMMDD.csv, update Identity Karma shards, and expose a secure REST API for AI agents.
+
+row AI_RUNNER.tiers Tier1_PublicTrust_qpudatashards,Tier2_SecureAccess_IdentityKarma,Tier2_SecureAccess_PolicyEngine,Tier2_SecureAccess_ControlledMiddleware
+
+row AI_RUNNER.api_capabilities GET_node_ecoimpactscore,GET_identity_karma,GET_corridor_ecoimpactscore,POST_ai_suggestion_log
+
+row AI_RUNNER.auth_methods chat_session_tokens,dev_tunnel_tokens
+row AI_RUNNER.hashing_strategy on_close_window_hash_shard_and_commit_low_energy_ledger
+
+# 7. Eco-positive research actions and ideas (for AI suggestions)
+
+fragment_section EcoResearchActions
+
+record ResearchAction
+  action_id    string!
+  description  string!
+  eco_impact   string!
+  status       string!
+
+row RESEARCH_ACTION action_id RA1_GILA_BUFFER_PLANNER
+  description Implement a C-based Gila E. coli Buffer Planner reading qpudatashards to rank riparian buffers and fencing projects by added Kn and ecoimpactscore.
+  eco_impact High reduction of E. coli and nutrients in Arizona river segments via proven 30–80% load cuts.
+  status ready_to_build
+
+row RESEARCH_ACTION action_id RA2_PFBS_EARLY_WARNING_AGENT
+  description Build a PFBS Early-Warning Agent in C that monitors Lake Pleasant and canal PFBS trends and emits early treatment recommendations based on CEIM Kn and Cref,x.
+  eco_impact High prevention of chronic PFBS exceedances using early alerts on trends rather than post-exceedance reactions.
+  status ready_to_build
+
+row RESEARCH_ACTION action_id RA3_SALINITY_OFFSET_PLANNER
+  description Develop a Colorado Salinity Offset Planner that uses CEIM salinity loads and program tonnage to allocate local Arizona projects within the basin salinity reduction envelope.
+  eco_impact High basin-scale salt load reduction aligned with 1.3 million tons/year control programs.
+  status ready_to_build
+
+row RESEARCH_ACTION action_id RA4_PHOENIX_CORRIDOR_SYNERGY
+  description Create a Corridor Synergy Optimizer for Phoenix that combines grid, buildings, mobility, green infrastructure, and air-sensing interventions into convex EcoImpactScore improvements.
+  eco_impact High corridor-level decarbonization and heat mitigation in dense urban zones.
+  status ready_to_build
+
+row RESEARCH_ACTION action_id RA5_AUTONOMOUS_CEIM_RUNNER
+  description Finalize and deploy the Autonomous CEIM Governance Runner with REST APIs and token-based access, enabling AI systems to consume qpudatashards safely.
+  eco_impact High enabling automation of earth-saving planning with strong governance and low risk-of-harm.
+  status ready_to_build
+
+row RESEARCH_ACTION action_id RA6_TRAY_LCA_EXTENSION
+  description Extend CEIM nodes with TRAYRESIDUAL contaminant to account for biodegradable tray residual mass and associated ecoimpactscore in Phoenix corridors.
+  eco_impact High plastic waste reduction and improved solid-waste management tied directly into water quality and corridor scores.
+  status design_ready
+
+row RESEARCH_ACTION action_id RA7_COMMUNITY_COMPOST_TELEMETRY
+  description Deploy C loggers at compost facilities handling biodegradable trays to record oxygen, temperature, and mass loss, closing the loop between modeled and real t90.
+  eco_impact Medium-high improved validation of biodegradable products and reduced landfill leakage.
+  status pilot_planning
+
+row RESEARCH_ACTION action_id RA8_PHOENIX_HYDRO_SITE_SCANNER
+  description Implement a Hydro siting scanner that uses canal cross-sections and flows to identify safe 3–10 kW hydro locations for powering eco plants without altering canal head.
+  eco_impact Medium-high renewable energy for waste and tray systems with minimal hydraulic risk.
+  status ready_to_build
+
+row RESEARCH_ACTION action_id RA9_GLOBAL_ECOKARMA_INDEX
+  description Build a Global EcoKarma Index that fuses CEIM Kn with contribution and trust scores across nodes and identities, reducing false positives for eco-stakeholders.
+  eco_impact High fair allocation of trust and protection to actors delivering real pollutant reductions.
+  status design_ready
+
+row RESEARCH_ACTION action_id RA10_AI_CHAT_QPUDATASHARD_CLIENT
+  description Develop C/C++ clients and schemas so AI chat platforms can safely read CEIM qpudatashards and Identity Karma shards through the Governance Runner, under token and corridor constraints.
+  eco_impact High by enabling low-friction research that still respects governance and eco corridors.
+  status ready_to_build
+
+# 8. Eco-impact score interpretation
+
+fragment_section EcoImpactScoreInterpretation
+
+row ECO_IMPACT_LEVEL level Minimal_or_uncertain_help range 0.0..0.3 description Project effects uncertain or marginal; needs more data or better design.
+row ECO_IMPACT_LEVEL level Solid_measurable_benefit range 0.3..0.7 description Project shows clear pollutant load reduction and verified eco-benefits.
+row ECO_IMPACT_LEVEL level High_leverage_node_or_corridor range 0.7..1.0 description Node or corridor produces large, verifiable reductions and should be protected and replicated.
+
+# 9. Safety, governance, and residual risk
+
+fragment_section SafetyGovernance
+
+row SAFETY_RULE no_direct_raw_data_exposure true
+row SAFETY_RULE ai_must_use_governance_runner true
+row SAFETY_RULE ceim_math_treated_as_fixed true
+row SAFETY_RULE parameter_updates_must_be_regulator_aligned true
+
+row GOVERNANCE_RULE require_hash_on_each_shard true
+row GOVERNANCE_RULE require_identity_binding_for_ai_clients true
+row GOVERNANCE_RULE require_corridor_and_ker_check_for_actions true
+
+fragment_footer END true
