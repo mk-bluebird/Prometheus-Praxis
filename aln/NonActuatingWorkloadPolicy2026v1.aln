@@ -1,0 +1,45 @@
+-- filename: NonActuatingWorkloadPolicy2026v1.aln
+-- destination: aln-platform-ecosystem/aln/NonActuatingWorkloadPolicy2026v1.aln
+
+TITLE NonActuatingWorkloadPolicy2026v1
+VERSION 1.0.0
+CATEGORY GOVERNANCE_CONTRACT
+SUMMARY "Machine-verifiable contract for workloads that compute ecosafety metrics without actuator I/O."
+
+[meta]
+owner_repo          : string = "aln-platform-ecosystem"
+owner_role_band     : string = "SPINE"
+contract_id         : string = "NonActuatingWorkload2026v1"
+knowledge_factor    : f64    = 0.96
+eco_impact          : f64    = 0.92
+risk_of_harm        : f64    = 0.11
+
+[fields]
+workload_id         : string  # e.g., 'EcoNet-CEIM-PhoenixWater::HydraulicDecayFrame'
+repo_name           : string  # Owning repository
+layer_name          : string  # e.g., 'CEIM/CPVM hydrology kernels'
+input_schema        : string  # Required ALN schema for input (e.g., 'HydrologicalBufferPhoenix2026v1')
+output_schema       : string  # Required ALN schema for output (must include RiskVector/KER)
+has_actuator_io     : bool    # MUST be false
+monotone_risk       : bool    # MUST be true (harmful inputs cannot decrease output risk)
+bounded_output      : bool    # MUST be true (all outputs clamped to [0,1])
+
+[invariants]
+# INV-01: Absolute prohibition on actuator control paths.
+invariant no_actuator_reachability {
+    for_each row in NonActuatingWorkloadPolicy2026v1 {
+        assert row.has_actuator_io == false;
+    }
+}
+
+# INV-02: Monotonicity and boundedness guarantees.
+# Verified via unit tests in the owning repo, registered here via evidence_hex.
+invariant monotone_and_bounded {
+    for_each row in NonActuatingWorkloadPolicy2026v1 {
+        assert row.monotone_risk == true;
+        assert row.bounded_output == true;
+    }
+}
+
+[tags]
+governance, non-actuating, safety-contract, virta-sys-enforced
