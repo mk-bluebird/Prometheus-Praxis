@@ -11,7 +11,7 @@
 CREATE SCHEMA IF NOT EXISTS eco_idx;
 
 ----------------------------------------------------------------------
--- 1. Repository and layer manifests (PostgreSQL mirror)
+-- 1. Repository manifests (PostgreSQL mirror)
 ----------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS eco_idx.master_repo (
@@ -55,13 +55,16 @@ CREATE INDEX IF NOT EXISTS idx_master_repo_role
 CREATE INDEX IF NOT EXISTS idx_master_repo_lang
     ON eco_idx.master_repo (languageprimary);
 
--- Layers (GRAMMAR, KERNEL, EDGESCRIPT, UI, MATERIAL, OTHER)
+----------------------------------------------------------------------
+-- 2. Layer and role-hint manifests (AI/CI discovery)
+----------------------------------------------------------------------
+
 CREATE TABLE IF NOT EXISTS eco_idx.master_layer (
     layerid            BIGSERIAL PRIMARY KEY,
     reponame           TEXT NOT NULL REFERENCES eco_idx.master_repo(reponame) ON DELETE CASCADE,
     layername          TEXT NOT NULL,
-    layertier          TEXT NOT NULL,
-    languages          TEXT NOT NULL,
+    layertier          TEXT NOT NULL,         -- GRAMMAR, KERNEL, EDGESCRIPT, UI, MATERIAL, OTHER
+    languages          TEXT NOT NULL,         -- comma-separated list
     description        TEXT,
     contracts          TEXT,
     createdutc         TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -73,7 +76,6 @@ CREATE INDEX IF NOT EXISTS idx_master_layer_repo
 CREATE INDEX IF NOT EXISTS idx_master_layer_name
     ON eco_idx.master_layer (layername);
 
--- Role hints (AI/CI discovery surface)
 CREATE TABLE IF NOT EXISTS eco_idx.master_rolehint (
     hintid             BIGSERIAL PRIMARY KEY,
     reponame           TEXT NOT NULL REFERENCES eco_idx.master_repo(reponame) ON DELETE CASCADE,
@@ -86,34 +88,39 @@ CREATE INDEX IF NOT EXISTS idx_master_rolehint_repo
     ON eco_idx.master_rolehint (reponame, hintkey);
 
 ----------------------------------------------------------------------
--- 2. Knowledge shards (ALN / SAI / MAI) and path map
+-- 3. Knowledge artifacts and path map
 --    (mirror of ecoknowledgeshardindex + ecorepopathmap)
 ----------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS eco_idx.master_artifact (
     artifactid         BIGSERIAL PRIMARY KEY,
-    shardname          TEXT NOT NULL,               -- e.g. ecolakekergovernancev1.aln
+    shardname          TEXT NOT NULL,          -- e.g. ecolakekergovernancev1.aln
     shardtype          TEXT NOT NULL CHECK (shardtype IN ('ALN','SAI','MAI','SQL','RUST','CONFIG','WORKFLOW','CSV','DOC')),
-    schemaid           TEXT NOT NULL,               -- e.g. ALN-ECO-LAKE-KER-GOV-1
-    version            TEXT NOT NULL,               -- semver or tag
-    filename           TEXT NOT NULL,               -- repo-relative path
-    scope              TEXT NOT NULL,               -- high-level scope string
-    repotarget         TEXT NOT NULL,               -- matches eco_idx.master_repo.reponame
+    schemaid           TEXT NOT NULL,          -- e.g. ALN-ECO-LAKE-KER-GOV-1
+    version            TEXT NOT NULL,          -- semver or tag
+    filename           TEXT NOT NULL,          -- repo-relative path
+    scope              TEXT NOT NULL,          -- high-level scope string
+    repotarget         TEXT NOT NULL,          -- matches eco_idx.master_repo.reponame
     description        TEXT NOT NULL,
     authordid          TEXT NOT NULL,
     createdat          TIMESTAMPTZ NOT NULL,
-    boundschemas       TEXT NOT NULL,               -- CSV of bound DB schemas/tables
+    boundschemas       TEXT NOT NULL,          -- CSV of bound DB schemas/tables
     primarydid         TEXT NOT NULL,
     altdid             TEXT NOT NULL,
     walletevm          TEXT NOT NULL,
     facebookprofile    TEXT NOT NULL,
-    keraxistag         TEXT NOT NULL,               -- e.g. lakeker, lakehumanloopRguardrail
-    safetyprofile      TEXT NOT NULL,               -- e.g. nopersonalreidnoprivateinference
+    keraxistag         TEXT NOT NULL,          -- e.g. lakeker, eco_master_index
+    safetyprofile      TEXT NOT NULL,          -- e.g. nopersonalreidnoprivateinference
     active             BOOLEAN NOT NULL DEFAULT TRUE,
     -- Knowledge, eco-impact, and risk-of-harm bands (0..1) for this shard
     knowledgefactor    REAL NOT NULL DEFAULT 0.0 CHECK (knowledgefactor >= 0.0 AND knowledgefactor <= 1.0),
     ecoimpactvalue     REAL NOT NULL DEFAULT 0.0 CHECK (ecoimpactvalue >= 0.0 AND ecoimpactvalue <= 1.0),
     riskofharmvalue    REAL NOT NULL DEFAULT 0.0 CHECK (riskofharmvalue >= 0.0 AND riskofharmvalue <= 1.0),
+    kerbandk           REAL CHECK (kerbandk >= 0.0 AND kerbandk <= 1.0),
+    kerbande           REAL CHECK (kerbande >= 0.0 AND kerbande <= 1.0),
+    kerbandr           REAL CHECK (kerbandr >= 0.0 AND kerbandr <= 1.0),
+    createdutc         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updatedutc         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (schemaid, version, shardtype, repotarget)
 );
 
@@ -126,13 +133,12 @@ CREATE INDEX IF NOT EXISTS idx_master_artifact_repo
 CREATE INDEX IF NOT EXISTS idx_master_artifact_eco
     ON eco_idx.master_artifact (ecoimpactvalue DESC, riskofharmvalue ASC);
 
--- Logical -> physical path mapping
 CREATE TABLE IF NOT EXISTS eco_idx.master_pathmap (
     mapid              BIGSERIAL PRIMARY KEY,
     repotarget         TEXT NOT NULL,
     filename           TEXT NOT NULL,
     destpath           TEXT NOT NULL,
-    lanescope          TEXT NOT NULL,              -- e.g. RESEARCH, EXPPROD, PROD, GOVERNANCE
+    lanescope          TEXT NOT NULL,          -- RESEARCH, EXPPROD, PROD, GOVERNANCE
     active             BOOLEAN NOT NULL DEFAULT TRUE,
     createdutc         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (repotarget, filename)
@@ -142,17 +148,16 @@ CREATE INDEX IF NOT EXISTS idx_master_pathmap_repo
     ON eco_idx.master_pathmap (repotarget, lanescope);
 
 ----------------------------------------------------------------------
--- 3. KER, risk planes, and capability floors (governance spine)
---    (mirror of riskplane, capabilityfloorhistory, kerbandversion, evolutionepoch)
+-- 4. KER risk planes, capability floors, and band versions
 ----------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS eco_idx.riskplane (
-    planeid            BIGSERIAL PRIMARY KEY,
-    planename          TEXT NOT NULL UNIQUE,       -- energy, carbon, biodiversity, topology, etc.
-    nonoffsettable     BOOLEAN NOT NULL DEFAULT FALSE,
-    capabilityfloor    REAL NOT NULL DEFAULT 0.0,
+    planeid               BIGSERIAL PRIMARY KEY,
+    planename             TEXT NOT NULL UNIQUE,       -- energy, carbon, biodiversity, topology, etc.
+    nonoffsettable        BOOLEAN NOT NULL DEFAULT FALSE,
+    capabilityfloor       REAL NOT NULL DEFAULT 0.0,
     capabilityfloorhardmin REAL NOT NULL DEFAULT 0.0,
-    description        TEXT
+    description           TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_riskplane_nonoffset
@@ -198,36 +203,35 @@ CREATE INDEX IF NOT EXISTS idx_kerbandversion_band_epoch
     ON eco_idx.kerbandversion (bandname, versionepoch);
 
 ----------------------------------------------------------------------
--- 4. Eco-wealth and steward portfolio surfaces (summary index)
---    (lightweight mirror; full tables remain in SQLite or separate PG schemas)
+-- 5. Eco-wealth and steward portfolio index
 ----------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS eco_idx.steward_portfolio_index (
-    statementid        BIGINT PRIMARY KEY,
-    stewarddid         TEXT NOT NULL,
-    region             TEXT NOT NULL,
-    lane               TEXT NOT NULL,
-    windowstartutc     TIMESTAMPTZ NOT NULL,
-    windowendutc       TIMESTAMPTZ NOT NULL,
-    kmean              REAL NOT NULL,
-    emean              REAL NOT NULL,
-    rmean              REAL NOT NULL,
-    vtmaxwindow        REAL NOT NULL,
-    ecounitfinal       REAL NOT NULL,
-    knowledgefactorbefore REAL NOT NULL,
-    knowledgefactorafter  REAL NOT NULL,
-    ecoimpactbefore    REAL NOT NULL,
-    ecoimpactafter     REAL NOT NULL,
-    riskofharmbefore   REAL NOT NULL,
-    riskofharmafter    REAL NOT NULL,
-    kernelid           TEXT NOT NULL,
-    planecontractid    TEXT NOT NULL,
-    corridorsetid      TEXT NOT NULL,
-    vshardkerwindowhash TEXT NOT NULL,
-    shardlisthash      TEXT NOT NULL,
-    evidencehex        TEXT NOT NULL,
-    signingdid         TEXT NOT NULL,
-    createdutc         TIMESTAMPTZ NOT NULL
+    statementid            BIGINT PRIMARY KEY,
+    stewarddid             TEXT NOT NULL,
+    region                 TEXT NOT NULL,
+    lane                   TEXT NOT NULL,
+    windowstartutc         TIMESTAMPTZ NOT NULL,
+    windowendutc           TIMESTAMPTZ NOT NULL,
+    kmean                  REAL NOT NULL,
+    emean                  REAL NOT NULL,
+    rmean                  REAL NOT NULL,
+    vtmaxwindow            REAL NOT NULL,
+    ecounitfinal           REAL NOT NULL,
+    knowledgefactorbefore  REAL NOT NULL,
+    knowledgefactorafter   REAL NOT NULL,
+    ecoimpactbefore        REAL NOT NULL,
+    ecoimpactafter         REAL NOT NULL,
+    riskofharmbefore       REAL NOT NULL,
+    riskofharmafter        REAL NOT NULL,
+    kernelid               TEXT NOT NULL,
+    planecontractid        TEXT NOT NULL,
+    corridorsetid          TEXT NOT NULL,
+    vshardkerwindowhash    TEXT NOT NULL,
+    shardlisthash          TEXT NOT NULL,
+    evidencehex            TEXT NOT NULL,
+    signingdid             TEXT NOT NULL,
+    createdutc             TIMESTAMPTZ NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_steward_portfolio_latest
@@ -237,13 +241,9 @@ CREATE INDEX IF NOT EXISTS idx_steward_portfolio_region
     ON eco_idx.steward_portfolio_index (region, lane, windowendutc DESC);
 
 ----------------------------------------------------------------------
--- 5. Cross-artifact eco-impact and blast-radius views
---    (soft dependencies: Eco-Fort blastradiusindex / cyboblastradius)
+-- 6. Blast-radius evidence (cross-artifact)
 ----------------------------------------------------------------------
 
--- Basic blast-radius evidence surface.
--- This is a lightweight mirror that can be populated from Eco-Fort / EcoNet
--- blastradius tables via ETL; we do not re-encode full details here.
 CREATE TABLE IF NOT EXISTS eco_idx.master_blastradius (
     linkid             BIGSERIAL PRIMARY KEY,
     sourcetype         TEXT NOT NULL,              -- REPO, SCHEMA, PARTICLE, SHARD, NODE
@@ -251,7 +251,8 @@ CREATE TABLE IF NOT EXISTS eco_idx.master_blastradius (
     targettype         TEXT NOT NULL,              -- NODE, SHARD, MACHINE, MATERIAL, REGION
     targetid           TEXT NOT NULL,
     impactplane        TEXT NOT NULL,              -- ENERGY, CARBON, MATERIALS, BIODIVERSITY, DATAQUALITY, TOPOLOGY, RESPONSIBILITY
-    impactscore        REAL NOT NULL,              -- 0..1
+    impacttype         TEXT NOT NULL,              -- LOAD, BUFFER, MAR, SUBSTRATE, SURCHARGE, FOOTPRINT, CONNECTIVITY, OTHER
+    impactscore        REAL NOT NULL CHECK (impactscore >= 0.0 AND impactscore <= 1.0),
     vtsensitivity      REAL,
     notes              TEXT,
     createdutc         TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -263,7 +264,10 @@ CREATE INDEX IF NOT EXISTS idx_master_blastradius_source
 CREATE INDEX IF NOT EXISTS idx_master_blastradius_target
     ON eco_idx.master_blastradius (targettype, targetid, impactplane);
 
--- View: eco-eco scoring per artifact + blast-radius rollup.
+----------------------------------------------------------------------
+-- 7. Cross-artifact eco-impact and blast-radius view
+----------------------------------------------------------------------
+
 CREATE OR REPLACE VIEW eco_idx.v_master_eco_score AS
 SELECT
     a.artifactid,
@@ -281,11 +285,10 @@ SELECT
     a.riskofharmvalue,
     r.roleband,
     r.languageprimary,
-    -- Aggregate blast-radius by carbon/biodiversity/materials planes where present.
-    COALESCE(SUM(CASE WHEN b.impactplane = 'CARBON' THEN b.impactscore END), 0.0) AS carbon_impact_sum,
+    COALESCE(SUM(CASE WHEN b.impactplane = 'CARBON' THEN b.impactscore END), 0.0)       AS carbon_impact_sum,
     COALESCE(SUM(CASE WHEN b.impactplane = 'BIODIVERSITY' THEN b.impactscore END), 0.0) AS biodiversity_impact_sum,
-    COALESCE(SUM(CASE WHEN b.impactplane = 'MATERIALS' THEN b.impactscore END), 0.0) AS materials_impact_sum,
-    COALESCE(SUM(CASE WHEN b.impactplane = 'ENERGY' THEN b.impactscore END), 0.0) AS energy_impact_sum
+    COALESCE(SUM(CASE WHEN b.impactplane = 'MATERIALS' THEN b.impactscore END), 0.0)    AS materials_impact_sum,
+    COALESCE(SUM(CASE WHEN b.impactplane = 'ENERGY' THEN b.impactscore END), 0.0)       AS energy_impact_sum
 FROM eco_idx.master_artifact AS a
 LEFT JOIN eco_idx.master_repo AS r
   ON r.reponame = a.repotarget
@@ -310,24 +313,25 @@ GROUP BY
     r.languageprimary;
 
 CREATE INDEX IF NOT EXISTS idx_v_master_eco_score_rank
-    ON eco_idx.v_master_eco_score (ecoimpactvalue DESC, riskofharmvalue ASC, carbon_impact_sum ASC, biodiversity_impact_sum ASC);
+    ON eco_idx.v_master_eco_score (
+        ecoimpactvalue DESC,
+        riskofharmvalue ASC,
+        carbon_impact_sum ASC,
+        biodiversity_impact_sum ASC
+    );
 
 ----------------------------------------------------------------------
--- 6. Always-improve / safestep scoring hints
---    (non-actuating helper for CI / AI routing)
+-- 8. Always-improve / safestep scoring hints
 ----------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS eco_idx.safestep_hint (
-    hintid             BIGSERIAL PRIMARY KEY,
-    artifactid         BIGINT NOT NULL REFERENCES eco_idx.master_artifact(artifactid) ON DELETE CASCADE,
-    evolutionepochid   BIGINT NOT NULL REFERENCES eco_idx.evolutionepoch(evolutionepochid) ON DELETE CASCADE,
-    -- Boolean that CI sets when replay confirms K↑, E↑, R↓, Vt↓ under new policy.
+    hintid               BIGSERIAL PRIMARY KEY,
+    artifactid           BIGINT NOT NULL REFERENCES eco_idx.master_artifact(artifactid) ON DELETE CASCADE,
+    evolutionepochid     BIGINT NOT NULL REFERENCES eco_idx.evolutionepoch(evolutionepochid) ON DELETE CASCADE,
     safestep_monotone_ok BOOLEAN NOT NULL DEFAULT FALSE,
-    -- Optional scalar summary in 0..1 (1 = strongest monotone improvement).
-    safestep_score     REAL NOT NULL DEFAULT 0.0 CHECK (safestep_score >= 0.0 AND safestep_score <= 1.0),
-    -- Free-form notes for why this artifact is a good candidate for expansion.
-    notes              TEXT,
-    createdutc         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    safestep_score       REAL NOT NULL DEFAULT 0.0 CHECK (safestep_score >= 0.0 AND safestep_score <= 1.0),
+    notes                TEXT,
+    createdutc           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (artifactid, evolutionepochid)
 );
 
@@ -335,7 +339,7 @@ CREATE INDEX IF NOT EXISTS idx_safestep_hint_rank
     ON eco_idx.safestep_hint (safestep_monotone_ok DESC, safestep_score DESC);
 
 ----------------------------------------------------------------------
--- 7. Seed: register master-index itself as an artifact (idempotent)
+-- 9. Seed: register ecorestorationshard repo and this master index artifact
 ----------------------------------------------------------------------
 
 INSERT INTO eco_idx.master_repo (
