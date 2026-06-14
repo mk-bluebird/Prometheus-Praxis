@@ -1,29 +1,104 @@
 # filename alnPlaneWeightsShard2026v1.aln
-# destination aln-platform-ecosystem/alnPlaneWeightsShard2026v1.aln
+# destination aln-platform-ecosystem/aln/alnPlaneWeightsShard2026v1.aln
 
 TITLE PlaneWeightsShard2026v1
-VERSION 1
-CATEGORY ECOSAFETY
+VERSION 1.1.0
+CATEGORY ECOSAFETY_GOVERNANCE
 
 SUMMARY
-Plane weights and non-offsettable flags for ecosafety Lyapunov residual.
+Authoritative weights, non-compensation flags, and uncertainty caps for ecosafety Lyapunov residual planes, including restoration, for 2026 governance-aligned systems.
 
-fields
-  contractid      string   # e.g. PhoenixEcosafetyContinuity2026v1
-  planeid         string   # e.g. energy, hydrologyMAR, biodiversity, carbon
-  weight          f32      # w_j >= 0
-  nonoffsettable  bool     # true means plane cannot be offset by other planes
-  softband        f32      # soft corridor band for r_j
-  hardband        f32      # hard corridor band for r_j
-  uncertaintycap  f32      # max tolerated uncertainty on r_j
-  versiontag      string   # PlaneWeightsShard2026v1
-  proofrefhex     string   # hex link to ecosafety proof bundle
+[meta]
+owner_repo       : string = "aln-platform-ecosystem"
+owner_role_band  : string = "SPINE"
+contract_id      : string = "EcosafetyPlaneWeights2026v1"
+region           : string = "Phoenix-AZ"
+scope            : string = "CONSTELLATION"
+lane_band        : string = "PROD"
+knowledge_factor : f64    = 0.96
+eco_impact       : f64    = 0.93
+risk_of_harm     : f64    = 0.11
+signing_did      : string = "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+evidence_hex     : string = "0xPW2026A1B2C3D4E5F67890"
+definition_id    : string = "planeweights.shard.2026.v1"
+kernel_version   : string = "KER2026v1"
 
-rows
-  contractid=PhoenixEcosafetyContinuity2026v1
-  planeid=energy            weight=0.7  nonoffsettable=false softband=0.10 hardband=0.20 uncertaintycap=0.15 versiontag=PlaneWeightsShard2026v1 proofrefhex=ec01
-  planeid=hydrologyMAR      weight=1.0  nonoffsettable=true  softband=0.10 hardband=0.13 uncertaintycap=0.10 versiontag=PlaneWeightsShard2026v1 proofrefhex=ec01
-  planeid=biodiversity      weight=1.0  nonoffsettable=true  softband=0.10 hardband=0.13 uncertaintycap=0.10 versiontag=PlaneWeightsShard2026v1 proofrefhex=ec01
-  planeid=materials         weight=0.8  nonoffsettable=false softband=0.10 hardband=0.15 uncertaintycap=0.10 versiontag=PlaneWeightsShard2026v1 proofrefhex=ec01
-  planeid=dataquality       weight=0.6  nonoffsettable=false softband=0.05 hardband=0.10 uncertaintycap=0.10 versiontag=PlaneWeightsShard2026v1 proofrefhex=ec01
-  planeid=topology          weight=0.5  nonoffsettable=false softband=0.05 hardband=0.10 uncertaintycap=0.10 versiontag=PlaneWeightsShard2026v1 proofrefhex=ec01
+[fields]
+plane_id        : string  # e.g. "CARBON", "BIODIVERSITY", "HYDROLOGYMAR", "ENERGY", "MATERIALS", "DATAQUALITY", "TOPOLOGY", "RESTORATION"
+weight          : f64     # Lyapunov weight w_j >= 0.0
+non_offsettable : bool    # If true, worsening this plane cannot be compensated by improving others
+soft_band       : f64     # Soft corridor band for r_j (warning threshold)
+hard_band       : f64     # Hard corridor band for r_j (gating threshold)
+uncertainty_cap : f64     # Maximum allowed uncertainty for PROD lane (0.0 to 1.0)
+lyap_channel    : string  # Maps to corridor_definition.lyap_channel
+proof_ref_hex   : string  # Hex link to ecosafety proof bundle
+
+[rows]
+# plane_id,       weight, non_offsettable, soft_band, hard_band, uncertainty_cap, lyap_channel,  proof_ref_hex
+"CARBON",        2.5,     true,           0.10,      0.13,      0.15,           "carbon",       "ec01"
+"BIODIVERSITY",  2.5,     true,           0.10,      0.13,      0.15,           "biodiversity", "ec01"
+"RESTORATION",   2.0,     true,           0.10,      0.13,      0.20,           "restoration",  "ec01"
+"HYDROLOGYMAR",  1.8,     true,           0.10,      0.13,      0.20,           "hydrologyMAR", "ec01"
+"ENERGY",        1.0,     false,          0.10,      0.20,      0.30,           "energy",       "ec01"
+"MATERIALS",     1.2,     false,          0.10,      0.15,      0.25,           "materials",    "ec01"
+"DATAQUALITY",   1.0,     false,          0.05,      0.10,      0.30,           "dataquality",  "ec01"
+"TOPOLOGY",      1.0,     false,          0.05,      0.10,      0.30,           "topology",     "ec01"
+
+[invariants]
+invariant non_negative_weights {
+    for_each row in PlaneWeightsShard2026v1 {
+        assert row.weight >= 0.0;
+    }
+}
+
+invariant non_offsettable_strict_uncertainty_caps {
+    for_each row in PlaneWeightsShard2026v1 where row.non_offsettable == true {
+        assert row.uncertainty_cap <= 0.30;
+    }
+}
+
+invariant restoration_plane_alignment {
+    let restoration_rows = filter r in PlaneWeightsShard2026v1 where r.plane_id == "RESTORATION";
+    let energy_rows      = filter r in PlaneWeightsShard2026v1 where r.plane_id == "ENERGY";
+
+    assert len(restoration_rows) == 1;
+    assert len(energy_rows) == 1;
+
+    let r_row = restoration_rows[0];
+    let e_row = energy_rows[0];
+
+    assert r_row.non_offsettable == true;
+    assert r_row.weight >= e_row.weight;
+}
+
+invariant hydrology_biodiversity_non_offsettable {
+    let hyd_rows = filter r in PlaneWeightsShard2026v1 where r.lyap_channel == "hydrologyMAR";
+    let bio_rows = filter r in PlaneWeightsShard2026v1 where r.lyap_channel == "biodiversity";
+
+    assert len(hyd_rows) == 1;
+    assert len(bio_rows) == 1;
+
+    let h_row = hyd_rows[0];
+    let b_row = bio_rows[0];
+
+    assert h_row.non_offsettable == true;
+    assert b_row.non_offsettable == true;
+}
+
+invariant soft_band_less_than_hard_band {
+    for_each row in PlaneWeightsShard2026v1 {
+        assert row.soft_band < row.hard_band;
+    }
+}
+
+invariant corridor_bands_in_unit_interval {
+    for_each row in PlaneWeightsShard2026v1 {
+        assert row.soft_band >= 0.0;
+        assert row.soft_band <= 1.0;
+        assert row.hard_band >= 0.0;
+        assert row.hard_band <= 1.0;
+    }
+}
+
+[tags]
+ecosafety, lyapunov, plane-weights, non-compensation, restoration, spine, phoenix-az, ker2026
