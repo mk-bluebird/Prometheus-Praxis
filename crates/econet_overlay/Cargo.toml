@@ -1,0 +1,10 @@
+[package]
+name = "econet_overlay"
+version = "0.1.0"
+edition = "2024"
+description = "Non-actuating smart-simplicity overlay types and chat summaries for EcoNet."
+license = "MIT"
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
