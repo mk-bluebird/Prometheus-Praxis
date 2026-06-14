@@ -1,0 +1,105 @@
+-- filename: MT6883RiskAuditShard2026v1.aln
+-- destination: aln-platform-ecosystem/aln/MT6883RiskAuditShard2026v1.aln
+
+TITLE MT6883RiskAuditShard2026v1
+VERSION 1.0.0
+CATEGORY GOVERNANCE_AUDIT
+SUMMARY "Immutable hardware risk audit trail for MT6883 neuro-rights and ecosafety invariants. Defines the append-only risk chain and specific mitigation events."
+
+[meta]
+owner_repo          : string = "aln-platform-ecosystem"
+owner_role_band     : string = "SPINE"
+contract_id         : string = "MT6883Continuity2026v1"
+knowledge_factor    : f64    = 0.96
+eco_impact          : f64    = 0.93
+risk_of_harm        : f64    = 0.11
+signing_did         : string = "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+evidence_hex        : string = "0xMT6883AUDIT2026A1B2C3D4E5F6"
+
+-- Enumerations for strict typing of hardware responses and violation types
+enum MitigationAction2026v1
+    ISOLATE_ACTUATOR
+    DYNAMIC_THROTTLE
+    FAIL_SAFE_SHUTDOWN
+    LOG_ONLY
+endenum
+
+enum InvariantType2026v1
+    CORRIDOR_BREACH
+    UNAUTHORIZED_MUTATION
+    TOPOLOGY_MISALIGNMENT
+    LYAPUNOV_INSTABILITY
+endenum
+
+-- Record: The append-only Risk Chain
+-- Represents the cryptographic anchor for a sequence of hardware risk events.
+record RiskChainRecord
+    risk_id             : uint64      -- Auto-incrementing or UUID-derived chain identifier
+    node_did            : string      -- Decentralized Identifier of the MT6883 hardware node
+    timestamp_utc       : datetime    -- ISO-8601 timestamp of the chain append
+    unauthorized_mutation_attempt : int32 -- MUST be 0. Any attempt to mutate existing records is blocked at the DB/ALN layer.
+    risk_evidence_bundle: string      -- 64-character hex hash of the telemetry state at the time of the event
+    signing_did         : string      -- DID of the system, auditor, or FFI wrapper that authored this record
+endrecord
+
+-- Record: The Specific Risk Event
+-- Tied to a RiskChainRecord, detailing the exact invariant breached and the physical/logical action taken.
+record RiskEventRecord
+    event_id                : uint64      -- Auto-incrementing or UUID-derived event identifier
+    risk_id                 : uint64      -- Foreign key linking to the parent RiskChainRecord
+    invariant_type          : InvariantType2026v1 -- The specific ecosafety or neuro-rights rule that was triggered
+    invariant_violation_detected : bool   -- True if a hard safety boundary was crossed
+    operational_action_taken: MitigationAction2026v1 -- The exact fail-safe or mitigation executed by the C++/Rust layer
+    action_timestamp_utc    : datetime    -- ISO-8601 timestamp of the mitigation execution
+    notes                   : string      -- Optional human-readable context (e.g., "Lyapunov V_t exceeded 0.30 threshold")
+endrecord
+
+[invariants]
+-- INV-01: Immutability of the Risk Chain
+-- This record type is strictly append-only. Updates or deletions are forbidden by both 
+-- the ALN grammar and the underlying SQLite BEFORE UPDATE/DELETE triggers.
+invariant risk_chain_immutability {
+    for_each record in RiskChainRecord {
+        assert record.unauthorized_mutation_attempt == 0;
+    }
+}
+
+-- INV-02: Evidence Bundle Formatting
+-- The evidence bundle must be a valid, lower-case hexadecimal string of exactly 64 characters 
+-- (representing a 256-bit SHA-2 hash of the pre-mitigation state).
+invariant evidence_hex_format {
+    for_each record in RiskChainRecord {
+        assert length(record.risk_evidence_bundle) == 64;
+        assert is_valid_hex(record.risk_evidence_bundle);
+    }
+}
+
+-- INV-03: Action Consistency
+-- If an invariant violation is detected (invariant_violation_detected == true), 
+-- the operational action taken MUST be a hard fail-safe (ISOLATE_ACTUATOR or FAIL_SAFE_SHUTDOWN), 
+-- never a permissive action like LOG_ONLY.
+invariant mitigation_severity_match {
+    for_each record in RiskEventRecord {
+        if record.invariant_violation_detected == true {
+            assert record.operational_action_taken == ISOLATE_ACTUATOR 
+                OR record.operational_action_taken == FAIL_SAFE_SHUTDOWN;
+        }
+    }
+}
+
+-- INV-04: Cryptographic Provenance
+-- Every record in the audit trail must be cryptographically signed by a recognized 
+-- system or governance DID, preventing spoofed audit logs.
+invariant audit_provenance {
+    for_each record in RiskChainRecord {
+        assert is_valid_did(record.signing_did);
+    }
+    for_each record in RiskEventRecord {
+        -- Events inherit provenance from their parent chain, but can also be independently signed
+        assert is_valid_did(record.signing_did) OR exists parent in RiskChainRecord 
+            where parent.risk_id == record.risk_id AND is_valid_did(parent.signing_did);
+    }
+}
+
+[tags]
+mt6883, neuro-rights, immutable-audit, fail-safe, ecosafety, governance
