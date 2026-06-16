@@ -1,0 +1,6 @@
+repotarget,filename,destination,roleplane
+eco_restoration_shard,dbcyboquatic_ecomachinery.sql,eco_restoration_shard/sql/spine/dbcyboquatic_ecomachinery.sql,cyboquatic-eco
+eco_restoration_shard,dbcyboquatic_definitionregistry.sql,eco_restoration_shard/sql/spine/dbcyboquatic_definitionregistry.sql,spine
+eco_restoration_shard,cyboquatic_eco_spine.rs,eco_restoration_shard/src/cyboquatic_eco_spine.rs,cyboquatic-eco
+eco_restoration_shard,cyboquatic_eco_overlay.lua,eco_restoration_shard/lua/cyboquatic_eco_overlay.lua,cyboquatic-eco
+eco_restoration_shard,CyboquaticEcoOverlay.kt,Cyboquatics-Android/android/app/src/main/java/org/econet/CyboquaticEcoOverlay.kt,cyboquatic-eco
