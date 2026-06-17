@@ -59,6 +59,7 @@ members = [
     "crates/eco_restoration_shard_config",
     "crates/kerdeployable",
     "crates/ecoresponseshard",
+    "crates/eco-chat-ffi",
 
     # Phase 0 governance spine and guards
     "crates/econet-governance-spine",
