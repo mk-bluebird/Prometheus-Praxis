@@ -56,6 +56,7 @@ members = [
     "crates/topology-risk",
     "crates/zoning-shards",
     "crates/lake-risk-init",
+    "crates/eco_restoration_shard_config",
 
     # Phase 0 governance spine and guards
     "crates/econet-governance-spine",
