@@ -1,0 +1,13 @@
+[package]
+name = "ersilogger"
+version = "0.1.0"
+edition = "2024"
+description = "Non-actuating ERSI token/compute/KER logger aligned with kerresidual and EcoFort SQLite spine."
+license = "MIT"
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+rusqlite = { version = "0.31", features = ["bundled"] }
+time = { version = "0.3", features = ["formatting", "macros"] }
+thiserror = "1.0"
