@@ -1,0 +1,68 @@
+-- filename: qpudatashards/LanePromotionReplayPolicyPhoenix2026v1.aln
+-- destination: eco_restoration_shard/qpudatashards/LanePromotionReplayPolicyPhoenix2026v1.aln
+-- repo-target: github.com/mk-bluebird/eco_restoration_shard
+
+particle LanePromotionReplayPolicyPhoenix2026v1
+  versiontag 2026v1
+  category   LANE_PROMOTION_POLICY
+  title      Phoenix lane promotion replay policy
+  description
+    Empirical, non-actuating policy for validating Phoenix KER lane
+    promotions using a paired-corridor replay harness over a frozen
+    vshardker spine and shared KER residual grammar.
+
+  lyapchannel governance
+  role        GOVERNANCE
+
+  record LanePromotionReplayPolicyRow
+    field policy_id        string
+      description Stable logical name, e.g. LaneReplayPolicy-PHX-2026v1.
+    field region           string
+      description Region code, e.g. Phoenix-AZ.
+    field lane_from        string
+      description Source lane, e.g. RESEARCH.
+    field lane_to          string
+      description Target lane, e.g. PROD.
+    field snapshot_old_tag string
+      description Old KER corridor snapshot tag.
+    field snapshot_new_tag string
+      description New KER corridor snapshot tag.
+
+    field eps_k            f64
+      description Knowledge tolerance.
+    field eps_e            f64
+      description Eco-impact tolerance.
+    field eps_r            f64
+      description Risk-of-harm tolerance.
+    field eps_vt           f64
+      description Lyapunov residual tolerance.
+
+    field ker_contract_id  string
+      description KER grammar contract binding.
+    field lane_contract_id string
+      description Lane FSM contract binding.
+    field def_registry_id  string
+      description Linked DefinitionRegistry2026v1.defid.
+    field routingspec_hex  string
+      description Hex fingerprint of full routing spec.
+
+    field k_target         f64
+      description Meta target K for this policy object.
+    field e_target         f64
+      description Meta target E for this policy object.
+    field r_target         f64
+      description Meta upper bound R for this policy object.
+
+    field evidence_hex     string
+      description Hex pointer to pilot replay evidence bundle.
+    field signing_did      string
+      description DID that signed this policy row.
+    field created_utc      datetime
+      description UTC creation time.
+  end
+
+  constraints
+    require lane_from in RESEARCH,EXPPROD
+    require lane_to   in EXPPROD,PROD
+  end
+end
