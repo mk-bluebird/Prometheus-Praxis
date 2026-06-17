@@ -1,0 +1,13 @@
+# filename: cpp/EcoNetCentralAZ/Cargo.toml
+# destination: eco_restoration_shard/cpp/EcoNetCentralAZ/Cargo.toml
+
+[package]
+name = "econet_centralaz"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+[[bin]]
+name = "centralaz"
+path = "src/main.rs"
