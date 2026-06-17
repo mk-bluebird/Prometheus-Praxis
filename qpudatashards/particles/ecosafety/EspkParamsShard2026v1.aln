@@ -1,0 +1,32 @@
+-- filename: ecosafety/EspkParamsShard2026v1.aln
+-- destination: qpudatashards/particles
+
+PARTICLE EspkParamsShard2026v1
+ROLE     GOVERNANCE
+CATEGORY SAFETY_PHASE_PARAMS
+VERSIONTAG 2026v1
+
+TITLE ESPK parameter block
+DESCRIPTION
+  Frozen parameters for EcoSafetyPhaseKernel, hex-stamped and DID-bound,
+  per region/contaminant corridor.
+
+FIELDS
+  espk_params_id  string  -- primary key, e.g. "ESPK-Phoenix-2026v1"
+  region          string  -- e.g. "Phoenix-AZ"
+  contaminant     string? -- optional specialization, e.g. "PFBS"
+
+  -- Thresholds for phases (all in [0,1])
+  bmin_deploy     f64     -- minimum Badj for DEPLOYABLE
+  rmax_deploy     f64     -- maximum R for DEPLOYABLE
+  dtmin_deploy    f64     -- minimum Dt for DEPLOYABLE
+
+  bmin_pilot      f64     -- minimum Badj for PILOT
+  rmax_pilot      f64     -- maximum R for PILOT
+  dtmin_pilot     f64     -- minimum Dt for PILOT
+
+  -- Hexstamp / provenance
+  evidence_hex    string
+  signing_did     string
+  created_utc     datetime
+END
