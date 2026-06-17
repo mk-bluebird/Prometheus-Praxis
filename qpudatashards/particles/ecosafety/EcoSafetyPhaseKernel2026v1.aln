@@ -1,0 +1,35 @@
+-- filename: ecosafety/EcoSafetyPhaseKernel2026v1.aln
+-- destination: qpudatashards/particles
+
+PARTICLE EcoSafetyPhaseKernel2026v1
+ROLE     GOVERNANCE
+CATEGORY SAFETY_PHASE
+VERSIONTAG 2026v1
+
+TITLE Eco-Safety Phase Kernel ESPK
+DESCRIPTION
+  Non-actuating governance kernel that maps adjusted eco-benefit Badj,
+  risk-of-harm R, and trust scalar Dt into a discrete SafetyPhase
+  (FORBID, PILOT, DEPLOYABLE) under a fixed ESPD parameter set.
+  Used for siting and lane decisions only; never drives actuators.
+
+FIELDS
+  -- Inputs (all already present in ESPD/Dt/KTSF shards)
+  node_id        string
+  region         string
+  contaminant    string
+  window_start   datetime
+  window_end     datetime
+  badj           f64    -- adjusted eco-benefit in [0,1]
+  r              f64    -- risk-of-harm scalar R in [0,1]
+  dt             f64    -- trust scalar Dt in [0,1]
+
+  -- Parameter block ID
+  espk_params_id string -- foreign key into EspkParamsShard2026v1
+
+  -- Derived outputs
+  safety_phase   string -- FORBID | PILOT | DEPLOYABLE
+  evidence_hex   string -- Merkle-linked bundle for this decision
+  signing_did    string -- DID of kernel instance / signer
+  created_utc    datetime
+END
