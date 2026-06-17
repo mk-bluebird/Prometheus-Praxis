@@ -1,0 +1,38 @@
+# Filename: .github/workflows/check_definition_registry.yml
+# Destination: .github/workflows/check_definition_registry.yml
+
+name: Check Definition Registry Coverage
+
+on:
+  push:
+    paths:
+      - "schemas/**"
+      - "sql/**"
+      - "crates/**"
+  pull_request:
+    paths:
+      - "schemas/**"
+      - "sql/**"
+      - "crates/**"
+
+jobs:
+  check-definition-registry:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.85.0"
+
+      - name: Build definition registry checker
+        run: |
+          cargo build -p definition_registry_checker
+
+      - name: Run definition registry checker
+        run: |
+          cargo run -p definition_registry_checker -- \
+            --root . \
+            --definition-db sql/db_governance_core_2026v1.sql
