@@ -3,33 +3,123 @@ version 1.0.0
 controllerid ECO-Repo-Index-2026v1
 owneralnid bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
 network ALN-MAINNET
-issuedutc 2026-05-02T21:00:00Z
 category GOVERNANCE
+ALNSPECHASHHEX 0xECOREPOINDEX2026FROZEN01
+
+meta
+    description   Canonical, DID-anchored repo manifest for the EcoNet constellation.
+    purpose       Declare roleband, lanes, ecosafety binding, and KER targets per repo.
+    shardfamily   EcoRepoIndex
+    lyapchannel   governance
+endmeta
 
 record EcoRepoIndexEntry2026v1
-    indexid        string   # stable id for this index shard
-    reponame       string   # GitHub slug, e.g. eco_restoration_shard
-    roleband       string   # SPINE, RESEARCH, ENGINE, MATERIAL, GOV, APP
-    entries        string   # CSV of ALN spec ids with versions
-    sql_migrations string   # CSV of db filenames applied
-    rust_crates    string   # CSV of crate names in this repo
-    evidencehex    string
-    signingdid     string
-    created_utc    string
+    indexid           string   # stable id for this index shard
+    reponame          string   # logical name, e.g. ecorestorationshard
+    githubslug        string   # mk-bluebird/eco_restoration_shard
+    roleband          string   # SPINE, RESEARCH, ENGINE, MATERIAL, GOV, APP
+    visibility        string   # Public, Private
+    languageprimary   string   # Rust, Lua, Kotlin, C, etc.
+
+    lanedefault       string   # RESEARCH, EXPPROD, PROD
+    allowedlanes      string   # CSV of allowed lanes for this repo
+    nonactuatingonly  bool     # true forbids actuator-bearing crates
+
+    ecosafetybinding  string   # canonical ecosafety spec id
+    shardprotocol     string   # EcoNetSchemaShard20XXvN
+    planecontractid   string   # PlaneWeights shard id, if bound
+
+    kertargetk        float    # target Knowledge factor K_target
+    kertargete        float    # target Eco-impact E_target
+    kertargetr        float    # target Risk-of-harm R_target (upper bound)
+
+    proofrepose       float    # minimum E for proof-of-evidence repos
+    proofrepr         float    # maximum R for proof-of-evidence repos
+
+    requiredcontracts string   # CSV of contract spec ids this repo must honor
+    importspine       string   # CSV of spine repos it may import from
+
+    indexversion      string   # semantic version of this manifest row
+    evidencehex       string   # hex-stamped provenance for this entry
+    signingdid        string   # Bostrom DID that signed this manifest
+    created_utc       string   # ISO8601
 endrecord
+
+section residual_math
+    # Lyapunov residual per shard is computed upstream as
+    #   V_t = Σ_j w_j * r_j^2   [1]
+    # with r_j in [0,1] and w_j ≥ 0 from the bound PlaneWeights contract.
+    # A normalized residualscore in [0,1] is defined as
+    #   residualscore = min(1.0, V_t / V_ref)   [2]
+    # where V_ref is the contract-specific GOLD/HARD pivot recorded in
+    # EcosafetyPlaneWeights2026v1 and referenced by planecontractid.
+endsection
+
+section invariants
+    # Governance invariants this manifest expects downstream CI to enforce:
+    #
+    # 1. Lane admissibility (per shard):
+    #    If lane = "PROD" then
+    #        k >= kertargetk
+    #        e >= kertargete
+    #        r <= kertargetr
+    #    evaluated over windowed KER from shardinstance.  [3]
+    #
+    # 2. Non-compensation for non-offsettable planes:
+    #    For any plane p with nonoffsettable = true (e.g. carbon, biodiversity)
+    #    and soft threshold r_soft(p) from PlaneWeightsShard2026v1:
+    #        if r_p,next > r_p,prev and r_p,prev >= r_soft(p)
+    #        then K_next <= K_prev, E_next <= E_prev, R_next >= R_prev.  [4]
+    #
+    # 3. Uncertainty monotonicity for r_calib and r_sigma:
+    #    For r in {r_calib, r_sigma}:
+    #        if r_next > r_prev
+    #        then K_next <= K_prev, E_next <= E_prev, R_next >= R_prev.  [5]
+endsection
 
 section example
     EcoRepoIndexEntry2026v1
-        indexid        eco_restoration_shard-2026v1
-        reponame       eco_restoration_shard
-        roleband       SPINE
-        entries        PlaneWeightsShard2026v1,StewardEcoWealthStatement2026v1,EcoWealthQuarantineContract2026v1
-        sql_migrations db_basetables.sql,ecoplot_portfolio_diversity.sql,econetrepoindex.sql
-        rust_crates    kerresidual,ecowealth
-        evidencehex    eco-repo-index-2026v1
-        signingdid     bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
-        created_utc    2026-05-02T21:00:00Z
+        indexid           eco_restoration_shard-2026v1
+        reponame          ecorestorationshard
+        githubslug        mk-bluebird/eco_restoration_shard
+        roleband          RESEARCH
+        visibility        Public
+        languageprimary   Rust
+
+        lanedefault       RESEARCH
+        allowedlanes      RESEARCH,EXPPROD
+        nonactuatingonly  true
+
+        ecosafetybinding  cyboquatic-ecosafety-core2026v1
+        shardprotocol     EcoNetSchemaShard2026v1
+        planecontractid   EcosafetyPlaneWeights2026v1
+
+        kertargetk        0.94
+        kertargete        0.90
+        kertargetr        0.12
+
+        proofrepose       0.91
+        proofrepr         0.13
+
+        requiredcontracts PlaneWeightsShard2026v1,EcosafetyCorridors2026v2,PlaneNonCompensationInvariants2026v1,DataQualityInvariants2026v1
+        importspine       EcoNet,Eco-Fort,aln-platform-ecosystem
+
+        indexversion      1.0.0
+        evidencehex       0xECOREPOINDEX2026V1EVIDENCE
+        signingdid        bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+        created_utc       2026-05-02T21:00:00Z
     end
+endsection
+
+section ci_contract
+    # CI MUST:
+    # - Fail if roleband ≠ declared, nonactuatingonly ≠ true for this repo.
+    # - Fail if ecosafetybinding or shardprotocol do not match frozen specs.
+    # - Fail if (kertargetk,kertargete,kertargetr) fall outside RESEARCH band
+    #   corridors for EcoRepoIndex governance.
+    # - Fail any change to this shard that is not accompanied by a
+    #   SchemaEvolution2026v1 proof showing K_new ≥ K_old, E_new ≥ E_old,
+    #   R_new ≤ R_old on replay windows.  [6]
 endsection
 
 end
