@@ -1,0 +1,19 @@
+default_llm: qwen
+
+llm_providers:
+  qwen:
+    api_base_url: "http://localhost:8000/v1"   # vLLM Qwen server or OpenAI-compatible endpoint
+    api_key_env: "QWEN_API_KEY"
+    model_name: "Qwen/Qwen3-8B-Instruct"
+
+  perplexity:
+    api_base_url: "https://api.perplexity.ai"
+    api_key_env: "PERPLEXITY_API_KEY"
+
+eco_shards:
+  central_az_karma_template: "qpudatashards/particles/EcoNetCentralAZKarmaWindowTemplate.csv"
+  karma_tolerance_metrics: "qpudatashards/particles/EcoKarmaToleranceMetrics2026v1.csv"
+
+routing:
+  max_tokens: 1024
+  temperature: 0.7
