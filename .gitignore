@@ -1,34 +1,38 @@
 ```
-# Database files
-*.sqlite3
+# Logs and temp files
+*.log
+*.tmp
 
 # Environment
 .env
 .env.local
 *.env.*
 
-# Logs and temp files
-*.log
-*.tmp
-*.swp
-
 # Editors
 .vscode/
 .idea/
 
-# Dependencies
-node_modules/
-.venv/
-venv/
+# Python
 __pycache__/
-.mypy_cache/
-.pytest_cache/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+.env
+env/
+ENV/
+
+# Build and distribution artifacts
 dist/
 build/
-target/
-.gradle/
+*.egg-info/
 
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Tools output
+.ai-chat/tools/output/
 ```
