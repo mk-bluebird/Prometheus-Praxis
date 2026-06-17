@@ -1,0 +1,65 @@
+-- filename: qpudatashards/particles/EcoSafetyPhaseTrayPFBS2026v1.aln
+-- destination: qpudatashards/particles
+
+PARTICLE EcoSafetyPhaseTrayPFBS2026v1
+ROLE     GOVERNANCE
+CATEGORY NODE_SAFETY_PHASE
+VERSIONTAG 2026v1
+
+TITLE Eco-safety phase record for PFBS-safe tray node in Phoenix
+DESCRIPTION
+  Single-window ESPK decision for a biodegradable tray deployment
+  reducing PFBS and E. coli loads in Phoenix-AZ, with explicit
+  CEIM-derived Badj, ESPD risk R, trust scalar Dt, and ESPK result.
+
+FIELDS
+  -- Node identity
+  node_id        string
+  nodetype       string
+  region         string
+  contaminant    string
+  window_start   datetime
+  window_end     datetime
+
+  -- Core eco-impact inputs (normalized)
+  badj           f64     -- adjusted eco-benefit [0,1]
+  r              f64     -- risk-of-harm scalar [0,1]
+  dt             f64     -- Multonry trust scalar [0,1]
+
+  -- Biodegradation coordinates (tray-specific)
+  material_id    string
+  t90_days       f64
+  rtox           f64
+  rmicro         f64
+  efactor        f64     -- composite eco-impact factor
+
+  -- ESPK parameter set
+  espk_params_id string
+
+  -- Output decision
+  safety_phase   string  -- FORBID | PILOT | DEPLOYABLE
+
+  -- Governance / provenance
+  lane           string  -- PROD | EXP
+  evidence_hex   string
+  signing_did    string
+  created_utc    datetime
+END
+
+ROWS
+  node_id, nodetype, region, contaminant,
+  window_start, window_end,
+  badj, r, dt,
+  material_id, t90_days, rtox, rmicro, efactor,
+  espk_params_id, safety_phase,
+  lane, evidence_hex, signing_did, created_utc
+
+  "AG-TRAY-PHX-01","tray-node","Phoenix-AZ","PFBS",
+  "2026-01-20T00:00:00Z","2026-01-21T00:00:00Z",
+  0.86,0.17,0.95,
+  "PHA-BAGASSE-MIX-01",120.0,0.10,0.08,0.88,
+  "ESPK-Phoenix-2026v1","DEPLOYABLE",
+  "PROD","0xa1b2c3d4e5f67890f1e2d3c4b5a69788",
+  "did:econet:phoenix-ker-core",
+  "2026-01-21T01:23:45Z"
+END
