@@ -1,0 +1,39 @@
+{
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an eco-restoration assistant. Use tools when necessary to fetch up-to-date ecological data."
+    },
+    {
+      "role": "user",
+      "content": "Given the latest regulations, what are the safe PFBS levels near Lake Pleasant this month?"
+    }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "perplexity_search",
+        "description": "Query the Perplexity research tool for up-to-date environmental and regulatory information.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Search query focusing on eco-regulations or contaminant levels."
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "tool_choice": "auto",
+  "temperature": 0.7,
+  "max_tokens": 1024,
+  "stream": false
+}
