@@ -1,0 +1,34 @@
+-- filename: ecosafety/EcoSafetyPhaseKernel2026v1.aln
+
+PARTICLE EcoSafetyPhaseKernel2026v1
+ROLE     GOVERNANCE
+CATEGORY SAFETY_PHASE
+VERSIONTAG 2026v1
+
+TITLE Eco-Safety Phase Kernel ESPK
+DESCRIPTION
+  Maps adjusted eco-benefit Badj, risk-of-harm R, and trust scalar Dt
+  into a discrete SafetyPhase under a fixed Eco-Safety Phase Diagram
+  (ESPD) parameter set. Non-actuating, used only for siting and lane
+  decisions.
+
+FIELDS
+  -- Inputs
+  node_id        string
+  region         string
+  contaminant    string
+  window_start   datetime
+  window_end     datetime
+  badj           f64    -- adjusted eco-benefit (e.g., CEIM benefit)
+  r              f64    -- risk-of-harm scalar R in [0,1]
+  dt             f64    -- trust displacement scalar Dt in [0,1]
+
+  -- Parameter block ID
+  espk_params_id string -- foreign key into EspkParamsShard
+
+  -- Derived outputs
+  safety_phase   string -- FORBID, PILOT, DEPLOYABLE
+  evidence_hex   string
+  signing_did    string
+  created_utc    datetime
+END
