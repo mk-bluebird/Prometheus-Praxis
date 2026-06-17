@@ -1,0 +1,10 @@
+# Filename: crates/econet_governance_guard/Cargo.toml
+# Destination: crates/econet_governance_guard/Cargo.toml
+
+[package]
+name = "econet_governance_guard"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+econet_governance_spine = { path = "../econet_governance_spine" }
