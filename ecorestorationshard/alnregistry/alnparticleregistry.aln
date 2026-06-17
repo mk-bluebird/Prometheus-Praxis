@@ -1,0 +1,18 @@
+# FILE: ecorestorationshard/alnregistry/alnparticleregistry.aln
+# DESTINATION: ecorestorationshard/alnregistry/alnparticleregistry.aln
+# REPO-TARGET: github.com/mk-bluebird/eco_restoration_shard
+
+PARTICLE aln.particle.registry.v1
+META
+  id aln.particle.registry.v1
+  kind registry
+  version v1
+END
+
+FIELDS
+  particlename string
+  roleplane    string
+  repotarget   string
+  relpath      string
+  evidencetag  string
+END
