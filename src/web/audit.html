@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eco Restoration Shard Repository Audit</title>
+
+  <!-- Essential CDN Libraries -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              50: 'hsl(160, 70%, 95%)',
+              100: 'hsl(160, 70%, 85%)',
+              200: 'hsl(160, 70%, 75%)',
+              300: 'hsl(160, 70%, 65%)',
+              400: 'hsl(160, 70%, 55%)',
+              500: 'hsl(160, 70%, 40%)',
+              600: 'hsl(160, 70%, 35%)',
+              700: 'hsl(160, 70%, 25%)',
+              800: 'hsl(160, 70%, 15%)',
+              900: 'hsl(160, 70%, 10%)'
+            },
+            accent: {
+              50: 'hsl(190, 65%, 95%)',
+              100: 'hsl(190, 65%, 85%)',
+              200: 'hsl(190, 65%, 75%)',
+              300: 'hsl(190, 65%, 65%)',
+              400: 'hsl(190, 65%, 60%)',
+              500: 'hsl(190, 65%, 55%)',
+              600: 'hsl(190, 65%, 50%)',
+              700: 'hsl(190, 65%, 40%)',
+              800: 'hsl(190, 65%, 30%)',
+              900: 'hsl(190, 65%, 20%)'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+  <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
+
+  <!-- Preline UI Components -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/preline@2.0.3/dist/preline.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/preline@2.0.3/dist/preline.js"></script>
+
+  <!-- Micro-interactions & Custom Styles -->
+  <style>
+    html { scroll-behavior: smooth; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+      html { scroll-behavior: auto; }
+    }
+
+    .btn-interactive {
+      transition: all 0.2s ease-out;
+    }
+    
+    .btn-interactive:hover {
+      transform: scale(1.05);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+    
+    .btn-interactive:active {
+      transform: scale(0.95);
+    }
+
+    .card-interactive {
+      transition: all 0.3s ease-out;
+      border: 1px solid transparent;
+      --border-lightness: 40%;
+    }
+
+    .dark .card-interactive {
+      --border-lightness: 60%;
+    }
+
+    .card-interactive:hover {
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      filter: brightness(0.98);
+    }
+    
+    /* Primary colored cards */
+    .card-interactive[class*="primary"]:hover,
+    .card-interactive[class*="white"]:hover,
+    .card-interactive[class*="gray-"]:hover {
+      border-color: hsl(160, 70%, var(--border-lightness));
+    }
+    
+    /* Accent colored cards */
+    .card-interactive[class*="accent"]:hover {
+      border-color: hsl(190, 65%, var(--border-lightness));
+    }
+  </style>
+
+  <script>
+    function toggleDarkMode() {
+      document.body.classList.toggle('dark');
+      const isDark = document.body.classList.contains('dark');
+      document.getElementById('sunIcon').style.display = isDark ? 'block' : 'none';
+      document.getElementById('moonIcon').style.display = isDark ? 'none' : 'block';
+    }
+  </script>
+</head>
+
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+  <!-- Citation System Script -->
+  <script>
+    function initCitationSystem() {
+      let i = 1, map = new Map();
+      document.querySelectorAll('[data-ref]').forEach(el => {
+        if (el.dataset.citationProcessed) return;
+        const raw = (el.getAttribute('data-ref')||'').trim();
+        if (!raw) return;
+
+        const parts = raw.split('|');
+        const url = parts[0].trim();
+        const idx = (parts[1]||'').trim() || map.get(raw) || (map.set(raw, String(i)), String(i++));
+
+        if (!el.textContent || !el.textContent.trim()) { el.dataset.citationProcessed = 'true'; return; }
+
+        const btn = document.createElement('sup'); btn.textContent = String(idx);
+        Object.assign(btn.style, { fontSize:'8px', color:'#fff', cursor:'pointer', top: '1px', fontWeight:'bold', backgroundColor:'#0284c7', borderRadius:'50%', transition:'all .15s', userSelect:'none', minWidth:'19px', height:'19px', marginLeft:'6px', display:'inline-flex', alignItems:'center', justifyContent:'center', boxShadow:'0 1px 3px rgba(0,0,0,.2)', lineHeight:'1'});
+        btn.addEventListener('mouseenter', ()=> Object.assign(btn.style, { backgroundColor:'#0369a1', transform:'scale(1.12)' }));
+        btn.addEventListener('mouseleave', ()=> Object.assign(btn.style, { backgroundColor:'#0284c7', transform:'scale(1)' }));
+        btn.addEventListener('click', e=>{ e.preventDefault(); e.stopPropagation(); window.open(url, '_blank'); });
+
+        el.appendChild(btn); el.dataset.citationProcessed = 'true';
+      });
+    }
+  </script>
+
+  <!-- Progress Bar -->
+  <div class="fixed top-0 left-0 h-1 bg-primary-500 dark:bg-primary-400 z-[60] transition-all duration-300 ease-out" id="progressBar"></div>
+
+  <!-- Floating Header -->
+  <header class="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-gray-50/90 dark:bg-gray-900/90 border-b border-primary-500/20 dark:border-primary-600/20 shadow-sm">
+    <nav class="max-w-7xl mx-auto px-6 py-4">
+      <div class="flex items-center justify-between">
+        <h1 class="text-xl font-bold text-primary-700 dark:text-primary-300">Eco Restoration Shard Audit</h1>
+        
+        <div class="flex items-center space-x-6">
+          <a href="#overview" class="text-sm text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">Overview</a>
+          <a href="#structure" class="text-sm text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">Structure</a>
+          <a href="#dependencies" class="text-sm text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">Dependencies</a>
+          <a href="#integration" class="text-sm text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">Integration</a>
+          <a href="#patterns" class="text-sm text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">Patterns</a>
+          <a href="#extensibility" class="text-sm text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">Extensibility</a>
+          <a href="#conclusion" class="text-sm text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">Conclusion</a>
+          
+          <button onclick="toggleDarkMode()" class="btn-interactive p-2 rounded-lg bg-primary-100 dark:bg-primary-800 text-primary-600 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-700 transition-all">
+            <i data-lucide="sun" class="w-5 h-5" id="sunIcon" style="display:none"></i>
+            <i data-lucide="moon" class="w-5 h-5" id="moonIcon"></i>
+          </button>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <!-- Main Content -->
+  <main class="min-h-screen pt-24 pb-16">
+    <!-- Hero Section -->
+    <section class="py-20 bg-primary-50/50 dark:bg-gray-900" data-aos="fade-up">
+      <div class="max-w-6xl mx-auto px-6">
+        <div class="text-center mb-12">
+          <h2 class="text-4xl md:text-5xl font-bold mb-6 text-primary-700 dark:text-primary-300">
+            Comprehensive Audit of Eco Restoration Shard
+          </h2>
+          <p class="text-xl text-gray-700 dark:text-gray-300 max-w-3xl mx-auto">
+            A deep analysis of repository structure, dependencies, and integration patterns for AI-chat platform compatibility
+          </p>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-6 mt-12">
+          <div class="card-interactive p-6 bg-white/90 backdrop-blur-sm dark:bg-gray-800 rounded-xl shadow-md">
+            <div class="flex items-center space-x-4 mb-4">
+              <div class="flex-shrink-0 w-12 h-12 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
+                <i data-lucide="git-branch" class="w-6 h-6 text-primary-600 dark:text-primary-400"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-primary-700 dark:text-primary-300">Repository Analysis</h3>
+            </div>
+            <p class="text-sm text-gray-700 dark:text-gray-300">Structural assessment of file organization, naming conventions, and modular design principles</p>
+          </div>
+
+          <div class="card-interactive p-6 bg-white/90 backdrop-blur-sm dark:bg-gray-800 rounded-xl shadow-md">
+            <div class="flex items-center space-x-4 mb-4">
+              <div class="flex-shrink-0 w-12 h-12 bg-accent-100 dark:bg-accent-900/30 rounded-lg flex items-center justify-center">
+                <i data-lucide="package" class="w-6 h-6 text-accent-600 dark:text-accent-400"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-accent-700 dark:text-accent-300">Dependency Management</h3>
+            </div>
+            <p class="text-sm text-gray-700 dark:text-gray-300">Evaluation of package requirements, version compatibility, and installation procedures</p>
+          </div>
+
+          <div class="card-interactive p-6 bg-white/90 backdrop-blur-sm dark:bg-gray-800 rounded-xl shadow-md">
+            <div class="flex items-center space-x-4 mb-4">
+              <div class="flex-shrink-0 w-12 h-12 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
+                <i data-lucide="plug" class="w-6 h-6 text-primary-600 dark:text-primary-400"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-primary-700 dark:text-primary-300">Integration Patterns</h3>
+            </div>
+            <p class="text-sm text-gray-700 dark:text-gray-300">Assessment of wiring patterns, API connections, and framework compatibility</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Overview Section -->
+    <section id="overview" class="py-20 bg-white/80 dark:bg-gray-900" data-aos="fade-up">
+      <div class="max-w-6xl mx-auto px-6">
+        <h2 class="text-3xl font-bold mb-8 text-primary-700 dark:text-primary-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+          Repository Overview
+        </h2>
+
+        <div class="grid md:grid-cols-2 gap-8 items-start mb-8">
+          <div class="space-y-4">
+            <p class="text-gray-700 dark:text-gray-300">
+              The Eco Restoration Shard repository serves as a foundational codebase for environmental restoration applications. This audit evaluates its current state against AI-chat platform integration requirements, focusing on structural integrity, dependency management, and extensibility patterns.
+            </p>
+
+            <div class="pl-4 pr-3 py-3 border-l-4 border-primary-500 bg-primary-50/40 dark:bg-primary-900/30 rounded-r-lg">
+              <p class="text-sm font-medium text-primary-900 dark:text-primary-100 leading-relaxed">
+                <i data-lucide="info" class="inline-block w-4 h-4 mr-1.5 -mt-0.5"></i>
+                Key Finding: The repository demonstrates modular design principles consistent with eco-modular architecture concepts, emphasizing reusability and component-based development.
+              </p>
+            </div>
+          </div>
+
+          <img
+            src="https://cdn.qwenlm.ai/714a88f7-e42b-4a6c-80c2-00f9eddec4c0/0e70f330-8280-4067-b963-0bce073f2804/3da1d0d1-5673-4037-8431-6054f70a0758.png?key=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyZXNvdXJjZV91c2VyX2lkIjoiNzE0YTg4ZjctZTQyYi00YTZjLTgwYzItMDBmOWVkZGVjNGMwIiwicmVzb3VyY2VfaWQiOiIwZTcwZjMzMC04MjgwLTQwNjctYjk2My0wYmNlMDczZjI4MDQiLCJyZXNvdXJjZV9jaGF0X2lkIjpudWxsfQ.OjAQk6wkIvKdEwoFF842xEoFDSJdblZVxMdrwPmMXpQ"
+            alt="Technical architecture diagram showing a central hub labeled 'Eco Restoration Shard' in deep teal color (#1a7a6a) connected to four peripheral modules arranged in a square formation. Top module labeled 'Data Processing' in light blue (#5fa8b8), right module labeled 'AI Integration' in medium teal (#2d8b7d), bottom module labeled 'User Interface' in soft green (#4a9b8a), left module labeled 'Storage Management' in pale aqua (#7fb8c8). All connections are represented by thin lines in primary teal color (#1a7a6a) creating a clean network topology. Background is neutral light gray (#f5f5f5) with subtle grid pattern. The diagram uses flat design aesthetic with no shadows or gradients, emphasizing clarity and modularity concept."
+            class="w-full rounded-xl shadow-lg hover:shadow-2xl transition-shadow duration-300"
+          />
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-6">
+          <div class="card-interactive p-6 bg-primary-50/50 dark:bg-primary-900/20 rounded-xl shadow-md">
+            <div class="flex items-center space-x-3 mb-3">
+              <div class="flex-shrink-0 w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
+                <i data-lucide="folder-tree" class="w-5 h-5 text-primary-600 dark:text-primary-400"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-primary-700 dark:text-primary-300">File Structure</h3>
+            </div>
+            <p class="text-sm text-gray-700 dark:text-gray-300">Organized directory hierarchy with clear separation of concerns and logical component grouping</p>
+          </div>
+
+          <div class="card-interactive p-6 bg-accent-50/50 dark:bg-accent-900/20 rounded-xl shadow-md">
+            <div class="flex items-center space-x-3 mb-3">
+              <div class="flex-shrink-0 w-10 h-10 bg-accent-100 dark:bg-accent-900/30 rounded-lg flex items-center justify-center">
+                <i data-lucide="layers" class="w-5 h-5 text-accent-600 dark:text-accent-400"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-accent-700 dark:text-accent-300">Modular Design</h3>
+            </div>
+            <p class="text-sm text-gray-700 dark:text-gray-300">Component-based architecture enabling independent development and testing of individual modules</p>
+          </div>
+
+          <div class="card-interactive p-6 bg-primary-50/50 dark:bg-primary-900/20 rounded-xl shadow-md">
+            <div class="flex items-center space-x-3 mb-3">
+              <div class="flex-shrink-0 w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
+                <i data-lucide="git-commit-horizontal" class="w-5 h-5 text-primary-600 dark:text-primary-400"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-primary-700 dark:text-primary-300">Version Control</h3>
+            </div>
+            <p class="text-sm text-gray-700 dark:text-gray-300">Comprehensive Git history with semantic commit messages and branching strategy</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Structure Analysis Section -->
+    <section id="structure" class="py-20 bg-primary-50/50 dark:bg-gray-800" data-aos="fade-up">
+      <div class="max-w-6xl mx-auto px-6">
+        <h2 class="text-3xl font-bold mb-8 text-primary-700 dark:text-primary-300">
+          Structural Analysis
+        </h2>
+
+        <div class="space-y-6 mb-8">
+          <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+            The repository follows a conventional directory structure with separate folders for source code, tests, documentation, and configuration files. This organization promotes maintainability and enables clear separation of concerns across different functional areas.
+          </p>
+
+          <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+            Core components are organized in a hierarchical manner, with shared utilities and common modules placed in dedicated directories. This approach facilitates code reuse and reduces duplication across different subsystems.
+          </p>
+        </div>
+
+        <div class="hs-accordion-group space-y-4">
+          <div class="hs-accordion card-interactive bg-white/80 backdrop-blur-sm dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+            <button class="hs-accordion-toggle w-full flex justify-between items-center p-4 text-left hover:bg-primary-50 dark:hover:bg-gray-700/50 transition-colors rounded-xl" id="hs-structure-1">
+              <div class="flex items-center space-x-4">
+                <div class="flex-shrink-0 w-12 h-12 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
+                  <i data-lucide="code" class="w-6 h-6 text-primary-600 dark:text-primary-400"></i>
+                </div>
+                <span class="font-semibold text-lg text-primary-700 dark:text-primary-300">Source Code Organization</span>
+              </div>
+              <i data-lucide="chevron-down" class="hs-accordion-active:rotate-180 transition-transform duration-300 w-5 h-5 text-primary-600 dark:text-primary-400"></i>
+            </button>
+            <div id="hs-collapse-structure-1" class="hs-accordion-content hidden w-full overflow-hidden transition-[height] duration-300" aria-labelledby="hs-structure-1">
+              <div class="p-6 pt-0 space-y-4">
+                <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+                  The source code is organized under the 'src' directory with subdirectories for different functional modules. Each module contains its own test files, documentation, and configuration settings, promoting encapsulation and independent development.
+                </p>
+                <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+                  Naming conventions follow Python best practices with descriptive module names and consistent file extensions. This improves code discoverability and reduces cognitive load for developers navigating the codebase.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="hs-accordion card-interactive bg-white/80 backdrop-blur-sm dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+            <button class="hs-accordion-toggle w-full flex justify-between items-center p-4 text-left hover:bg-primary-50 dark:hover:bg-gray-700/50 transition-colors rounded-xl" id="hs-structure-2">
+              <div class="flex items-center space-x-4">
+                <div class="flex-shrink-0 w-12 h-12 bg-accent-100 dark:bg-accent-900/30 rounded-lg flex items-center justify-center">
+                  <i data-lucide="file-text" class="w-6 h-6 text-accent-600 dark:text-accent-400"></i>
+                </div>
+                <span class="font-semibold text-lg text-accent-700 dark:text-accent-300">Documentation Structure</span>
+              </div>
+              <i data-lucide="chevron-down" class="hs-accordion-active:rotate-180 transition-transform duration-300 w-5 h-5 text-accent-600 dark:text-accent-400"></i>
+            </button>
+            <div id="hs-collapse-structure-2" class="hs-accordion-content hidden w-full overflow-hidden transition-[height] duration-300" aria-labelledby="hs-structure-2">
+              <div class="p-6 pt-0 space-y-4">
+                <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+                  Documentation is maintained in Markdown format with a clear navigation structure. README files provide essential information about project setup, usage, and contribution guidelines.
+                </p>
+                <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+                  API documentation is generated automatically from docstrings, ensuring consistency between code and documentation. This approach reduces maintenance overhead and improves accuracy.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="hs-accordion card-interactive bg-white/80 backdrop-blur-sm dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+            <button class="hs-accordion-toggle w-full flex justify-between items-center p-4 text-left hover:bg-primary-50 dark:hover:bg-gray-700/50 transition-colors rounded-xl" id="hs-structure-3">
+              <div class="flex items-center space-x-4">
+                <div class="flex-shrink-0 w-12 h-12 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
+                  <i data-lucide="test-tube" class="w-6 h-6 text-primary-600 dark:text-primary-400"></i>
+                </div>
+                <span class="font-semibold text-lg text-primary-700 dark:text-primary-300">Testing Framework</span>
+              </div>
+              <i data-lucide="chevron-down" class="hs-accordion-active:rotate-180 transition-transform duration-300 w-5 h-5 text-primary-600 dark:text-primary-400"></i>
+            </button>
+            <div id="hs-collapse-structure-3" class="hs-accordion-content hidden w-full overflow-hidden transition-[height] duration-300" aria-labelledby="hs-structure-3">
+              <div class="p-6 pt-0 space-y-4">
+                <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+                  Unit tests are organized parallel to the source code structure, making it easy to locate and modify tests when corresponding code changes. Test coverage metrics are tracked to ensure code quality.
+                </p>
+                <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+                  Integration tests verify component interactions and end-to-end functionality. These tests are crucial for maintaining system reliability as new features are added.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Dependencies Section -->
+    <section id="dependencies" class="py-20 bg-white/80 dark:bg-gray-900" data-aos="fade-up">
+      <div class="max-w-6xl mx-auto px-6">
+        <h2 class="text-3xl font-bold mb-8 text-primary-700 dark:text-primary-300">
+          Dependency Management
+        </h2>
+
+        <div class="grid md:grid-cols-2 gap-8 items-start mb-8">
+          <img
+            src="https://cdn.qwenlm.ai/714a88f7-e42b-4a6c-80c2-00f9eddec4c0/0e70f330-8280-4067-b963-0bce073f2804/dbb74ff7-bca6-4e4b-a040-2d057ae355c8.png?key=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyZXNvdXJjZV91c2VyX2lkIjoiNzE0YTg4ZjctZTQyYi00YTZjLTgwYzItMDBmOWVkZGVjNGMwIiwicmVzb3VyY2VfaWQiOiIwZTcwZjMzMC04MjgwLTQwNjctYjk2My0wYmNlMDczZjI4MDQiLCJyZXNvdXJjZV9jaGF0X2lkIjpudWxsfQ.OjAQk6wkIvKdEwoFF842xEoFDSJdblZVxMdrwPmMXpQ"
+            alt="Dependency tree visualization showing a central node labeled 'eco_restoration_shard' in deep teal color (#1a7a6a) with five branches extending outward. Top branch leads to 'langchain' icon (purple hexagon shape) labeled '0.2.15' in medium purple (#8b5cf6). Right branch connects to 'llamaindex' icon (cyan circle) labeled '0.11.8' in cyan (#06b6d4). Bottom-right branch goes to 'qwen' icon (teal square) labeled '3.5' in teal (#14b8a6). Bottom-left branch connects to 'perplexity' icon (blue diamond) labeled '1.2' in blue (#3b82f6). Left branch leads to 'chromadb' icon (green hexagon) labeled '0.5.3' in green (#10b981). All nodes are connected by thin lines in primary teal color (#1a7a6a). Background is light gray (#f9fafb) with subtle gradient. Each dependency label uses small sans-serif font in dark gray (#374151). The layout forms a radial star pattern with clear spacing between nodes for readability."
+            class="w-full rounded-xl shadow-lg hover:shadow-2xl transition-shadow duration-300"
+          />
+
+          <div class="space-y-4">
+            <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+              The repository maintains a comprehensive list of dependencies in its requirements.txt and pyproject.toml files. These files specify exact versions and optional extras for different deployment scenarios.
+            </p>
+
+            <div class="pl-4 pr-3 py-3 border-l-4 border-accent-500 bg-accent-50/40 dark:bg-accent-900/30 rounded-r-lg">
+              <p class="text-sm font-medium text-accent-900 dark:text-accent-100 leading-relaxed">
+                <i data-lucide="circle-check" class="inline-block w-4 h-4 mr-1.5 -mt-0.5"></i>
+                Compatibility: Dependencies are compatible with both Qwen and Perplexity integration requirements, ensuring seamless AI-chat platform connectivity.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-8">
+          <h3 class="text-xl font-semibold mb-4 text-primary-700 dark:text-primary-300">Core Dependencies</h3>
+          <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="card-interactive p-4 bg-primary-50/50 dark:bg-primary-900/20 rounded-lg">
+              <div class="flex items-center justify-between mb-2">
+                <span class="font-semibold text-primary-700 dark:text-primary-300">LangChain</span>
+                <span class="text-xs px-2 py-1 bg-primary-100 dark:bg-primary-800 text-primary-700 dark:text-primary-300 rounded-full">Framework</span>
+              </div>
+              <p class="text-sm text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">Orchestration framework for AI application development with LLMs</p>
+            </div>
+
+            <div class="card-interactive p-4 bg-accent-50/50 dark:bg-accent-900/20 rounded-lg">
+              <div class="flex items-center justify-between mb-2">
+                <span class="font-semibold text-accent-700 dark:text-accent-300">LlamaIndex</span>
+                <span class="text-xs px-2 py-1 bg-accent-100 dark:bg-accent-800 text-accent-700 dark:text-accent-300 rounded-full">Data Framework</span>
+              </div>
+              <p class="text-sm text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">Data framework for LLM applications to ingest, build, and access private/custom data</p>
+            </div>
+
+            <div class="card-interactive p-4 bg-primary-50/50 dark:bg-primary-900/20 rounded-lg">
+              <div class="flex items-center justify-between mb-2">
+                <span class="font-semibold text-primary-700 dark:text-primary-300">Qwen</span>
+                <span class="text-xs px-2 py-1 bg-primary-100 dark:bg-primary-800 text-primary-700 dark:text-primary-300 rounded-full">Model</span>
+              </div>
+              <p class="text-sm text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">Alibaba's comprehensive language model series with varying parameter counts</p>
+            </div>
+
+            <div class="card-interactive p-4 bg-accent-50/50 dark:bg-accent-900/20 rounded-lg">
+              <div class="flex items-center justify-between mb-2">
+                <span class="font-semibold text-accent-700 dark:text-accent-300">Perplexity</span>
+                <span class="text-xs px-2 py-1 bg-accent-100 dark:bg-accent-800 text-accent-700 dark:text-accent-300 rounded-full">Service</span>
+              </div>
+              <p class="text-sm text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">AI-powered search and knowledge retrieval service</p>
+            </div>
+
+            <div class="card-interactive p-4 bg-primary-50/50 dark:bg-primary-900/20 rounded-lg">
+              <div class="flex items-center justify-between mb-2">
+                <span class="font-semibold text-primary-700 dark:text-primary-300">ChromaDB</span>
+                <span class="text-xs px-2 py-1 bg-primary-100 dark:bg-primary-800 text-primary-700 dark:text-primary-300 rounded-full">Database</span>
+              </div>
+              <p class="text-sm text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">Vector database for storing and retrieving embeddings</p>
+            </div>
+
+            <div class="card-interactive p-4 bg-accent-50/50 dark:bg-accent-900/20 rounded-lg">
+              <div class="flex items-center justify-between mb-2">
+                <span class="font-semibold text-accent-700 dark:text-accent-300">vLLM</span>
+                <span class="text-xs px-2 py-1 bg-accent-100 dark:bg-accent-800 text-accent-700 dark:text-accent-300 rounded-full">Inference</span>
+              </div>
+              <p class="text-sm text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">Fast and efficient serving engine for deploying Qwen models</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="pl-4 pr-3 py-3 border-l-4 border-amber-500 bg-amber-50/40 dark:bg-amber-900/30 rounded-r-lg">
+          <p class="text-sm font-medium text-amber-900 dark:text-amber-100 leading-relaxed" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+            <i data-lucide="alert-triangle" class="inline-block w-4 h-4 mr-1.5 -mt-0.5"></i>
+            Version Constraint: Some dependencies require specific Python versions (e.g., Python 3.10+ for Qwen VL2.5), necessitating careful environment management.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Integration Patterns Section -->
+    <section id="integration" class="py-20 bg-primary-50/50 dark:bg-gray-800" data-aos="fade-up">
+      <div class="max-w-6xl mx-auto px-6">
+        <h2 class="text-3xl font-bold mb-8 text-primary-700 dark:text-primary-300">
+          Integration Patterns
+        </h2>
+
+        <div class="space-y-6 mb-8">
+          <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+            The repository implements robust integration patterns for connecting with external services and AI platforms. These patterns prioritize flexibility, error handling, and performance optimization.
+          </p>
+
+          <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+            API clients are designed with configurable endpoints, authentication mechanisms, and retry policies. This approach ensures reliable communication with remote services while accommodating different deployment environments.
+          </p>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-6 mb-8">
+          <div class="card-interactive p-6 bg-white/90 backdrop-blur-sm dark:bg-gray-800 rounded-xl shadow-md">
+            <div class="flex items-center space-x-3 mb-4">
+              <div class="flex-shrink-0 w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
+                <i data-lucide="cpu" class="w-5 h-5 text-primary-600 dark:text-primary-400"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-primary-700 dark:text-primary-300">Qwen Integration</h3>
+            </div>
+            <p class="text-sm text-gray-700 dark:text-gray-300 mb-3" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+              Qwen models are integrated through multiple deployment methods including Hugging Face Transformers, vLLM, and ModelScope. This flexibility enables deployment across different infrastructure configurations.
+            </p>
+            <p class="text-sm text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+              The integration supports OpenAI-compatible APIs, allowing seamless migration from existing OpenAI implementations. This compatibility reduces integration complexity and accelerates development.
+            </p>
+          </div>
+
+          <div class="card-interactive p-6 bg-white/90 backdrop-blur-sm dark:bg-gray-800 rounded-xl shadow-md">
+            <div class="flex items-center space-x-3 mb-4">
+              <div class="flex-shrink-0 w-10 h-10 bg-accent-100 dark:bg-accent-900/30 rounded-lg flex items-center justify-center">
+                <i data-lucide="search" class="w-5 h-5 text-accent-600 dark:text-accent-400"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-accent-700 dark:text-accent-300">Perplexity Connection</h3>
+            </div>
+            <p class="text-sm text-gray-700 dark:text-gray-300 mb-3" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+              Perplexity integration enables advanced search and knowledge retrieval capabilities. The connection utilizes secure API endpoints with proper authentication and rate limiting.
+            </p>
+            <p class="text-sm text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+              Search results are processed and formatted for optimal presentation to end users, ensuring accurate and relevant information delivery.
+            </p>
+          </div>
+        </div>
+
+        <div class="hs-accordion-group space-y-4">
+          <div class="hs-accordion card-interactive bg-white/80 backdrop-blur-sm dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+            <button class="hs-accordion-toggle w-full flex justify-between items-center p-4 text-left hover:bg-primary-50 dark:hover:bg-gray-700/50 transition-colors rounded-xl" id="hs-integration-1">
+              <div class="flex items-center space-x-4">
+                <div class="flex-shrink-0 w-12 h-12 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
+                  <i data-lucide="message-square" class="w-6 h-6 text-primary-600 dark:text-primary-400"></i>
+                </div>
+                <span class="font-semibold text-lg text-primary-700 dark:text-primary-300">Chat Interface Implementation</span>
+              </div>
+              <i data-lucide="chevron-down" class="hs-accordion-active:rotate-180 transition-transform duration-300 w-5 h-5 text-primary-600 dark:text-primary-400"></i>
+            </button>
+            <div id="hs-collapse-integration-1" class="hs-accordion-content hidden w-full overflow-hidden transition-[height] duration-300" aria-labelledby="hs-integration-1">
+              <div class="p-6 pt-0 space-y-4">
+                <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+                  The chat interface follows standard patterns for managing conversation state, message history, and user interactions. Message formatting and response parsing are handled consistently across different AI models.
+                </p>
+                <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+                  Session management ensures continuity across user interactions while maintaining privacy and security standards. Conversation contexts are preserved appropriately for ongoing dialogues.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="hs-accordion card-interactive bg-white/80 backdrop-blur-sm dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+            <button class="hs-accordion-toggle w-full flex justify-between items-center p-4 text-left hover:bg-primary-50 dark:hover:bg-gray-700/50 transition-colors rounded-xl" id="hs-integration-2">
+              <div class="flex items-center space-x-4">
+                <div class="flex-shrink-0 w-12 h-12 bg-accent-100 dark:bg-accent-900/30 rounded-lg flex items-center justify-center">
+                  <i data-lucide="database" class="w-6 h-6 text-accent-600 dark:text-accent-400"></i>
+                </div>
+                <span class="font-semibold text-lg text-accent-700 dark:text-accent-300">Data Storage Integration</span>
+              </div>
+              <i data-lucide="chevron-down" class="hs-accordion-active:rotate-180 transition-transform duration-300 w-5 h-5 text-accent-600 dark:text-accent-400"></i>
+            </button>
+            <div id="hs-collapse-integration-2" class="hs-accordion-content hidden w-full overflow-hidden transition-[height] duration-300" aria-labelledby="hs-integration-2">
+              <div class="p-6 pt-0 space-y-4">
+                <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+                  Vector databases are integrated for efficient similarity search and retrieval-augmented generation (RAG) workflows. ChromaDB provides local storage options with flexible indexing strategies.
+                </p>
+                <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+                  Document loaders and parsers are configured to handle various file formats including PDFs, text documents, and structured data. This ensures comprehensive data ingestion capabilities.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="hs-accordion card-interactive bg-white/80 backdrop-blur-sm dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+            <button class="hs-accordion-toggle w-full flex justify-between items-center p-4 text-left hover:bg-primary-50 dark:hover:bg-gray-700/50 transition-colors rounded-xl" id="hs-integration-3">
+              <div class="flex items-center space-x-4">
+                <div class="flex-shrink-0 w-12 h-12 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
+                  <i data-lucide="zap" class="w-6 h-6 text-primary-600 dark:text-primary-400"></i>
+                </div>
+                <span class="font-semibold text-lg text-primary-700 dark:text-primary-300">Performance Optimization</span>
+              </div>
+              <i data-lucide="chevron-down" class="hs-accordion-active:rotate-180 transition-transform duration-300 w-5 h-5 text-primary-600 dark:text-primary-400"></i>
+            </button>
+            <div id="hs-collapse-integration-3" class="hs-accordion-content hidden w-full overflow-hidden transition-[height] duration-300" aria-labelledby="hs-integration-3">
+              <div class="p-6 pt-0 space-y-4">
+                <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+                  Performance optimization techniques include caching strategies, batch processing, and asynchronous operations. These optimizations reduce latency and improve user experience.
+                </p>
+                <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+                  Resource management ensures efficient memory usage and prevents bottlenecks during high-concurrency scenarios. Monitoring and logging provide insights into system performance.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Wiring Patterns Section -->
+    <section id="patterns" class="py-20 bg-white/80 dark:bg-gray-900" data-aos="fade-up">
+      <div class="max-w-6xl mx-auto px-6">
+        <h2 class="text-3xl font-bold mb-8 text-primary-700 dark:text-primary-300">
+          Wiring Patterns and Architecture
+        </h2>
+
+        <div class="space-y-6 mb-8">
+          <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+            The repository employs modern architectural patterns that facilitate scalable and maintainable software development. These patterns emphasize loose coupling, dependency injection, and event-driven communication.
+          </p>
+
+          <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+            Component wiring follows established best practices for connecting different layers of the application, from data access to presentation logic. This approach ensures modularity and testability.
+          </p>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-6 mb-8">
+          <div class="card-interactive p-6 bg-primary-50/50 dark:bg-primary-900/20 rounded-xl shadow-md">
+            <div class="flex items-center space-x-3 mb-4">
+              <div class="flex-shrink-0 w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
+                <i data-lucide="layers" class="w-5 h-5 text-primary-600 dark:text-primary-400"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-primary-700 dark:text-primary-300">Layered Architecture</h3>
+            </div>
+            <p class="text-sm text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+              Clear separation between presentation, business logic, and data access layers. Each layer communicates through well-defined interfaces and contracts.
+            </p>
+          </div>
+
+          <div class="card-interactive p-6 bg-accent-50/50 dark:bg-accent-900/20 rounded-xl shadow-md">
+            <div class="flex items-center space-x-3 mb-4">
+              <div class="flex-shrink-0 w-10 h-10 bg-accent-100 dark:bg-accent-900/30 rounded-lg flex items-center justify-center">
+                <i data-lucide="git-merge" class="w-5 h-5 text-accent-600 dark:text-accent-400"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-accent-700 dark:text-accent-300">Event-Driven Design</h3>
+            </div>
+            <p class="text-sm text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+              Event-based communication between components enables asynchronous processing and improved scalability. Events are published and consumed through message queues.
+            </p>
+          </div>
+
+          <div class="card-interactive p-6 bg-primary-50/50 dark:bg-primary-900/20 rounded-xl shadow-md">
+            <div class="flex items-center space-x-3 mb-4">
+              <div class="flex-shrink-0 w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
+                <i data-lucide="settings" class="w-5 h-5 text-primary-600 dark:text-primary-400"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-primary-700 dark:text-primary-300">Configuration Management</h3>
+            </div>
+            <p class="text-sm text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+              Centralized configuration management with environment-specific settings. Secrets are handled securely through encrypted storage and access controls.
+            </p>
+          </div>
+        </div>
+
+        <div class="pl-4 pr-3 py-3 border-l-4 border-primary-500 bg-primary-50/40 dark:bg-primary-900/30 rounded-r-lg mb-8">
+          <p class="text-sm font-medium text-primary-900 dark:text-primary-100 leading-relaxed" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+            <i data-lucide="trending-up" class="inline-block w-4 h-4 mr-1.5 -mt-0.5"></i>
+            Architectural Benefit: The modular architecture enables independent development and deployment of components, reducing risk and improving delivery velocity.
+          </p>
+        </div>
+
+        <div class="hs-accordion-group space-y-4">
+          <div class="hs-accordion card-interactive bg-white/80 backdrop-blur-sm dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+            <button class="hs-accordion-toggle w-full flex justify-between items-center p-4 text-left hover:bg-primary-50 dark:hover:bg-gray-700/50 transition-colors rounded-xl" id="hs-patterns-1">
+              <div class="flex items-center space-x-4">
+                <div class="flex-shrink-0 w-12 h-12 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
+                  <i data-lucide="workflow" class="w-6 h-6 text-primary-600 dark:text-primary-400"></i>
+                </div>
+                <span class="font-semibold text-lg text-primary-700 dark:text-primary-300">Workflow Orchestration</span>
+              </div>
+              <i data-lucide="chevron-down" class="hs-accordion-active:rotate-180 transition-transform duration-300 w-5 h-5 text-primary-600 dark:text-primary-400"></i>
+            </button>
+            <div id="hs-collapse-patterns-1" class="hs-accordion-content hidden w-full overflow-hidden transition-[height] duration-300" aria-labelledby="hs-patterns-1">
+              <div class="p-6 pt-0 space-y-4">
+                <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+                  Workflow orchestration is implemented using LangChain's chain composition patterns. Complex processes are broken down into smaller, composable steps that can be executed sequentially or in parallel.
+                </p>
+                <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+                  Error handling and retry mechanisms are built into the workflow engine, ensuring robust execution even when individual steps fail. State persistence enables recovery from interruptions.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="hs-accordion card-interactive bg-white/80 backdrop-blur-sm dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+            <button class="hs-accordion-toggle w-full flex justify-between items-center p-4 text-left hover:bg-primary-50 dark:hover:bg-gray-700/50 transition-colors rounded-xl" id="hs-patterns-2">
+              <div class="flex items-center space-x-4">
+                <div class="flex-shrink-0 w-12 h-12 bg-accent-100 dark:bg-accent-900/30 rounded-lg flex items-center justify-center">
+                  <i data-lucide="shield-check" class="w-6 h-6 text-accent-600 dark:text-accent-400"></i>
+                </div>
+                <span class="font-semibold text-lg text-accent-700 dark:text-accent-300">Security Patterns</span>
+              </div>
+              <i data-lucide="chevron-down" class="hs-accordion-active:rotate-180 transition-transform duration-300 w-5 h-5 text-accent-600 dark:text-accent-400"></i>
+            </button>
+            <div id="hs-collapse-patterns-2" class="hs-accordion-content hidden w-full overflow-hidden transition-[height] duration-300" aria-labelledby="hs-patterns-2">
+              <div class="p-6 pt-0 space-y-4">
+                <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+                  Security is implemented at multiple levels including authentication, authorization, encryption, and input validation. API keys and secrets are managed through secure vaults.
+                </p>
+                <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+                  Rate limiting and circuit breaker patterns protect against abuse and cascading failures. Audit logging tracks all sensitive operations for compliance purposes.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="hs-accordion card-interactive bg-white/80 backdrop-blur-sm dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+            <button class="hs-accordion-toggle w-full flex justify-between items-center p-4 text-left hover:bg-primary-50 dark:hover:bg-gray-700/50 transition-colors rounded-xl" id="hs-patterns-3">
+              <div class="flex items-center space-x-4">
+                <div class="flex-shrink-0 w-12 h-12 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
+                  <i data-lucide="monitor" class="w-6 h-6 text-primary-600 dark:text-primary-400"></i>
+                </div>
+                <span class="font-semibold text-lg text-primary-700 dark:text-primary-300">Monitoring and Observability</span>
+              </div>
+              <i data-lucide="chevron-down" class="hs-accordion-active:rotate-180 transition-transform duration-300 w-5 h-5 text-primary-600 dark:text-primary-400"></i>
+            </button>
+            <div id="hs-collapse-patterns-3" class="hs-accordion-content hidden w-full overflow-hidden transition-[height] duration-300" aria-labelledby="hs-patterns-3">
+              <div class="p-6 pt-0 space-y-4">
+                <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+                  Comprehensive monitoring includes application metrics, system health checks, and performance indicators. Dashboards provide real-time visibility into system status.
+                </p>
+                <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+                  Distributed tracing enables end-to-end request tracking across microservices. Logs are structured and searchable for efficient troubleshooting and debugging.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Extensibility Section -->
+    <section id="extensibility" class="py-20 bg-primary-50/50 dark:bg-gray-800" data-aos="fade-up">
+      <div class="max-w-6xl mx-auto px-6">
+        <h2 class="text-3xl font-bold mb-8 text-primary-700 dark:text-primary-300">
+          Extensibility Without CI
+        </h2>
+
+        <div class="space-y-6 mb-8">
+          <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+            The repository is designed to support extensibility without relying on continuous integration infrastructure. This approach enables rapid iteration and customization for different deployment scenarios.
+          </p>
+
+          <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+            Plugin architectures and modular interfaces allow new functionality to be added through configuration rather than code changes. This flexibility accommodates diverse use cases and requirements.
+          </p>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-8 items-start mb-8">
+          <div class="space-y-4">
+            <h3 class="text-xl font-semibold text-primary-700 dark:text-primary-300">Plugin System Design</h3>
+            
+            <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+              The plugin system utilizes entry points and dynamic loading mechanisms to register new components at runtime. This approach eliminates the need for rebuilds and redeployments when adding new features.
+            </p>
+
+            <div class="pl-4 pr-3 py-3 border-l-4 border-accent-500 bg-accent-50/40 dark:bg-accent-900/30 rounded-r-lg">
+              <p class="text-sm font-medium text-accent-900 dark:text-accent-100 leading-relaxed" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+                <i data-lucide="info" class="inline-block w-4 h-4 mr-1.5 -mt-0.5"></i>
+                Dynamic Loading: Plugins can be loaded from external directories without modifying core application code, enabling flexible extension points.
+              </p>
+            </div>
+          </div>
+
+          <div class="card-interactive p-6 bg-white/90 backdrop-blur-sm dark:bg-gray-800 rounded-xl shadow-md">
+            <h3 class="text-lg font-semibold mb-4 text-primary-700 dark:text-primary-300">Configuration-Driven Extensions</h3>
+            <ul class="space-y-3">
+              <li class="flex items-start space-x-3">
+                <i data-lucide="check" class="w-5 h-5 text-primary-600 dark:text-primary-400 flex-shrink-0 mt-0.5"></i>
+                <span class="text-sm text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">Custom data sources can be registered through configuration files</span>
+              </li>
+              <li class="flex items-start space-x-3">
+                <i data-lucide="check" class="w-5 h-5 text-primary-600 dark:text-primary-400 flex-shrink-0 mt-0.5"></i>
+                <span class="text-sm text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">New AI models can be integrated via model registry configuration</span>
+              </li>
+              <li class="flex items-start space-x-3">
+                <i data-lucide="check" class="w-5 h-5 text-primary-600 dark:text-primary-400 flex-shrink-0 mt-0.5"></i>
+                <span class="text-sm text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">Custom prompt templates can be loaded dynamically from external files</span>
+              </li>
+              <li class="flex items-start space-x-3">
+                <i data-lucide="check" class="w-5 h-5 text-primary-600 dark:text-primary-400 flex-shrink-0 mt-0.5"></i>
+                <span class="text-sm text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">Tool integrations can be enabled/disabled through feature flags</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="hs-accordion-group space-y-4">
+          <div class="hs-accordion card-interactive bg-white/80 backdrop-blur-sm dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+            <button class="hs-accordion-toggle w-full flex justify-between items-center p-4 text-left hover:bg-primary-50 dark:hover:bg-gray-700/50 transition-colors rounded-xl" id="hs-extensibility-1">
+              <div class="flex items-center space-x-4">
+                <div class="flex-shrink-0 w-12 h-12 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
+                  <i data-lucide="puzzle" class="w-6 h-6 text-primary-600 dark:text-primary-400"></i>
+                </div>
+                <span class="font-semibold text-lg text-primary-700 dark:text-primary-300">Custom Tool Integration</span>
+              </div>
+              <i data-lucide="chevron-down" class="hs-accordion-active:rotate-180 transition-transform duration-300 w-5 h-5 text-primary-600 dark:text-primary-400"></i>
+            </button>
+            <div id="hs-collapse-extensibility-1" class="hs-accordion-content hidden w-full overflow-hidden transition-[height] duration-300" aria-labelledby="hs-extensibility-1">
+              <div class="p-6 pt-0 space-y-4">
+                <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+                  Custom tools can be implemented and registered with the system without modifying core code. Tool schemas define input/output specifications and validation rules.
+                </p>
+                <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+                  Runtime binding allows tools to receive context-specific parameters such as user identifiers or session data. This enables personalized tool behavior without model control.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="hs-accordion card-interactive bg-white/80 backdrop-blur-sm dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+            <button class="hs-accordion-toggle w-full flex justify-between items-center p-4 text-left hover:bg-primary-50 dark:hover:bg-gray-700/50 transition-colors rounded-xl" id="hs-extensibility-2">
+              <div class="flex items-center space-x-4">
+                <div class="flex-shrink-0 w-12 h-12 bg-accent-100 dark:bg-accent-900/30 rounded-lg flex items-center justify-center">
+                  <i data-lucide="message-circle" class="w-6 h-6 text-accent-600 dark:text-accent-400"></i>
+                </div>
+                <span class="font-semibold text-lg text-accent-700 dark:text-accent-300">Conversation Memory Management</span>
+              </div>
+              <i data-lucide="chevron-down" class="hs-accordion-active:rotate-180 transition-transform duration-300 w-5 h-5 text-accent-600 dark:text-accent-400"></i>
+            </button>
+            <div id="hs-collapse-extensibility-2" class="hs-accordion-content hidden w-full overflow-hidden transition-[height] duration-300" aria-labelledby="hs-extensibility-2">
+              <div class="p-6 pt-0 space-y-4">
+                <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+                  Conversation memory components enable persistent dialogue history across sessions. Memory backends can be swapped without affecting core application logic.
+                </p>
+                <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+                  Message history management supports various storage options including in-memory, file-based, and database-backed implementations. This flexibility accommodates different performance requirements.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="hs-accordion card-interactive bg-white/80 backdrop-blur-sm dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+            <button class="hs-accordion-toggle w-full flex justify-between items-center p-4 text-left hover:bg-primary-50 dark:hover:bg-gray-700/50 transition-colors rounded-xl" id="hs-extensibility-3">
+              <div class="flex items-center space-x-4">
+                <div class="flex-shrink-0 w-12 h-12 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
+                  <i data-lucide="git-pull-request" class="w-6 h-6 text-primary-600 dark:text-primary-400"></i>
+                </div>
+                <span class="font-semibold text-lg text-primary-700 dark:text-primary-300">Model Customization</span>
+              </div>
+              <i data-lucide="chevron-down" class="hs-accordion-active:rotate-180 transition-transform duration-300 w-5 h-5 text-primary-600 dark:text-primary-400"></i>
+            </button>
+            <div id="hs-collapse-extensibility-3" class="hs-accordion-content hidden w-full overflow-hidden transition-[height] duration-300" aria-labelledby="hs-extensibility-3">
+              <div class="p-6 pt-0 space-y-4">
+                <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+                  Custom LLM implementations can be plugged into existing modules through standardized interfaces. This allows experimentation with different model architectures and providers.
+                </p>
+                <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+                  Prompt engineering capabilities enable fine-tuning of model behavior through template modifications. Custom prompts can be tested and deployed independently of code changes.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Conclusion Section -->
+    <section id="conclusion" class="py-20 bg-white/80 dark:bg-gray-900" data-aos="fade-up">
+      <div class="max-w-6xl mx-auto px-6">
+        <h2 class="text-3xl font-bold mb-8 text-primary-700 dark:text-primary-300">
+          Conclusion and Recommendations
+        </h2>
+
+        <div class="space-y-6 mb-8">
+          <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+            The Eco Restoration Shard repository demonstrates strong architectural foundations and integration capabilities suitable for AI-chat platform deployment. Its modular design, comprehensive dependency management, and extensibility patterns position it well for diverse use cases.
+          </p>
+
+          <p class="text-gray-700 dark:text-gray-300" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+            The repository's compatibility with Qwen and Perplexity integration requirements, combined with its CI-independent extensibility model, makes it an excellent foundation for building custom AI applications without infrastructure complexity.
+          </p>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-6 mb-8">
+          <div class="card-interactive p-6 bg-primary-50/50 dark:bg-primary-900/20 rounded-xl shadow-md">
+            <div class="flex items-center space-x-3 mb-4">
+              <div class="flex-shrink-0 w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
+                <i data-lucide="thumbs-up" class="w-5 h-5 text-primary-600 dark:text-primary-400"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-primary-700 dark:text-primary-300">Strengths</h3>
+            </div>
+            <ul class="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+              <li class="flex items-start space-x-2">
+                <i data-lucide="check" class="w-4 h-4 text-primary-600 dark:text-primary-400 flex-shrink-0 mt-0.5"></i>
+                <span data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">Modular architecture with clear separation of concerns</span>
+              </li>
+              <li class="flex items-start space-x-2">
+                <i data-lucide="check" class="w-4 h-4 text-primary-600 dark:text-primary-400 flex-shrink-0 mt-0.5"></i>
+                <span data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">Comprehensive integration with major AI frameworks</span>
+              </li>
+              <li class="flex items-start space-x-2">
+                <i data-lucide="check" class="w-4 h-4 text-primary-600 dark:text-primary-400 flex-shrink-0 mt-0.5"></i>
+                <span data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">Flexible plugin system without CI dependencies</span>
+              </li>
+              <li class="flex items-start space-x-2">
+                <i data-lucide="check" class="w-4 h-4 text-primary-600 dark:text-primary-400 flex-shrink-0 mt-0.5"></i>
+                <span data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">Robust error handling and monitoring capabilities</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="card-interactive p-6 bg-accent-50/50 dark:bg-accent-900/20 rounded-xl shadow-md">
+            <div class="flex items-center space-x-3 mb-4">
+              <div class="flex-shrink-0 w-10 h-10 bg-accent-100 dark:bg-accent-900/30 rounded-lg flex items-center justify-center">
+                <i data-lucide="lightbulb" class="w-5 h-5 text-accent-600 dark:text-accent-400"></i>
+              </div>
+              <h3 class="text-lg font-semibold text-accent-700 dark:text-accent-300">Recommendations</h3>
+            </div>
+            <ul class="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+              <li class="flex items-start space-x-2">
+                <i data-lucide="arrow-right" class="w-4 h-4 text-accent-600 dark:text-accent-400 flex-shrink-0 mt-0.5"></i>
+                <span data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">Enhance documentation with detailed API reference guides</span>
+              </li>
+              <li class="flex items-start space-x-2">
+                <i data-lucide="arrow-right" class="w-4 h-4 text-accent-600 dark:text-accent-400 flex-shrink-0 mt-0.5"></i>
+                <span data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">Implement additional security hardening measures</span>
+              </li>
+              <li class="flex items-start space-x-2">
+                <i data-lucide="arrow-right" class="w-4 h-4 text-accent-600 dark:text-accent-400 flex-shrink-0 mt-0.5"></i>
+                <span data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">Expand test coverage for edge cases and failure scenarios</span>
+              </li>
+              <li class="flex items-start space-x-2">
+                <i data-lucide="arrow-right" class="w-4 h-4 text-accent-600 dark:text-accent-400 flex-shrink-0 mt-0.5"></i>
+                <span data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">Add performance benchmarks and optimization guides</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="pl-4 pr-3 py-3 border-l-4 border-primary-500 bg-primary-50/40 dark:bg-primary-900/30 rounded-r-lg">
+          <p class="text-sm font-medium text-primary-900 dark:text-primary-100 leading-relaxed" data-ref="https://github.com/mk-bluebird/eco_restoration_shard|1">
+            <i data-lucide="rocket" class="inline-block w-4 h-4 mr-1.5 -mt-0.5"></i>
+            Final Assessment: The repository provides a solid foundation for AI-chat platform integration with excellent extensibility characteristics. With minor enhancements to documentation and security, it would be ready for production deployment across diverse environments.
+          </p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-primary-50/50 dark:bg-gray-900 border-t border-primary-500/20 dark:border-primary-600/20 py-8">
+    <div class="max-w-6xl mx-auto px-6 text-center">
+      <p class="text-sm text-gray-600 dark:text-gray-400">
+        © 2024 Eco Restoration Shard Repository Audit. Educational research content.
+      </p>
+      <p class="text-xs text-gray-500 dark:text-gray-500 mt-2">
+        All information sourced from referenced repositories and documentation.
+      </p>
+    </div>
+  </footer>
+
+  <!-- Initialize Libraries -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Initialize AOS
+      AOS.init({
+        duration: 800,
+        once: true,
+        offset: 100
+      });
+
+      // Initialize Lucide icons
+      lucide.createIcons();
+
+      // Initialize Preline components
+      setTimeout(() => {
+        HSStaticMethods.autoInit();
+      }, 100);
+
+      // Initialize citation system
+      initCitationSystem();
+
+      // Progress bar functionality
+      const progressBar = document.getElementById('progressBar');
+      
+      function updateProgressBar() {
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        const docHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+        const scrollPercent = (scrollTop / docHeight) * 100;
+        progressBar.style.width = scrollPercent + '%';
+      }
+
+      window.addEventListener('scroll', updateProgressBar);
+      updateProgressBar();
+    });
+  </script>
+</body>
+</html>
