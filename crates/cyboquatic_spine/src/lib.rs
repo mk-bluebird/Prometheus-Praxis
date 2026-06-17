@@ -53,6 +53,8 @@ pub struct WorkloadWindowEntry {
     pub mean_delta_vt: f64,
     pub mean_r_carbon: Option<f64>,
     pub mean_r_biodiv: Option<f64>,
+    pub mean_r_materials: Option<f64>,
+    pub mean_r_water: Option<f64>,
     pub accept_fraction: Option<f64>,
 }
 
@@ -71,7 +73,6 @@ pub struct SubstrateSummaryEntry {
     pub window_count: i64,
 }
 
-// Open read-only connection to SQLite DB.
 fn open_ro_db(db_path: &str) -> rusqlite::Result<Connection> {
     Connection::open_with_flags(
         Path::new(db_path),
@@ -79,17 +80,13 @@ fn open_ro_db(db_path: &str) -> rusqlite::Result<Connection> {
     )
 }
 
-// Convert C string pointer to Rust &str safely.
 unsafe fn cstr_to_str(ptr: *const c_char) -> Result<&'static str, &'static str> {
     if ptr.is_null() {
         return Err("null pointer");
     }
-    CStr::from_ptr(ptr)
-        .to_str()
-        .map_err(|_| "invalid UTF-8")
+    CStr::from_ptr(ptr).to_str().map_err(|_| "invalid UTF-8")
 }
 
-// Query KER-like substrate window for a single node (best window by highest K, lowest R).
 fn query_ker_for_node(conn: &Connection, node_id: &str) -> rusqlite::Result<KerTarget> {
     let mut stmt = conn.prepare(
         r#"
@@ -120,11 +117,7 @@ fn query_ker_for_node(conn: &Connection, node_id: &str) -> rusqlite::Result<KerT
     })
 }
 
-// Query blast-radius summary for a node from v_cybo_node_blastradius.
-fn query_blastradius_for_node(
-    conn: &Connection,
-    node_id: &str,
-) -> rusqlite::Result<Vec<BlastRadiusEntry>> {
+fn query_blastradius_for_node(conn: &Connection, node_id: &str) -> rusqlite::Result<Vec<BlastRadiusEntry>> {
     let mut stmt = conn.prepare(
         r#"
         SELECT
@@ -162,11 +155,7 @@ fn query_blastradius_for_node(
     Ok(out)
 }
 
-// Query workload windows for a node from v_cybo_workload_window.
-fn query_workload_windows_for_node(
-    conn: &Connection,
-    node_id: &str,
-) -> rusqlite::Result<Vec<WorkloadWindowEntry>> {
+fn query_workload_windows_for_node(conn: &Connection, node_id: &str) -> rusqlite::Result<Vec<WorkloadWindowEntry>> {
     let mut stmt = conn.prepare(
         r#"
         SELECT
@@ -184,6 +173,8 @@ fn query_workload_windows_for_node(
             mean_delta_vt,
             mean_r_carbon,
             mean_r_biodiv,
+            mean_r_materials,
+            mean_r_water,
             accept_fraction
         FROM v_cybo_workload_window
         WHERE node_id = ?1
@@ -207,7 +198,9 @@ fn query_workload_windows_for_node(
             mean_delta_vt: row.get(11)?,
             mean_r_carbon: row.get(12).ok(),
             mean_r_biodiv: row.get(13).ok(),
-            accept_fraction: row.get(14).ok(),
+            mean_r_materials: row.get(14).ok(),
+            mean_r_water: row.get(15).ok(),
+            accept_fraction: row.get(16).ok(),
         })
     })?;
 
@@ -218,11 +211,7 @@ fn query_workload_windows_for_node(
     Ok(out)
 }
 
-// Query biodegradable substrate summary for all materials at a node.
-fn query_substrate_summary_for_node(
-    conn: &Connection,
-    node_id: &str,
-) -> rusqlite::Result<Vec<SubstrateSummaryEntry>> {
+fn query_substrate_summary_for_node(conn: &Connection, node_id: &str) -> rusqlite::Result<Vec<SubstrateSummaryEntry>> {
     let mut stmt = conn.prepare(
         r#"
         SELECT
@@ -266,7 +255,6 @@ fn query_substrate_summary_for_node(
     Ok(out)
 }
 
-// Serialize a value to JSON and hand it out as a C string pointer.
 fn to_json_c_string<T: Serialize>(val: &T) -> *mut c_char {
     match serde_json::to_string(val) {
         Ok(json) => match CString::new(json) {
@@ -277,7 +265,6 @@ fn to_json_c_string<T: Serialize>(val: &T) -> *mut c_char {
     }
 }
 
-// Serialize an error message to JSON.
 fn error_json(msg: &str) -> *mut c_char {
     #[derive(Serialize)]
     struct ErrWrap<'a> {
@@ -286,7 +273,6 @@ fn error_json(msg: &str) -> *mut c_char {
     to_json_c_string(&ErrWrap { error: msg })
 }
 
-// C ABI: get KER-like target for a node.
 #[no_mangle]
 pub unsafe extern "C" fn cybo_get_ker_for_node(
     db_path: *const c_char,
@@ -310,7 +296,6 @@ pub unsafe extern "C" fn cybo_get_ker_for_node(
     }
 }
 
-// C ABI: get blast-radius summary for a node.
 #[no_mangle]
 pub unsafe extern "C" fn cybo_get_blastradius_for_node(
     db_path: *const c_char,
@@ -334,7 +319,6 @@ pub unsafe extern "C" fn cybo_get_blastradius_for_node(
     }
 }
 
-// C ABI: get workload windows for a node.
 #[no_mangle]
 pub unsafe extern "C" fn cybo_get_workload_windows_for_node(
     db_path: *const c_char,
@@ -358,7 +342,6 @@ pub unsafe extern "C" fn cybo_get_workload_windows_for_node(
     }
 }
 
-// C ABI: get biodegradable substrate summary for a node.
 #[no_mangle]
 pub unsafe extern "C" fn cybo_get_substrate_summary_for_node(
     db_path: *const c_char,
@@ -382,7 +365,6 @@ pub unsafe extern "C" fn cybo_get_substrate_summary_for_node(
     }
 }
 
-// C ABI: free JSON strings returned by this library.
 #[no_mangle]
 pub unsafe extern "C" fn cybo_free_json(ptr: *mut c_char) {
     if ptr.is_null() {
