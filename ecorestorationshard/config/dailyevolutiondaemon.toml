@@ -1,0 +1,35 @@
+# FILE: ecorestorationshard/config/dailyevolutiondaemon.toml
+# DESTINATION: ecorestorationshard/config/dailyevolutiondaemon.toml
+# REPO-TARGET: github.com/mk-bluebird/eco_restoration_shard
+
+[daemon]
+name = "daily_evolution_daemon"
+region = "Phoenix-AZ-US"
+planecontractid = "KERCORE2026V1"
+
+[ratelimits.global]
+maxevolutionwindowsperday = 64
+maxpromotionsperday = 8
+maxhealthcarecoursesperday = 16
+maxrohevaluationsperday = 256
+
+[ratelimits.lanegovernance]
+maxlanedecisionsperday = 128
+maxevidencewindowsperkernel = 4
+
+[ratelimits.placement]
+maxplacementverdictsperday = 64
+
+[ratelimits.mt6883]
+maxdetoxepisodespercitizen = 3
+maxcourseupdatespercitizen = 6
+
+[guards]
+rohceiling = 0.3
+minknowledgefactor = 0.8
+minecoimpact = 0.7
+maxrtopology = 0.4
+
+[logging]
+logpath = "logs/dailyevolutiondaemon.log"
+loglevel = "info"
