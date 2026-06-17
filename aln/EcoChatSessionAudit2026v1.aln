@@ -1,0 +1,72 @@
+# filename: aln/EcoChatSessionAudit2026v1.aln
+# category: GOVERNANCE / AUDIT
+
+PARTICLE EcoChatSessionAudit2026v1
+ROLE GOVERNANCE
+CATEGORY AUDIT
+VERSIONTAG 2026v1
+
+FIELDS
+    # Session identity
+    session_id              string      # stable UUID for chat session
+    stewarddid              string      # Bostrom DID, or pseudo-DID for anonymous
+    client_id               string      # logical client or app id
+    region                  string      # e.g. "Phoenix-AZ-US"
+    lane                    string      # RESEARCH | EXPPROD | PROD | GOV
+
+    # Time bounds
+    session_start_utc       datetime
+    session_end_utc         datetime
+
+    # Model and kernel context
+    model_id                string      # e.g. "ecochat-ker-2026v1"
+    kfk_kernelid            string      # "KnowledgeFactorKernel2026v1"
+    ecosafety_kernelid      string      # e.g. "EcosafetyGrammarCore2026v1"
+    planecontractid         string      # e.g. "PlaneWeightsShard2026v1"
+    corridorsetid           string      # e.g. "ecosafety.corridors.v2"
+
+    # Conversation content
+    # Canonical JSON, UTF-8, deterministic field order:
+    # [
+    #   {"role":"user","content":"...","tool_name":null,"tool_call_id":null},
+    #   {"role":"assistant","content":"...","tool_name":null,"tool_call_id":null},
+    #   {"role":"assistant","content":"","tool_name":"ecowealth.query","tool_call_id":"call-1"},
+    #   {"role":"tool","content":"{\"status\":\"ok\",...}","tool_name":"ecowealth.query","tool_call_id":"call-1"}
+    # ]
+    messages_json           string
+
+    # Tool calls summary
+    tool_call_count         uint64
+    tool_names_csv          string      # comma-separated distinct tool names
+    tools_json              string      # JSON array of tool call descriptors
+
+    # KFK evaluations (per-session aggregate)
+    kfk_eval_count          uint64
+    kfk_kmin                f64         0.0..1.0
+    kfk_kmax                f64         0.0..1.0
+    kfk_kmean               f64         0.0..1.0
+
+    # ERSI logging references
+    ersi_db_path            string      # logical path to ERSI SQLite DB
+    ersi_row_ids_csv        string      # comma-separated row ids or primary keys
+    ersi_rows_hashhex       string      # hex hash over canonical ERSI row subset
+
+    # Energy and cost accounting
+    compute_joules          f64         0.0..10000.0
+    sqlite_joules           f64         0.0..1000.0
+    total_tokens_prompt     uint64
+    total_tokens_completion uint64
+
+    # Safety surfaces snapshot (optional, for T03)
+    kmean_window            f64         0.0..1.0
+    emean_window            f64         0.0..1.0
+    rmean_window            f64         0.0..1.0
+    vtmax_window            f64         0.0..
+    kerdeployable_flag      uint8       # 0 | 1
+
+    # Evidence and provenance
+    evidencehex             string      # hex over messages_json + tools_json + KFK + ERSI refs
+    rohanchorhex            string      # optional RoH anchor for this session
+    signingdid              string      # Bostrom DID that signed the audit shard
+    createdutc              datetime
+END
