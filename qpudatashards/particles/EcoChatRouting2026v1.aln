@@ -1,0 +1,91 @@
+alnversion 1.0
+schema econet.ecochat.routing
+
+TITLE EcoChat Routing Manifest for EcoNet Shards
+
+projectid EcoNet-EcoChat-2026
+region Phoenix-AZ
+basins Gila, CAP-Canal, Lake-Pleasant
+kernelversion KER-2026-03
+rohtarget 0.13
+ecoimpacttarget 0.90
+knowledgetarget 0.93
+hexstamp 0xa3f5c7e9b1d20468c7e4a9d2b5f81357
+
+TITLE LLM Provider Configuration
+
+llm-default qwen
+llm-provider qwen
+  api_base_env QWEN_API_BASE
+  api_key_env QWEN_API_KEY
+  model_name Qwen/Qwen3-8B-Instruct
+  max_tokens 2048
+  temperature 0.7
+endllm-provider
+
+llm-provider perplexity
+  api_base_env PERPLEXITY_API_BASE
+  api_key_env PERPLEXITY_API_KEY
+  endpoint_path /v1/chat/completions
+  role tool
+endllm-provider
+
+TITLE Eco Shard Bindings
+
+shard-binding central_az_karma
+  filepath qpudatashards/particles/EcoNetCentralAZKarmaWindowTemplate.csv
+  schema econet.karma.window.centralaz
+  required_columns nodeid,stakeholderid,contaminant,cin,cout,flow,windowstart,windowend,cref,hazardweight,kn,ecoimpactscore,unitsC,unitsQ
+  evidencehex 0x1234567890abcdef
+endshard-binding
+
+shard-binding karma_tolerance
+  filepath qpudatashards/particles/EcoKarmaToleranceMetrics2026v1.csv
+  schema econet.karma.tolerance.metrics
+  required_columns identityid,identitytype,region,ecoimpactscore,contributionscore,securitytrustscore,currentkarma,karmatolerancelevel,maxintrusionresponselevel
+  evidencehex 0x1a2b3c4d5e6f7890
+endshard-binding
+
+TITLE Tool Registration Rules
+
+tool eco_compute_kn
+  implementation C++
+  library EcoNetKarmaCore
+  header EcoNetKarmaCore.hpp
+  function compute_kn_window
+  input_shard central_az_karma
+  output_field kn
+  ecoimpactscore_field ecoimpactscore
+  ecoimpactmin 0.80
+  ecoimpactmax 1.00
+endtool
+
+tool eco_karmatolerance_eval
+  implementation C++
+  library EcoKarmaToleranceCore
+  header KarmaPolicy.hpp
+  function evaluateKarmaTolerance
+  input_shard karma_tolerance
+  max_intrusion_response_level LOW
+  guard_rule no_lockout_for_high_karma
+endtool
+
+tool eco_perplexity_search
+  implementation HTTP
+  provider perplexity
+  route_type retrieval
+  description "Ground answers in live eco and regulatory data."
+endtool
+
+TITLE Routing Policies
+
+route chat_default
+  description "Eco-safe chat route for Central AZ water and waste topics."
+  llm qwen
+  tools eco_compute_kn, eco_karmatolerance_eval
+  retrieval_tool eco_perplexity_search
+  corridor_rule corridorpresent
+  safestep_rule Vt+1 <= Vt
+endroute
+
+END
