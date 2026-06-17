@@ -1,0 +1,3 @@
+repotarget,filename,destination,roleplane
+eco_restoration_shard,db_econet_centralaz_tools.sql,eco_restoration_shard/sql/shards/db_econet_centralaz_tools.sql,kerresidual
+eco_restoration_shard,dbfileindex_centralaz_tools_2026v1.csv,eco_restoration_shard/sql/dbfileindex_centralaz_tools_2026v1.csv,spine
