@@ -1,0 +1,28 @@
+[package]
+name = "ker-score-lab"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+authors = ["bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"]
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+description = "Synthetic KER lab: fixture replay, scoring, and corridor-band gate for merge checks."
+publish = false
+
+[lib]
+name = "ker_score_lab"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ker_score_replay"
+path = "src/bin/ker_score_replay.rs"
+
+[dependencies]
+serde      = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror  = "1.0"
+rusqlite   = { version = "0.31", features = ["bundled"] }
+chrono     = { version = "0.4", features = ["serde"] }
+
+kerdeployable    = { path = "../kerdeployable" }
+ecoresponseshard = { path = "../ecoresponseshard" }
