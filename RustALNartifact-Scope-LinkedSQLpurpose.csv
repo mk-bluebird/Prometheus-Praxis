@@ -1,0 +1,7 @@
+"Rust / ALN artifact","Scope","Linked SQL / purpose"
+"kerresidual crate (design)","Shared math spine: RiskVector, PlaneWeights, KerSnapshot, compute_residual","Mirrors vshardresidual/vshardtopologyker logic in Rust; must be canonical for all clients.ca84dd50-843f-426e-af63-dc4114a1b917.md"
+"EcoWealthKernel2026v1.aln","KER → EcoWealth kernel","Stores lane‑specific exponents (alpha, beta, gamma), non‑offsettable plane ids, sensitivity bounds, CEIM coefficient ids; referenced by EcoUnit.ca84dd50-843f-426e-af63-dc4114a1b917.md"
+"StewardEcoWealthStatement2026v1.aln","Portfolio statement, QPUDATASHARD","Schema for EcoWealth statement table, mapping to SQL StewardEcoWealthStatement, carrying KER aggregates, representation, diversity, education, trust discounts, evidencehex, hashes.ca84dd50-843f-426e-af63-dc4114a1b917.md"
+"EcoNetStakeTerminalBatch2026Q2Phoenix.aln","Stake batch QPU data shard","Mirrors econetstaketerminalbatch2026q2phx table and daily/ker‑window views; used for eco‑reward CI.ca84dd50-843f-426e-af63-dc4114a1b917.md"
+"econetgovernancespine crate","Governance spine Rust client","Exposes typed accessors for vresidualkernel, vplaneweights, vshardblast, vlanestatuslatest, vstewardecowealthlatest, vcyboquaticecoperjoule, etc.07dd115e-91e6-4373-96d5-63fb31f27654.md"
+"econetgovernanceguards crate","Guards and harnesses","Implements e.g. Mt6883Guard, checks K/E/R thresholds, blast radius, non‑offsettable weights, etc., using spine data.07dd115e-91e6-4373-96d5-63fb31f27654.md"
