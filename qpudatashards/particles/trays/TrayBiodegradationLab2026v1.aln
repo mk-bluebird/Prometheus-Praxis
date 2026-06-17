@@ -1,0 +1,23 @@
+-- filename: trays/TrayBiodegradationLab2026v1.aln
+-- destination: qpudatashards/particles
+
+PARTICLE TrayBiodegradationLab2026v1
+ROLE     LAB_DATA
+CATEGORY BIODEG_TRAY
+VERSIONTAG 2026v1
+
+TITLE Tray biodegradation and toxicity lab results
+DESCRIPTION
+  Lab-calibrated biodegradation kinetics and toxicity for tray materials.
+
+FIELDS
+  material_id    string  -- recipe/batch identifier
+  matrix         string  -- soil, compost, Phoenix-water, etc.
+  temperature_c  f64
+  t90_days       f64     -- time to 90% mass loss
+  rtox           f64     -- normalized toxicity coordinate [0,1]
+  rmicro         f64     -- normalized micro-residue risk [0,1]
+  evidence_hex   string
+  signing_did    string
+  created_utc    datetime
+END
