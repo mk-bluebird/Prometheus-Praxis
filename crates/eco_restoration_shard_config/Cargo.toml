@@ -1,0 +1,27 @@
+# filename: eco_restoration_shard_config/Cargo.toml (updated to include binary)
+
+[package]
+name = "eco_restoration_shard_config"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+description = "Non-actuating configuration loader for eco_restoration_shard, with DID-bound validation and machine-readable error reports."
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+readme = "README.md"
+keywords = ["ecosafety", "config", "serde", "yaml", "non-actuating"]
+categories = ["config"]
+
+[lib]
+name = "eco_restoration_shard_config"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[[bin]]
+name = "eco_config_report"
+path = "src/bin/print_config_report.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+thiserror = "1"
+serde_json = "1"
