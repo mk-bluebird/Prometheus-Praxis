@@ -1,0 +1,11 @@
+# Filename: crates/cyboquatic_benchmark_tool/Cargo.toml
+# Destination: crates/cyboquatic_benchmark_tool/Cargo.toml
+
+[package]
+name = "cyboquatic_benchmark_tool"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+econet_governance_spine = { path = "../econet_governance_spine" }
+rusqlite = { version = "0.31", features = ["bundled"] }
