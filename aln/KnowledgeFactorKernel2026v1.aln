@@ -1,0 +1,82 @@
+# filename: aln/KnowledgeFactorKernel2026v1.aln
+# destination: ecorestorationshard/aln/KnowledgeFactorKernel2026v1.aln
+
+PARTICLE KnowledgeFactorKernel2026v1
+ROLE GOVERNANCE
+CATEGORY ECOSAFETY
+VERSIONTAG 2026v1
+
+FIELDS
+    kernelid                string      # "KnowledgeFactorKernel2026v1"
+    description             string      # Human-readable description
+    kmin                    f64         0.0..1.0   # floor for K
+    kmax                    f64         0.0..1.0   # ceiling for K, <= 1.0
+    w_evidence_count        f64         0.0..10.0  # weight for evidence_count
+    w_independent_sources   f64         0.0..10.0  # weight for independent_sources
+    w_peer_reviewed         f64         0.0..10.0  # weight for peer_reviewed_fraction
+    w_sensor_trust          f64         0.0..10.0  # weight for sensor_trust_score
+    w_residual_docs         f64         0.0..10.0  # weight for documentation_residual
+    w_code_audit            f64         0.0..10.0  # weight for code_audit_coverage
+    w_aln_coverage          f64         0.0..10.0  # weight for aln_spec_coverage
+    w_conflict_history      f64         -10.0..0.0 # penalty weight for conflict_history
+    w_incident_history      f64         -10.0..0.0 # penalty weight for incident_history
+    bias                    f64         -5.0..5.0  # intercept term
+
+    # Normalization parameters for each input feature
+    evidence_count_min      f64         0.0..1e6
+    evidence_count_max      f64         1.0..1e9
+    independent_min         f64         0.0..1000.0
+    independent_max         f64         1.0..10000.0
+    peer_reviewed_min       f64         0.0..1.0
+    peer_reviewed_max       f64         0.0..1.0
+    sensor_trust_min        f64         0.0..1.0
+    sensor_trust_max        f64         0.0..1.0
+    residual_docs_min       f64         0.0..1.0
+    residual_docs_max       f64         0.0..1.0
+    code_audit_min          f64         0.0..1.0
+    code_audit_max          f64         0.0..1.0
+    aln_coverage_min        f64         0.0..1.0
+    aln_coverage_max        f64         0.0..1.0
+    conflict_history_min    f64         0.0..1.0
+    conflict_history_max    f64         0.0..1.0
+    incident_history_min    f64         0.0..1.0
+    incident_history_max    f64         0.0..1.0
+
+    # Evidence and provenance
+    evidencehex             string      # hex hash over canonical JSON of inputs
+    kernelhash              string      # hex hash of this ALN artifact
+    signingdid              string      # e.g. bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+    createdutc              datetime
+    updatedutc              datetime
+END
+
+# Strictly evidential input features (all raw values are serialized before normalization):
+#
+#   - evidence_count:            u64     # number of distinct evidence shards (papers, datasets)
+#   - independent_sources:       u64     # count of independent organizations contributing evidence
+#   - peer_reviewed_fraction:    f64     # fraction of evidence_count that is peer-reviewed
+#   - sensor_trust_score:        f64     # 0..1 aggregate from SensorTrustPlane2026v1
+#   - documentation_residual:    f64     # 0..1 coverage of residual/grammar docs vs required set
+#   - code_audit_coverage:       f64     # 0..1 fraction of codebase covered by formal audits
+#   - aln_spec_coverage:         f64     # 0..1 fraction of active kernels with ALN mirror
+#   - conflict_history:          f64     # 0..1 normalized count of resolved conflicts/incidents
+#   - incident_history:          f64     # 0..1 normalized severity score of safety incidents
+#
+# Canonical evidence serialization:
+#
+#   - Define a JSON object with fields in the exact order:
+#       {
+#         "kernelid": "...",
+#         "evidence_count": ...,
+#         "independent_sources": ...,
+#         "peer_reviewed_fraction": ...,
+#         "sensor_trust_score": ...,
+#         "documentation_residual": ...,
+#         "code_audit_coverage": ...,
+#         "aln_spec_coverage": ...,
+#         "conflict_history": ...,
+#         "incident_history": ...
+#       }
+#   - All numbers encoded as JSON numbers, no extra fields, UTF-8.
+#   - Serialize using a deterministic JSON encoder (no spacing, sorted keys not allowed; rely on this fixed field order).
+#   - Compute evidencehex as a hex-encoded hash over the UTF-8 bytes of this JSON object.
