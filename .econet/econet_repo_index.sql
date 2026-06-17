@@ -1,33 +1,47 @@
 -- filename: .econet/econet_repo_index.sql
 -- destination: eco_restoration_shard/.econet/econet_repo_index.sql
--- Purpose:
---   Master index SQL-shard for EcoNet constellation repos.
---   Guides AI and coding agents on repo roles, layers, and ecosafety invariants.
+-- repo: github.com/mk-bluebird/eco_restoration_shard
 
 PRAGMA foreign_keys = ON;
 
 -------------------------------------------------------------------------------
--- 1. Canonical per-repo index (normalized, enriched version)
+-- 1. Canonical per-repo index (normalized, DID-anchored)
 -------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS econet_repo_index (
-    repo_name           TEXT PRIMARY KEY,
-    github_slug         TEXT NOT NULL,
-    role_band           TEXT NOT NULL,  -- SPINE, RESEARCH, ENGINE, MATERIAL, GOV, APP
-    visibility          TEXT NOT NULL,  -- Public, Private
-    language_primary    TEXT NOT NULL,
+    index_id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    repo_name           TEXT    NOT NULL,
+    github_slug         TEXT    NOT NULL,
+    github_url          TEXT    NOT NULL,
+    owner_did           TEXT    NOT NULL,
+    role_band           TEXT    NOT NULL,  -- SPINE, RESEARCH, ENGINE, MATERIAL, GOV, APP
+    visibility          TEXT    NOT NULL,  -- Public, Private
+    language_primary    TEXT    NOT NULL,
     description         TEXT,
-    ecosafety_binding   TEXT NOT NULL,  -- e.g. cyboquatic-ecosafety-coreEcosafetyGrammar2026v1.aln
-    shard_protocol      TEXT NOT NULL,  -- e.g. ALN-RFC4180EcoNetSchemaShard2026v1
-    lane_default        TEXT NOT NULL,  -- RESEARCH, EXPPROD, PROD
-    ker_target_k        REAL NOT NULL CHECK (ker_target_k BETWEEN 0.0 AND 1.0 AND ker_target_k >= 0.90),
-    ker_target_e        REAL NOT NULL CHECK (ker_target_e BETWEEN 0.0 AND 1.0 AND ker_target_e >= 0.85),
-    ker_target_r        REAL NOT NULL CHECK (ker_target_r BETWEEN 0.0 AND 1.0 AND ker_target_r <= 0.20),
+    ecosafety_binding   TEXT    NOT NULL,  -- e.g. ecosafety.corridors.v2
+    shard_protocol      TEXT    NOT NULL,  -- e.g. EcoNetSchemaShard2026v1
+    lane_default        TEXT    NOT NULL,  -- RESEARCH, EXPPROD, PROD
+    ker_target_k        REAL    NOT NULL,
+    ker_target_e        REAL    NOT NULL,
+    ker_target_r        REAL    NOT NULL,
+    roh_ceiling         REAL    NOT NULL,
     non_actuating_only  INTEGER NOT NULL CHECK (non_actuating_only IN (0,1)),
+    rust_edition        TEXT    NOT NULL,
+    rust_version_min    TEXT    NOT NULL,
+    region              TEXT    NOT NULL,
     manifest_schema_ver INTEGER NOT NULL DEFAULT 1,
+    version_seq         INTEGER NOT NULL DEFAULT 1,
     did_owner           TEXT,
     signing_did         TEXT,
-    evidence_hex        TEXT
+    evidence_hex        TEXT,
+    created_utc         TEXT    NOT NULL,
+    CHECK (ker_target_k BETWEEN 0.0 AND 1.0 AND ker_target_k >= 0.90),
+    CHECK (ker_target_e BETWEEN 0.0 AND 1.0 AND ker_target_e >= 0.85),
+    CHECK (ker_target_r BETWEEN 0.0 AND 1.0 AND ker_target_r <= 0.20),
+    CHECK (roh_ceiling   >= 0.0 AND roh_ceiling   <= 1.0)
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_econet_repo_index_name_ver
+    ON econet_repo_index (repo_name, version_seq);
 
 CREATE INDEX IF NOT EXISTS idx_econet_repo_index_roleband
     ON econet_repo_index (role_band, visibility);
@@ -36,16 +50,67 @@ CREATE INDEX IF NOT EXISTS idx_econet_repo_index_visibility
     ON econet_repo_index (visibility);
 
 -------------------------------------------------------------------------------
+-- 1.a Lint view for manifest violations (used by econet_repo_manifest_lint)
+-------------------------------------------------------------------------------
+CREATE VIEW IF NOT EXISTS vw_repo_manifest_violations AS
+SELECT
+    index_id,
+    repo_name,
+    'ker_target_k below 0.90' AS violation
+FROM econet_repo_index
+WHERE ker_target_k < 0.90
+UNION ALL
+SELECT
+    index_id,
+    repo_name,
+    'ker_target_e below 0.85'
+FROM econet_repo_index
+WHERE ker_target_e < 0.85
+UNION ALL
+SELECT
+    index_id,
+    repo_name,
+    'ker_target_r above 0.20'
+FROM econet_repo_index
+WHERE ker_target_r > 0.20
+UNION ALL
+SELECT
+    index_id,
+    repo_name,
+    'roh_ceiling above 0.30'
+FROM econet_repo_index
+WHERE roh_ceiling > 0.30
+UNION ALL
+SELECT
+    index_id,
+    repo_name,
+    'non_actuating_only is 0 for RESEARCH repo'
+FROM econet_repo_index
+WHERE role_band = 'RESEARCH'
+  AND non_actuating_only = 0
+UNION ALL
+SELECT
+    index_id,
+    repo_name,
+    'role_band is not RESEARCH for eco_restoration_shard'
+FROM econet_repo_index
+WHERE repo_name = 'eco_restoration_shard'
+  AND role_band != 'RESEARCH';
+
+-------------------------------------------------------------------------------
 -- 2. Per-repo programming layers
 -------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS econet_layer (
     layer_id    INTEGER PRIMARY KEY AUTOINCREMENT,
-    repo_name   TEXT NOT NULL REFERENCES econet_repo_index(repo_name) ON DELETE CASCADE,
+    repo_name   TEXT NOT NULL,
     layer_name  TEXT NOT NULL,
     layer_tier  TEXT NOT NULL,  -- GRAMMAR, KERNEL, EDGESCRIPT, UI, GOVERNANCE, MATERIAL, OTHER
     languages   TEXT NOT NULL,  -- comma-separated list
     description TEXT,
-    contracts   TEXT
+    contracts   TEXT,
+    FOREIGN KEY (repo_name)
+        REFERENCES econet_repo_index(repo_name)
+        ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_econet_layer_repo
@@ -59,9 +124,12 @@ CREATE INDEX IF NOT EXISTS idx_econet_layer_tier
 -------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS econet_role_hint (
     hint_id   INTEGER PRIMARY KEY AUTOINCREMENT,
-    repo_name TEXT NOT NULL REFERENCES econet_repo_index(repo_name) ON DELETE CASCADE,
+    repo_name TEXT NOT NULL,
     hint_key  TEXT NOT NULL,
-    hint_val  TEXT NOT NULL
+    hint_val  TEXT NOT NULL,
+    FOREIGN KEY (repo_name)
+        REFERENCES econet_repo_index(repo_name)
+        ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_econet_role_hint_repo
@@ -73,6 +141,8 @@ CREATE INDEX IF NOT EXISTS idx_econet_role_hint_repo
 INSERT OR REPLACE INTO econet_repo_index (
     repo_name,
     github_slug,
+    github_url,
+    owner_did,
     role_band,
     visibility,
     language_primary,
@@ -83,14 +153,22 @@ INSERT OR REPLACE INTO econet_repo_index (
     ker_target_k,
     ker_target_e,
     ker_target_r,
+    roh_ceiling,
     non_actuating_only,
+    rust_edition,
+    rust_version_min,
+    region,
     manifest_schema_ver,
+    version_seq,
     did_owner,
     signing_did,
-    evidence_hex
+    evidence_hex,
+    created_utc
 ) VALUES (
     'eco_restoration_shard',
     'mk-bluebird/eco_restoration_shard',
+    'https://github.com/mk-bluebird/eco_restoration_shard',
+    'bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7',
     'RESEARCH',
     'Public',
     'Rust',
@@ -101,11 +179,17 @@ INSERT OR REPLACE INTO econet_repo_index (
     0.94,
     0.90,
     0.12,
+    0.30,
+    1,
+    '2024',
+    '1.85',
+    'Phoenix-AZ-US',
     1,
     1,
     'bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7',
     NULL,
-    NULL
+    '0xECOREPOINDEX2026V1_bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7',
+    strftime('%Y-%m-%dT%H:%M:%SZ','now')
 );
 
 DELETE FROM econet_layer
@@ -176,6 +260,8 @@ INSERT INTO econet_role_hint (repo_name, hint_key, hint_val) VALUES
 INSERT OR REPLACE INTO econet_repo_index (
     repo_name,
     github_slug,
+    github_url,
+    owner_did,
     role_band,
     visibility,
     language_primary,
@@ -186,14 +272,22 @@ INSERT OR REPLACE INTO econet_repo_index (
     ker_target_k,
     ker_target_e,
     ker_target_r,
+    roh_ceiling,
     non_actuating_only,
+    rust_edition,
+    rust_version_min,
+    region,
     manifest_schema_ver,
+    version_seq,
     did_owner,
     signing_did,
-    evidence_hex
+    evidence_hex,
+    created_utc
 ) VALUES (
     'EcoNet-CEIM-PhoenixWater',
     'mk-bluebird/EcoNet-CEIM-PhoenixWater',
+    'https://github.com/mk-bluebird/EcoNet-CEIM-PhoenixWater',
+    'bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7',
     'ENGINE',
     'Public',
     'Rust',
@@ -204,11 +298,17 @@ INSERT OR REPLACE INTO econet_repo_index (
     0.94,
     0.90,
     0.13,
+    0.30,
     0,
+    '2024',
+    '1.85',
+    'Phoenix-AZ-US',
+    1,
     1,
     'bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7',
     NULL,
-    NULL
+    NULL,
+    strftime('%Y-%m-%dT%H:%M:%SZ','now')
 );
 
 DELETE FROM econet_layer
@@ -248,16 +348,16 @@ WHERE repo_name = 'EcoNet-CEIM-PhoenixWater';
 INSERT INTO econet_role_hint (repo_name, hint_key, hint_val) VALUES
     (
         'EcoNet-CEIM-PhoenixWater',
-        'shardtypes',
+        'shard_types',
         'HydrologicalBufferShard,PhoenixMarShard,FOGRoutingDecision'
     ),
     (
         'EcoNet-CEIM-PhoenixWater',
-        'primaryplane',
+        'primary_plane',
         'hydraulics'
     ),
     (
         'EcoNet-CEIM-PhoenixWater',
-        'pilotdomains',
+        'pilot_domains',
         'Phoenix-AZ;Gila River;Lake Pleasant PFBS'
     );
