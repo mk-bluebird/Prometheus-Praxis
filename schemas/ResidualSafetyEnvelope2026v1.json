@@ -1,0 +1,126 @@
+{
+  "$id": "https://ecosafety.eco/schemas/ResidualSafetyEnvelope2026v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ResidualSafetyEnvelope2026v1",
+  "type": "object",
+  "required": [
+    "envelope_id",
+    "planecontractid",
+    "kernelid",
+    "planes",
+    "invariant"
+  ],
+  "properties": {
+    "envelope_id": {
+      "type": "string",
+      "description": "Stable identifier, e.g. 'ResidualSafetyEnvelope2026v1-Phoenix'"
+    },
+    "planecontractid": {
+      "type": "string",
+      "description": "Reference to PlaneWeightsShard contract id, e.g. 'PlaneWeightsShard2026v1'"
+    },
+    "kernelid": {
+      "type": "string",
+      "description": "Residual kernel id, e.g. 'ecosafety.Vt.core2026v1'"
+    },
+    "planes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "planecode",
+          "coordid",
+          "weight",
+          "nonoffsettable",
+          "soft_band",
+          "hard_band"
+        ],
+        "properties": {
+          "planecode": {
+            "type": "string",
+            "description": "Plane code, e.g. 'CARBON', 'BIODIVERSITY', 'TOPOLOGY'"
+          },
+          "coordid": {
+            "type": "string",
+            "description": "corridorvar or residualterm coord id"
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0.0,
+            "description": "Non-negative Lyapunov weight w_j"
+          },
+          "nonoffsettable": {
+            "type": "boolean",
+            "description": "True if this plane is non-compensatory"
+          },
+          "soft_band": {
+            "type": "object",
+            "required": ["min", "max"],
+            "properties": {
+              "min": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+              "max": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+            }
+          },
+          "hard_band": {
+            "type": "object",
+            "required": ["min", "max"],
+            "properties": {
+              "min": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+              "max": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "invariant": {
+      "type": "object",
+      "required": ["type", "expression", "variables"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["LyapunovNonIncrease"],
+          "description": "Invariant kind"
+        },
+        "expression": {
+          "type": "string",
+          "const": "sum_j w_j * r_next_j^2 <= sum_j w_j * r_prev_j^2",
+          "description": "Human-readable Lyapunov condition"
+        },
+        "variables": {
+          "type": "object",
+          "required": ["r_prev", "r_next"],
+          "properties": {
+            "r_prev": {
+              "type": "object",
+              "description": "Map from coordid to previous normalized risk coordinate r_prev_j in [0,1]",
+              "additionalProperties": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+            },
+            "r_next": {
+              "type": "object",
+              "description": "Map from coordid to next normalized risk coordinate r_next_j in [0,1]",
+              "additionalProperties": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "nonoffsettable_rule": {
+      "type": "object",
+      "description": "Optional explicit rule for non-offsettable planes",
+      "required": ["expression"],
+      "properties": {
+        "expression": {
+          "type": "string",
+          "const": "if nonoffsettable and r_next_j > r_prev_j then K_next <= K_prev and R_next >= R_prev",
+          "description": "Non-compensation rule sketch"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
