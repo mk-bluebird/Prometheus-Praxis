@@ -1,0 +1,48 @@
+Lua FFI Usage:
+File: lua/lua_cyboquatic_spine.lua
+ffi.cdef[[
+char* cybo_get_node_blastradius(const char* dbpath, const char* nodeid);
+char* cybo_get_workload_window(const char* dbpath, const char* nodeid);
+void  cybo_free_json(char* ptr);
+]]
+
+File: lua/cyboquatic_eco_overlay.lua
+ffi.cdef[[
+char* cybo_get_machines_for_region(const char* dbpath, const char* region);
+char* cybo_get_machine_windows(const char* dbpath, long long machine_id);
+char* cybo_get_ecoperjoule_for_node(const char* dbpath, const char* nodeid);
+char* cybo_get_ecorank_for_region(const char* dbpath, const char* region);
+char* cybo_get_blastradius_for_machine(const char* dbpath, long long machine_id);
+
+File: lua/cyboquatic_node_scores.lua
+ffi.cdef[[
+    const char* econet_cybo_list_nodes(const char* db_path, double rplane_max);
+    void econet_cybo_free_json(char* ptr);
+]]
+
+local lib = ffi.load("eco_restoration_shard_cybo") -- cdylib name to match build
+
+File: lua/econet_blastradius_client.lua
+ffi.cdef[[
+    char* econet_blastradius_spine_init_json(const char* root_path_utf8,
+                                             const char* region_utf8,
+                                             double min_restoration_score);
+    char* econet_blastradius_spine_improvement_json(const char* root_path_utf8,
+                                                    const char* lane_utf8);
+
+File: lua/econet_cybo_overlay.lua
+ffi.cdef[[
+char* econet_get_ker_targets(const char* dbpath, const char* reponame);
+char* econet_get_blast_radius_for_node(const char* dbpath, const char* nodeid);
+char* econet_get_workload_trends_for_node(const char* dbpath, const char* nodeid);
+char* econet_get_cybo_node_eco_metrics(const char* dbpath, const char* nodeid);
+void  econet_free_json(char* ptr);
+
+File: lua/lua_cyboquatic_overlay.lua
+ffi.cdef[[
+    char* cybo_get_ker_for_node(const char* db_path, const char* node_id);
+    char* cybo_get_blastradius_for_node(const char* db_path, const char* node_id);
+    char* cybo_get_workload_windows_for_node(const char* db_path, const char* node_id);
+    char* cybo_get_substrate_summary_for_node(const char* db_path, const char* node_id);
+    void  cybo_free_json(char* ptr);
+

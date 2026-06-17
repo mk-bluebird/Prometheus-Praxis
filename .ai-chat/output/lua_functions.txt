@@ -1,0 +1,62 @@
+Lua Functions:
+File: crates/econet-hardware/lua/blast_radius_guard.lua
+19:local function with_db(path, fn)
+36:local function fetch_route_guard(db, nodeid)
+71:local function fetch_latest_risk_chain(db, nodeid)
+92:local function boolean_flag(value)
+105:function blast_radius_guard.evaluate_node(nodeid)
+174:function blast_radius_guard.evaluate_route(source_nodeid, dest_nodeid)
+
+File: automation/ci_orchestrator.lua
+10:local function open_db()
+18:local function check_ker_compliance(db)
+38:local function validate_blast_radius(db, artifact_id)
+51:local function main()
+
+File: lua/lua_cyboquatic_spine.lua
+17:local function read_json(ptr)
+26:function M.get_node_blastradius(dbpath, nodeid)
+31:function M.get_workload_window(dbpath, nodeid)
+
+File: lua/econet_overlay.lua
+9:function RepoMethods:to_chat_summary()
+40:function EconetOverlay.new_repo_summary(row)
+61:function EconetOverlay.rank_artifacts(rows, limit)
+
+File: lua/cyboquatic_eco_overlay.lua
+23:local function read_json_ptr(ptr)
+32:function M.get_machines_for_region(dbpath, region)
+37:function M.get_machine_windows(dbpath, machine_id)
+42:function M.get_ecoperjoule_for_node(dbpath, nodeid)
+47:function M.get_ecorank_for_region(dbpath, region)
+52:function M.get_blastradius_for_machine(dbpath, machine_id)
+
+File: lua/cyboquatic_node_scores.lua
+18:local function read_json_ptr(ptr)
+27:function M.list_ecorestorative_nodes(db_path, rplane_max)
+
+File: lua/econet_blastradius_client.lua
+20:local function to_lua_string(c_ptr)
+29:function M.list_shards_for_region(lib_path, repo_root, region, min_restoration_score)
+36:function M.list_improvement_ok(lib_path, repo_root, lane)
+
+File: lua/econet_cybo_overlay.lua
+25:local function read_json_ptr(ptr)
+34:function M.get_ker_targets(dbpath, reponame)
+42:function M.get_blast_radius(dbpath, nodeid)
+50:function M.get_workload_trends(dbpath, nodeid)
+58:function M.get_cybo_node_eco_metrics(dbpath, nodeid)
+
+File: lua/lua_cyboquatic_overlay.lua
+22:local function read_json_ptr(ptr)
+31:function M.get_ker_for_node(db_path, node_id)
+36:function M.get_blastradius_for_node(db_path, node_id)
+41:function M.get_workload_windows_for_node(db_path, node_id)
+46:function M.get_substrate_summary_for_node(db_path, node_id)
+
+File: lua/econet_blastradius_inspect.lua
+9:function M.open_spine(path)
+14:function M.close_spine(db)
+20:function M.list_candidate_ecorestorative(db, limit)
+46:function M.best_nodes_for_energy_tailwind(db, limit)
+
