@@ -1,0 +1,44 @@
+-- filename: LanePromotionReplayPolicy2026v1.aln
+-- destination: Eco-Fort/aln/LanePromotionReplayPolicy2026v1.aln
+-- repo-target: github.com/mk-bluebird/eco_restoration_shard
+
+PARTICLE LanePromotionReplayPolicy2026v1
+ROLE     GOVERNANCE
+CATEGORY LANE_PROMOTION_POLICY
+VERSIONTAG 2026v1
+
+TITLE Phoenix lane promotion replay policy
+DESCRIPTION
+  Empirical, non-actuating policy for validating lane promotions
+  from RESEARCH to PROD in Phoenix using a paired-corridor replay
+  harness over a frozen vshardker KER grammar.
+
+FIELDS
+  policy_id          string  -- e.g. "LaneReplayPolicy-PHX-2026v1"
+  region             string  -- "Phoenix-AZ"
+  lane_from          string  -- "RESEARCH"
+  lane_to            string  -- "PROD"
+  snapshot_old_tag   string  -- e.g. "PhoenixESPD-2026v1"
+  snapshot_new_tag   string  -- e.g. "PhoenixESPD-2026v2"
+
+  -- Tolerances for non-regression checks
+  eps_k              f64
+  eps_e              f64
+  eps_r              f64
+  eps_vt             f64
+
+  -- Governance contracts and registry bindings
+  ker_contract_id    string  -- KER grammar contract
+  lane_contract_id   string  -- lane FSM contract
+  def_registry_id    string  -- DefinitionRegistry2026v1 entry
+  routingspec_hex    string  -- hex fingerprint of full routing spec
+
+  -- Meta K/E/R for this policy object itself
+  k_target           f64
+  e_target           f64
+  r_target           f64
+
+  evidence_hex       string
+  signing_did        string
+  created_utc        datetime
+END
