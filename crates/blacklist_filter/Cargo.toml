@@ -1,0 +1,22 @@
+# Minimal Cargo.toml for blacklist_filter
+[package]
+name = "blacklist_filter"
+version = "0.1.0"
+edition = "2024"
+description = "Bloom filter-based blacklist checking for EcoNet content moderation"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+authors = ["mk-bluebird <bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7>"]
+rust-version = "1.85"
+
+[lib]
+name = "blacklist_filter"
+path = "src/lib.rs"
+
+[dependencies]
+blake3 = "1.5"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+base64 = "0.21"
+ureq = "2.9"
+thiserror = "1.0"
