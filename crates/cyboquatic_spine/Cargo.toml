@@ -1,0 +1,19 @@
+# filename: Cargo.toml
+# destination: ecorestorationshard/crates/cyboquatic_spine/Cargo.toml
+
+[package]
+name = "cyboquatic_spine"
+version = "0.1.0"
+edition = "2024"
+description = "Non-actuating Cyboquatic blast-radius and eco-workload cdylib spine for EcoNet."
+license = "MIT"
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+
+[lib]
+name = "cyboquatic_spine"
+crate-type = ["cdylib"]
+
+[dependencies]
+rusqlite = { version = "0.31", features = ["bundled"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
