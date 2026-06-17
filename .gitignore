@@ -1,4 +1,8 @@
 ```
+# Dependencies
+target/
+Cargo.lock
+
 # Logs and temp files
 *.log
 *.tmp
@@ -12,27 +16,7 @@
 .vscode/
 .idea/
 
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-venv/
-.venv/
-.env
-env/
-ENV/
-
-# Build and distribution artifacts
-dist/
-build/
-*.egg-info/
-
 # OS generated files
 .DS_Store
 Thumbs.db
-
-# Tools output
-.ai-chat/tools/output/
 ```
