@@ -14,7 +14,7 @@ members = [
     # Crates under `crates/` (exactly matching your directory listing, kebab-case)
     "crates/adaptive-corridors",
     "crates/bioscale-fairness-validator",
-    "crates/bioscale-evolution-cli",
+    "crates/biosascale-evolution-cli",
     "crates/blacklist-filter",
     "crates/blast-radius",
     "crates/bostrom-cli",
@@ -60,13 +60,13 @@ members = [
     "crates/kerdeployable",
     "crates/ecoresponseshard",
     "crates/eco-chat-ffi",
-    "crates/ker-score-lab"
+    "crates/ker-score-lab",
 
     # Phase 0 governance spine and guards
     "crates/econet-governance-spine",
     "crates/econet-governance-guard",
     "crates/definition-registry-checker",
-    "crates/cyboquatic-benchmark-tool",
+    "crates/cyboquatic-benchmark-tool"
 ]
 
 resolver = "2"
@@ -82,6 +82,7 @@ version      = "0.2.0"
 description  = "Eco restoration shard repository with Cyboquatic eco-machinery, KER governance, and EcoNet constellation indexing."
 
 [workspace.dependencies]
+# Core non-actuating stack, pinned for deterministic builds
 rusqlite      = { version = "0.31", default-features = false, features = ["bundled"] }
 serde         = { version = "1.0.197", features = ["derive"] }
 serde_json    = "1.0.115"
@@ -90,14 +91,24 @@ chrono        = { version = "0.4.38", features = ["serde"] }
 thiserror     = "1.0.57"
 log           = "0.4.21"
 env_logger    = "0.11.3"
+
+# Graph and hex utilities
 petgraph      = "0.6.5"
 hex           = "0.4.3"
+
+# Crypto and signatures
 ed25519-dalek = "2.1"
+
+# Async runtime (non-network, no actuation)
 tokio         = { version = "1.38", features = ["rt", "macros", "time", "io-util", "sync", "fs"] }
+
+# Proc-macro toolchain for internal derives
 proc-macro2   = "1.0"
 quote         = "1.0"
 syn           = { version = "2.0", features = ["full"] }
-kani          = { version = "0.50.0" }  # Kani is required, never optional
+
+# Kani is required, never optional; wired at workspace level
+kani          = { version = "0.50.0" }
 
 [workspace.dev-dependencies]
 serde_json = "1.0.115"
@@ -168,17 +179,23 @@ name = "restorationindextool"
 path = "ecorestorationshard/src/bin/restorationindextool.rs"
 
 [features]
-default       = ["nonactuating"]
-nonactuating  = []
+# Default strictly non-actuating index surface.
+default      = ["nonactuating"]
+nonactuating = []
 
 [dependencies]
 rusqlite   = { workspace = true }
 serde      = { workspace = true }
 serde_json = { workspace = true }
+serde_yaml = { workspace = true }
 chrono     = { workspace = true }
 thiserror  = { workspace = true }
 log        = { workspace = true }
 env_logger = { workspace = true }
+petgraph   = { workspace = true }
+hex        = { workspace = true }
+ed25519-dalek = { workspace = true }
+tokio      = { workspace = true }
 kani       = { workspace = true }
 
 [dev-dependencies]
