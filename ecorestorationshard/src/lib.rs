@@ -1,29 +1,33 @@
 // filename: lib.rs
 // destination: ecorestorationshard/src/lib.rs
 // Purpose:
-// - Provide a cdylib exposing read-only JSON APIs over the EcoNet index,
-//   Cyboquatic blast-radius ledger, workload trends, and cybo_node eco-metrics
-//   for Lua and Kotlin/Android.
-// - Strictly non-actuating; all queries are read-only.
+// - Non-actuating Rust cdylib exposing read-only JSON APIs over:
+//   - EcoNet SQLite index (KER targets)
+//   - Cyboquatic blast-radius diagnostics
+//   - Cyboquatic workload trends
+//   - Cyboquatic node eco-metrics view (vcybo_node_eco_metrics)
+// - Designed as a shared spine for Lua, Kotlin/Android, C, and ALN within EcoNet.
+
+#![crate_type = "cdylib"]
 
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::path::Path;
 
-use rusqlite::{Connection, OpenFlags};
+use rusqlite::{params, Connection, OpenFlags};
 use serde::Serialize;
 
-// ----------------------------
-// Core structs (existing)
-// ----------------------------
+// ---------------------------
+// Data structures
+// ---------------------------
 
 #[derive(Debug, Serialize)]
 pub struct KerTargets {
     pub reponame: String,
     pub roleband: String,
-    pub kertargetk: f64,
-    pub kertargete: f64,
-    pub kertargetr: f64,
+    pub kertarget_k: f64,
+    pub kertarget_e: f64,
+    pub kertarget_r: f64,
 }
 
 #[derive(Debug, Serialize)]
@@ -44,15 +48,11 @@ pub struct WorkloadTrendEntry {
     pub channel: String,
     pub totalrequestsj: f64,
     pub totalsurplusj: f64,
-    pub meanvtbefore: f64,
-    pub meanvtafter: f64,
-    pub meanrcarbon: Option<f64>,
-    pub meanrbiodiv: Option<f64>,
+    pub mean_vt_before: f64,
+    pub mean_vt_after: f64,
+    pub mean_r_carbon: Option<f64>,
+    pub mean_r_biodiv: Option<f64>,
 }
-
-// ----------------------------
-// New: Cyboquatic eco-metrics
-// ----------------------------
 
 #[derive(Debug, Serialize)]
 pub struct CyboNodeEcoMetrics {
@@ -67,29 +67,31 @@ pub struct CyboNodeEcoMetrics {
     pub totalrequestsj: Option<f64>,
     pub totalsurplusj: Option<f64>,
     pub acceptfraction: Option<f64>,
-    pub meanvtbefore: Option<f64>,
-    pub meanvtafter: Option<f64>,
-    pub meandeltavt: Option<f64>,
-    pub meanrcarbon: Option<f64>,
-    pub meanrbiodiv: Option<f64>,
+    pub mean_vt_before: Option<f64>,
+    pub mean_vt_after: Option<f64>,
+    pub mean_delta_vt: Option<f64>,
+    pub mean_r_carbon: Option<f64>,
+    pub mean_r_biodiv: Option<f64>,
     pub impacttype: Option<String>,
     pub impactscoresum: Option<f64>,
     pub vtsensitivitymean: Option<f64>,
     pub linkcount: Option<i64>,
 }
 
-// ----------------------------
-// Internal helpers
-// ----------------------------
-
-fn open_ro_db(dbpath: &str) -> rusqlite::Result<Connection> {
-    Connection::open_with_flags(
-        Path::new(dbpath),
-        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
-    )
+#[derive(Debug, Serialize)]
+struct ErrorEnvelope<'a> {
+    error: &'a str,
 }
 
-// Convert C string pointer to Rust &str safely.
+// ---------------------------
+// Internal helpers
+// ---------------------------
+
+fn open_ro_db(db_path: &str) -> rusqlite::Result<Connection> {
+    let flags = OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX;
+    Connection::open_with_flags(Path::new(db_path), flags)
+}
+
 unsafe fn cstr_to_str<'a>(ptr: *const c_char) -> Result<&'a str, &'static str> {
     if ptr.is_null() {
         return Err("null pointer");
@@ -97,26 +99,24 @@ unsafe fn cstr_to_str<'a>(ptr: *const c_char) -> Result<&'a str, &'static str> {
     CStr::from_ptr(ptr).to_str().map_err(|_| "invalid UTF-8")
 }
 
-// Serialize a value to JSON and hand it out as a C string pointer.
-fn to_json_cstring<T: Serialize>(val: T) -> *mut c_char {
-    match serde_json::to_string(&val) {
-        Ok(json) => CString::new(json).map(|s| s.into_raw()).unwrap_or(std::ptr::null_mut()),
+fn to_json_c_string<T: Serialize>(val: &T) -> *mut c_char {
+    match serde_json::to_string(val) {
+        Ok(json) => match CString::new(json) {
+            Ok(s) => s.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
         Err(_) => std::ptr::null_mut(),
     }
 }
 
-// Serialize an error message to JSON envelope.
 fn error_json(msg: &str) -> *mut c_char {
-    #[derive(Serialize)]
-    struct ErrorEnvelope<'a> {
-        error: &'a str,
-    }
-    to_json_cstring(ErrorEnvelope { error: msg })
+    let wrapped = ErrorEnvelope { error: msg };
+    to_json_c_string(&wrapped)
 }
 
-// ----------------------------
-// Query functions (existing)
-// ----------------------------
+// ---------------------------
+// SQLite queries
+// ---------------------------
 
 fn query_ker_targets(conn: &Connection, reponame: &str) -> rusqlite::Result<KerTargets> {
     let mut stmt = conn.prepare(
@@ -127,13 +127,13 @@ fn query_ker_targets(conn: &Connection, reponame: &str) -> rusqlite::Result<KerT
         LIMIT 1
         "#,
     )?;
-    stmt.query_row([reponame], |row| {
+    stmt.query_row(params![reponame], |row| {
         Ok(KerTargets {
             reponame: row.get(0)?,
             roleband: row.get(1)?,
-            kertargetk: row.get(2)?,
-            kertargete: row.get(3)?,
-            kertargetr: row.get(4)?,
+            kertarget_k: row.get(2)?,
+            kertarget_e: row.get(3)?,
+            kertarget_r: row.get(4)?,
         })
     })
 }
@@ -141,22 +141,22 @@ fn query_ker_targets(conn: &Connection, reponame: &str) -> rusqlite::Result<KerT
 fn query_blast_radius(conn: &Connection, nodeid: &str) -> rusqlite::Result<Vec<BlastRadiusEntry>> {
     let mut stmt = conn.prepare(
         r#"
-        SELECT sourcetype,
-               sourceid,
-               targettype,
-               targetid,
-               impacttype,
-               impactscore,
-               COALESCE(vtsensitivity, 0.0),
-               COALESCE(notes, '')
+        SELECT
+            sourcetype,
+            sourceid,
+            targettype,
+            targetid,
+            impacttype,
+            impactscore,
+            COALESCE(vtsensitivity, 0.0) AS vtsensitivity,
+            COALESCE(notes, '')          AS notes
         FROM blastradiuslink
-        WHERE sourcetype = 'NODE'
-          AND sourceid = ?1
+        WHERE sourcetype = 'NODE' AND sourceid = ?1
         ORDER BY impacttype, targettype, targetid
         "#,
     )?;
 
-    let rows = stmt.query_map([nodeid], |row| {
+    let rows = stmt.query_map(params![nodeid], |row| {
         Ok(BlastRadiusEntry {
             sourcetype: row.get(0)?,
             sourceid: row.get(1)?,
@@ -182,14 +182,15 @@ fn query_workload_trends(
 ) -> rusqlite::Result<Vec<WorkloadTrendEntry>> {
     let mut stmt = conn.prepare(
         r#"
-        SELECT nodeid,
-               channel,
-               SUM(ereqj) AS totalrequestsj,
-               SUM(esurplusj) AS totalsurplusj,
-               AVG(vtbefore) AS meanvtbefore,
-               AVG(vtafter)  AS meanvtafter,
-               AVG(rcarbon)  AS meanrcarbon,
-               AVG(rbiodiv)  AS meanrbiodiv
+        SELECT
+            nodeid,
+            channel,
+            SUM(ereqj)      AS totalrequestsj,
+            SUM(esurplusj)  AS totalsurplusj,
+            AVG(vtbefore)   AS mean_vt_before,
+            AVG(vtafter)    AS mean_vt_after,
+            AVG(rcarbon)    AS mean_r_carbon,
+            AVG(rbiodiv)    AS mean_r_biodiv
         FROM cyboworkloadledger
         WHERE nodeid = ?1
         GROUP BY nodeid, channel
@@ -197,16 +198,16 @@ fn query_workload_trends(
         "#,
     )?;
 
-    let rows = stmt.query_map([nodeid], |row| {
+    let rows = stmt.query_map(params![nodeid], |row| {
         Ok(WorkloadTrendEntry {
             nodeid: row.get(0)?,
             channel: row.get(1)?,
             totalrequestsj: row.get(2)?,
             totalsurplusj: row.get(3)?,
-            meanvtbefore: row.get(4)?,
-            meanvtafter: row.get(5)?,
-            meanrcarbon: row.get(6)?,
-            meanrbiodiv: row.get(7)?,
+            mean_vt_before: row.get(4)?,
+            mean_vt_after: row.get(5)?,
+            mean_r_carbon: row.get(6)?,
+            mean_r_biodiv: row.get(7)?,
         })
     })?;
 
@@ -216,10 +217,6 @@ fn query_workload_trends(
     }
     Ok(out)
 }
-
-// ----------------------------
-// New: Cyboquatic eco-metrics query
-// ----------------------------
 
 fn query_cybo_node_eco_metrics(
     conn: &Connection,
@@ -254,7 +251,7 @@ fn query_cybo_node_eco_metrics(
         "#,
     )?;
 
-    let rows = stmt.query_map([nodeid], |row| {
+    let rows = stmt.query_map(params![nodeid], |row| {
         Ok(CyboNodeEcoMetrics {
             nodeid: row.get(0)?,
             displayname: row.get(1)?,
@@ -262,20 +259,20 @@ fn query_cybo_node_eco_metrics(
             medium: row.get(3)?,
             noderole: row.get(4)?,
             machineryclass: row.get(5)?,
-            windowstartutc: row.get::<_, Option<String>>(6)?,
-            windowendutc: row.get::<_, Option<String>>(7)?,
-            totalrequestsj: row.get::<_, Option<f64>>(8)?,
-            totalsurplusj: row.get::<_, Option<f64>>(9)?,
-            acceptfraction: row.get::<_, Option<f64>>(10)?,
-            meanvtbefore: row.get::<_, Option<f64>>(11)?,
-            meanvtafter: row.get::<_, Option<f64>>(12)?,
-            meandeltavt: row.get::<_, Option<f64>>(13)?,
-            meanrcarbon: row.get::<_, Option<f64>>(14)?,
-            meanrbiodiv: row.get::<_, Option<f64>>(15)?,
-            impacttype: row.get::<_, Option<String>>(16)?,
-            impactscoresum: row.get::<_, Option<f64>>(17)?,
-            vtsensitivitymean: row.get::<_, Option<f64>>(18)?,
-            linkcount: row.get::<_, Option<i64>>(19)?,
+            windowstartutc: row.get(6)?,
+            windowendutc: row.get(7)?,
+            totalrequestsj: row.get(8)?,
+            totalsurplusj: row.get(9)?,
+            acceptfraction: row.get(10)?,
+            mean_vt_before: row.get(11)?,
+            mean_vt_after: row.get(12)?,
+            mean_delta_vt: row.get(13)?,
+            mean_r_carbon: row.get(14)?,
+            mean_r_biodiv: row.get(15)?,
+            impacttype: row.get(16)?,
+            impactscoresum: row.get(17)?,
+            vtsensitivitymean: row.get(18)?,
+            linkcount: row.get(19)?,
         })
     })?;
 
@@ -286,9 +283,9 @@ fn query_cybo_node_eco_metrics(
     Ok(out)
 }
 
-// ----------------------------
+// ---------------------------
 // C ABI exports
-// ----------------------------
+// ---------------------------
 
 #[no_mangle]
 pub unsafe extern "C" fn econet_get_ker_targets(
@@ -303,12 +300,14 @@ pub unsafe extern "C" fn econet_get_ker_targets(
         Ok(s) => s,
         Err(m) => return error_json(m),
     };
+
     let conn = match open_ro_db(db) {
         Ok(c) => c,
         Err(_) => return error_json("failed to open SQLite index"),
     };
+
     match query_ker_targets(&conn, repo) {
-        Ok(row) => to_json_cstring(row),
+        Ok(row) => to_json_c_string(&row),
         Err(_) => error_json("repo not found"),
     }
 }
@@ -326,12 +325,14 @@ pub unsafe extern "C" fn econet_get_blast_radius_for_node(
         Ok(s) => s,
         Err(m) => return error_json(m),
     };
+
     let conn = match open_ro_db(db) {
         Ok(c) => c,
         Err(_) => return error_json("failed to open SQLite index"),
     };
+
     match query_blast_radius(&conn, node) {
-        Ok(rows) => to_json_cstring(rows),
+        Ok(rows) => to_json_c_string(&rows),
         Err(_) => error_json("node not found or query failed"),
     }
 }
@@ -349,17 +350,18 @@ pub unsafe extern "C" fn econet_get_workload_trends_for_node(
         Ok(s) => s,
         Err(m) => return error_json(m),
     };
+
     let conn = match open_ro_db(db) {
         Ok(c) => c,
         Err(_) => return error_json("failed to open SQLite index"),
     };
+
     match query_workload_trends(&conn, node) {
-        Ok(rows) => to_json_cstring(rows),
+        Ok(rows) => to_json_c_string(&rows),
         Err(_) => error_json("node not found or query failed"),
     }
 }
 
-// New: Cyboquatic eco-metrics JSON for a node.
 #[no_mangle]
 pub unsafe extern "C" fn econet_get_cybo_node_eco_metrics(
     dbpath: *const c_char,
@@ -373,18 +375,18 @@ pub unsafe extern "C" fn econet_get_cybo_node_eco_metrics(
         Ok(s) => s,
         Err(m) => return error_json(m),
     };
+
     let conn = match open_ro_db(db) {
         Ok(c) => c,
         Err(_) => return error_json("failed to open SQLite index"),
     };
+
     match query_cybo_node_eco_metrics(&conn, node) {
-        Ok(rows) => to_json_cstring(rows),
+        Ok(rows) => to_json_c_string(&rows),
         Err(_) => error_json("node not found or query failed"),
     }
 }
 
-// Free JSON strings returned by this library.
-// Safety: ptr must be a pointer previously returned by one of the econet_* functions.
 #[no_mangle]
 pub unsafe extern "C" fn econet_free_json(ptr: *mut c_char) {
     if ptr.is_null() {
