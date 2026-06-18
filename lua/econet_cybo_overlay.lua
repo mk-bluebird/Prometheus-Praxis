@@ -1,5 +1,5 @@
 -- filename: lua/econet_cybo_overlay.lua
--- destination: eco_restoration_shard/lua/econet_cybo_overlay.lua
+-- destination: mk-bluebird/eco_restoration_shard/ecorestorationshard/lua/econet_cybo_overlay.lua
 -- target-repo: github.com/mk-bluebird/eco_restoration_shard
 -- Purpose:
 -- Minimal LuaJIT FFI harness for the EcoNet Cyboquatic read-only cdylib.
