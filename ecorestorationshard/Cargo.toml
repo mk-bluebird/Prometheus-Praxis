@@ -1,0 +1,20 @@
+# filename: ecorestorationshard/Cargo.toml
+# destination: mk-bluebird/eco_restoration_shard/ecorestorationshard/Cargo.toml
+
+[package]
+name = "ecorestorationshard"
+version = "0.1.0"
+edition = "2024"
+description = "Non-actuating cdylib spine for EcoNet / Cyboquatic blast-radius and KER diagnostics."
+license = "MIT"
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+keywords = ["ecosafety", "ker", "cyboquatics", "blast-radius"]
+
+[lib]
+name = "ecorestorationshard"
+crate-type = ["cdylib"]
+
+[dependencies]
+rusqlite = { version = "0.31", features = ["bundled"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
