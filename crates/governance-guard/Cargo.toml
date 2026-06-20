@@ -1,0 +1,19 @@
+# filename: crates/governance-guard/Cargo.toml
+# repo: mk-bluebird/eco_restoration_shard
+# destination: Eco-Fort/crates/governance-guard/Cargo.toml
+
+[package]
+name = "governance-guard"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+description = "Non-actuating governance guard functions for KER, lanes, and MT6883 RoH ceilings."
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+publish = false
+
+[lib]
+name = "governance_guard"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
