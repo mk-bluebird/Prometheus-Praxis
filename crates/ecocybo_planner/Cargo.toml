@@ -1,0 +1,16 @@
+# filename: crates/ecocybo_planner/Cargo.toml
+# destination: eco_restoration_shard/crates/ecocybo_planner/Cargo.toml
+
+[package]
+name = "ecocybo_planner"
+version = "0.1.0"
+edition = "2024"
+description = "Non-actuating eco-restoration planner for Cyboquatic nodes."
+license = "Apache-2.0"
+
+[dependencies]
+rusqlite = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
