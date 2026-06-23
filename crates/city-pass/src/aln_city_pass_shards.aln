@@ -1,0 +1,68 @@
+//
+// QPU.Datashard for CityPassShard2026v1, CityPassAuditShard2026v1, CityPassBindingShard2026v1
+// Design (D): Append-only, hex_commit anchored.
+// NR: 0 — no neurodata; only neurorights contract ids.
+// EE: eco_savings_kwh tracked per pass and per tap.
+datashardheader
+  destination-path, module, version, role, security-protocol, interop-standard, identity-mgmt, ai-agent-integration, device-type, authentication, edge-analytics, compliance, log-persistence
+  vnodephxcitypass, CityPassShard2026v1, 1.0.0, OfflineTransitLedger, AES256-GCM, ALN-Core, DID-ALN-Bostrom, MistralQwen, KioskController, FIDO2-WebAuthn, SNNEcoMetrics, GDPR-HIPAA-Neuro, HyperledgerVital
+
+schema CityPassShard2026v1
+  shard_id               uuid
+  host_did               text
+  pass_cap_id            uuid
+  validity_start_utc     text
+  validity_end_utc       text
+  max_taps               integer
+  taps_used              integer
+  eco_savings_kwh        real
+  neurorights_contract_id text
+  eco_contract_id        text
+  jurisdiction_policy    text
+  hex_commit             text
+
+//
+// CityPassAuditShard2026v1
+//
+schema CityPassAuditShard2026v1
+  audit_id               uuid
+  host_did               text
+  pass_cap_id            uuid
+  tap_timestamp_utc      text
+  eco_savings_kwh_increment real
+  neurorights_ok         boolean
+  roh_ok                 boolean
+  psychload_ok           boolean
+  jurisdiction_policy    text
+  hex_commit             text
+
+//
+// CityPassBindingShard2026v1
+//
+schema CityPassBindingShard2026v1
+  binding_id             integer
+  host_did               text
+  pass_cap_id            uuid
+  validity_start_utc     text
+  validity_end_utc       text
+  max_taps               integer
+  taps_used              integer
+  eco_savings_kwh        real
+  neurorights_contract_id text
+  eco_contract_id        text
+  jurisdiction_policy    text
+  hex_commit             text
+
+//
+// Phoenix Metro dev-tunnel graph for ALN Dev-Tunneling
+//
+graph TD
+  PHX_KIOSK --> PHX_CITYPASS_CORE
+  PHX_CITYPASS_CORE --> PHX_CITYPASS_SHARD
+  PHX_CITYPASS_CORE --> PHX_CITYPASS_AUDIT
+  PHX_CITYPASS_CORE --> PHX_CITYPASS_BINDING
+  PHX_CITYPASS_SHARD --> PHX_ECO_ANALYTICS
+  PHX_CITYPASS_SHARD --> PHX_NEURORIGHTS_POLICY
+  TEMPE_KIOSK --> PHX_CITYPASS_CORE
+  MESA_KIOSK --> PHX_CITYPASS_CORE
+  SCOTTSDALE_KIOSK --> PHX_CITYPASS_CORE
