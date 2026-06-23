@@ -1,0 +1,234 @@
+# filename: ecosafety/cybo/CyboNodeEcoScore2026v1.aln
+# destination: eco_restoration_shard/aln/ecosafety/cybo/CyboNodeEcoScore2026v1.aln
+
+alnspec v1.0 CyboNodeEcoScore2026v1
+description Cyboquatic node eco-score window metrics bound to KER and Lyapunov residuals
+version 2026.06.22
+owneralnid bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+groundinghex 0x4359424f5f4e4f44455f45434f5f53434f52455f323032365f7631
+
+type CyboNodeEcoScore2026v1
+
+  # Primary identity and window
+  field score_id
+    type integer
+    required true
+    invariant nonrevocable
+  endfield
+
+  field node_id
+    type string
+    required true
+    pattern CYBO-[A-Za-z0-9._:-]{4,64}
+    invariant nonrevocable
+  endfield
+
+  field window_start_utc
+    type datetime
+    required true
+  endfield
+
+  field window_end_utc
+    type datetime
+    required true
+  endfield
+
+  # KER triad over the window (normalized 0..1)
+  field k_avg
+    type float
+    required true
+    min 0.0
+    max 1.0
+  endfield
+
+  field e_avg
+    type float
+    required true
+    min 0.0
+    max 1.0
+  endfield
+
+  field r_avg
+    type float
+    required true
+    min 0.0
+    max 1.0
+  endfield
+
+  # Lyapunov residual and eco metrics
+  field vt_max
+    type float
+    required true
+    min 0.0
+  endfield
+
+  field eco_gain
+    type float
+    required true
+  endfield
+
+  field energy_cost_kwh
+    type float
+    required true
+    min 0.0
+  endfield
+
+  field carbon_delta_kg
+    type float
+    required true
+  endfield
+
+  field materials_residue
+    type float
+    required true
+    min 0.0
+    max 1.0
+  endfield
+
+  field biodiv_delta
+    type float
+    required true
+  endfield
+
+  field eco_efficiency
+    type float
+    required true
+  endfield
+
+  field reward_class
+    type string
+    required true
+    enum BASELINE,GREEN,GOLD
+  endfield
+
+  field eco_restorative
+    type integer
+    required true
+    min 0
+    max 1
+  endfield
+
+  field created_utc
+    type datetime
+    required true
+  endfield
+
+  # Data-quality and provenance hooks (aligned with DataQualityPlane2026v1)
+  field rcalib
+    type float
+    required false
+    min 0.0
+    max 1.0
+  endfield
+
+  field rsigma
+    type float
+    required false
+    min 0.0
+    max 1.0
+  endfield
+
+  field d_data
+    type float
+    required false
+    min 0.0
+    max 1.0
+  endfield
+
+  field d_combined
+    type float
+    required false
+    min 0.0
+    max 1.0
+  endfield
+
+  field evidence_hex
+    type string
+    required true
+    pattern 0x[0-9A-Fa-f]{64}
+    invariant nonrevocable
+  endfield
+
+  field signing_did
+    type string
+    required true
+    pattern bostrom1[0-9a-z]{38}|bostrom18[0-9a-z]{36}
+    invariant nonrevocable
+  endfield
+
+  field signing_hex
+    type string
+    required true
+    pattern 0x[0-9A-Fa-f]{128}
+    invariant nonrevocable
+  endfield
+
+endtype
+
+# Invariants tying CyboNodeEcoScore windows to KER and Lyapunov math
+
+predicate ker_bounds
+  expr k_avg >= 0.0 && k_avg <= 1.0 &&
+       e_avg >= 0.0 && e_avg <= 1.0 &&
+       r_avg >= 0.0 && r_avg <= 1.0
+endpredicate
+
+predicate eco_efficiency_well_defined
+  expr (energy_cost_kwh > 0.0 && eco_efficiency == eco_gain / energy_cost_kwh) ||
+       (energy_cost_kwh == 0.0 && eco_efficiency == 0.0)
+endpredicate
+
+predicate lyapunov_residual_nonnegative
+  expr vt_max >= 0.0
+endpredicate
+
+predicate eco_restorative_flag_consistency
+  expr (eco_restorative == 1 && carbon_delta_kg < 0.0 && biodiv_delta >= 0.0) ||
+       (eco_restorative == 0)
+endpredicate
+
+predicate reward_class_consistency
+  expr (reward_class == "BASELINE") ||
+       (reward_class == "GREEN" && eco_restorative == 1 && e_avg >= 0.80) ||
+       (reward_class == "GOLD"  && eco_restorative == 1 && e_avg >= 0.90)
+endpredicate
+
+predicate data_quality_monotone
+  expr (rcalib == null || (rcalib >= 0.0 && rcalib <= 1.0)) &&
+       (rsigma == null || (rsigma >= 0.0 && rsigma <= 1.0)) &&
+       (d_data == null  || (d_data  >= 0.0 && d_data  <= 1.0)) &&
+       (d_combined == null || (d_combined >= 0.0 && d_combined <= 1.0))
+endpredicate
+
+predicate provenance_bound_to_owner
+  expr signing_did == "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+endpredicate
+
+invariant all
+  ensures ker_bounds
+  ensures eco_efficiency_well_defined
+  ensures lyapunov_residual_nonnegative
+  ensures eco_restorative_flag_consistency
+  ensures reward_class_consistency
+  ensures data_quality_monotone
+  ensures provenance_bound_to_owner
+endinvariant
+
+binding cybo_node_eco_score
+  field node_id           type string  required true ref CyboNodeEcoScore2026v1.node_id
+  field window_start_utc  type datetime required true ref CyboNodeEcoScore2026v1.window_start_utc
+  field window_end_utc    type datetime required true ref CyboNodeEcoScore2026v1.window_end_utc
+  field k_avg             type float   required true ref CyboNodeEcoScore2026v1.k_avg
+  field e_avg             type float   required true ref CyboNodeEcoScore2026v1.e_avg
+  field r_avg             type float   required true ref CyboNodeEcoScore2026v1.r_avg
+  field vt_max            type float   required true ref CyboNodeEcoScore2026v1.vt_max
+  field eco_gain          type float   required true ref CyboNodeEcoScore2026v1.eco_gain
+  field energy_cost_kwh   type float   required true ref CyboNodeEcoScore2026v1.energy_cost_kwh
+  field carbon_delta_kg   type float   required true ref CyboNodeEcoScore2026v1.carbon_delta_kg
+  field materials_residue type float   required true ref CyboNodeEcoScore2026v1.materials_residue
+  field biodiv_delta      type float   required true ref CyboNodeEcoScore2026v1.biodiv_delta
+  field eco_efficiency    type float   required true ref CyboNodeEcoScore2026v1.eco_efficiency
+  field reward_class      type string  required true ref CyboNodeEcoScore2026v1.reward_class
+  field eco_restorative   type integer required true ref CyboNodeEcoScore2026v1.eco_restorative
+  field created_utc       type datetime required true ref CyboNodeEcoScore2026v1.created_utc
+endbinding
