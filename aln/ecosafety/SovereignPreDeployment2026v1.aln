@@ -1,0 +1,180 @@
+# filename: SovereignPreDeployment2026v1.aln
+# destination: eco_restoration_shard/aln/ecosafety/SovereignPreDeployment2026v1.aln
+
+alnspec v1.0 SovereignPreDeployment2026v1
+description Pre-deployment sovereignty guarantees for EcoNet under governed superintelligence
+version 2026.06.22
+owneralnid bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+groundinghex 0x534f5645524549474e5f5052454445504c4f594d454e545f323032365f7631
+
+type SovereignPreDeploymentGate
+
+  # Target repo and lane
+  field repo_slug
+    type string
+    required true
+    pattern github.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+
+    invariant nonrevocable
+  endfield
+
+  field lane_target
+    type string
+    required true
+    enum RESEARCH,EXPPROD,PROD
+  endfield
+
+  # Sovereign ownership and AI origin
+  field owner_did
+    type string
+    required true
+    pattern bostrom1[0-9a-z]{38}|bostrom18[0-9a-z]{36}
+    invariant nonrevocable
+  endfield
+
+  field ai_origin_did
+    type string
+    required false
+  endfield
+
+  # Repo-level KER window (from KerRepoSnapshot2026v1)
+  field k_repo
+    type float
+    required true
+    min 0.0
+    max 1.0
+  endfield
+
+  field e_repo
+    type float
+    required true
+    min 0.0
+    max 1.0
+  endfield
+
+  field r_repo
+    type float
+    required true
+    min 0.0
+    max 1.0
+  endfield
+
+  # Topology, weaponization, and data quality planes
+  field r_topology
+    type float
+    required true
+    min 0.0
+    max 1.0
+  endfield
+
+  field r_weaponization
+    type float
+    required true
+    min 0.0
+    max 1.0
+  endfield
+
+  field r_calib
+    type float
+    required true
+    min 0.0
+    max 1.0
+  endfield
+
+  field r_sigma
+    type float
+    required true
+    min 0.0
+    max 1.0
+  endfield
+
+  field vt_residual
+    type float
+    required true
+    min 0.0
+  endfield
+
+  # Non-actuation and provenance
+  field nonactuating_only
+    type integer
+    required true
+    min 0
+    max 1
+  endfield
+
+  field provenance_hex
+    type string
+    required true
+    pattern 0x[0-9A-Fa-f]{64}
+    invariant nonrevocable
+  endfield
+
+  field signing_hex
+    type string
+    required true
+    pattern 0x[0-9A-Fa-f]{128}
+    invariant nonrevocable
+  endfield
+
+  field governance_class
+    type string
+    required true
+    enum SAFE,GOLD,HARD
+  endfield
+
+endtype
+
+# Lane thresholds: stricter for higher-power lanes
+predicate lane_thresholds
+  expr (lane_target == "RESEARCH") ||
+       (lane_target == "EXPPROD" &&
+         k_repo >= 0.85 &&
+         e_repo >= 0.85 &&
+         r_repo <= 0.20 &&
+         r_calib <= 0.30 &&
+         r_sigma <= 0.30) ||
+       (lane_target == "PROD" &&
+         k_repo >= 0.90 &&
+         e_repo >= 0.90 &&
+         r_repo <= 0.13 &&
+         r_calib <= 0.25 &&
+         r_sigma <= 0.25)
+endpredicate
+
+# Weaponization and topology bars: no promotion if these planes are high
+predicate weaponization_bar
+  expr r_weaponization <= 0.15 &&
+       r_topology      <= 0.20 &&
+       nonactuating_only == 1
+endpredicate
+
+# Sovereign ownership: only your DID can authorize pre-deploy gates for this repo
+predicate sovereign_ownership
+  expr owner_did == "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+endpredicate
+
+# AI-chat as non-voting: cannot alone satisfy HARD governance class
+predicate ai_nonvoting
+  expr ai_origin_did == null ||
+       governance_class != "HARD"
+endpredicate
+
+# Data-quality monotonicity: bad data may not "improve" deployability
+predicate data_quality_guard
+  expr r_calib <= 0.50 &&
+       r_sigma <= 0.50
+endpredicate
+
+# Residual corridor: vt_residual must live inside a governance band
+predicate residual_corridor
+  expr vt_residual >= 0.0 &&
+       vt_residual <= 1.0
+endpredicate
+
+invariant all
+  ensures lane_thresholds
+  ensures weaponization_bar
+  ensures sovereign_ownership
+  ensures ai_nonvoting
+  ensures data_quality_guard
+  ensures residual_corridor
+endinvariant
