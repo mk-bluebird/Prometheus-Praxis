@@ -1,0 +1,154 @@
+aln
+  title HealthcareRiskPlane2026v1
+  version 1.0.0
+
+  section metadata
+    record HealthcareRiskPlaneMeta2026v1
+      defid          string  required true  -- "HealthcareRiskPlane2026v1"
+      description    string  required true
+      contractid     string  required true  -- e.g. "RoH.Healthcare.2026v1"
+      primaryplane   string  required true  -- "healthcare"
+      baserange_min  f32     required true  -- 0.0
+      baserange_max  f32     required true  -- 1.0 (normalized RoH)
+      roh_global_ceiling f32 required true  -- 0.30 normalized RoH ceiling
+      nonoffsettable bool    required true  -- true, cannot be compensated by other planes
+      proofrefhex    string  required true  -- hex of RoH kernel proof bundle
+    end
+  endsection
+
+  section schema
+    -- One row per healthcare risk coordinate in the plane: RoH, continuity, neuroethic, nanoswarm duty, etc.
+    record HealthcareRiskCoordinate2026v1
+      coordid        string  required true  -- e.g. "roh_scalar", "continuity_grade_A_share"
+      description    string  required true
+
+      -- Normalized value range for this coordinate; always 0..1 in the Lyapunov kernel.
+      valuemin       f32     required true  -- usually 0.0
+      valuemax       f32     required true  -- usually 1.0
+
+      -- Whether this coordinate is non-offsettable in KER residual (e.g. RoH, neuroethic).
+      nonoffsettable bool    required true
+
+      -- Optional band thresholds in normalized space; these are logical, not jurisdictional.
+      band_green_max f32     required false -- <= this is green
+      band_amber_max f32     required false -- <= this is amber, > green
+      band_red_max   f32     required false -- <= this is red, > amber
+
+      -- Mapping from raw healthcare telemetry into this coordinate (textual; implemented in guards).
+      raw_source     string  required true  -- e.g. "RoH(course_window)", "holiday_delay", "neuroethicradiushours"
+
+      -- How this coordinate contributes to K, E, or R (by convention only; math lives in kerdefinition).
+      contributes_to string  required true  -- "R", "E", "K"
+    end
+  endsection
+
+  section invariants
+    invariant RoHCoordinateWithinGlobalCeiling
+      description RoH scalar coordinate must respect the global 0.30 ceiling when nonoffsettable is true.
+      condition
+        forall c in HealthcareRiskCoordinate2026v1 .
+          (c.coordid == "roh_scalar" and c.nonoffsettable) ->
+            (c.valuemin == 0.0 and c.valuemax <= 1.0)
+    end
+
+    invariant NonOffsettableMustMapToR
+      description Non-offsettable healthcare risk coordinates always contribute to R, not E or K.
+      condition
+        forall c in HealthcareRiskCoordinate2026v1 .
+          (c.nonoffsettable) -> (c.contributes_to == "R")
+    end
+
+    invariant NormalizedBandsMonotone
+      description Band thresholds must be monotonically increasing within 0..1 when present.
+      condition
+        forall c in HealthcareRiskCoordinate2026v1 .
+          (c.band_green_max >= 0.0 and c.band_green_max <= 1.0) and
+          (c.band_amber_max == 0.0 or c.band_amber_max >= c.band_green_max) and
+          (c.band_red_max   == 0.0 or c.band_red_max   >= c.band_amber_max)
+    end
+  endsection
+
+  section data
+    data HealthcareRiskPlaneMeta2026v1
+      defid              HealthcareRiskPlane2026v1
+      description        Healthcare risk plane and coordinates for MT6883 and related healthcare workloads.
+      contractid         RoH.Healthcare.2026v1
+      primaryplane       healthcare
+      baserange_min      0.0
+      baserange_max      1.0
+      roh_global_ceiling 0.30
+      nonoffsettable     true
+      proofrefhex        0xHRP-2026-RoH-Kernel-Continuity-Proof-AB12CD34
+    end
+
+    -- Global RoH scalar over full course window, normalized 0..1 with ceiling 0.30.
+    data HealthcareRiskCoordinate2026v1
+      coordid        roh_scalar
+      description    Normalized Risk-of-Harm scalar over MT6883 course window.
+      valuemin       0.0
+      valuemax       1.0
+      nonoffsettable true
+      band_green_max 0.30
+      band_amber_max 0.50
+      band_red_max   1.00
+      raw_source     RoH(course_window)
+      contributes_to R
+    end
+
+    -- Fraction of time in continuity grade A or B over the course.
+    data HealthcareRiskCoordinate2026v1
+      coordid        continuity_ab_share
+      description    Fraction of course time where continuity grade is A or B.
+      valuemin       0.0
+      valuemax       1.0
+      nonoffsettable false
+      band_green_max 0.80
+      band_amber_max 0.60
+      band_red_max   0.40
+      raw_source     continuity_grade_AB_time_fraction
+      contributes_to K
+    end
+
+    -- Neuroethic processing radius normalized from hours into 0..1 corridor.
+    data HealthcareRiskCoordinate2026v1
+      coordid        neuroethic_radius_norm
+      description    Normalized neuroethic processing radius (hours) against corridor bounds.
+      valuemin       0.0
+      valuemax       1.0
+      nonoffsettable true
+      band_green_max 0.25
+      band_amber_max 0.50
+      band_red_max   1.00
+      raw_source     neuroethicradiushours
+      contributes_to R
+    end
+
+    -- Nanoswarm duty cycle / burden relative to safe envelope.
+    data HealthcareRiskCoordinate2026v1
+      coordid        nanoswarm_burden_norm
+      description    Normalized nanoswarm burden relative to safe envelope.
+      valuemin       0.0
+      valuemax       1.0
+      nonoffsettable true
+      band_green_max 0.30
+      band_amber_max 0.60
+      band_red_max   1.00
+      raw_source     nanoswarm_duty_envelope_ratio
+      contributes_to R
+    end
+
+    -- Psych continuity pressure: how close a course is to continuity floor breaches.
+    data HealthcareRiskCoordinate2026v1
+      coordid        psych_continuity_pressure
+      description    Normalized pressure on psychological continuity invariants over the course.
+      valuemin       0.0
+      valuemax       1.0
+      nonoffsettable false
+      band_green_max 0.40
+      band_amber_max 0.70
+      band_red_max   1.00
+      raw_source     continuity_floor_margin
+      contributes_to R
+    end
+  endsection
+end
