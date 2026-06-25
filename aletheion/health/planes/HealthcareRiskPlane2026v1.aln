@@ -1,0 +1,271 @@
+aln
+aln-spec v1.0
+HealthcareRiskPlane2026v1
+
+description
+Unified healthcare and augmentation risk plane for augmented citizens,
+mapping MT6883 course windows, nanoswarm interventions, surgery, and
+thermal overload into a normalized RoH lattice with a global ceiling of
+0.30 outside explicitly governed near-death continuity corridors.
+end-description
+
+version 2026.06.25
+owner-aln-id bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+
+type HealthcareRiskCoordinate2026v1
+  field coordinate_id
+    type string
+    required true
+    pattern hrc-2026-[A-Za-z0-9]{12}
+  endfield
+
+  field identityid
+    type string
+    required true
+  endfield
+
+  field soicref
+    type string
+    required true
+  endfield
+
+  field mt6883_course_id
+    type string
+    required false
+  endfield
+
+  field region_id
+    type string
+    required true
+  endfield
+
+  field birthsign_id
+    type string
+    required true
+  endfield
+
+  field plane_version
+    type string
+    required true
+    enum HEALTHCARE_RISK_PLANE_2026V1
+  endfield
+
+  field r_healthcare
+    type float
+    required true
+    min 0.0
+    max 1.0
+  endfield
+
+  field r_nanoswarm
+    type float
+    required true
+    min 0.0
+    max 1.0
+  endfield
+
+  field r_surgery
+    type float
+    required true
+    min 0.0
+    max 1.0
+  endfield
+
+  field r_thermal_overload
+    type float
+    required true
+    min 0.0
+    max 1.0
+  endfield
+
+  field r_near_death
+    type float
+    required true
+    min 0.0
+    max 1.0
+  endfield
+
+  field roh_norm
+    type float
+    required true
+    min 0.0
+    max 1.0
+  endfield
+
+  field roh_ceiling_norm
+    type float
+    required true
+    min 0.0
+    max 1.0
+  endfield
+
+  field near_death_corridor_flag
+    type boolean
+    required true
+  endfield
+
+  field psych_continuity_pressure
+    type float
+    required true
+    min 0.0
+    max 1.0
+  endfield
+
+  field continuity_floor_norm
+    type float
+    required true
+    min 0.0
+    max 1.0
+  endfield
+
+  field continuity_margin_norm
+    type float
+    required true
+    min 0.0
+    max 1.0
+  endfield
+
+  field ker_eco_impact
+    type float
+    required true
+    min -1.0
+    max 1.0
+  endfield
+
+  field ker_risk_of_harm
+    type float
+    required true
+    min 0.0
+    max 1.0
+  endfield
+
+  field ker_knowledge_yield
+    type float
+    required true
+    min 0.0
+    max 1.0
+  endfield
+
+  field ker_composite
+    type float
+    required true
+    min -1.0
+    max 1.0
+  endfield
+
+  field reward_ker_sum
+    type float
+    required true
+    min 0.0
+  endfield
+
+  field reward_corridor_kind
+    type string
+    required true
+    enum REWARD_CORRIDOR
+  endfield
+
+  field rohanchorhex
+    type string
+    required true
+    pattern 0x[0-9a-f]{64}
+  endfield
+
+  field continuity_proofhex
+    type string
+    required false
+    pattern 0x[0-9a-f]{64}
+  endfield
+
+  field nonrollback_provenance_anchor_id
+    type string
+    required false
+  endfield
+
+  field vtresidual
+    type float
+    required true
+    min 0.0
+    max 1.0
+  endfield
+
+  field topologyrisk
+    type float
+    required true
+    min 0.0
+    max 1.0
+  endfield
+
+  field created_utc
+    type string
+    required true
+  endfield
+
+  field updated_utc
+    type string
+    required true
+  endfield
+
+  field active
+    type boolean
+    required true
+  endfield
+endtype
+
+section constraints
+  rule GLOBAL_ROH_CEILING_NON_NEAR_DEATH
+    description
+    Enforce global RoH ceiling of 0.30 when not in an explicitly governed
+    near-death corridor. When near_death_corridor_flag = false, roh_norm
+    and ker_risk_of_harm MUST be <= 0.30. When the flag is true,
+    roh_norm MAY exceed 0.30 but MUST still respect neurorights, continuity
+    floors, and NonRollbackProvenanceAnchor requirements.
+    end-description
+  endrule
+
+  rule ROH_NORM_IS_MAX_COORD
+    description
+    roh_norm MUST equal the maximum of r_healthcare, r_nanoswarm,
+    r_surgery, r_thermal_overload, and r_near_death, up to numeric
+    tolerance defined in implementation.
+    end-description
+  endrule
+
+  rule PSYCH_CONTINUITY_PRESSURE_FLOOR
+    description
+    psych_continuity_pressure MUST be computed as a function of
+    continuity_floor_norm, continuity_margin_norm, the number and severity
+    of high-risk courses, and unresolved incidents, and MUST be >=
+    continuity_floor_norm. It MUST NOT be a simple max(roh_norm, pain, eco_stress).
+    end-description
+  endrule
+
+  rule REWARD_KER_SUM_MONOTONE
+    description
+    reward_ker_sum MUST be non-decreasing across time for a given identityid
+    and plane_version, except when adjusted by a dual-review harm verdict
+    recorded via a separate compensating event workflow linked by
+    nonrollback_provenance_anchor_id.
+    end-description
+  endrule
+
+  rule HASHONLY_ROHANCHOR
+    description
+    rohanchorhex MUST be computed using HEXCOMMIT256 over a canonical
+    preimage that encodes roh_ceiling_norm, neurorights flags, KER weights,
+    and lane identifiers, per HexCommitmentPolicy2026v1 with
+    canonicalization rule CANONICAL-ROH-V1. No raw neuro data may be used
+    directly as preimage.
+    end-description
+  endrule
+
+  rule CONTINUITY_PROOF_REQUIRED_NEAR_DEATH
+    description
+    When near_death_corridor_flag = true, continuity_proofhex MUST be
+    present, MUST bind to BrainIdentityBindingShard2026v1 continuityhash,
+    and MUST be anchored in a NonRollbackProvenanceAnchor record before
+    rewards or elevated RoH ceilings are accepted.
+    end-description
+  endrule
+endsection
+end-aln
