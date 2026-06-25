@@ -1,8 +1,10 @@
-title Prometheus-Praxis Core Execution Engine v1
+aln
+title   Prometheus-Praxis Core Execution Engine v1
 version 1
+
 aln_migration ALN.MIGRATION.CYBERCORE_AUTHORITY.v1
 
-binding.host_did didalnorganic-host
+binding.host_did        didalnorganic-host
 binding.bostrom_address bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
 
 ;; Canonical neurorights + equality envelope (external, referenced)
@@ -15,12 +17,105 @@ invariant.monotone_ota       true
 invariant.no_actuation_fields torque,current,stimpattern,autopilot
 
 ;; Prometheus-Praxis identity
-prometheuspraxis.id       prometheus-praxis.core.v1
-prometheuspraxis.role     AdaptiveImplementationEngine
-prometheuspraxis.domain   EcosystemRestoration, Healthcare, Cybernetics, SmartCity
-prometheuspraxis.scope    PlanetaryStewardship, HumanAugmentation, EcoPayments
+prometheuspraxis.id     prometheus-praxis.core.v1
+prometheuspraxis.role   AdaptiveImplementationEngine
+prometheuspraxis.domain EcosystemRestoration, Healthcare, Cybernetics, SmartCity
+prometheuspraxis.scope  PlanetaryStewardship, HumanAugmentation, EcoPayments
 
-;; Linked subsystems (names from Architecting Authority)
+
+;; ---------------------------------------------------------------------------
+;; ContinuityProof structures
+;; ---------------------------------------------------------------------------
+
+prometheuspraxis.continuity_proof.type ContinuityProof
+
+prometheuspraxis.continuity_proof.field.proof_id           string
+prometheuspraxis.continuity_proof.field.subject_id         string
+prometheuspraxis.continuity_proof.field.context_id         string
+prometheuspraxis.continuity_proof.field.decision_id        string
+prometheuspraxis.continuity_proof.field.epoch              uint64
+prometheuspraxis.continuity_proof.field.proof_ref_hex      string
+prometheuspraxis.continuity_proof.field.neurorights_envref ref   ref.neurorights_envelope
+prometheuspraxis.continuity_proof.field.equality_envref    ref   ref.equality_envelope
+prometheuspraxis.continuity_proof.field.k_vector           string
+prometheuspraxis.continuity_proof.field.r_vector           string
+prometheuspraxis.continuity_proof.field.capability_floor   Bounded01
+prometheuspraxis.continuity_proof.field.timestamp_utc      string
+
+prometheuspraxis.continuity_proof.invariant.epoch_monotone_per_subject true
+prometheuspraxis.continuity_proof.invariant.capability_floor_monotone   true
+prometheuspraxis.continuity_proof.invariant.r_vector_leq_global_ceil    true
+
+
+;; ---------------------------------------------------------------------------
+;; ClinicalKernel structures
+;; ---------------------------------------------------------------------------
+
+prometheuspraxis.clinical_kernel.type ClinicalKernel
+
+prometheuspraxis.clinical_kernel.field.kernel_id           string
+prometheuspraxis.clinical_kernel.field.version             string
+prometheuspraxis.clinical_kernel.field.owner_id            string
+prometheuspraxis.clinical_kernel.field.context_class       string
+prometheuspraxis.clinical_kernel.field.risk_class          string
+prometheuspraxis.clinical_kernel.field.roh_budget          Bounded01
+prometheuspraxis.clinical_kernel.field.capability_floor    Bounded01
+prometheuspraxis.clinical_kernel.field.evidence_hex        string
+prometheuspraxis.clinical_kernel.field.neurorights_envref  ref    ref.neurorights_envelope
+prometheuspraxis.clinical_kernel.field.psych_continuity_req bool
+prometheuspraxis.clinical_kernel.field.soi_c_ref           string
+prometheuspraxis.clinical_kernel.field.timestamp_utc       string
+
+prometheuspraxis.clinical_kernel.invariant.roh_budget_leq_global_ceil        true
+prometheuspraxis.clinical_kernel.invariant.capability_floor_geq_global_floor true
+prometheuspraxis.clinical_kernel.invariant.highrisk_requires_continuity      true
+
+
+;; ---------------------------------------------------------------------------
+;; Governance guard configuration
+;; ---------------------------------------------------------------------------
+
+prometheuspraxis.governance_guard.enabled        true
+prometheuspraxis.governance_guard.policy_ref     lex-machina.v1
+prometheuspraxis.governance_guard.themis_axiom_ref themis-axiom.v1
+prometheuspraxis.governance_guard.pan_ethos_ref  pan-ethos.v1
+
+prometheuspraxis.rights_risk_guard.enabled       true
+prometheuspraxis.rights_risk_guard.schutz_recht_ref schutz-recht.v1
+
+prometheuspraxis.public_good_guard.enabled       true
+prometheuspraxis.public_good_guard.res_publica_ref  res-publica.v1
+prometheuspraxis.public_good_guard.corpus_juris_ref corpus-juris.v1
+
+prometheuspraxis.monotonicity.roh_ceiling_ref        roh.global.ceiling.v1
+prometheuspraxis.monotonicity.capability_floor_ref   capability.floor.global.v1
+prometheuspraxis.monotonicity.enforce_at_runtime     true
+prometheuspraxis.monotonicity.log_violations         true
+
+
+;; ---------------------------------------------------------------------------
+;; Logging configuration
+;; ---------------------------------------------------------------------------
+
+prometheuspraxis.logging.continuity_proof_shard qpudatashards/PrometheusPraxisContinuityProof.v1.aln
+prometheuspraxis.logging.clinical_kernel_shard  qpudatashards/PrometheusPraxisClinicalKernel.v1.aln
+
+prometheuspraxis.logging.veritas_chain_ref      veritas-chain.v1
+
+prometheuspraxis.logging.decision_log_shard     qpudatashards/PrometheusPraxisDecision.v1.aln
+prometheuspraxis.logging.field.decision_id      string
+prometheuspraxis.logging.field.task_id          string
+prometheuspraxis.logging.field.allowed          bool
+prometheuspraxis.logging.field.reasons          string
+prometheuspraxis.logging.field.hextrace         string
+prometheuspraxis.logging.field.timestamp_utc    string
+prometheuspraxis.logging.field.k_e_r_vector     string
+
+
+;; ---------------------------------------------------------------------------
+;; Linked subsystems
+;; ---------------------------------------------------------------------------
+
 link.tellus_synoptikos    tellus-synoptikos.v1
 link.nova_terra           nova-terra.v1
 link.gaia_orbis           gaia-orbis.v1
@@ -38,34 +133,41 @@ link.lex_machina          lex-machina.v1
 link.atlas_consilio       atlas-consilio.v1
 link.res_publica          res-publica.v1
 link.corpus_juris         corpus-juris.v1
-link.schutzh_recht        schutz-recht.v1
+link.schutz_recht         schutz-recht.v1
 link.nosphere             nosphere.v1
 link.gemeinschaft_verein  gemeinschaft-verein.v1
 link.wachstum_faktor      wachstum-faktor.v1
 link.fortschritt_link     fortschritt-link.v1
 
-;; Execution corridors (high-level)
+
+;; ---------------------------------------------------------------------------
+;; Execution corridors
+;; ---------------------------------------------------------------------------
+
 corridor.eco_restoration
   description "All restoration plans must reduce or hold EcoImpactScore and RiskOfHarm compared to baseline."
-  metric.eco_impact_score.type   Bounded01
-  metric.risk_of_harm.type       Bounded01
-  inequality.eco_new_leq_old     EcoImpactScore_new <= EcoImpactScore_old
-  inequality.roh_new_leq_old     RiskOfHarm_new    <= RiskOfHarm_old
+  metric.eco_impact_score.type Bounded01
+  metric.risk_of_harm.type     Bounded01
+  inequality.eco_new_leq_old   EcoImpactScore_new <= EcoImpactScore_old
+  inequality.roh_new_leq_old   RiskOfHarm_new     <= RiskOfHarm_old
 
 corridor.healthcare_cybernetics
   description "Clinical + nanoswarm actions must respect lifeforce and ROH ceilings, non-rollback of capabilities."
-  metric.lifeforce_band.type     Enum Stable,Fragile,Recovering,Other
-  metric.roh_session.type        Bounded01
+  metric.lifeforce_band.type   Enum Stable,Fragile,Recovering,Other
+  metric.roh_session.type      Bounded01
   invariant.roh_session_leq_ceil roh_session <= 0.3
-  monotone.capability_floor      true
+  monotone.capability_floor    true
 
 corridor.smartcity_payments
   description "BioPay / Aug_Fingerprint flows must enforce neurorights and non-exclusion from basics."
-  ref.payment_policy_lattice     payment.policy.lattice.global.v1
-  invariant.noexclusion_basic    ref.neurorights_envelope.noexclusionbasicservices == true
-  invariant.noscore_inner        ref.neurorights_envelope.noscorefrominnerstate     == true
+  ref.payment_policy_lattice   payment.policy.lattice.global.v1
+  invariant.noexclusion_basic  ref.neurorights_envelope.noexclusionbasicservices == true
+  invariant.noscore_inner      ref.neurorights_envelope.noscorefrominnerstate     == true
 
-;; Task graph types: how Prometheus-Praxis represents plans
+
+;; ---------------------------------------------------------------------------
+;; Task graph types
+;; ---------------------------------------------------------------------------
 
 prometheuspraxis.task_type
   enum TaskKind
@@ -76,50 +178,40 @@ prometheuspraxis.task_type
     PaymentProgramRollout
 
 prometheuspraxis.task
-  field.task_id           string
-  field.kind              TaskKind
-  field.jurisdiction_ref  string   ;; e.g., policy.jurisdiction.us-az-maricopa-phoenix.v1
-  field.service_class     string   ;; e.g., ServiceClassBasic, ServiceClassExtended
-  field.eco_target        Bounded01    ;; desired EcoImpactScore improvement
-  field.roh_target        Bounded01    ;; maximum allowed RiskOfHarm delta
-  field.neurorights_env   ref neurorights.envelope.citizen.v1
-  field.equality_env      ref equality.envelope.payment_and_access.v1
+  field.task_id          string
+  field.kind             TaskKind
+  field.jurisdiction_ref string
+  field.service_class    string
+  field.eco_target       Bounded01
+  field.roh_target       Bounded01
+  field.neurorights_env  ref neurorights.envelope.citizen.v1
+  field.equality_env     ref equality.envelope.payment_and_access.v1
 
-;; Planner safety constraints (compile-time, then enforced in Rust guards)
+
+;; ---------------------------------------------------------------------------
+;; Planner safety constraints
+;; ---------------------------------------------------------------------------
 
 prometheuspraxis.planner_constraints
-  ;; Unsafe actions must be unrepresentable
-  forbidden.fields        torque,current,stimpattern,autopilot
+  forbidden.fields torque,current,stimpattern,autopilot
 
-  ;; Monotone evolution
-  inequality.G_new_leq_G_old  G_new <= G_old
-  inequality.D_new_leq_D_old  D_new <= D_old
-  inequality.R_new_leq_R_old  R_new <= R_old
+  inequality.G_new_leq_G_old G_new <= G_old
+  inequality.D_new_leq_D_old D_new <= D_old
+  inequality.R_new_leq_R_old R_new <= R_old
 
-  ;; Neurorights invariants
   require.neurorights.noexclusionbasicservices true
   require.neurorights.noscorefrominnerstate    true
   require.neurorights.noneurocoercion          true
 
-;; Metrics required from generated Rust crate (Prometheus/metrics.rs style)
 
-metric.required decoder_accuracy     Bounded01
-metric.required eco_impact_score     Bounded01
-metric.required avg_daily_device_hours_reduced Bounded01
-metric.required fatigue_index        Bounded01
-metric.required healthy_engagement_band Enum Low,Target,High
+;; ---------------------------------------------------------------------------
+;; Metrics required from generated Rust crate
+;; ---------------------------------------------------------------------------
+
+metric.required decoder_accuracy                 Bounded01
+metric.required eco_impact_score                 Bounded01
+metric.required avg_daily_device_hours_reduced   Bounded01
+metric.required fatigue_index                    Bounded01
+metric.required healthy_engagement_band          Enum Low,Target,High
 metric.required safety_invariant_violation_count Counter
 metric.required equality_violation_count         Counter
-
-;; Logging to Veritas-Chain
-
-prometheuspraxis.logging
-  veritas_chain_ref     veritas-chain.v1
-  decision_log_shard    qpudatashards/PrometheusPraxisDecision.v1.aln
-  field.decision_id     string
-  field.task_id         string
-  field.allowed         bool
-  field.reasons         string
-  field.hextrace        string
-  field.timestamp_utc   string
-  field.k_e_r_vector    string   ;; encoded K/E/R summary for this decision
