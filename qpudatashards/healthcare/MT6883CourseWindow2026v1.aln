@@ -1,0 +1,78 @@
+aln
+  title MT6883CourseWindow2026v1
+  version 1.0.0
+
+  section schema
+    -- One row per MT6883 treatment course window for a given citizen/device.
+    record MT6883CourseWindow2026v1
+      courseid           string  required true  -- stable course identifier
+      citizenid          string  required true  -- sovereign citizen DID
+      hardwarefamily     string  required true  -- "MT6883"
+      hardwareprofile    string  required true  -- e.g. "mt6883-handset-2026"
+
+      twindow_start_utc  string  required true  -- ISO-8601
+      twindow_end_utc    string  required true  -- ISO-8601
+
+      -- Risk-of-Harm and burden metrics over this course window.
+      roh_scalar_norm    f32     required true  -- 0..1, normalized RoH
+      roh_ceiling_norm   f32     required true  -- usually 0.30
+      pain_debt_norm     f32     required true  -- 0..1
+      eco_stress_norm    f32     required true  -- 0..1
+      nanoswarm_burden_norm f32  required true  -- 0..1
+
+      -- Continuity metrics and proofs.
+      continuity_grade   string  required true  -- "A","B","C"
+      continuity_ab_share f32    required true  -- 0..1, fraction in A/B
+      psych_continuity_pressure f32 required true -- 0..1 (from HealthcareRiskPlane)
+
+      -- KER summary for this course (benefits).
+      Ei_course          f32     required true  -- eco-impact
+      Ci_course          f32     required true  -- contribution incl. biocompatible cybernetics
+      Si_course          f32     required true  -- security / trust
+      Ki_course          f32     required true  -- fused K
+
+      -- Benefit evidence and non-rollback hooks.
+      reward_ker_sum     f32     required false -- sum of KER rewards for this course
+      reward_unit        string  required false -- "EcoWealthPoints", etc.
+      reward_ledger_batchid string required false
+
+      continuity_proofhex string required true  -- hash of continuity+RoH proof bundle
+      rohchainhex         string required true  -- RoH chain hash across episodes
+      nonrollback_anchorid string required true -- NonRollbackProvenanceAnchor id
+
+      mt6883registryid   string  required false -- optional FK into mt6883registry row
+    end
+  endsection
+
+  section invariants
+    invariant RoHRespectsCeiling
+      description Normalized RoH must not exceed its own ceiling.
+      condition
+        forall c in MT6883CourseWindow2026v1 .
+          c.roh_scalar_norm <= c.roh_ceiling_norm
+    end
+
+    invariant ContinuityABShareConsistent
+      description continuity_ab_share must be in [0,1].
+      condition
+        forall c in MT6883CourseWindow2026v1 .
+          c.continuity_ab_share >= 0.0 and c.continuity_ab_share <= 1.0
+    end
+
+    invariant PsychPressureMonotoneWithRisk
+      description psych_continuity_pressure must be >= max(rohrisk, pain, eco_stress).
+      condition
+        forall c in MT6883CourseWindow2026v1 .
+          c.psych_continuity_pressure >= c.roh_scalar_norm and
+          c.psych_continuity_pressure >= c.pain_debt_norm and
+          c.psych_continuity_pressure >= c.eco_stress_norm
+    end
+
+    invariant NonRollbackAnchorRequired
+      description Every course window must be anchored to NonRollbackProvenanceAnchor.
+      condition
+        forall c in MT6883CourseWindow2026v1 .
+          c.nonrollback_anchorid != ""
+    end
+  endsection
+end
