@@ -61,6 +61,7 @@ members = [
     "crates/ecoresponseshard",
     "crates/eco-chat-ffi",
     "crates/ker-score-lab",
+    "crates/prometheus-praxis",
 
     # Phase 0 governance spine and guards
     "crates/econet-governance-spine",
