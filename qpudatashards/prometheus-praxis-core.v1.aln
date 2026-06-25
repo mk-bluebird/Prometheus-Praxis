@@ -1,0 +1,125 @@
+title Prometheus-Praxis Core Execution Engine v1
+version 1
+aln_migration ALN.MIGRATION.CYBERCORE_AUTHORITY.v1
+
+binding.host_did didalnorganic-host
+binding.bostrom_address bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+
+;; Canonical neurorights + equality envelope (external, referenced)
+ref.neurorights_envelope  neurorights.envelope.citizen.v1
+ref.equality_envelope     equality.envelope.payment_and_access.v1
+
+;; Global invariants
+invariant.roh_global_ceiling 0.3
+invariant.monotone_ota       true
+invariant.no_actuation_fields torque,current,stimpattern,autopilot
+
+;; Prometheus-Praxis identity
+prometheuspraxis.id       prometheus-praxis.core.v1
+prometheuspraxis.role     AdaptiveImplementationEngine
+prometheuspraxis.domain   EcosystemRestoration, Healthcare, Cybernetics, SmartCity
+prometheuspraxis.scope    PlanetaryStewardship, HumanAugmentation, EcoPayments
+
+;; Linked subsystems (names from Architecting Authority)
+link.tellus_synoptikos    tellus-synoptikos.v1
+link.nova_terra           nova-terra.v1
+link.gaia_orbis           gaia-orbis.v1
+link.summus_civitas       summus-civitas.v1
+link.hestia_continuus     hestia-continuus.v1
+link.perknos_nexus        perknos-nexus.v1
+link.aug_fingerprint      aug-fingerprint.guard.v1
+link.biopay_mop           biopay.mop.core.v1
+link.veritas_chain        veritas-chain.v1
+link.nyx_semantix         nyx-semantix.v1
+link.semanticus           semanticus.v1
+link.ontos_veritas        ontos-veritas.v1
+link.janus_veritas        janus-veritas.v1
+link.lex_machina          lex-machina.v1
+link.atlas_consilio       atlas-consilio.v1
+link.res_publica          res-publica.v1
+link.corpus_juris         corpus-juris.v1
+link.schutzh_recht        schutz-recht.v1
+link.nosphere             nosphere.v1
+link.gemeinschaft_verein  gemeinschaft-verein.v1
+link.wachstum_faktor      wachstum-faktor.v1
+link.fortschritt_link     fortschritt-link.v1
+
+;; Execution corridors (high-level)
+corridor.eco_restoration
+  description "All restoration plans must reduce or hold EcoImpactScore and RiskOfHarm compared to baseline."
+  metric.eco_impact_score.type   Bounded01
+  metric.risk_of_harm.type       Bounded01
+  inequality.eco_new_leq_old     EcoImpactScore_new <= EcoImpactScore_old
+  inequality.roh_new_leq_old     RiskOfHarm_new    <= RiskOfHarm_old
+
+corridor.healthcare_cybernetics
+  description "Clinical + nanoswarm actions must respect lifeforce and ROH ceilings, non-rollback of capabilities."
+  metric.lifeforce_band.type     Enum Stable,Fragile,Recovering,Other
+  metric.roh_session.type        Bounded01
+  invariant.roh_session_leq_ceil roh_session <= 0.3
+  monotone.capability_floor      true
+
+corridor.smartcity_payments
+  description "BioPay / Aug_Fingerprint flows must enforce neurorights and non-exclusion from basics."
+  ref.payment_policy_lattice     payment.policy.lattice.global.v1
+  invariant.noexclusion_basic    ref.neurorights_envelope.noexclusionbasicservices == true
+  invariant.noscore_inner        ref.neurorights_envelope.noscorefrominnerstate     == true
+
+;; Task graph types: how Prometheus-Praxis represents plans
+
+prometheuspraxis.task_type
+  enum TaskKind
+    EcoRestoration
+    SmartCityUpgrade
+    HealthcareProcedure
+    AugmentationUpgrade
+    PaymentProgramRollout
+
+prometheuspraxis.task
+  field.task_id           string
+  field.kind              TaskKind
+  field.jurisdiction_ref  string   ;; e.g., policy.jurisdiction.us-az-maricopa-phoenix.v1
+  field.service_class     string   ;; e.g., ServiceClassBasic, ServiceClassExtended
+  field.eco_target        Bounded01    ;; desired EcoImpactScore improvement
+  field.roh_target        Bounded01    ;; maximum allowed RiskOfHarm delta
+  field.neurorights_env   ref neurorights.envelope.citizen.v1
+  field.equality_env      ref equality.envelope.payment_and_access.v1
+
+;; Planner safety constraints (compile-time, then enforced in Rust guards)
+
+prometheuspraxis.planner_constraints
+  ;; Unsafe actions must be unrepresentable
+  forbidden.fields        torque,current,stimpattern,autopilot
+
+  ;; Monotone evolution
+  inequality.G_new_leq_G_old  G_new <= G_old
+  inequality.D_new_leq_D_old  D_new <= D_old
+  inequality.R_new_leq_R_old  R_new <= R_old
+
+  ;; Neurorights invariants
+  require.neurorights.noexclusionbasicservices true
+  require.neurorights.noscorefrominnerstate    true
+  require.neurorights.noneurocoercion          true
+
+;; Metrics required from generated Rust crate (Prometheus/metrics.rs style)
+
+metric.required decoder_accuracy     Bounded01
+metric.required eco_impact_score     Bounded01
+metric.required avg_daily_device_hours_reduced Bounded01
+metric.required fatigue_index        Bounded01
+metric.required healthy_engagement_band Enum Low,Target,High
+metric.required safety_invariant_violation_count Counter
+metric.required equality_violation_count         Counter
+
+;; Logging to Veritas-Chain
+
+prometheuspraxis.logging
+  veritas_chain_ref     veritas-chain.v1
+  decision_log_shard    qpudatashards/PrometheusPraxisDecision.v1.aln
+  field.decision_id     string
+  field.task_id         string
+  field.allowed         bool
+  field.reasons         string
+  field.hextrace        string
+  field.timestamp_utc   string
+  field.k_e_r_vector    string   ;; encoded K/E/R summary for this decision
