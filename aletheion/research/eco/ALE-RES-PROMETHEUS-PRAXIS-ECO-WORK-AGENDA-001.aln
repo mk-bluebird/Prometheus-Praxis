@@ -1,0 +1,345 @@
+aln_schema ALE-RES-PROMETHEUS-PRAXIS-ECO-WORK-AGENDA-001 {
+  meta {
+    role        = "ResearchAgendaShard"
+    domain      = "EcoWork"
+    engine      = "Prometheus-Praxis"
+    scope       = ["NovaTerra", "Tellus-Synoptikos", "Gaia-Sentinel",
+                   "Boden-Wesen", "Erde-Sync", "BioticTreaty"]
+    version     = "0.1.0"
+    status      = "active"
+    jurisdiction= ["GLOBAL", "PHOENIX", "EU"]
+    notes       = "Tracks concrete, non-fictional research tasks for translating
+                   planetary simulation and monitoring outputs into governed,
+                   daily restoration actions across land, marine, and coastal systems."
+  }
+
+  type ResearchId = string;
+  type WorkflowId = string;
+  type RegionId   = string;   // e.g. REGION_DOWNTOWN_CORE, REGION_MANGROVE_BAY_X
+  type ChainId    = string;   // e.g. SMART01_AWP_THERMAL_THERMAPHORA
+  type TreatyId   = string;   // BioticTreaty, IndigenousWaterTreaty, EU-NRR-ArticleRef
+  type MetricId   = string;   // K, E, R components or derived eco indices
+
+  enum ResearchStatus {
+    PLANNED;
+    IN_PROGRESS;
+    VALIDATED_PATTERN;
+    DEPRECATED;
+  }
+
+  enum Priority {
+    P0_MUST;
+    P1_HIGH;
+    P2_MEDIUM;
+    P3_LOW;
+  }
+
+  enum DomainFocus {
+    FOREST_LAND;
+    MARINE_COASTAL;
+    SOIL_GROUNDWATER;
+    CARBON;
+    BIODIVERSITY;
+    MULTI_REGION_SYNC;
+  }
+
+  enum TriggerSource {
+    NOVA_TERRA_SCENARIO;
+    TELLUS_SYNOPTIKOS_STATE;
+    GAIA_SENTINEL_ALERT;
+    BODEN_WESEN_MEASUREMENT;
+    SMART_CHAIN_POLICY;
+  }
+
+  enum CorridorType {
+    SOIL_CORRIDOR;
+    WATER_CORRIDOR;
+    HABITAT_CORRIDOR;
+    HEAT_BUDGET_CORRIDOR;
+  }
+
+  enum ConstraintKind {
+    HARD;
+    SOFT_HIGH_PENALTY;
+  }
+
+  // Unified K/E/R metric components
+  record KerScore {
+    eco_impact      : float;     // + higher is better
+    risk_of_harm    : float;     // + higher is worse
+    knowledge_yield : float;     // + higher is better
+    composite       : float;     // pre-weighted score; ROH must still pass ceilings
+  }
+
+  // Generic research task descriptor
+  record ResearchTask {
+    id              : ResearchId;
+    label           : string;
+    status          : ResearchStatus;
+    priority        : Priority;
+    domain          : DomainFocus;
+    owner_workflow  : WorkflowId;    // which Aletheion workflow will consume this
+    region          : RegionId?;
+    depends_on      : list<ResearchId>;
+    related_chains  : list<ChainId>;
+    related_treaties: list<TreatyId>;
+    outputs_schemas : list<string>;  // ALN schema ids this task must define or extend
+    notes           : string;
+  }
+
+  // 1. Nova Terra → daily sorties, corridor-safe
+  record Task_NovaTerra_To_Daily_Sorties {
+    base : ResearchTask;
+
+    // Which simulation types this mapping must cover
+    supported_scenario_classes : list<string>; // e.g. "REFORESTATION_TILE", "MANGROVE_RESTORE"
+
+    // Soil/water/habitat corridors that must be respected as constraints
+    corridor_types             : list<CorridorType>;
+    corridor_constraint_kind   : ConstraintKind;  // usually HARD
+
+    // Target workflow skeletons
+    target_workflows           : list<WorkflowId>; // e.g. "ALE-ERM-RESTORATION-SORTIES-001"
+
+    // Required bindings
+    requires_birthsign_binding : bool;
+    requires_biotictreaty_check: bool;
+  }
+
+  // 2. Gaia Sentinel auto-pause thresholds
+  record Task_GaiaSentinel_Thresholds {
+    base : ResearchTask;
+
+    monitored_metrics   : list<string>; // e.g. "SOIL_MOISTURE_IDX", "DROUGHT_IDX", "FIRE_RISK"
+    trigger_sources     : list<TriggerSource>; // GAIA_SENTINEL_ALERT, TELLUS_SYNOPTIKOS_STATE
+    pause_conditions_aln: string;       // reference to ALN rule-set id
+    affected_domains    : list<DomainFocus>;
+  }
+
+  // 3. Unified K/E/R metric normalization for eco-restoration
+  record Task_KER_Normalization {
+    base : ResearchTask;
+
+    metric_ids          : list<MetricId>;   // K, E, R component ids
+    composite_formula   : string;          // human-readable formula; code lives in Rust
+    roh_max_allowed     : float;           // global ROH ceiling; chain-specific ceilings can be tighter
+    eco_min_required    : float?;          // minimum eco-impact to consider an action worth doing
+    knowledge_min_required : float?;       // optional floor for experimentation tasks
+  }
+
+  // 4. EU Nature Restoration governance envelope for marine deployments
+  record Task_EU_NRR_Marine_Evidence {
+    base : ResearchTask;
+
+    eu_regulation_refs  : list<string>;    // article numbers, directive ids
+    mandatory_treaty_ids: list<TreatyId>;  // Natura2000, MSFD, local Indigenous treaties where relevant
+    required_evidence_fields : list<string>; // e.g. "BIRTH_SIGN_ID", "ALN_NORMS", "FPIC_STATUS", "IMPACT_ASSESSMENT_ID"
+    target_tx_schema_id : string;         // e.g. "ALE-TRUST-MARINE-RESTORATION-TX-001"
+  }
+
+  // 5. Boden-Wesen → Tellus-Synoptikos 24h loop
+  record Task_BodenWesen_24h_Loop {
+    base : ResearchTask;
+
+    soil_feature_vector : list<string>;    // e.g. "MOISTURE", "NITROGEN", "PH", "CONTAMINATION_IDX"
+    max_propagation_delay_hours : int;    // e.g. 24
+    required_sla_enforcement_chain: ChainId; // SMART chain that encodes the SLA
+    stale_data_policy  : string;          // e.g. "BLOCK_NEW_ACTIONS_IF_STALE"
+  }
+
+  // 6. Anti-carbon-only over-optimization
+  record Task_Carbon_Biodiversity_Guardrail {
+    base : ResearchTask;
+
+    biodiversity_hard_constraints : list<string>; // ids of constraints that cannot be traded off
+    biodiversity_objectives       : list<string>; // softer objectives that can be optimized
+    carbon_objectives             : list<string>; // e.g. "CARBON_SEQUESTRATION", "HEAT_REDUCTION"
+    smart_chain_ids               : list<ChainId>; // which chains must forbid biodiversity-sacrificing Pareto points
+  }
+
+  // 7. Multi-timezone Erde-Sync campaigns for mangroves
+  record Task_ErdeSync_MultiRegion_Mangrove {
+    base : ResearchTask;
+
+    campaign_id        : string;          // e.g. "MANGROVE_GLOBAL_WAVE_001"
+    participating_regions : list<RegionId>;
+    local_constraints  : list<string>;    // tide windows, safe heat hours, labor safety, nursery capacity
+    shared_assets      : list<string>;    // nurseries, satellite capacity, core logistics fleets
+    governance_requirements : list<string>; // e.g. "ALL_LOCAL_BIRTHSIGNS_REQUIRED", "FPIC_PER_REGION"
+  }
+
+  // ====== Agenda Instances for Questions 1–7 ======
+
+  const AGENDA_TASK_1_NOVA_TERRA_TO_SORTIES : Task_NovaTerra_To_Daily_Sorties = {
+    base = {
+      id               = "RES-ECO-0001";
+      label            = "Map Nova Terra restoration scenarios to daily, corridor-safe sorties";
+      status           = IN_PROGRESS;
+      priority         = P0_MUST;
+      domain           = FOREST_LAND;
+      owner_workflow   = "ALE-ERM-RESTORATION-SORTIES-001";
+      region           = "GLOBAL";
+      depends_on       = [];
+      related_chains   = ["SMART01_AWP_THERMAL_THERMAPHORA"];
+      related_treaties = ["GENERIC-BIOTIC-TREATY", "INDIGENOUS-LAND-USE-BASELINE"];
+      outputs_schemas  = ["ALE-ERM-RESTORATION-TASK-001.aln",
+                          "ALE-GOV-CORRIDOR-CONSTRAINTS-001.aln"];
+      notes            = "Implements question 1: Nova Terra → daily sorties without violating soil/water corridors.";
+    };
+    supported_scenario_classes   = ["REFORESTATION_TILE", "GRASSLAND_RESTORE", "MANGROVE_RESTORE"];
+    corridor_types               = [SOIL_CORRIDOR, WATER_CORRIDOR, HABITAT_CORRIDOR, HEAT_BUDGET_CORRIDOR];
+    corridor_constraint_kind     = HARD;
+    target_workflows             = ["ALE-ERM-RESTORATION-SORTIES-001"];
+    requires_birthsign_binding   = true;
+    requires_biotictreaty_check  = true;
+  };
+
+  const AGENDA_TASK_2_GAIA_THRESHOLDS : Task_GaiaSentinel_Thresholds = {
+    base = {
+      id               = "RES-ECO-0002";
+      label            = "Define Gaia Sentinel thresholds for auto-pause of reforestation sorties";
+      status           = PLANNED;
+      priority         = P0_MUST;
+      domain           = FOREST_LAND;
+      owner_workflow   = "ALE-ERM-RESTORATION-SORTIES-001";
+      region           = "GLOBAL";
+      depends_on       = ["RES-ECO-0001"];
+      related_chains   = ["SMART01_AWP_THERMAL_THERMAPHORA"];
+      related_treaties = ["GENERIC-BIOTIC-TREATY"];
+      outputs_schemas  = ["ALE-GOV-GAIA-THRESHOLDS-001.aln"];
+      notes            = "Implements question 2: auto-pause windows encoded as ALN constraints checked in Governance Pre-flight.";
+    };
+    monitored_metrics   = ["SOIL_MOISTURE_IDX", "DROUGHT_IDX", "FIRE_RISK_IDX", "HEAT_STRESS_IDX"];
+    trigger_sources     = [GAIA_SENTINEL_ALERT, TELLUS_SYNOPTIKOS_STATE];
+    pause_conditions_aln= "ALE-GOV-GAIA-THRESHOLDS-001.aln::PAUSE_RULES";
+    affected_domains    = [FOREST_LAND, SOIL_GROUNDWATER];
+  };
+
+  const AGENDA_TASK_3_KER_METRIC : Task_KER_Normalization = {
+    base = {
+      id               = "RES-ECO-0003";
+      label            = "Normalize and bind K/E/R metrics for restoration actions into a single composite score";
+      status           = IN_PROGRESS;
+      priority         = P1_HIGH;
+      domain           = FOREST_LAND;
+      owner_workflow   = "ALE-TRUST-GOVERNED-DECISION-TX-001";
+      region           = "GLOBAL";
+      depends_on       = [];
+      related_chains   = ["SMART01_AWP_THERMAL_THERMAPHORA"];
+      related_treaties = [];
+      outputs_schemas  = ["ALE-METRICS-KER-001.aln", "ALE-TRUST-GOVERNED-DECISION-TX-001.aln"];
+      notes            = "Implements question 3: unified metric while preserving explicit ROH ceilings and decomposed components.";
+    };
+    metric_ids          = ["K_KNOWLEDGE_YIELD", "E_ECO_IMPACT", "R_RISK_OF_HARM"];
+    composite_formula   = "Score = wK*K - wR*R + wE*E; wR >= wE >= wK; R <= roh_max_allowed.";
+    roh_max_allowed     = 0.2;
+    eco_min_required    = 0.0;
+    knowledge_min_required = null;
+  };
+
+  const AGENDA_TASK_4_EU_MARINE : Task_EU_NRR_Marine_Evidence = {
+    base = {
+      id               = "RES-ECO-0004";
+      label            = "Define governance evidence envelope for marine restoration deployments under EU NRR";
+      status           = PLANNED;
+      priority         = P0_MUST;
+      domain           = MARINE_COASTAL;
+      owner_workflow   = "ALE-ERM-MARINE-RESTORATION-001";
+      region           = "EU";
+      depends_on       = [];
+      related_chains   = ["SMARTxx_MARINE_EU_NRR"]; // to be concretized
+      related_treaties = ["EU-NRR-BASELINE", "MSFD-BASELINE", "NATURA2000-BASELINE"];
+      outputs_schemas  = ["ALE-TRUST-MARINE-RESTORATION-TX-001.aln"];
+      notes            = "Implements question 4: which evidence fields must be present to satisfy EU Nature Restoration Regulation.";
+    };
+    eu_regulation_refs  = ["EU-NRR-2023-XXX-ART4", "EU-NRR-2023-XXX-ARTxx"];
+    mandatory_treaty_ids= ["MSFD-BASELINE", "NATURA2000-BASELINE"];
+    required_evidence_fields = [
+      "BIRTH_SIGN_ID",
+      "ALN_NORM_IDS",
+      "FPIC_STATUS",
+      "IMPACT_ASSESSMENT_ID",
+      "KER_SCORE",
+      "DEPLOYMENT_REGION",
+      "CHAIN_ID"
+    ];
+    target_tx_schema_id = "ALE-TRUST-MARINE-RESTORATION-TX-001";
+  };
+
+  const AGENDA_TASK_5_BODEN_LOOP : Task_BodenWesen_24h_Loop = {
+    base = {
+      id               = "RES-ECO-0005";
+      label            = "Guarantee Boden-Wesen soil diagnostics feed Tellus-Synoptikos within 24 hours";
+      status           = IN_PROGRESS;
+      priority         = P0_MUST;
+      domain           = SOIL_GROUNDWATER;
+      owner_workflow   = "ALE-ERM-SOIL-SYNC-001";
+      region           = "GLOBAL";
+      depends_on       = [];
+      related_chains   = ["SMARTxx_SOIL_STATE_SLA"];
+      related_treaties = ["GENERIC-BIOTIC-TREATY"];
+      outputs_schemas  = ["ALE-ERM-SOIL-STATE-001.aln", "ALE-GOV-SLA-CONSTRAINTS-001.aln"];
+      notes            = "Implements question 5: Boden-Wesen → Tellus-Synoptikos propagation SLA, with stale-data blocking policy.";
+    };
+    soil_feature_vector = ["MOISTURE", "NITROGEN", "PH", "SALINITY", "CONTAMINATION_IDX"];
+    max_propagation_delay_hours = 24;
+    required_sla_enforcement_chain = "SMARTxx_SOIL_STATE_SLA";
+    stale_data_policy  = "BLOCK_NEW_RESTORATION_ACTIONS_IF_LAST_SOIL_SNAPSHOT_AGE_GT_24H";
+  };
+
+  const AGENDA_TASK_6_ANTI_CARBON : Task_Carbon_Biodiversity_Guardrail = {
+    base = {
+      id               = "RES-ECO-0006";
+      label            = "Prevent over-optimization for carbon at expense of biodiversity";
+      status           = PLANNED;
+      priority         = P0_MUST;
+      domain           = BIODIVERSITY;
+      owner_workflow   = "ALE-OPT-HEAT-WATER-TREE-001";
+      region           = "GLOBAL";
+      depends_on       = ["RES-ECO-0003"];
+      related_chains   = ["SMART01_AWP_THERMAL_THERMAPHORA", "SMART03_SYNTHEXIS_LNP_ENV"];
+      related_treaties = ["GENERIC-BIOTIC-TREATY"];
+      outputs_schemas  = ["ALE-OPT-HEAT-WATER-TREE-001.aln", "ALE-GOV-BIODIVERSITY-GUARDRAIL-001.aln"];
+      notes            = "Implements question 6: encode biodiversity as hard constraints + objectives, forbidding carbon-only Pareto points.";
+    };
+    biodiversity_hard_constraints = [
+      "NO_MONOCULTURE_WHERE_BIOTIC_TREATY_PRESENT",
+      "MAINTAIN_CORRIDOR_CONNECTIVITY_ABOVE_THRESHOLD",
+      "NO_INTRODUCTION_OF_INVASIVE_SPECIES"
+    ];
+    biodiversity_objectives       = ["MAX_HABITAT_CONNECTIVITY", "MAX_NATIVE_SPECIES_SUPPORT"];
+    carbon_objectives             = ["MAX_CARBON_SEQUESTRATION", "MIN_URBAN_HEAT"];
+    smart_chain_ids               = ["SMART01_AWP_THERMAL_THERMAPHORA", "SMART03_SYNTHEXIS_LNP_ENV"];
+  };
+
+  const AGENDA_TASK_7_ERDE_SYNC_MANGROVE : Task_ErdeSync_MultiRegion_Mangrove = {
+    base = {
+      id               = "RES-ECO-0007";
+      label            = "Coordinate Erde-Sync across timezones for synchronized mangrove campaigns";
+      status           = PLANNED;
+      priority         = P1_HIGH;
+      domain           = MULTI_REGION_SYNC;
+      owner_workflow   = "ALE-ERM-MANGROVE-CAMPAIGN-001";
+      region           = "GLOBAL";
+      depends_on       = ["RES-ECO-0001"];
+      related_chains   = ["SMARTyy_ERDE_SYNC_GLOBAL"];
+      related_treaties = ["COASTAL_BIOTIC_TREATY_BASELINE"];
+      outputs_schemas  = ["ALE-ERM-MANGROVE-CAMPAIGN-001.aln", "ALE-GOV-CAMPAIGN-TX-001.aln"];
+      notes            = "Implements question 7: multi-region time-synced campaigns, respecting each region's BirthSigns and safety corridors.";
+    };
+    campaign_id        = "MANGROVE_GLOBAL_WAVE_001";
+    participating_regions = ["REGION_MANGROVE_BAY_A", "REGION_MANGROVE_BAY_B", "REGION_MANGROVE_DELTA_C"];
+    local_constraints  = [
+      "TIDE_WINDOW_LOCAL",
+      "SAFE_HEAT_HOURS_LOCAL",
+      "LABOR_SAFETY_RULES_LOCAL",
+      "NURSERY_CAPACITY_LOCAL"
+    ];
+    shared_assets      = ["GLOBAL_MANGROVE_NURSERY_POOL", "SATELLITE_DOWNLINK_BANDWIDTH", "GLOBAL_LOGISTICS_FLEET"];
+    governance_requirements = [
+      "ALL_LOCAL_BIRTHSIGNS_REQUIRED",
+      "FPIC_PER_REGION_REQUIRED",
+      "KER_METRICS_PER_REGION_REQUIRED"
+    ];
+  };
+}
