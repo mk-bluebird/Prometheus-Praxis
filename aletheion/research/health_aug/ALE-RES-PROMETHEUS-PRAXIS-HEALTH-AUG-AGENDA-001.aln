@@ -1,0 +1,180 @@
+aln_schema ALE-RES-PROMETHEUS-PRAXIS-HEALTH-AUG-AGENDA-001 {
+  meta {
+    role         = "ResearchAgendaShard";
+    domain       = "HealthAugmentation";
+    engine       = "Prometheus-Praxis";
+    scope        = ["CryptoSomatic-Shield", "Hestia-Continuus", "Perknos-Nexus", "Panacea-Logos"];
+    authority    = "eco_restoration_shard";
+    version      = "0.1.0";
+    status       = "active";
+    jurisdiction = ["GLOBAL", "PHOENIX", "EU"];
+    notes        = "Tracks concrete, non-fictional research tasks for translating neurorights, psychological continuity, and high-risk healthcare/cybernetic interfaces into governed, daily operations for augmented citizens.";
+  }
+
+  type ResearchId  = string;
+  type WorkflowId  = string;
+  type RegionId    = string;   // e.g. REGION_PHOENIX_DOWNTOWN, REGION_CLINIC_MT6883_X
+  type PlaneId     = string;   // e.g. HEALTHCARE_RISK_PLANE_2026V1
+  type TreatyId    = string;   // e.g. BioticTreaty, IndigenousWaterTreaty, EU-NRR-ArticleRef
+  type NeurorightId= string;   // e.g. NR_NO_IDENTITY_SWAP
+  type MetricId    = string;   // K, E, R components or derived risk indices
+  type SoicId      = string;   // Sovereign Ontology Identity Card
+  type ShardId     = string;   // e.g. BrainIdentityBindingShard2026v1
+
+  enum ResearchStatus {
+    PLANNED;
+    IN_PROGRESS;
+    VALIDATED_PATTERN;
+    DEPRECATED;
+  }
+
+  enum Priority {
+    P0_MUST;
+    P1_HIGH;
+    P2_MEDIUM;
+    P3_LOW;
+  }
+
+  enum DomainFocus {
+    BIOSIGNAL_NEURORIGHTS;
+    PSYCH_CONTINUITY;
+    CYBERNETIC_INTERFACE;
+    CLINICAL_PROTOCOL;
+    RISK_PLANE;
+    REWARD_MONOTONICITY;
+    GOVERNANCE_BINDINGS;
+  }
+
+  enum CorridorKind {
+    SOMATIC_ENVELOPE;
+    CONTINUITY_CORRIDOR;
+    HIGH_RISK_MEDICAL;
+    REWARD_CORRIDOR;
+  }
+
+  enum ConstraintKind {
+    HARD;
+    SOFT_HIGH_PENALTY;
+  }
+
+  enum TriggerSource {
+    MT6883_COURSE_WINDOW;
+    CRYPTOSOMATIC_ALERT;
+    HESTIA_CONTINUUS_EVENT;
+    PERKNOS_NEXUS_SESSION;
+    PANACEA_LOGOS_DECISION;
+  }
+
+  record KerScore {
+    eco_impact      : float;   // + higher is better
+    risk_of_harm    : float;   // + higher is worse
+    knowledge_yield : float;   // + higher is better
+    composite       : float;   // pre-weighted score; RoH ceiling still enforced
+  }
+
+  record ResearchTask {
+    id               : ResearchId;
+    label            : string;
+    status           : ResearchStatus;
+    priority         : Priority;
+    domain           : DomainFocus;
+    owner_workflow   : WorkflowId;     // corresponding concrete workflow in repos
+    region           : RegionId?;
+    depends_on       : list<ResearchId>;
+    related_planes   : list<PlaneId>;
+    related_treaties : list<TreatyId>;
+    related_neurorights : list<NeurorightId>;
+    outputs_schemas  : list<string>;   // ALN schema ids to define or extend
+    notes            : string;
+  }
+
+  //
+  // 1. CryptoSomatic Shield — FEAR/PAIN/SANITY envelopes and consent kernels
+  //
+  record Task_CryptoSomatic_Shield_Envelopes {
+    base : ResearchTask;
+
+    envelope_plane_id       : PlaneId;      // e.g. CRYPTOSOMATIC_SOMATIC_ENVELOPE_2026V1
+    envelope_coordinates    : list<string>; // e.g. ["fear_norm","pain_norm","sanity_norm"]
+    envelope_constraint_kind: ConstraintKind;
+    required_workflows      : list<WorkflowId>; // e.g. ALE-HB-SOMATIC-KERNEL-001, ALE-HB-CONSENT-STATE-001
+    hashonly_required       : bool;         // raw neuro data forbidden when true
+  }
+
+  //
+  // 2. Healthcare risk plane and MT6883 binding (Hestia-Continuus, Panacea-Logos)
+  //
+  record Task_Healthcare_RiskPlane_2026 {
+    base : ResearchTask;
+
+    risk_plane_id           : PlaneId;      // HEALTHCARE_RISK_PLANE_2026V1
+    coordinates             : list<string>; // ["r_healthcare","r_nanoswarm","r_surgery","r_thermal_overload","r_near_death"]
+    global_roh_ceiling_norm : float;       // e.g. 0.30
+    near_death_corridor_kind: CorridorKind; // CONTINUITY_CORRIDOR/HIGH_RISK_MEDICAL
+    mt6883_course_shard_ids : list<ShardId>;
+    requires_continuity_proofhex : bool;
+  }
+
+  //
+  // 3. Psychological continuity hardening (Hestia-Continuus)
+  //
+  record Task_Psychological_Continuity_Assurance {
+    base : ResearchTask;
+
+    soic_required_flags     : list<NeurorightId>; // NR_NO_IDENTITY_SWAP, NR_AUDITABLE_CONTINUITY, etc.
+    continuity_shard_ids    : list<ShardId>;      // BrainIdentityBindingShard2026v1, NonRollbackProvenanceAnchor
+    continuity_corridor_kind: CorridorKind;       // CONTINUITY_CORRIDOR
+    max_course_gap_seconds  : int;               // continuity window tolerance
+    explicit_continuity_evidence_required : bool;
+  }
+
+  //
+  // 4. Perknos-Nexus high-intensity interface safety and KER ropes
+  //
+  record Task_Perknos_Nexus_Interface_Safety {
+    base : ResearchTask;
+
+    interface_modes         : list<string>;   // e.g. "READ_ONLY","WRITE_LIMITED","CLOSED_LOOP"
+    max_risk_plane_ids      : list<PlaneId>;  // which risk planes must be consulted for each mode
+    vt_residual_max         : float;          // Lyapunov residual ceiling during interface sessions
+    required_ker_metrics    : list<MetricId>; // e.g. ["K_knowledge_gain","E_energy_cost","R_responsibility"]
+    requires_crypto_somatic : bool;          // CryptoSomatic envelopes mandatory
+  }
+
+  //
+  // 5. Panacea-Logos governed clinical decision bundles
+  //
+  record Task_Panacea_Logos_Clinical_Bundles {
+    base : ResearchTask;
+
+    decision_bundle_schema_id : string;       // e.g. PANACEA-CLINICAL-DECISION-BUNDLE-2026V1
+    required_evidence_fields  : list<string>; // "continuityhash","evidencehex","rohanchorhex","healthcare_plane_state"
+    linked_trust_tx_schema_id : string;       // e.g. ALE-TRUST-GOVERNED-DECISION-TX-001
+    requires_two_human_review : bool;
+  }
+
+  //
+  // 6. Reward monotonicity and benefit corridors for high-risk health work
+  //
+  record Task_Reward_Monotonicity_Health {
+    base : ResearchTask;
+
+    reward_table_id          : string;        // e.g. KERREWARD_HEALTH_2026V1
+    reward_metric_ids        : list<MetricId>;
+    reward_corridor_kind     : CorridorKind;  // REWARD_CORRIDOR
+    non_decreasing_except_dual_review : bool;
+    requires_harm_review_workflow_id  : WorkflowId; // dual-review compensating events
+  }
+
+  //
+  // 7. Governance bindings and CI gates for health/aug shards
+  //
+  record Task_Governance_CI_HealthAug {
+    base : ResearchTask;
+
+    governance_tx_schema_ids : list<string>;  // ALE-TRUST-GOVERNED-DECISION-TX-001, etc.
+    required_ci_jobs         : list<string>;  // workflow names enforcing NonRollbackProvenanceAnchor, neurorights checks
+    affected_repos           : list<string>;  // "eco_restoration_shard","EcoNet","Virta-Sys","Eco-Fort"
+    must_enforce_hashonly    : bool;         // HASHONLY enforcement for biosignal/augmentation evidence
+  }
+}
