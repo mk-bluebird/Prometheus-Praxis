@@ -1,0 +1,560 @@
+title PrometheusPraxisEcoRestorationDatashard2026v1
+destination-path,plane,module,version,role,design,neuro-risk,energy-efficiency
+vnode/ecorestoration/prometheus-praxis.aln,PrometheusPraxis,AdaptiveImplementationEngine,1.0.0,EcoRestorationCoordinator,DMedium,NRLow,EEHigh
+
+# ============================================================================
+# 1. ALN RestorationTask schema + corridor constraints
+# ============================================================================
+
+schema RestorationTask
+  id                string          ; stable task identifier (e.g. tile-run UUID)
+  tile-id           string          ; Nova Terra / Tellus-Synoptikos tile identifier
+  scenario-id       string          ; Nova Terra scenario template id
+  birth-sign-id     string          ; governance / treaty bundle id
+  action-kind       enum            ; {Planting,SoilTreatment,WaterRouting,ErosionControl,Monitoring}
+  species-code      string?         ; e.g. FAO / GBIF reference for planted species
+  area-m2           f64             ; affected surface area
+  trees-count       u32?            ; if action-kind = Planting
+  soil-depth-m      f32?            ; effective depth of soil action
+  start-window-utc  datetime        ; earliest allowed start time
+  end-window-utc    datetime        ; latest allowed start time
+  drone-profile-id  string?         ; Erde-Sync / Raum-Leitung drone profile
+  robot-profile-id  string?         ; ground robot profile where relevant
+  corridor-ref-id   string          ; references CorridorEnvelope.id
+  k-score           f32             ; knowledge yield component (0..1)
+  eco-score         f32             ; eco-impact component (0..1)
+  roh-score         f32             ; risk-of-harm component (0..1)
+  composite-score   f32             ; bound-safe composite, defined below
+  roh-hard-floor    f32             ; maximum allowed RoH for this task, <= global ceiling
+  created-at-utc    datetime
+  created-by        string          ; Prometheus-Praxis engine DID
+  justification-ref string          ; pointer to Nova Terra / Gaia Sentinel evidence bundle
+  state             enum            ; {Planned,PreflightRejected,AutoPaused,Queued,InFlight,Completed,Aborted}
+
+schema CorridorEnvelope
+  id                      string
+  tile-id                 string
+  birth-sign-id           string
+  # soil corridors
+  soil-moisture-min       f32       ; volumetric %, lower bound for safe intervention
+  soil-moisture-max       f32       ; volumetric %, upper bound to avoid compaction/runoff
+  soil-salinity-max       f32       ; dS/m, salinity ceiling
+  soil-ph-min             f32
+  soil-ph-max             f32
+  soil-organic-matter-min f32       ; %, minimum to avoid further degradation
+  # water corridors
+  water-table-depth-min-m f32       ; minimum depth to avoid waterlogging roots
+  water-table-depth-max-m f32       ; maximum depth to avoid drought stress
+  surface-water-draw-max  f32       ; m3/day from local stream/aquifer
+  # habitat / connectivity corridors
+  habitat-continuity-min  f32       ; 0..1 index, minimum allowed continuity
+  corridor-width-min-m    f32       ; minimum continuous corridor width
+  keystone-species-present bool     ; protected species flag
+  # operational envelopes
+  max-sortie-frequency-day u32      ; max field sorties per day in tile
+  max-disturbance-days-year u32     ; max days with soil disturbance per year
+  # governance invariants
+  roh-ceiling             f32       ; absolute RoH ceiling for any task on this tile
+  biodiversity-floor      f32       ; 0..1 minimum biodiversity index
+  carbon-priority-cap     f32       ; 0..1 cap on weight assigned to carbon in optimizations
+  active                   bool
+  updated-at-utc          datetime
+
+invariant RestorationTaskCorridorBinding
+  when RestorationTask.corridor-ref-id -> CorridorEnvelope.id
+  require RestorationTask.tile-id == CorridorEnvelope.tile-id
+  require CorridorEnvelope.active == true
+
+# Composite K/E/R metric with hard RoH ceiling
+constant GLOBAL_ROH_CEILING = 0.30
+
+function CompositeScore(K: f32, E: f32, R: f32) -> f32
+  # normalized inputs in [0,1]
+  # weights: safety-first (wR highest), eco second, knowledge third
+  let wK = 0.20
+  let wE = 0.35
+  let wR = 0.45
+  return (wK * K) + (wE * E) - (wR * R)
+
+invariant RestorationTaskRiskEnvelope
+  require RestorationTask.roh-score >= 0.0
+  require RestorationTask.roh-score <= coalesce(RestorationTask.roh-hard-floor, GLOBAL_ROH_CEILING)
+  require RestorationTask.roh-score <= GLOBAL_ROH_CEILING
+  require RestorationTask.composite-score == CompositeScore(RestorationTask.k-score,
+                                                            RestorationTask.eco-score,
+                                                            RestorationTask.roh-score)
+
+# ============================================================================
+# 2. Gaia Sentinel minimal metric set + auto-pause thresholds
+# ============================================================================
+
+schema GaiaSentinelSnapshot
+  id                 string
+  tile-id            string
+  sampled-at-utc     datetime
+  soil-moisture-pct  f32
+  drought-index      f32          ; e.g. standardized precipitation-evapotranspiration index
+  heat-budget-index  f32          ; Thermaphora-style index (0..1)
+  flood-risk-index   f32          ; 0..1
+  wind-erosion-index f32          ; 0..1
+  fire-risk-index    f32          ; 0..1
+  anomaly-flag       bool
+  source-satellite   string?
+  source-in-situ     string?
+
+schema GaiaCorridorThresholds
+  id                         string
+  corridor-id                string        ; links to CorridorEnvelope.id
+  soil-moisture-pause-below  f32           ; X% for persistent drought
+  soil-moisture-pause-days   u32           ; Y days below threshold
+  heat-budget-pause-above    f32           ; Thermaphora index upper bound
+  drought-index-pause-above  f32
+  flood-risk-pause-above     f32
+  fire-risk-pause-above      f32
+  updated-at-utc             datetime
+
+schema TileRiskWindow
+  tile-id               string
+  window-start-utc      datetime
+  window-end-utc        datetime
+  metric-kind           enum      ; {SoilMoisture,HeatBudget,Drought,Flood,Fire}
+  consecutive-breaches  u32
+  active                bool
+
+# Hard pre-flight guard: auto-pause on corridor breach
+policy GaiaAutoPausePreflight
+  input  RestorationTask
+  uses   GaiaSentinelSnapshot, GaiaCorridorThresholds, TileRiskWindow
+  when   RestorationTask.state == Planned
+  effect
+    let thresholds = GaiaCorridorThresholds where corridor-id == RestorationTask.corridor-ref-id
+    let latest = GaiaSentinelSnapshot where tile-id == RestorationTask.tile-id order-by sampled-at-utc desc limit 1
+    # soil moisture persistent drought
+    if latest.soil-moisture-pct < thresholds.soil-moisture-pause-below
+       and TileRiskWindow(tile-id=RestorationTask.tile-id,
+                          metric-kind=SoilMoisture,
+                          active=true).consecutive-breaches
+           >= thresholds.soil-moisture-pause-days
+    then
+      set RestorationTask.state = AutoPaused
+      append TrustEventAutoPause(RestorationTask.id,
+                                 reason="SoilMoistureDrought",
+                                 snapshot-id=latest.id,
+                                 thresholds-id=thresholds.id)
+      deny "Auto-pause: soil moisture corridor breached"
+
+    # combined heat + drought guard rail
+    if latest.heat-budget-index > thresholds.heat-budget-pause-above
+       and latest.drought-index > thresholds.drought-index-pause-above
+    then
+      set RestorationTask.state = AutoPaused
+      append TrustEventAutoPause(RestorationTask.id,
+                                 reason="HeatPlusDrought",
+                                 snapshot-id=latest.id,
+                                 thresholds-id=thresholds.id)
+      deny "Auto-pause: heat budget and drought index exceeded"
+
+    # additional flood / fire auto-pauses
+    if latest.flood-risk-index > thresholds.flood-risk-pause-above
+    then
+      set RestorationTask.state = AutoPaused
+      append TrustEventAutoPause(RestorationTask.id,
+                                 reason="FloodRisk",
+                                 snapshot-id=latest.id,
+                                 thresholds-id=thresholds.id)
+      deny "Auto-pause: flood risk corridor exceeded"
+
+    if latest.fire-risk-index > thresholds.fire-risk-pause-above
+    then
+      set RestorationTask.state = AutoPaused
+      append TrustEventAutoPause(RestorationTask.id,
+                                 reason="FireRisk",
+                                 snapshot-id=latest.id,
+                                 thresholds-id=thresholds.id)
+      deny "Auto-pause: fire risk corridor exceeded"
+
+# Trust-layer append schema for auto-pause transparency
+schema TrustEventAutoPause
+  id              string
+  task-id         string
+  reason          string
+  snapshot-id     string
+  thresholds-id   string
+  created-at-utc  datetime
+  raised-by       string    ; Prometheus-Praxis Gaia guardrail module DID
+  citizen-visible bool
+
+# ============================================================================
+# 3. K/E/R metric normalization + RoH ceilings and non-tradeable constraints
+# ============================================================================
+
+schema ActionMetricsRaw
+  task-id                 string
+  delta-heat-mj           f64
+  delta-habitat-connect   f32     ; -1..1 raw change
+  delta-soil-health-index f32     ; -1..1
+  delta-water-use-m3      f64
+  biodiversity-index-before f32
+  biodiversity-index-after  f32
+  uncertainty-before      f32     ; entropy / variance
+  uncertainty-after       f32
+  instrumentation-score   f32     ; 0..1
+
+function NormalizeEcoImpact(raw: ActionMetricsRaw) -> f32
+  # simple bounded normalization: improvements > 0, harms < 0
+  let habitat_term = clamp((raw.delta-habitat-connect) * 0.5 + 0.5, 0.0, 1.0)
+  let soil_term    = clamp((raw.delta-soil-health-index) * 0.5 + 0.5, 0.0, 1.0)
+  let heat_term    = clamp((-raw.delta-heat-mj) / 1000.0 + 0.5, 0.0, 1.0)
+  let water_term   = clamp((-raw.delta-water-use-m3) / 1000.0 + 0.5, 0.0, 1.0)
+  return (habitat_term * 0.30) + (soil_term * 0.30) + (heat_term * 0.20) + (water_term * 0.20)
+
+function NormalizeRiskOfHarm(raw: ActionMetricsRaw, corridor: CorridorEnvelope) -> f32
+  # RoH in [0,1], mapped to <= GLOBAL_ROH_CEILING via corridor.roh-ceiling
+  let biodiversity_drop =
+    max(0.0, (raw.biodiversity-index-before - raw.biodiversity-index-after))
+  let moisture_violation =
+    if raw.delta-soil-health-index < 0.0 then abs(raw.delta-soil-health-index) else 0.0
+  let water_overuse =
+    if raw.delta-water-use-m3 > 0.0 then min(1.0, raw.delta-water-use-m3 / corridor.surface-water-draw-max)
+    else 0.0
+  let base_risk = clamp(biodiversity_drop * 0.5 + moisture_violation * 0.3 + water_overuse * 0.2, 0.0, 1.0)
+  return min(base_risk * corridor.roh-ceiling, corridor.roh-ceiling)
+
+function NormalizeKnowledge(raw: ActionMetricsRaw) -> f32
+  let uncertainty_reduction =
+    max(0.0, raw.uncertainty-before - raw.uncertainty-after)
+  let normalized_u = clamp(uncertainty_reduction / max(0.0001, raw.uncertainty-before), 0.0, 1.0)
+  return clamp(0.7 * normalized_u + 0.3 * raw.instrumentation-score, 0.0, 1.0)
+
+policy ComputeKERMetrics
+  input  RestorationTask
+  uses   ActionMetricsRaw, CorridorEnvelope
+  effect
+    let raw = ActionMetricsRaw where task-id == RestorationTask.id
+    let corridor = CorridorEnvelope where id == RestorationTask.corridor-ref-id
+    let E = NormalizeEcoImpact(raw)
+    let R = NormalizeRiskOfHarm(raw, corridor)
+    let K = NormalizeKnowledge(raw)
+    set RestorationTask.eco-score = E
+    set RestorationTask.roh-score = R
+    set RestorationTask.k-score   = K
+    set RestorationTask.composite-score = CompositeScore(K, E, R)
+    # enforce non-tradeable RoH ceiling
+    if R > corridor.roh-ceiling
+    then
+      set RestorationTask.state = PreflightRejected
+      append TrustEventMetricRejection(RestorationTask.id,
+                                       reason="RoHCeilingExceeded",
+                                       roh=R,
+                                       roh-ceiling=corridor.roh-ceiling)
+      deny "RoH ceiling exceeded regardless of composite score"
+
+schema TrustEventMetricRejection
+  id             string
+  task-id        string
+  reason         string
+  roh            f32
+  roh-ceiling    f32
+  created-at-utc datetime
+
+# ============================================================================
+# 4. EU Nature Restoration Regulation compliance envelope for marine actions
+# ============================================================================
+
+schema MarineRestorationTx
+  id                         string
+  task-id                    string             ; links RestorationTask.id
+  birth-sign-id              string             ; includes Natura 2000 / MSFD / Indigenous bundles
+  eu-nrr-envelope-id         string
+  scenario-id                string
+  eco-impact-score           f32
+  roh-score                  f32
+  knowledge-score            f32
+  composite-score            f32
+  fpci-status                enum               ; {NotRequired,Pending,Completed,Disputed}
+  consultation-record-ref    string             ; pointer to FPIC / consultation doc
+  regulator-jurisdiction     string             ; e.g. "EU-EEA", "Non-EU-Analogous"
+  checked-articles           string[]           ; explicit EU NRR article references
+  mitigations-applied        string[]
+  verifier-did               string
+  verified-at-utc            datetime
+  trust-anchor-txid          string?            ; Organichain/Bostrom anchor
+  state                      enum               ; {Draft,Validated,Rejected,OnChain}
+
+schema EUNRRComplianceEnvelope
+  id                         string
+  regulation-version         string             ; e.g. "EU-NRR-2023"
+  required-articles          string[]           ; article ids that must be checked
+  fpci-required              bool
+  marine-zone-category       string             ; e.g. "Natura2000", "MSFDGoodStatus"
+  sensitive-species-list-ref string             ; external list pointer
+  verifier-role-requirement  string             ; required role in DID doc
+  active                     bool
+
+policy EUNRRPreActuationCheck
+  input  MarineRestorationTx
+  uses   EUNRRComplianceEnvelope, RestorationTask
+  when   MarineRestorationTx.state == Draft
+  effect
+    let env = EUNRRComplianceEnvelope where id == MarineRestorationTx.eu-nrr-envelope-id
+                                          and active == true
+    # ensure all required articles referenced
+    for art in env.required-articles
+      require art in MarineRestorationTx.checked-articles
+        else deny "Missing required EU NRR article check: " + art
+    # FPIC / consultation
+    if env.fpci-required == true
+    then
+      require MarineRestorationTx.fpci-status == Completed
+        else deny "FPIC/consultation not completed"
+    # link to a valid RestorationTask
+    let task = RestorationTask where id == MarineRestorationTx.task-id
+    require task.state in {Queued,InFlight,Completed}
+      else deny "Linked RestorationTask is not in a valid state"
+    # sync K/E/R
+    set MarineRestorationTx.eco-impact-score = task.eco-score
+    set MarineRestorationTx.roh-score        = task.roh-score
+    set MarineRestorationTx.knowledge-score  = task.k-score
+    set MarineRestorationTx.composite-score  = task.composite-score
+    # advance state, ready for trust anchor
+    set MarineRestorationTx.state = Validated
+
+# ============================================================================
+# 5. Boden-Wesen soil diagnostics SLA + corridor linkage
+# ============================================================================
+
+schema BodenWesenSample
+  id                    string
+  tile-id               string
+  sampled-at-utc        datetime
+  moisture-pct          f32
+  ph                    f32
+  salinity-ds-per-m     f32
+  organic-matter-pct    f32
+  bulk-density-g-per-cc f32
+  contaminants-index    f32    ; 0..1 aggregated contamination score
+  n-p-k-kg-per-ha       f32[3] ; N,P,K per hectare
+  sensor-source         string
+
+schema SoilSyncWorkflowRun
+  id                    string
+  window-start-utc      datetime
+  window-end-utc        datetime
+  tiles-count           u32
+  success               bool
+  failed-tile-ids       string[]
+  max-latency-hours     f32
+  roh-max-observed      f32
+  sla-breached          bool
+
+constant SOIL_SLA_HOURS = 24.0
+
+policy BodenWesenToStateModel
+  input  BodenWesenSample
+  uses   CorridorEnvelope, SoilSyncWorkflowRun
+  effect
+    # update CorridorEnvelope corridors from latest soil diagnostics
+    let corridor = CorridorEnvelope where tile-id == BodenWesenSample.tile-id and active == true
+    # basic envelope adaptation example: adjust moisture corridor if long-term shift observed
+    set corridor.soil-moisture-min = clamp(BodenWesenSample.moisture-pct * 0.6, 0.0, 100.0)
+    set corridor.soil-moisture-max = clamp(BodenWesenSample.moisture-pct * 1.4, 0.0, 100.0)
+    # contamination guard
+    if BodenWesenSample.contaminants-index > 0.5
+    then
+      append SoilOutOfCorridorEvent(BodenWesenSample.tile-id,
+                                    sample-id=BodenWesenSample.id,
+                                    reason="Contamination")
+      # block new tasks in this tile until remediation plan exists
+      policy BlockNewTasksOnTile(BodenWesenSample.tile-id)
+
+schema SoilOutOfCorridorEvent
+  id              string
+  tile-id         string
+  sample-id       string
+  reason          string
+  created-at-utc  datetime
+
+policy SoilSyncSLAEnforcement
+  input  SoilSyncWorkflowRun
+  effect
+    let latency = SoilSyncWorkflowRun.max-latency-hours
+    if latency > SOIL_SLA_HOURS
+    then
+      set SoilSyncWorkflowRun.sla-breached = true
+      append SoilSLAIncident(run-id=SoilSyncWorkflowRun.id,
+                             max-latency-hours=latency)
+      deny "Soil SLA 24h breached for one or more tiles"
+
+schema SoilSLAIncident
+  id                 string
+  run-id             string
+  max-latency-hours  f32
+  created-at-utc     datetime
+
+policy BlockNewTasksOnTile
+  input  string          ; tile-id
+  uses   RestorationTask
+  effect
+    for t in RestorationTask where t.tile-id == input and t.state == Planned
+      set t.state = PreflightRejected
+      append TrustEventPreflightReject(t.id,
+                                       reason="SoilOutOfCorridor",
+                                       tile-id=input)
+
+schema TrustEventPreflightReject
+  id             string
+  task-id        string
+  reason         string
+  tile-id        string
+  created-at-utc datetime
+
+# ============================================================================
+# 6. Carbon vs biodiversity anti-over-optimization constraints
+# ============================================================================
+
+schema BiodiversityState
+  tile-id                      string
+  index-current                f32      ; 0..1 biodiversity index
+  index-baseline               f32
+  protected-species-present    bool
+  keystone-species-count       u32
+  structural-complexity-index  f32      ; 0..1
+  last-updated-utc             datetime
+
+schema MultiObjectiveWeights
+  id                 string
+  context            string         ; e.g. "EcoRestorationGlobalDefault"
+  carbon-weight      f32
+  heat-weight        f32
+  biodiversity-weight f32
+  water-weight       f32
+  knowledge-weight   f32
+  roh-weight         f32
+
+constant BIODIVERSITY_HARD_FLOOR = 0.50
+
+invariant BiodiversityHardConstraint
+  when BiodiversityState.index-baseline >= BIODIVERSITY_HARD_FLOOR
+  require BiodiversityState.index-current >= BIODIVERSITY_HARD_FLOOR
+
+policy EnforceCarbonBiodiversityBalance
+  input  RestorationTask
+  uses   BiodiversityState, MultiObjectiveWeights, CorridorEnvelope
+  effect
+    let bio = BiodiversityState where tile-id == RestorationTask.tile-id
+    let weights = MultiObjectiveWeights where context == "EcoRestorationGlobalDefault"
+    let corridor = CorridorEnvelope where id == RestorationTask.corridor-ref-id
+    # disallow any optimization solution that:
+    #  - decreases biodiversity below hard floor
+    #  - increases carbon gains by violating BioticTreaty-like corridors
+    if bio.index-current < BIODIVERSITY_HARD_FLOOR
+    then
+      set RestorationTask.state = PreflightRejected
+      append TrustEventMetricRejection(RestorationTask.id,
+                                       reason="BiodiversityFloorBreach",
+                                       roh=RestorationTask.roh-score,
+                                       roh-ceiling=corridor.roh-ceiling)
+      deny "Biodiversity hard floor breached"
+    # enforce upper bound on carbon weight vs biodiversity
+    require weights.carbon-weight <= corridor.carbon-priority-cap
+      else deny "Carbon weight exceeds corridor-specific cap"
+
+# ============================================================================
+# 7. Erde-Sync time-zone aware mangrove campaign coordination
+# ============================================================================
+
+schema LocalConstraintWindow
+  id                     string
+  tile-id                string
+  campaign-id            string
+  # local time windows (UTC-agnostic; derived before scheduling)
+  tide-window-start-utc  datetime
+  tide-window-end-utc    datetime
+  daylight-start-utc     datetime
+  daylight-end-utc       datetime
+  safe-heat-max-c        f32
+  safe-heat-window-start-utc datetime
+  safe-heat-window-end-utc   datetime
+  labor-availability-start-utc datetime
+  labor-availability-end-utc   datetime
+  max-daily-hours        f32
+  local-legal-notes      string
+  nursery-capacity-trees u32
+  updated-at-utc         datetime
+
+schema MangroveCampaign
+  id                     string
+  name                   string
+  description            string
+  start-date-utc         datetime
+  end-date-utc           datetime
+  tiles                  string[]      ; list of tile-ids
+  coordinator-did        string
+  created-at-utc         datetime
+  fairness-notes         string
+  trust-anchor-txid      string?
+
+schema CampaignPhase
+  id                     string
+  campaign-id            string
+  phase-kind             enum          ; {Preparation,Planting,Monitoring,Maintenance}
+  global-phase-index     u32
+  start-utc              datetime
+  end-utc                datetime
+
+schema ErdeSyncSchedule
+  id                     string
+  campaign-id            string
+  task-id                string
+  tile-id                string
+  phase-id               string
+  scheduled-start-utc    datetime
+  scheduled-end-utc      datetime
+  erde-sync-region       string        ; e.g. "UTC+7-Coast"
+  assets-assigned        string[]      ; drone/robot ids
+  created-at-utc         datetime
+
+policy ErdeSyncMangroveCoordinator
+  input  MangroveCampaign
+  uses   RestorationTask, LocalConstraintWindow, CampaignPhase, ErdeSyncSchedule
+  effect
+    for phase in CampaignPhase where campaign-id == MangroveCampaign.id
+      for tile in MangroveCampaign.tiles
+        let lcw = LocalConstraintWindow where tile-id == tile and campaign-id == MangroveCampaign.id
+        # intersect global phase window with local tide/daylight/heat/labor windows
+        let local-start = max(phase.start-utc, lcw.tide-window-start-utc,
+                                             lcw.daylight-start-utc,
+                                             lcw.safe-heat-window-start-utc,
+                                             lcw.labor-availability-start-utc)
+        let local-end   = min(phase.end-utc, lcw.tide-window-end-utc,
+                                           lcw.daylight-end-utc,
+                                           lcw.safe-heat-window-end-utc,
+                                           lcw.labor-availability-end-utc)
+        if local-end <= local-start
+        then
+          continue    ; no feasible window for this tile+phase
+        # enforce nursery capacity and local max daily hours via downstream optimizer
+        for task in RestorationTask where task.tile-id == tile
+                                      and task.state == Planned
+                                      and task.action-kind == Planting
+        do
+          # scheduling stub: engine selects actual start inside [local-start, local-end]
+          let sched = ErdeSyncSchedule{
+            id: new-uuid(),
+            campaign-id: MangroveCampaign.id,
+            task-id: task.id,
+            tile-id: tile,
+            phase-id: phase.id,
+            scheduled-start-utc: local-start,
+            scheduled-end-utc:   local-end,
+            erde-sync-region: derive-region-from-tile(tile),
+            assets-assigned: []
+          }
+          append sched
+          set task.state = Queued
+
+# Safety vectors for this shard
+safety.vectors
+  design          DMedium
+  neuro-risk      NRLow
+  energy-efficiency EEHigh
