@@ -31,3 +31,23 @@ fn arb_labor_event() -> impl Strategy<Value = HealthLaborEvent> {
         }
     })
 }
+
+proptest! {
+    #[test]
+    fn gas_discounts_monotonic_with_credits(
+        credits in prop::collection::vec(0u64..1_000_000u64, 2..50)
+    ) {
+        use aletheion_erm_health_tcr::compute_gas_price_with_discount;
+
+        let mut prev_price = None;
+        for c in credits.into_iter().scan(0u64, |acc, x| { *acc += x; Some(*acc) }) {
+            let credits_dec = Decimal::from(c);
+            let price = compute_gas_price_with_discount(dec!(1_000), credits_dec); // 1000 units base
+            if let Some(pp) = prev_price {
+                // Price must be monotone non-increasing as credits grow.
+                prop_assert!(price <= pp);
+            }
+            prev_price = Some(price);
+        }
+    }
+}
