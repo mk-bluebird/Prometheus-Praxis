@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aletheion.local/schemas/ai_chat_labor_evidence.schema.json",
+  "title": "AIChatLaborEvidenceV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "session_id",
+    "birth_sign_id",
+    "related_account_id",
+    "labor_span_seconds",
+    "token_count",
+    "topic_vector",
+    "consent_flags",
+    "evidence_mode"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "birth_sign_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "related_account_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Pseudonymous DLAccount or scoped hash"
+    },
+    "labor_span_seconds": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 86400
+    },
+    "token_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100000
+    },
+    "topic_vector": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 8,
+      "maxItems": 512
+    },
+    "model_family_id": {
+      "type": "string"
+    },
+    "consent_flags": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "labor_use_approved",
+        "hashonly_mode",
+        "allow_biosignal_linkage"
+      ],
+      "properties": {
+        "labor_use_approved": { "type": "boolean" },
+        "hashonly_mode": { "type": "boolean" },
+        "allow_biosignal_linkage": { "type": "boolean" }
+      }
+    },
+    "evidence_mode": {
+      "type": "string",
+      "enum": ["HASHONLY"],
+      "description": "For AI-chat evidence this schema enforces HASHONLY"
+    },
+    "topic_vocab_version": {
+      "type": "string"
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "maxItems": 32
+    }
+  }
+}
