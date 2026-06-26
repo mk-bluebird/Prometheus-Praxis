@@ -1,0 +1,14 @@
+# Path: aletheion/erm/health_tcr/test_vectors/ALE-ERM-HEALTH-TCR-VECTORS-001.aln
+
+record HealthTcrTestVectorRef
+  vector_id   text
+  did         text
+  seed        u64
+  filepath    text
+
+table HealthTcrTestVectors
+  rows
+    { vector_id: "HEALTH-TCR-2026V1-001",
+      did: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7",
+      seed: 123456789,
+      filepath: "aletheion/erm/health_tcr/test_vectors/HEALTH-TCR-2026V1-001.json" }
