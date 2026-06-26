@@ -1,0 +1,173 @@
+aln
+  alnversion 1.0.0
+  alnnamespace ALE.IDENTITY.BRAINDID.ALIASING.V1
+
+contract BrainDidAliasingPolicyV1
+  meta
+    role "Pseudonymous BrainDid aliasing and domain scoping for Prometheus-Praxis"
+    ecoreporoot "github.com/mk-bluebird/eco_restoration_shard"
+    status "DRAFT"
+
+  enum DidScopeV1
+    HEALTH_TCR
+    ECOSAFETY
+    WATER_ERM
+    CYBOQUATIC
+    CITY_ANALYTICS
+    RESEARCH_ONLY
+    TEST_FIXTURE
+
+  enum DidAliasStatusV1
+    ACTIVE
+    REVOKED
+    SUPERSEDED
+
+  record PrimaryBrainDid
+    primary_did String          -- DID of the brain-identity, e.g. "did:ppx:brain:abc..."
+    created_at_utc Timestamp
+    revoked_at_utc Timestamp?   -- null when not revoked
+    note String?                -- free-form description, no PII
+
+  record BrainDidAlias
+    alias_did String            -- scoped alias DID, e.g. "did:ppx:alias:xyz..."
+    primary_did String          -- references PrimaryBrainDid.primary_did
+    scope DidScopeV1
+    created_at_utc Timestamp
+    revoked_at_utc Timestamp?   -- null when active
+    status DidAliasStatusV1
+    comment String?             -- operational notes, no PII
+
+  record BrainDidAliasBinding
+    alias_did String            -- references BrainDidAlias.alias_did
+    chain_context String        -- e.g. "health-tcr-2026", "ecosafety-biodegrade"
+    local_subject_id String     -- local, non-PII subject identifier in that context
+    created_at_utc Timestamp
+    revoked_at_utc Timestamp?   -- null when binding is active
+
+  invariant NoAliasWithoutPrimaryV1
+    description "Every BrainDidAlias must point to an existing PrimaryBrainDid."
+    forall a BrainDidAlias .
+      exists p PrimaryBrainDid .
+        a.primary_did == p.primary_did
+
+  invariant AliasStatusConsistentWithRevocationV1
+    description "Alias status and revoked_at_utc must be consistent."
+    forall a BrainDidAlias .
+      (a.status == DidAliasStatusV1.ACTIVE and a.revoked_at_utc == null)
+      or
+      (a.status != DidAliasStatusV1.ACTIVE and a.revoked_at_utc != null)
+
+  invariant ScopedAliasUniquenessPerScopeV1
+    description "The same alias_did may not appear with multiple scopes."
+    forall a1 BrainDidAlias, a2 BrainDidAlias .
+      (a1.alias_did == a2.alias_did) implies (a1.scope == a2.scope)
+
+  invariant SingleActiveAliasPerScopeV1
+    description "For a given primary_did and scope, at most one ACTIVE alias exists."
+    forall p PrimaryBrainDid, s DidScopeV1 .
+      let active_aliases =
+        { a | a BrainDidAlias .
+              a.primary_did == p.primary_did
+              and a.scope == s
+              and a.status == DidAliasStatusV1.ACTIVE } in
+      |active_aliases| <= 1
+
+  invariant AliasMustNotExposePrimaryAcrossScopesV1
+    description """
+    No artifact outside the identity governance namespace may store both
+    primary_did and alias_did on the same row. This prevents uncontrolled
+    cross-domain correlation.
+    """
+    check "Enforced by schema design and CI: no non-identity ALN shard or SQL table may contain both fields primary_did and alias_did."
+
+  guard AliasReuseAcrossDistinctScopesForbiddenV1 a BrainDidAlias, b BrainDidAlias
+    description """
+    Hard guard: the same DID value must not be reused as an alias across
+    distinct privacy scopes. If a.alias_did == b.alias_did then a.scope == b.scope.
+    """
+    require not (a.alias_did == b.alias_did and a.scope != b.scope)
+
+  function registerPrimaryBrainDid
+    input did String, created_at_utc Timestamp, note String?
+    output PrimaryBrainDid
+    body
+      require did != ""
+      let p =
+        PrimaryBrainDid(
+          primary_did = did,
+          created_at_utc = created_at_utc,
+          revoked_at_utc = null,
+          note = note
+        )
+      return p
+
+  function revokePrimaryBrainDid
+    input p PrimaryBrainDid, revoked_at_utc Timestamp
+    output PrimaryBrainDid
+    body
+      require p.revoked_at_utc == null
+      let updated = p
+      updated.revoked_at_utc = revoked_at_utc
+      return updated
+
+  function mintAliasForScope
+    input alias_did String,
+          primary_did String,
+          scope DidScopeV1,
+          created_at_utc Timestamp,
+          comment String?
+    output BrainDidAlias
+    body
+      require alias_did != ""
+      require primary_did != ""
+      let a =
+        BrainDidAlias(
+          alias_did = alias_did,
+          primary_did = primary_did,
+          scope = scope,
+          created_at_utc = created_at_utc,
+          revoked_at_utc = null,
+          status = DidAliasStatusV1.ACTIVE,
+          comment = comment
+        )
+      return a
+
+  function revokeAlias
+    input a BrainDidAlias, revoked_at_utc Timestamp
+    output BrainDidAlias
+    body
+      require a.status == DidAliasStatusV1.ACTIVE
+      let updated = a
+      updated.status = DidAliasStatusV1.REVOKED
+      updated.revoked_at_utc = revoked_at_utc
+      return updated
+
+  function bindAliasToContext
+    input alias_did String,
+          chain_context String,
+          local_subject_id String,
+          created_at_utc Timestamp
+    output BrainDidAliasBinding
+    body
+      require alias_did != ""
+      require chain_context != ""
+      require local_subject_id != ""
+      let b =
+        BrainDidAliasBinding(
+          alias_did = alias_did,
+          chain_context = chain_context,
+          local_subject_id = local_subject_id,
+          created_at_utc = created_at_utc,
+          revoked_at_utc = null
+        )
+      return b
+
+  function revokeAliasBinding
+    input b BrainDidAliasBinding, revoked_at_utc Timestamp
+    output BrainDidAliasBinding
+    body
+      require b.revoked_at_utc == null
+      let updated = b
+      updated.revoked_at_utc = revoked_at_utc
+      return updated
+end
