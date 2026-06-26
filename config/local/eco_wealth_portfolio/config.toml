@@ -1,0 +1,33 @@
+[database]
+# Local-first SQLite paths; relative to repo root or $XDG_DATA_HOME
+health_registry_path = "var/local/eco_wealth/health_registry.sqlite"
+labor_events_path    = "var/local/eco_wealth/labor_events.sqlite"
+
+[neurorights_corridors]
+# Default corridor ids to load from ALN shards
+default_corridor_id = "NR-CORRIDOR-GLOBAL-001"
+biosignal_corridor_id = "NR-CORRIDOR-BIO-001"
+chat_corridor_id      = "NR-CORRIDOR-CHAT-001"
+
+[portfolio]
+# Corridor defaults for eco-wealth allocation
+max_single_dataset_weight_01 = 0.15
+max_high_risk_fraction_01    = 0.20
+min_neurorights_safe_fraction_01 = 0.60
+
+[quadratic_funding_pool]
+# QF pool parameters for health data labor credits
+pool_id              = "QF-POOL-HEALTH-LABOR-001"
+epoch_days           = 30
+min_match_multiplier = 1.0
+max_match_multiplier = 5.0
+min_contributor_stake_credits_microunits = 10000
+max_dataset_match_share_01 = 0.10
+
+[local_first]
+# Sync / replication behavior
+enable_replication   = false
+max_local_cache_mb   = 256
+
+[logging]
+level = "info"
