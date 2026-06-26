@@ -1,14 +1,23 @@
 # Path: aln/health/2026/HealthDataTCR2026v1.aln
-# Role: Aletheion/Bostrom health-data TCR + QF grammar with neurorights guarantees.
+# Role: Prometheus-Praxis health & AI-chat data TCR + QF grammar with neurorights and data-as-labor guarantees.
 
 contract HealthDataTCR2026v1 {
   meta {
-    city          = "Aletheion-Phoenix";
-    shard         = "health-tcr2026";
-    version       = "1.0.0";
-    author_did    = "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7";
-    eco_repo_root = "github.com/mk-bluebird/eco_restoration_shard";
+    authority          = "Prometheus-Praxis";
+    shard              = "health-tcr2026";
+    version            = "1.0.0";
+    author_did         = "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7";
+    eco_repo_root      = "github.com/mk-bluebird/eco_restoration_shard";
+    data_as_labor      = true;
+    inclusion_ai_chat  = true;
   }
+
+  import {
+    BrainDid
+    PsychContinuityEvidence
+    NeurorightCorridorSpec
+    SystemWellBeingVector
+  } from PPX.IDENTITY.MINIMAL.CONTINUITY.NEURORIGHTS.001;
 
   import {
     MsgPublishDataContribution
@@ -38,17 +47,39 @@ contract HealthDataTCR2026v1 {
     OTHER_HEALTH_RESTRICTED
   }
 
+  enum LaborSourceKind {
+    HEALTH_DEVICE,
+    CLINIC_EXPORT,
+    ENV_SENSOR,
+    AI_CHAT_SUMMARY,
+    MANUAL_ENTRY,
+    OTHER_ACCOUNT_ACTIVITY
+  }
+
+  record DataLaborEvent {
+    id: Integer
+    subject_brain: BrainDid
+    source_kind: LaborSourceKind
+    related_account_id: String?
+    msg_publish_ref: MsgPublishDataContribution.Id?
+    psych_continuity_evidence: PsychContinuityEvidence.Id?
+    created_at_utc: Timestamp
+    note: String
+  }
+
   record HealthDataset {
     dataset_cid: String
     contributor: Address
+    subject_brain: BrainDid
     curator: Address
     stake_amount: Decimal
     status: CurationStatus
     category: DatasetCategory
-    quality_score: Decimal  # [0,1]
+    quality_score: Decimal
     neurorights_safe: Bool
     msg_publish_ref: MsgPublishDataContribution.Id
-    responsibility_scalar_snap: Decimal  # [0,1]
+    labor_event_ids: List<DataLaborEvent.Id>
+    responsibility_scalar_snap: Decimal
     ker_anchor: KERResidualAnchor.Id
     eco_credit_reward_locked: Decimal
     eco_credit_reward_vested: Decimal
@@ -106,10 +137,30 @@ contract HealthDataTCR2026v1 {
     responsibility_scalar_snap: Decimal
   }
 
-  invariant NeurorightsNoDowngradeForNonDisclosure(subject: Address) {
-    description = "Refusal to provide additional health data MUST NOT reduce Karma, EcoCredit eligibility, or access to essential care."
+  record HealthQFWeights {
+    sqrt_boot_sum: Decimal
+    qf_weight: Decimal
+  }
+
+  invariant DataAsLaborDignity(subject: BrainDid) {
+    description = "Health and AI-chat data produced by this brain-identity are labor; absence or reduction of such labor must not reduce neurorights or baseline access."
     check = {
-      # This invariant is checked off-chain by KERResidualAnchor proofs; here we only define the corridor.
+      forbid_using_labor_absence_as_penalty = true;
+      allow_subject_to_pause_labor_streams_without_downgrade = true;
+    }
+  }
+
+  invariant NoIdentityClassificationByHealthTCR(subject: BrainDid) {
+    description = "HealthDataTCR2026v1 may not classify the subject's identity as legitimate or illegitimate or modify personhood state."
+    check = {
+      forbid_identity_status_fields = true;
+      allow_only_artifact_classification = true;
+    }
+  }
+
+  invariant NeurorightsNoDowngradeForNonDisclosure(subject: Address) {
+    description = "Refusal to provide additional health or AI-chat data must not reduce Karma, EcoCredit eligibility, or access to essential care."
+    check = {
       allow_if_no_health_dataset = true;
       forbid_negative_delta_karma_due_to_absence_of_health_logs = true;
     }
@@ -118,14 +169,17 @@ contract HealthDataTCR2026v1 {
   function submitHealthDataset(
     curator: Address,
     dataset_cid: String,
+    subject_brain: BrainDid,
     msg_publish_id: MsgPublishDataContribution.Id,
     category: DatasetCategory,
     stake_amount: Decimal,
     initial_quality_score: Decimal,
+    labor_event_ids: List<DataLaborEvent.Id>,
     ker_anchor: KERResidualAnchor.Id
   ) -> HealthDataset {
     require(stake_amount >= 0, "stake_amount must be non-negative");
     require(initial_quality_score >= 0 && initial_quality_score <= 1, "quality_score in [0,1]");
+    require(labor_event_ids.len() > 0, "dataset must reference at least one DataLaborEvent");
 
     let msg = MsgPublishDataContribution.load(msg_publish_id);
 
@@ -146,11 +200,14 @@ contract HealthDataTCR2026v1 {
     );
 
     let rs = ResponsibilityScalar.snapshot(msg.contributor_address);
+    require(rs.value >= 0 && rs.value <= 1, "ResponsibilityScalar in [0,1]");
+
     let neurorights_safe = true;
 
     let hd = HealthDataset {
       dataset_cid = dataset_cid,
       contributor = msg.contributor_address,
+      subject_brain = subject_brain,
       curator = curator,
       stake_amount = stake_amount,
       status = CurationStatus.PENDING,
@@ -158,6 +215,7 @@ contract HealthDataTCR2026v1 {
       quality_score = initial_quality_score,
       neurorights_safe = neurorights_safe,
       msg_publish_ref = msg_publish_id,
+      labor_event_ids = labor_event_ids,
       responsibility_scalar_snap = rs.value,
       ker_anchor = ker_anchor,
       eco_credit_reward_locked = 0,
@@ -192,8 +250,10 @@ contract HealthDataTCR2026v1 {
   ) -> HealthDataset {
     require(dataset.curator == curator, "only curator can reject");
     require(dataset.status == CurationStatus.PENDING, "dataset not pending");
+
     let updated = dataset;
     updated.status = CurationStatus.REJECTED;
+
     return updated;
   }
 
@@ -286,11 +346,6 @@ contract HealthDataTCR2026v1 {
     return (updated_dataset, updated_challenge);
   }
 
-  record HealthQFWeights {
-    sqrt_boot_sum: Decimal
-    qf_weight: Decimal
-  }
-
   function computeQFWeight(
     contributions: List<HealthQFContribution>
   ) -> HealthQFWeights {
@@ -357,9 +412,6 @@ contract HealthDataTCR2026v1 {
   }
 
   guard AntiPlutocracyQF(contrib: HealthQFContribution) {
-    require(
-      contrib.cumulative_ecocredit_snap >= 0,
-      "cumulative ecocredit cannot be negative"
-    );
+    require(contrib.cumulative_ecocredit_snap >= 0, "cumulative ecocredit cannot be negative");
   }
 }
