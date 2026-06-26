@@ -1,0 +1,46 @@
+TITLE DataAsLaborDignity2026v1
+FAMILY DataAsLaborDignity
+VERSION 1.0.0
+CATEGORY PRINCIPLE
+SUMMARY Invariants ensuring human dignity, consent, and neurorights in data-as-labor flows.
+
+fields
+  event_id          hex64        mandatory true
+  worker_did        utf8id64     mandatory true
+  corridor_id       utf8id64     mandatory true
+  consent_scope     ConsentScope mandatory true
+  neurorights_flag  NeurorightsFlag mandatory true
+  labor_seconds     float64      mandatory true
+  pay_eco           float64      mandatory true
+  pay_fiat          float64      mandatory true
+  evidencehex       hex64        mandatory true
+endfields
+
+invariants
+  -- 1. No labor without explicit corridor binding.
+  corridorpresent worker_did, corridor_id
+
+  -- 2. No uncompensated labor for ECOSYSTEM_POOL scope.
+  forbid condition (
+    consent_scope == ECOSYSTEM_POOL
+    AND pay_eco == 0.0
+    AND pay_fiat == 0.0
+  )
+
+  -- 3. Neurorights-unsafe events cannot be stored or monetized.
+  forbid condition (
+    neurorights_flag == NEURORIGHTS_REJECTED
+  )
+
+  -- 4. Time and pay must be non-negative and bounded.
+  require range labor_seconds 0.0 86400.0
+  require range pay_eco       0.0 1.0e9
+  require range pay_fiat      0.0 1.0e9
+
+  -- 5. Lyapunov dignity residual cannot increase under admissible moves.
+  safesteprule dignity_safestep
+    vtcoord    rdignity
+    vtweights  1.0
+    vtceiling  0.13
+  endsafesteprule
+endinvariants
