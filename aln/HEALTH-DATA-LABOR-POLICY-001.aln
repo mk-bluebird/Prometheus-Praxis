@@ -1,0 +1,207 @@
+-- filename: HEALTH-DATA-LABOR-POLICY-001.aln
+-- destination: ecorestorationshard/aln/HEALTH-DATA-LABOR-POLICY-001.aln
+
+namespace HEALTH.DATA.LABOR.POLICY.V1
+
+import HEALTH.DATATCR.SCHEMA.V1 as Tcr   -- brainidentity, laborevent, ecocreditledger
+import PPX.CONTINUITY.KERNEL.V1 as Ppx   -- PsychContinuityEvidence, NeurorightCorridorSpec
+import NEURORIGHTS.POLICY.TABLE.V1 as Nrt
+
+----------------------------------------------------------------------
+-- 1. Records mirroring SQL policy tables
+----------------------------------------------------------------------
+
+record LaborCategoryPolicy
+  category_code             text
+  description               text
+  base_ecocredit_rate       float
+  sovereignty_cost_factor   float
+  max_daily_credits         float
+
+table LaborCategoryPolicies
+  rows
+    category_code aichatsummary,
+    description   AI chat summaries used as HASHONLY labor events,
+    base_ecocredit_rate 1.0,
+    sovereignty_cost_factor 1.0,
+    max_daily_credits 50.0
+
+    category_code biosignalstream,
+    description   Time-bounded biosignal events under strict neurorights corridors,
+    base_ecocredit_rate 1.0,
+    sovereignty_cost_factor 2.0,
+    max_daily_credits 100.0
+
+record NeurorightsNonDowngradeRule
+  rule_code       text
+  description     text
+
+table NeurorightsNonDowngradeRules
+  rows
+    rule_code NeurorightsNoDowngradeForNonDisclosure,
+    description Refusal to share new data or deletion of existing data must never reduce neurorights protections, access to baseline care, or psychological continuity guarantees.
+
+    rule_code PsychContinuityNoWeaken,
+    description Any policy change, union corridor negotiation, or labor contract must not reduce psychologicalcontinuityscore or weaken continuity corridors for any BrainDid.
+
+----------------------------------------------------------------------
+-- 2. Data unions and mandates
+----------------------------------------------------------------------
+
+record DataUnion
+  union_code      text
+  display_name    text
+  description     text
+
+record DataUnionMembershipMandate
+  union_code      text
+  brainid_ref     text      -- references Tcr.brainidentity.id (or a local alias)
+  mandate_scope   text      -- ALN expression / tag describing corridor negotiation scope
+
+record DataUnionCorridorProposal
+  proposal_label  text
+  union_code      text
+  description     text
+  affected_corridor_ids list text   -- references Ppx.NeurorightCorridorSpec.id
+  aln_ref         text              -- self-reference or external shard id
+  can_only_strengthen  bool         -- true: proposal may only tighten protections
+
+----------------------------------------------------------------------
+-- 3. Credit formula (declarative)
+----------------------------------------------------------------------
+
+record LaborEventReference
+  laborevent_id   int
+  category_code   text
+  brainid_ref     text
+  occurred_at     text
+  effort_score_local float
+  marginal_knowledge_gain float
+  responsibility_scalar float
+  corridor_safe  bool
+
+record LaborCreditDecision
+  laborevent_id   int
+  ecocredits      float
+  reason          text
+
+fn base_rate_for_category(code text) -> float
+  match code with
+    aichatsummary   -> 1.0
+    biosignalstream -> 1.0
+    _               -> 0.0
+
+fn sovereignty_factor_for_category(code text) -> float
+  match code with
+    aichatsummary   -> 1.0
+    biosignalstream -> 2.0
+    _               -> 1.0
+
+fn compute_labor_credits(ev LaborEventReference) -> LaborCreditDecision
+  let base  = base_rate_for_category(ev.category_code)
+  let sov   = sovereignty_factor_for_category(ev.category_code)
+  let k     = ev.marginal_knowledge_gain
+  let resp  = ev.responsibility_scalar
+  let safe  = ev.corridor_safe
+
+  -- Corridor must be satisfied for any credits to be issued.
+  when safe = false then
+    LaborCreditDecision
+      laborevent_id ev.laborevent_id,
+      ecocredits 0.0,
+      reason "Corridor not satisfied; no credits issued."
+  else
+    let raw = base * sov * ev.effort_score_local * resp * k
+    -- Credits are never negative; clamp at zero in case of numeric anomalies.
+    let credits = max raw 0.0
+    LaborCreditDecision
+      laborevent_id ev.laborevent_id,
+      ecocredits credits,
+      reason "Credits computed from base, sovereignty factor, effort, resp, and marginal knowledge gain under satisfied corridors."
+
+----------------------------------------------------------------------
+-- 4. NeurorightsNoDowngradeForNonDisclosure and PsychContinuityNoWeaken
+----------------------------------------------------------------------
+
+-- Helper references to continuity and TCR state.
+record BrainContinuitySnapshot
+  brainid_ref              text
+  psychologicalcontinuityscore float
+  continuity_corridor_ids  list text
+
+record PolicyChangeContext
+  brainid_ref              text
+  union_code               text
+  proposal_label           text
+  affected_corridor_ids    list text
+  before_continuity        BrainContinuitySnapshot
+  after_continuity         BrainContinuitySnapshot
+  disclosed_new_data       bool
+  requested_deletion       bool
+
+rule neurorights_no_downgrade_for_non_disclosure
+  doc
+    Enforces NeurorightsNoDowngradeForNonDisclosure:
+    - If a brain declines to share new data or requests deletion within allowed corridors,
+      their neurorights protections, access to baseline care, and psychological continuity
+      protections must not be reduced.
+  when ctx PolicyChangeContext
+  then
+    let before = ctx.before_continuity
+    let after  = ctx.after_continuity
+
+    -- If no new disclosure and/or deletion is requested, check invariants.
+    when (ctx.disclosed_new_data = false or ctx.requested_deletion = true) then
+      -- 1. Psychological continuity score must not decrease.
+      require after.psychologicalcontinuityscore >= before.psychologicalcontinuityscore
+        else error NEURORIGHTS_NON_DOWNGRADE_PSYCH_SCORE
+          "Psychological continuity score decreased under non-disclosure/deletion."
+
+      -- 2. Continuity corridors must not weaken: after must include all corridors from before.
+      require forall cid in before.continuity_corridor_ids .
+                cid in after.continuity_corridor_ids
+        else error NEURORIGHTS_NON_DOWNGRADE_CONTINUITY_CORRIDOR
+          "Continuity corridor set weakened under non-disclosure/deletion."
+
+rule psych_continuity_no_weaken_union_proposal
+  doc
+    Any data union corridor proposal must not reduce psychological
+    continuity or weaken continuity corridors for any member BrainDid.
+  when proposal DataUnionCorridorProposal, ctx PolicyChangeContext
+  then
+    -- Proposal must only strengthen protections.
+    require proposal.can_only_strengthen = true
+      else error UNION_PROPOSAL_WEAKENS_PROTECTION
+        "Union proposal not flagged as can_only_strengthen."
+
+    -- Reuse same invariants as neurorights_no_downgrade_for_non_disclosure.
+    let before = ctx.before_continuity
+    let after  = ctx.after_continuity
+
+    require after.psychologicalcontinuityscore >= before.psychologicalcontinuityscore
+      else error UNION_PROPOSAL_PSYCH_SCORE_DECREASE
+        "Union corridor proposal decreased psychological continuity score."
+
+    require forall cid in before.continuity_corridor_ids .
+              cid in after.continuity_corridor_ids
+      else error UNION_PROPOSAL_CONTINUITY_CORRIDOR_WEAKENED
+        "Union corridor proposal removed an existing continuity corridor."
+
+----------------------------------------------------------------------
+-- 5. Enforcement hooks for Rust / MCP
+----------------------------------------------------------------------
+
+-- These names are reserved for Rust implementations that must be called
+-- before applying any union corridor proposal or labor contract change.
+
+fn get_brain_continuity_snapshot(brainid_ref text) -> BrainContinuitySnapshot
+  -- Implemented in Rust: queries PsychologicalContinuityEvidence and
+  -- continuity corridor specs for the given brain.
+
+fn evaluate_policy_change(
+  ctx PolicyChangeContext
+) -> bool
+  -- Implemented in Rust: calls the above rules and returns true only if
+  -- all invariants hold; otherwise fails with explicit error codes.
+
+end namespace
