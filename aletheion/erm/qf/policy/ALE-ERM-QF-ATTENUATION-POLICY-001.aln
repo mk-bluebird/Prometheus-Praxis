@@ -1,0 +1,16 @@
+# Path: aletheion/erm/qf/policy/ALE-ERM-QF-ATTENUATION-POLICY-001.aln
+alnversion 1.0.0
+alnnamespace ALE.ERM.QF.ATTENUATION.V1
+
+record DomainAlphaPolicy
+  domain          text        -- "health", "eco_restoration", "neurorights_tooling"
+  alpha_min       float       -- lower bound
+  alpha_max       float       -- upper bound
+  default_alpha   float
+  max_credits_ref float       -- reference credit scale e.g., 10_000
+
+table HealthQFAttenuationPolicy
+  rows
+    { domain: "health",             alpha_min: 0.0001, alpha_max: 0.01, default_alpha: 0.001,  max_credits_ref: 10000.0 }
+    { domain: "eco_restoration",    alpha_min: 0.0005, alpha_max: 0.05, default_alpha: 0.005,  max_credits_ref: 20000.0 }
+    { domain: "neurorights_tooling",alpha_min: 0.001,  alpha_max: 0.10, default_alpha: 0.02,   max_credits_ref: 5000.0 }
