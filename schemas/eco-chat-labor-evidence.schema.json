@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mk-bluebird/eco_restoration_shard/schemas/eco-chat-labor-evidence.schema.json",
+  "title": "EcoChatLaborEvidence",
+  "description": "Evidence record for AI-chat labor where verbatim text is replaced by topic vectors and explicit consent flags.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "worker_did",
+    "corridor_id",
+    "labor_source_kind",
+    "evidence_mode",
+    "consent_scope",
+    "neurorights_flag",
+    "labor_seconds",
+    "topic_vector",
+    "topic_dim",
+    "created_utc_ms"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "worker_did": {
+      "type": "string",
+      "maxLength": 64
+    },
+    "corridor_id": {
+      "type": "string",
+      "maxLength": 128
+    },
+    "labor_source_kind": {
+      "type": "string",
+      "enum": [
+        "HUMAN_CHAT_SESSION",
+        "HUMAN_DATA_UPLOAD",
+        "SENSOR_STREAM_AGGREGATE",
+        "DERIVED_FEATURE_VECTOR",
+        "CURATION_REVIEW_DECISION",
+        "MODEL_GENERATED_DRAFT",
+        "MODEL_SELF_CORRECTION"
+      ]
+    },
+    "evidence_mode": {
+      "type": "string",
+      "enum": [
+        "TOPIC_VECTOR_ONLY",
+        "REDACTED_TEXT_SNIPPET",
+        "FULL_TEXT_LOCAL_ONLY"
+      ]
+    },
+    "consent_scope": {
+      "type": "string",
+      "enum": [
+        "SINGLE_TASK",
+        "PROJECT_BOUNDED",
+        "ECOSYSTEM_POOL"
+      ]
+    },
+    "neurorights_flag": {
+      "type": "string",
+      "enum": [
+        "NEURORIGHTS_SAFE",
+        "REQUIRES_REVIEW",
+        "NEURORIGHTS_REJECTED"
+      ]
+    },
+    "labor_seconds": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 86400
+    },
+    "topic_vector": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 4096,
+      "items": {
+        "type": "number"
+      }
+    },
+    "topic_dim": {
+      "type": "integer",
+      "minimum": 8,
+      "maximum": 4096
+    },
+    "has_explicit_consent": {
+      "type": "boolean",
+      "const": true
+    },
+    "allow_training_use": {
+      "type": "boolean"
+    },
+    "allow_governance_use": {
+      "type": "boolean"
+    },
+    "region_code": {
+      "type": "string",
+      "maxLength": 16
+    },
+    "project_id": {
+      "type": "string",
+      "maxLength": 64
+    },
+    "created_utc_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "evidencehex": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "signinghex": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "consent_scope": { "const": "ECOSYSTEM_POOL" }
+        }
+      },
+      "then": {
+        "properties": {
+          "allow_training_use": { "const": true }
+        },
+        "required": ["allow_training_use"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "neurorights_flag": { "const": "NEURORIGHTS_REJECTED" }
+        }
+      },
+      "then": {
+        "properties": {
+          "allow_training_use": { "const": false },
+          "allow_governance_use": { "const": false }
+        }
+      }
+    }
+  ]
+}
