@@ -7,19 +7,14 @@ alnnamespace ALETHEION.IDENTITY.PPX_NO_IDENTITY_CLASSIFICATION.V1
 
 particle crate.identity.continuity.v1
   id             koid.v1
-  crate_name     str.v1        -- e.g. "aletheion-identity-continuity-kernel"
+  crate_name     str.v1
   version_semver semver.v1
-  git_ref        str.v1        -- commit hash or tag
-  enabled        bool.v1       -- if false, crate is exempt (migration only)
+  git_ref        str.v1
+  enabled        bool.v1
 
 -------------------------------------------------------------------------------
 -- 2. Forbidden symbols for continuity-only crates
 -------------------------------------------------------------------------------
-
-particle crate.identity.forbidden.symbol.v1
-  id           koid.v1
-  symbol_fq    str.v1          -- fully qualified Rust path or ALN name
-  symbol_kind  enum.symbol.kind.v1
 
 enum enum.symbol.kind.v1
   TYPE
@@ -27,6 +22,11 @@ enum enum.symbol.kind.v1
   TRAIT
   FIELD
   MODULE
+
+particle crate.identity.forbidden.symbol.v1
+  id           koid.v1
+  symbol_fq    str.v1
+  symbol_kind  enum.symbol.kind.v1
 
 particle crate.identity.forbidden.set.v1
   id             koid.v1
@@ -37,9 +37,8 @@ particle crate.identity.forbidden.set.v1
 const PPX_FORBIDDEN_IDENTITY_SYMBOLS
   crate.identity.forbidden.set.v1
   label        "PPX_NO_IDENTITY_CLASSIFICATION"
-  description  "Symbols that must never appear in continuity-only crates"
+  description  "Symbols that must never appear in continuity-only identity crates"
   symbols
-    -- Identity / classification types
     crate.identity.forbidden.symbol.v1
       symbol_fq  "crate::IdentityClass"
       symbol_kind TYPE
@@ -49,8 +48,6 @@ const PPX_FORBIDDEN_IDENTITY_SYMBOLS
     crate.identity.forbidden.symbol.v1
       symbol_fq  "crate::EligibilityFlag"
       symbol_kind TYPE
-
-    -- Access-control / rights sinks
     crate.identity.forbidden.symbol.v1
       symbol_fq  "crate::NeurorightCorridorSpec"
       symbol_kind TYPE
@@ -65,25 +62,141 @@ const PPX_FORBIDDEN_IDENTITY_SYMBOLS
       symbol_kind FUNCTION
 
 -------------------------------------------------------------------------------
--- 3. Source–sink invariant definition
+-- 3. Doctrine: no identity classification / no rights downgrade by metrics
+-------------------------------------------------------------------------------
+
+atom DoctrineId
+  field id string
+
+atom MetricType
+  enum
+    SimilarityScore
+    PsychContinuityEvidence
+    ReputationScore
+    HealthRiskScore
+    EcoImpactScore
+    LaborContributionScore
+
+atom SourceType
+  enum
+    BrainDid
+    PseudonymousId
+    DeviceDid
+    DataLaborEventId
+    AggregateCohortId
+
+atom TargetType
+  enum
+    AccessDecision
+    AclUpdate
+    NeurorightsFloor
+    BenefitSchedule
+    SanctionSchedule
+    ContinuityEvidenceLog
+    EvolutionWindowAudit
+    GovernanceAuditLog
+
+atom ForbiddenFlow
+  field source SourceType
+  field metric MetricType
+  field target TargetType
+
+atom AllowedSink
+  field sink TargetType
+
+atom PpxDoctrineAtom
+  field doctrine_id DoctrineId
+  field forbidden_flows list ForbiddenFlow
+  field allowed_uses list AllowedSink
+  field no_rights_downgrade_by_metric bool
+  field notes string
+
+const DOCTRINE_PPX_NO_IDENTITY_CLASSIFICATION DoctrineId
+  id "PPX-NO-IDENTITY-CLASSIFICATION"
+
+const DOCTRINE_PPX_NO_RIGHTS_DOWNGRADE_BY_METRIC DoctrineId
+  id "PPX-NO-RIGHTS-DOWNGRADE-BY-METRIC"
+
+const FORBID_BRAINDID_SIMILARITY_TO_ACCESS ForbiddenFlow
+  source BrainDid
+  metric SimilarityScore
+  target AccessDecision
+
+const FORBID_BRAINDID_SIMILARITY_TO_ACL ForbiddenFlow
+  source BrainDid
+  metric SimilarityScore
+  target AclUpdate
+
+const FORBID_BRAINDID_CONTINUITY_TO_ACCESS ForbiddenFlow
+  source BrainDid
+  metric PsychContinuityEvidence
+  target AccessDecision
+
+const FORBID_BRAINDID_CONTINUITY_TO_ACL ForbiddenFlow
+  source BrainDid
+  metric PsychContinuityEvidence
+  target AclUpdate
+
+const FORBID_BRAINDID_REPUTATION_TO_SANCTION ForbiddenFlow
+  source BrainDid
+  metric ReputationScore
+  target SanctionSchedule
+
+const FORBID_BRAINDID_HEALTHRISK_TO_SANCTION ForbiddenFlow
+  source BrainDid
+  metric HealthRiskScore
+  target SanctionSchedule
+
+const FORBID_BRAINDID_LABORSCORE_TO_BENEFIT ForbiddenFlow
+  source BrainDid
+  metric LaborContributionScore
+  target BenefitSchedule
+
+const ALLOW_TO_CONTINUITY_LOG AllowedSink
+  sink ContinuityEvidenceLog
+
+const ALLOW_TO_EVOLUTION_AUDIT AllowedSink
+  sink EvolutionWindowAudit
+
+const ALLOW_TO_GOVERNANCE_AUDIT AllowedSink
+  sink GovernanceAuditLog
+
+const DOCTRINE_PPX_CORE PpxDoctrineAtom
+  doctrine_id DOCTRINE_PPX_NO_IDENTITY_CLASSIFICATION
+  forbidden_flows
+    FORBID_BRAINDID_SIMILARITY_TO_ACCESS
+    FORBID_BRAINDID_SIMILARITY_TO_ACL
+    FORBID_BRAINDID_CONTINUITY_TO_ACCESS
+    FORBID_BRAINDID_CONTINUITY_TO_ACL
+    FORBID_BRAINDID_REPUTATION_TO_SANCTION
+    FORBID_BRAINDID_HEALTHRISK_TO_SANCTION
+    FORBID_BRAINDID_LABORSCORE_TO_BENEFIT
+  allowed_uses
+    ALLOW_TO_CONTINUITY_LOG
+    ALLOW_TO_EVOLUTION_AUDIT
+    ALLOW_TO_GOVERNANCE_AUDIT
+  no_rights_downgrade_by_metric true
+  notes "Continuity and similarity metrics are evidence-only for continuity and safety audits. BrainDid is never used for classification, ranking, or rights changes."
+
+-------------------------------------------------------------------------------
+-- 4. Source–sink invariant definition
 -------------------------------------------------------------------------------
 
 particle crate.identity.source.sink.policy.v1
   id                  koid.v1
   label               str.v1
   description         str.v1
-  source_type_names   list.str.v1   -- e.g. ["PsychContinuityEvidence", "SimilarityScore"]
-  sink_type_names     list.str.v1   -- e.g. ["AccessDecision", "NeurorightCorridorSpec"]
-  allow_paths         bool.v1       -- must be false for PPX_NO_IDENTITY_CLASSIFICATION
+  source_type_names   list.str.v1
+  sink_type_names     list.str.v1
+  allow_paths         bool.v1
 
 const PPX_NO_IDENTITY_CLASSIFICATION_POLICY
   crate.identity.source.sink.policy.v1
   label         "PPX_NO_IDENTITY_CLASSIFICATION"
-  description   "No dataflow from continuity sources to identity/rights sinks"
+  description   "No dataflow from continuity metrics to identity or rights sinks"
   source_type_names
     "PsychContinuityEvidence"
     "SimilarityScore"
-    "ContinuityDecision"
   sink_type_names
     "IdentityClass"
     "RiskProfile"
@@ -94,7 +207,7 @@ const PPX_NO_IDENTITY_CLASSIFICATION_POLICY
   allow_paths   false
 
 -------------------------------------------------------------------------------
--- 4. Crate-level invariant binding
+-- 5. Crate-level invariant binding
 -------------------------------------------------------------------------------
 
 particle crate.identity.invariant.binding.v1
@@ -102,12 +215,11 @@ particle crate.identity.invariant.binding.v1
   crate_ref       ref.crate.identity.continuity.v1
   forbidden_set   ref.crate.identity.forbidden.set.v1
   policy_ref      ref.crate.identity.source.sink.policy.v1
-  required        bool.v1              -- must be true in production
+  required        bool.v1
 
--- Example binding (to be instantiated per crate)
 const BINDING_IDENTITY_CONTINUITY_KERNEL
   crate.identity.invariant.binding.v1
-  crate_ref     ref.crate.identity.continuity.v1 "aletheion-identity-continuity-kernel"
-  forbidden_set ref.crate.identity.forbidden.set.v1 PPX_FORBIDDEN_IDENTITY_SYMBOLS
-  policy_ref    ref.crate.identity.source.sink.policy.v1 PPX_NO_IDENTITY_CLASSIFICATION_POLICY
-  required      true
+  crate_ref       ref.crate.identity.continuity.v1 "aletheion-identity-continuity-kernel"
+  forbidden_set   ref.crate.identity.forbidden.set.v1 PPX_FORBIDDEN_IDENTITY_SYMBOLS
+  policy_ref      ref.crate.identity.source.sink.policy.v1 PPX_NO_IDENTITY_CLASSIFICATION_POLICY
+  required        true
