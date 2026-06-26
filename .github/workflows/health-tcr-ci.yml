@@ -1,0 +1,46 @@
+# Path: .github/workflows/health-tcr-ci.yml
+
+name: Health TCR CI
+
+on:
+  push:
+    paths:
+      - "aletheion/erm/health_tcr/**"
+      - ".github/workflows/health-tcr-ci.yml"
+  pull_request:
+    paths:
+      - "aletheion/erm/health_tcr/**"
+      - ".github/workflows/health-tcr-ci.yml"
+
+jobs:
+  health-tcr-ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Rustfmt
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy -p aletheion-erm-health-tcr -- -D warnings
+
+      - name: Unit and property tests
+        env:
+          RUST_BACKTRACE: 1
+        run: cargo test -p aletheion-erm-health-tcr --all-features
+
+      - name: SQL migrations lint
+        run: |
+          sudo apt-get update && sudo apt-get install -y sqlite3
+          find aletheion/erm/health_tcr/migrations -name "*.sql" -print0 \
+            | xargs -0 -I{} sqlite3 :memory: ".read {}"
+
+      - name: Ecosafety grammar preflight
+        # Reuse existing ecosafety-grammar check binary.
+        run: cargo test -p aletheion-erm-ecosafety --test ecosafetygrammarcheck
