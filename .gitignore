@@ -1,7 +1,12 @@
 ```
-# Dependencies
+# Rust/Cargo specific
 target/
 Cargo.lock
+*.rs.bk
+*.tmp
+
+# Dependencies
+vendor/
 
 # Logs and temp files
 *.log
@@ -15,8 +20,10 @@ Cargo.lock
 # Editors
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# OS generated files
+# OS
 .DS_Store
 Thumbs.db
 ```
