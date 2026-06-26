@@ -1,0 +1,31 @@
+[package]
+name = "ai_chat_hashonly_normalizer"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+authors = ["Aletheion / Prometheus-Praxis"]
+description = "HASHONLY AI chat normalizer that converts raw transcripts into AiChatSummaryV1 data-labor KOs with TopicVectorHashAtom, never storing raw text."
+readme = "README.md"
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+keywords = ["aletheion", "data-labor", "hashonly", "ai-chat"]
+categories = ["science", "data-processing"]
+publish = false
+
+[lib]
+name = "ai_chat_hashonly_normalizer"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[dependencies]
+sha2 = "0.10"
+hex = "0.4"
+
+[dev-dependencies]
+# No additional dev dependencies currently required; tests use std only.
+
+[features]
+default = []
+# Future hooks:
+# - "mcp" for MCP-specific wiring
+# - "real-embedder" for model-backed embedding instead of TrivialEmbedder
