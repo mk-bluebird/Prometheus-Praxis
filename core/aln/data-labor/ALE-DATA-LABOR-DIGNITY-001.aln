@@ -1,0 +1,41 @@
+alnversion 1.0.0
+alnnamespace ALE.DATA.LABOR.DIGNITY.V1
+
+particle DataAsLaborDignityPolicyV1
+  policy_id                  koid.v1
+  label                      str.v1
+  version                    u32.v1
+  applies_to_union_ids       list.str.v1
+  applies_to_source_kinds    list.enum.LaborSourceKindV1
+  neurorights_no_downgrade   bool.v1
+  min_credit_floor_microunits i64.v1       # minimum per-event credit when used
+  forbid_care_downgrade_flag bool.v1
+  forbid_service_lockout_flag bool.v1
+
+invariant NEURORIGHTS_NO_DOWNGRADE_FOR_NON_DISCLOSURE_V1
+  forall e_before DataLaborEventV1,
+         e_after  DataLaborEventV1
+  where  e_before.header.related_account_id == e_after.header.related_account_id
+     and e_before.header.labor_source_kind   == e_after.header.labor_source_kind
+     and e_after.header.consent_state_id != e_before.header.consent_state_id
+     and consent_revoked(e_before.header.consent_state_id,
+                         e_after.header.consent_state_id)
+  implies
+     e_after.metrics.credit_amount_microunits
+       >= e_before.metrics.credit_amount_microunits
+
+invariant NO_CARE_OR_RIGHTS_DOWNGRADE_FOR_NON_DISCLOSURE_V1
+  forall s_before ALE.HEALTH.CARE.STATE.V1,
+         s_after  ALE.HEALTH.CARE.STATE.V1
+  where  s_before.account_id == s_after.account_id
+     and s_after.latest_consent_change_reason == "REVOCATION"
+  implies
+     s_after.base_care_tier_rank <= s_before.base_care_tier_rank
+  and s_after.access_rights_superset_of(s_before)
+
+invariant MIN_CREDIT_FLOOR_ENFORCED_V1
+  forall e DataLaborEventV1, p DataAsLaborDignityPolicyV1
+  where  e.header.labor_source_kind in p.applies_to_source_kinds
+     and p.min_credit_floor_microunits > 0
+  implies
+     e.metrics.credit_amount_microunits >= p.min_credit_floor_microunits
