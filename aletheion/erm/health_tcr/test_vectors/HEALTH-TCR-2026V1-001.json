@@ -2,50 +2,89 @@
   "vector_id": "HEALTH-TCR-2026V1-001",
   "did": "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7",
   "seed": 123456789,
-  "description": "Happy-path health TCR flow with non-negative credits, monotone gas discounts, and no neurorights/treaty violations.",
+  "description": "Happy-path HealthDataTCR2026v1 flow with neurorights-safe HASHONLY dataset, non-negative credits, monotone gas discounts, and simple QF allocation.",
+  "scenario_kind": "unit",
+  "city_context": "Phoenix-Health-TCR-2026",
   "base_parameters": {
     "base_gas_price": "1000.000000",
     "min_credit": "0.000000",
-    "discount_curve_id": "HEALTH-TCR-DISCOUNT-2026V1"
+    "discount_curve_id": "HEALTH-TCR-DISCOUNT-2026V1",
+    "qf_pool_id": "QF-POOL-HEALTH-LABOR-001",
+    "qf_matching_pool": "300.000000"
   },
   "inputs": {
-    "datasets": [
-      {
-        "dataset_id": "DATASET-001",
-        "submitter_account_id": "acct-researcher-001",
-        "brain_did": "braindid-0001",
-        "hash_mode": "HASHONLY",
-        "schema_id": "health.dataset.registry.v1",
-        "bytes_hash_hex": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "neurorights_safe": true,
-        "fpic_required": true,
-        "fpic_token_id": "FPIC-TOKEN-001",
-        "governance_scope": {
-          "treaty_ids": ["GODTREATY-NEURO-001"],
-          "birthsign_id": "BIRTHSIGN-PHX-001",
-          "geo_point_wgs84": [33.4484, -112.0740]
-        }
-      }
-    ],
+    "dataset": {
+      "dataset_id": "DATASET-001",
+      "submitter_account_id": "acct-researcher-001",
+      "name": "Phoenix HASHONLY symptom trajectory 2026-01",
+      "description": "HASHONLY AI-chat summary dataset for Phoenix citizen, January 2026.",
+      "owner_union_id": "UNION-HEALTH-DATA-COOP-001",
+      "schema_id": "health.dataset.registry.v1",
+      "bytes_hash_hex": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "birthsign_id": "BIRTHSIGN-PHX-001",
+      "neurorights_policy_id": "NR-POLICY-GLOBAL-001",
+      "neurorights_safe": true,
+      "evidence_mode": "HASHONLY",
+      "hash_mode": "HASHONLY",
+      "fpic_required": true,
+      "fpic_token_id": "FPIC-TOKEN-001",
+      "braindid": "braindid-0001",
+      "brain_did": "braindid-0001",
+      "related_account_id": "DLACCT-0001",
+      "bci_challenge_sig": "BCI-SIG-PLACEHOLDER",
+      "stake_min_credits": "10000",
+      "stake_locked_credits": "10000",
+      "created_at_utc": "2026-01-01T00:00:00Z",
+      "governance_scope": {
+        "treaty_ids": [
+          "GODTREATY-NEURO-001"
+        ],
+        "birthsign_id": "BIRTHSIGN-PHX-001",
+        "geo_point_wgs84": [33.4484, -112.0740]
+      },
+      "tags": [
+        "HASHONLY-SUMMARIZER",
+        "NEURORIGHTS-SAFE",
+        "NO-VERBATIM"
+      ]
+    },
     "labor_events": [
       {
         "event_id": "LABOR-001",
         "account_id": "acct-researcher-001",
         "dataset_id": "DATASET-001",
+        "labor_span_seconds": 1800,
+        "labor_intensity_01": 0.70,
+        "info_value_01": 0.80,
+        "risk_cost_01": 0.20,
+        "eco_cost_01": 0.10,
+        "labor_value_index_01": 0.75,
+        "credit_amount_microunits": 10000000,
         "reward_delta": "10.000000",
-        "info_value_01": "0.80",
-        "timestamp_utc": "2026-01-01T00:00:00Z"
+        "evidence_mode": "HASHONLY",
+        "topic_vector_hash": "tvh-e3b0c442-0",
+        "timestamp_utc": "2026-01-01T00:00:00Z",
+        "created_at_utc": "2026-01-01T00:00:00Z"
       },
       {
         "event_id": "LABOR-002",
         "account_id": "acct-researcher-001",
         "dataset_id": "DATASET-001",
+        "labor_span_seconds": 900,
+        "labor_intensity_01": 0.60,
+        "info_value_01": 0.90,
+        "risk_cost_01": 0.25,
+        "eco_cost_01": 0.12,
+        "labor_value_index_01": 0.78,
+        "credit_amount_microunits": 5000000,
         "reward_delta": "5.000000",
-        "info_value_01": "0.90",
-        "timestamp_utc": "2026-01-02T00:00:00Z"
+        "evidence_mode": "HASHONLY",
+        "topic_vector_hash": "tvh-e3b0c442-1",
+        "timestamp_utc": "2026-01-02T00:00:00Z",
+        "created_at_utc": "2026-01-02T00:00:00Z"
       }
     ],
-    "discount_check_points": [
+    "discount_checkpoints": [
       {
         "label": "no-credits",
         "total_credits": "0.000000"
@@ -58,24 +97,45 @@
         "label": "after-LABOR-002",
         "total_credits": "15.000000"
       }
+    ],
+    "qf_contributions": [
+      {
+        "campaign_id": "QF-POOL-HEALTH-LABOR-001",
+        "project_id": "PROJECT-A",
+        "contributor_account_id": "acct-researcher-001",
+        "amount": "1.000000",
+        "responsibility_scalar": "1.000000",
+        "attenuation_alpha": "0.000000",
+        "cumulative_credits": "0.000000",
+        "ts_utc_ms": 1767225600000
+      },
+      {
+        "campaign_id": "QF-POOL-HEALTH-LABOR-001",
+        "project_id": "PROJECT-B",
+        "contributor_account_id": "acct-researcher-001",
+        "amount": "4.000000",
+        "responsibility_scalar": "1.000000",
+        "attenuation_alpha": "0.000000",
+        "cumulative_credits": "0.000000",
+        "ts_utc_ms": 1767312000000
+      }
     ]
   },
   "expected_outputs": {
-    "dataset_results": [
-      {
-        "dataset_id": "DATASET-001",
-        "expected_status": "PendingReview",
-        "expected_neurorights_corridor_ok": true,
-        "expected_treaty_gate_decision": "MayRun"
-      }
-    ],
-    "labor_account_states": [
-      {
-        "account_id": "acct-researcher-001",
-        "expected_final_credits": "15.000000",
-        "expected_min_credits_over_time": "0.000000"
-      }
-    ],
+    "dataset_result": {
+      "dataset_id": "DATASET-001",
+      "expected_status": "PendingReview",
+      "expected_neurorights_safe": true,
+      "expected_neurorights_corridor_ok": true,
+      "expected_treaty_gate_decision": "MayRun",
+      "expected_quality_score_min": "0.300000",
+      "expected_challenge_open": true
+    },
+    "labor_account_state": {
+      "account_id": "acct-researcher-001",
+      "expected_final_credits": "15.000000",
+      "expected_min_credits_over_time": "0.000000"
+    },
     "discount_results": [
       {
         "label": "no-credits",
@@ -93,20 +153,35 @@
         "expected_gas_price": "925.000000"
       }
     ],
+    "qf_results": {
+      "campaign_id": "QF-POOL-HEALTH-LABOR-001",
+      "matching_pool": "300.000000",
+      "projects": [
+        {
+          "project_id": "PROJECT-A",
+          "expected_qf_score": "1.000000",
+          "expected_matched_amount": "100.000000"
+        },
+        {
+          "project_id": "PROJECT-B",
+          "expected_qf_score": "4.000000",
+          "expected_matched_amount": "200.000000"
+        }
+      ]
+    },
     "invariants": {
       "credits_never_negative": true,
       "discount_monotone_non_increasing": true,
-      "no_neuroright_corridor_breach": true,
+      "no_neurorights_corridor_breach": true,
       "no_treaty_violation": true
     }
   },
   "bindings": {
     "rust_tests": [
       "aletheion/erm/health_tcr/tests/prop_health_credits.rs",
-      "aletheion/erm/health_tcr/tests/discount_curve_tests.rs"
+      "aletheion/erm/health_tcr/tests/discount_curve_tests.rs",
+      "aletheion/erm/health_tcr/tests/qf_allocation_tests.rs"
     ],
-    "aln_catalog_ref": "ALE-ERM-HEALTH-TCR-VECTORS-001",
-    "scenario_kind": "unit",
-    "city_context": "Phoenix-Health-TCR-2026"
+    "aln_catalog_ref": "ALE-ERM-HEALTH-TCR-VECTORS-001"
   }
 }
