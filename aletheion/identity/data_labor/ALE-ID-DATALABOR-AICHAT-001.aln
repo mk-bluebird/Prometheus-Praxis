@@ -1,0 +1,65 @@
+aln ALE-ID-DATALABOR-AICHAT-001.aln
+namespace ALE.IDENTITY.DATALABOR.AICHAT.001
+
+; HASHONLY AI-chat summaries as labor events, never raw exhaust.
+
+; 1. Shared atoms
+
+atom ConsentFlag
+  enum
+    ExplicitOptIn
+    ExplicitOptOut
+    EmergencyOverride
+    ResearchOnly
+    ClinicalOnly
+    AnonymizedAnalytics
+    MonetizationForbidden
+
+atom ConsentFlagsAtom
+  field flags list ConsentFlag
+
+atom SourceKind
+  enum
+    AiChatSummaryV1
+    OtherLaborEvent
+
+
+; 2. Hash-only topic representation
+
+atom TopicVectorHashAtom
+  doc "Opaque hash of a topic vector or embedding, using a non-blacklisted primitive."
+  field algo string      ; e.g. 'ALLOWED-HASH-V1' (must NOT be any globally blacklisted primitive)
+  field value string     ; hex-encoded hash string (no raw text)
+  field dim u32          ; embedding dimensionality before hashing (for audit)
+  field salt_id string   ; identifier for domain salt / key schedule
+
+
+; 3. AiChatSummaryV1 KO
+
+atom AiChatSummaryV1
+  doc "HASHONLY representation of an AI chat interaction, treated as labor, not exhaust."
+  field summary_id string               ; KO / event ID
+  field topic_vector_hash TopicVectorHashAtom
+  field labor_span_seconds u64          ; duration of the labor episode
+  field source_kind SourceKind
+  field hashonly bool
+  field consent ConsentFlagsAtom
+
+  ; Optional coarse labels, never raw text:
+  field domain_label string             ; e.g., 'health', 'mobility', 'governance'
+  field symptom_cluster_label string    ; e.g., 'sleep', 'anxiety', 'pain', or 'none'
+  field locality_label string           ; e.g., 'phoenix-metro', 'remote', coarse only
+
+  ; Provenance, with no conversational content:
+  field created_at_utc string           ; ISO-8601 timestamp
+  field tool_chain_id string            ; MCP / tool pipeline identifier
+  field normalizer_version string       ; version of hash-only normalizer crate
+
+
+; 4. Invariants for CI / DB gates (to be enforced in Rust/SQL)
+
+; - summary_id MUST be non-empty.
+; - source_kind MUST equal AiChatSummaryV1.
+; - hashonly MUST be true.
+; - topic_vector_hash.value MUST NOT be empty and MUST NOT be reversible to raw text.
+; - No field in AiChatSummaryV1 is allowed to contain quoted conversational text.
