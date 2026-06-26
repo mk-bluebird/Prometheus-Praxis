@@ -1,0 +1,173 @@
+# filename: aln/identity/PPX-Minimal-Continuity-Neurorights-001.aln
+# repo: github.com/mk-bluebird/eco_restoration_shard
+# role: Neutral evidence kernel for psychological continuity, neurorights corridors, and system well-being.
+#       No identity classification, no legitimacy decisions, no downgrade logic.
+
+namespace PPX.IDENTITY.MINIMAL.CONTINUITY.NEURORIGHTS.001
+
+# --------------------------------------------------------------------
+# 1. Core IDs (neutral, no personhood semantics attached)
+# --------------------------------------------------------------------
+
+atom BrainDid
+  doc "Decentralized identifier string for a brain-identity; semantics decided by the user, not by this kernel."
+  field did string          # e.g. did:ppx:..., or any DID method chosen by Prometheus-Praxis
+
+atom PsychStateRef
+  doc "Reference to an external psychological state representation (e.g., qpudatashard, snapshot)."
+  field shard_id string     # external or local ID
+  field version_tag string  # semantic version of representation / encoding
+
+atom SystemId
+  doc "Identifier for a system or workflow (e.g., cyboquatic autopilot, health rewards engine)."
+  field id string
+
+# --------------------------------------------------------------------
+# 2. Psychological continuity evidence (no verdicts)
+# --------------------------------------------------------------------
+
+atom SimilarityMetricId
+  doc "Identifier for a continuity / similarity metric definition (e.g. protocol name)."
+  field id string           # e.g. 'PSYCONT-PHX-EEG-V1'
+
+atom SimilarityScore
+  doc "Numeric similarity in [0,1] between two psych-state references under a named metric."
+  field metric SimilarityMetricId
+  field value float
+  field description string  # human-readable explanation of what was measured
+
+atom PsychContinuityEvidence
+  doc "Evidence that relates two psych states; purely descriptive, not a statement about identity or rights."
+  field subject BrainDid
+  field from_state PsychStateRef
+  field to_state PsychStateRef
+  field score SimilarityScore
+  field measured_at_utc string
+  field notes string
+
+rule similarity_score_range_only
+  doc "Similarity scores MUST stay in [0,1]; no other semantics enforced here."
+  when ev PsychContinuityEvidence
+  then
+    require ev.score.value >= 0.0 && ev.score.value <= 1.0
+      else error "PPX_SIMILARITY_SCORE_OUT_OF_RANGE"
+  end
+
+# NOTE: No rule in this namespace interprets similarity as legitimacy, personhood, or access.
+
+# --------------------------------------------------------------------
+# 3. Neurorights corridor specifications (UNESCO-inspired, evidence-only)
+# --------------------------------------------------------------------
+
+atom NeurorightName
+  enum COGNITIVE_LIBERTY, MENTAL_PRIVACY, MENTAL_INTEGRITY, PSYCHOLOGICAL_CONTINUITY
+
+atom NeurorightCorridorSpec
+  doc "Specification of desired neurorights protections for a given context; descriptive only."
+  field id string                 # e.g. 'NR-PHX-BCI-2026-V1'
+  field context_tag string        # user or system-defined, e.g. 'PPX-HEALTH-BCI-TRIAL'
+  field description string
+  field right NeurorightName
+  field min_protection_level float  # 0..1 desired level; interpreted by user / higher-level logic
+  field max_risk_tolerance float    # 0..1 upper bound for acceptable risk; not enforced here
+
+rule neurorights_levels_bounded
+  doc "Neurorights protection and risk levels MUST stay in [0,1]; interpretation is left to higher layers."
+  when spec NeurorightCorridorSpec
+  then
+    require spec.min_protection_level >= 0.0 && spec.min_protection_level <= 1.0
+      else error "PPX_NEURORIGHTS_PROTECTION_OUT_OF_RANGE" spec.id
+    require spec.max_risk_tolerance >= 0.0 && spec.max_risk_tolerance <= 1.0
+      else error "PPX_NEURORIGHTS_RISK_OUT_OF_RANGE" spec.id
+  end
+
+# NOTE: This kernel does not decide whether a specific system complies.
+#       It just standardizes how corridor specs are recorded.
+
+# --------------------------------------------------------------------
+# 4. System well-being vectors (IEEE 7010 & GPAI-inspired, system-centric)
+# --------------------------------------------------------------------
+
+atom WellBeingComponentName
+  enum HEALTH, AUTONOMY, SAFETY, ENVIRONMENT, EQUITY, SOCIAL_COHESION
+
+atom WellBeingComponent
+  doc "Single well-being component in [0,1] for a given system in a given context."
+  field name WellBeingComponentName
+  field value float
+  field description string
+
+atom SystemWellBeingVector
+  doc "Well-being assessment for a system; applies to artifacts/workflows, not to persons."
+  field system SystemId
+  field context_tag string
+  field components list WellBeingComponent
+  field assessed_at_utc string
+  field notes string
+
+rule wellbeing_components_bounded
+  doc "Well-being component values MUST be in [0,1]; no automatic policy is derived here."
+  when comp WellBeingComponent
+  then
+    require comp.value >= 0.0 && comp.value <= 1.0
+      else error "PPX_WELLBEING_COMPONENT_OUT_OF_RANGE" comp.name
+  end
+
+# NOTE: These vectors are for evaluating systems (e.g. 'health-reward-engine-2026'),
+#       not for scoring citizens or identities.
+
+# --------------------------------------------------------------------
+# 5. Hard sovereignty guarantees (no downgrade / no classification)
+# --------------------------------------------------------------------
+
+atom SovereigntyGuarantee
+  doc "Prometheus-Praxis invariants about how evidence may NOT be used."
+  field id string
+  field text string
+
+# For reference and audit purposes; these guarantees are also baked into higher-level policy.
+
+const GUARANTEE_NO_IDENTITY_CLASSIFICATION SovereigntyGuarantee
+  id "PPX-NO-IDENTITY-CLASSIFICATION"
+  text "No rule, metric, or threshold in this kernel may classify a branch, state, or BrainDid as 'legitimate' or 'illegitimate'."
+
+const GUARANTEE_NO_RIGHTS_DOWNGRADE_BY_METRIC SovereigntyGuarantee
+  id "PPX-NO-RIGHTS-DOWNGRADE-BY-METRIC"
+  text "No decrease in similarity, neurorights spec values, or well-being scores may directly downgrade personhood, neurorights, or access to healthcare/cybernetics."
+
+rule enforce_no_classification_in_this_namespace
+  doc "Mechanical guard: if a future artifact in this namespace attempts to add identity classification, CI should treat it as a violation."
+  when g SovereigntyGuarantee
+  then
+    # This is a semantic constraint: any new atom/enum containing strings like 'LEGITIMATE', 'ILLEGITIMATE', 'VALID_DESCENDANT'
+    # should be rejected at CI time by out-of-band text search. Here we simply expose the guarantees for CI tooling.
+    require g.id in [
+      "PPX-NO-IDENTITY-CLASSIFICATION",
+      "PPX-NO-RIGHTS-DOWNGRADE-BY-METRIC"
+    ]
+      else error "PPX_SOVEREIGNTY_GUARANTEE_UNKNOWN" g.id
+  end
+
+# --------------------------------------------------------------------
+# 6. User-configurable metadata (thresholds etc., never enforced here)
+# --------------------------------------------------------------------
+
+atom UserContinuityPreference
+  doc "User-defined metadata describing how *they* interpret continuity evidence for themselves."
+  field owner BrainDid
+  field preferred_metric SimilarityMetricId
+  field preferred_min_score float   # purely descriptive; not enforced here
+  field note string
+
+rule continuity_preference_range_only
+  doc "User continuity preferences must stay in [0,1], but do not trigger any automatic effects here."
+  when pref UserContinuityPreference
+  then
+    require pref.preferred_min_score >= 0.0 && pref.preferred_min_score <= 1.0
+      else error "PPX_CONTINUITY_PREF_OUT_OF_RANGE"
+  end
+
+# NOTE: Higher-level agents or UIs may read these preferences to assist the user.
+#       This kernel does not act on them autonomously.
+
+end namespace
