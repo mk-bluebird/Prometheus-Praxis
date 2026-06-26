@@ -1,0 +1,223 @@
+{
+  "name": "ppx_continuity_mcp",
+  "version": "0.1.0",
+  "description": "Read-only continuity and neurorights evidence tools for Prometheus-Praxis, backed by the PPX minimal SQLite schema.",
+  "license": "MIT",
+  "contact_email": "ops@prometheus-praxis.local",
+  "server": {
+    "command": "ppx_continuity_mcp_server",
+    "args": [
+      "${env:PPX_CONTINUITY_DB_PATH}"
+    ],
+    "env": {
+      "RUST_LOG": "info"
+    }
+  },
+  "tools": [
+    {
+      "name": "get_psych_continuity_for_subject",
+      "description": "Return psychological continuity evidence for a subject DID over an optional time window, using precomputed similarity metrics and scores.",
+      "input_schema": {
+        "type": "object",
+        "required": ["subject_did"],
+        "properties": {
+          "subject_did": {
+            "type": "string",
+            "description": "Brain DID of the augmented citizen, e.g. did:ppx:brain:123."
+          },
+          "from_utc": {
+            "type": ["string", "null"],
+            "description": "Optional start of time window (RFC3339 UTC). If null, window is open-ended."
+          },
+          "to_utc": {
+            "type": ["string", "null"],
+            "description": "Optional end of time window (RFC3339 UTC). If null, window is open-ended."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 50,
+            "description": "Maximum number of evidence records to return (0 = no limit)."
+          }
+        }
+      },
+      "output_schema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "evidence_id": { "type": "integer" },
+            "subject_did": { "type": "string" },
+            "from_state_id": { "type": "integer" },
+            "to_state_id": { "type": "integer" },
+            "metric_id": { "type": "string" },
+            "score": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            },
+            "measured_at_utc": { "type": "string" },
+            "notes": {
+              "type": ["string", "null"]
+            }
+          },
+          "required": [
+            "evidence_id",
+            "subject_did",
+            "from_state_id",
+            "to_state_id",
+            "metric_id",
+            "score",
+            "measured_at_utc"
+          ]
+        }
+      }
+    },
+    {
+      "name": "get_user_continuity_preference",
+      "description": "Return continuity preference settings (metric and minimum acceptable score) for a given subject DID, if present.",
+      "input_schema": {
+        "type": "object",
+        "required": ["subject_did"],
+        "properties": {
+          "subject_did": {
+            "type": "string",
+            "description": "Brain DID of the augmented citizen."
+          }
+        }
+      },
+      "output_schema": {
+        "type": ["object", "null"],
+        "properties": {
+          "subject_did": { "type": "string" },
+          "preferred_metric_id": { "type": "string" },
+          "preferred_min_score": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0
+          },
+          "note": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": [
+          "subject_did",
+          "preferred_metric_id",
+          "preferred_min_score"
+        ]
+      }
+    },
+    {
+      "name": "list_neuroright_corridors_for_context",
+      "description": "List neuroright corridor specs for a given context tag (e.g. a system, geography, or workflow label).",
+      "input_schema": {
+        "type": "object",
+        "required": ["context_tag"],
+        "properties": {
+          "context_tag": {
+            "type": "string",
+            "description": "Context tag used to group neuroright corridor specs."
+          }
+        }
+      },
+      "output_schema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string" },
+            "context_tag": { "type": "string" },
+            "description": { "type": "string" },
+            "right_name": { "type": "string" },
+            "min_protection_level": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            },
+            "max_risk_tolerance": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            }
+          },
+          "required": [
+            "id",
+            "context_tag",
+            "description",
+            "right_name",
+            "min_protection_level",
+            "max_risk_tolerance"
+          ]
+        }
+      }
+    },
+    {
+      "name": "list_system_wellbeing_components",
+      "description": "List well-being components for a given system and context, reflecting neurorights and ecosafety-related status without actuation.",
+      "input_schema": {
+        "type": "object",
+        "required": ["system_id", "context_tag"],
+        "properties": {
+          "system_id": {
+            "type": "string",
+            "description": "Logical system identifier (e.g. a city subsystem or service)."
+          },
+          "context_tag": {
+            "type": "string",
+            "description": "Context tag (e.g. geography, corridor, or workload label)."
+          }
+        }
+      },
+      "output_schema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "integer" },
+            "system_id": { "type": "string" },
+            "context_tag": { "type": "string" },
+            "component_name": { "type": "string" },
+            "value": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            },
+            "description": { "type": "string" },
+            "assessed_at_utc": { "type": "string" },
+            "notes": {
+              "type": ["string", "null"]
+            }
+          },
+          "required": [
+            "id",
+            "system_id",
+            "context_tag",
+            "component_name",
+            "value",
+            "description",
+            "assessed_at_utc"
+          ]
+        }
+      }
+    },
+    {
+      "name": "list_sovereignty_guarantees",
+      "description": "List core sovereignty guarantees (e.g. NO-IDENTITY-CLASSIFICATION, NO-RIGHTS-DOWNGRADE-BY-METRIC) encoded in the continuity DB.",
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      },
+      "output_schema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string" },
+            "text": { "type": "string" }
+          },
+          "required": ["id", "text"]
+        }
+      }
+    }
+  ]
+}
