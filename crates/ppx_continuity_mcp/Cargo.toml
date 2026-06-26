@@ -1,0 +1,25 @@
+[package]
+name = "ppx_continuity_mcp"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+
+[lib]
+name = "ppx_continuity_mcp"
+crate-type = ["rlib"]
+
+[[bin]]
+name = "ppx_continuity_mcp_server"
+path = "src/bin/server.rs"
+
+[dependencies]
+ppx_continuity_kernel = { path = "../ppx_continuity_kernel" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+
+[features]
+default = []
+# Forwarded feature: if you want this crate (or CI) to run PPX invariants,
+# enable `ppx-validator` which pulls it in from the kernel crate.
+ppx-validator = ["ppx_continuity_kernel/ppx-validator"]
