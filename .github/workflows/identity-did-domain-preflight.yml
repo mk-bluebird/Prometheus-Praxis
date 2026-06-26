@@ -1,0 +1,37 @@
+name: Identity DID Domain Preflight
+
+on:
+  push:
+    paths:
+      - "aln/identity/**"
+      - "rust/identity/**"
+      - ".github/workflows/identity-did-domain-preflight.yml"
+  pull_request:
+    paths:
+      - "aln/identity/**"
+      - "rust/identity/**"
+      - ".github/workflows/identity-did-domain-preflight.yml"
+
+jobs:
+  did-domain-preflight:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Run Rust tests for identity crate
+        run: |
+          cargo test -p identity --all-features
+
+      - name: Static scan for direct DID reuse across domains
+        run: |
+          python3 scripts/identity/check_did_domain_separation.py \
+            --aln-root aln \
+            --identity-namespace ALE.IDENTITY \
+            --policy-contract ALE.IDENTITY.DID.DOMAIN.POLICY.V1
