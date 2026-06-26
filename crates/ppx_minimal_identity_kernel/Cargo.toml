@@ -1,0 +1,21 @@
+# filename: ppx_minimal_identity_kernel/Cargo.toml
+
+[package]
+name = "ppx_minimal_identity_kernel"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "ppx_minimal_identity_kernel"
+crate-type = ["rlib", "cdylib"]
+
+[[bin]]
+name = "ppx_minimal_identity_migrate"
+path = "src/bin/migrate.rs"
+
+[dependencies]
+rusqlite = { version = "0.31", features = ["bundled"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+walkdir = "2.5"
+regex = "1.10"
