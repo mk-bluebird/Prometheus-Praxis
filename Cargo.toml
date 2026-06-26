@@ -54,6 +54,7 @@ members = [
     "crates/sensor-health",
     "crates/sensor-telemetry",
     "crates/topology-risk",
+    "crates/eco-wealth-portfolio",
 ]
 
 resolver = "2"
