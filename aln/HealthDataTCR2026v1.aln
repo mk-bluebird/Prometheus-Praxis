@@ -1,0 +1,63 @@
+# filename: HealthDataTCR2026v1.aln
+# repo: mk-bluebird/eco_restoration_shard
+# destination_hint: PATH_TO_BE_CHOSEN_IN_REPO_ROOT
+
+document HealthDataContribution2026v1 {
+    @identity.brain {
+        primary_key: "BRAIN_ID:LOCAL";
+        continuity_ref: "psychological_continuity_score >= 0.9";
+        external_addresses: [
+            "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7",
+            "0x519fC0eB4111323Cac44b70e1aE31c30e405802D"
+        ];
+    }
+
+    @labor.evidence {
+        event_id: "UUIDv4";
+        occurred_at: "ISO8601";
+        category: "health_metric|ai_chat_summary|cyboquatic_telemetry";
+        duration_seconds: "INT>=0";
+        effort_score_local: "FLOAT>=0";  # never exported as price
+        description: "TEXT<=1024";
+    }
+
+    @sovereignty.ruleset {
+        version: "2026.1";
+        storage_model: "local_first_sqlite_only";
+        export_permissions: [
+            "fhir_readonly_structured",
+            "aggregated_stats_only"
+        ];
+        revocation_conditions: [
+            "brain_identity_explicit_revocation",
+            "psychological_continuity_breach"
+        ];
+    }
+
+    @neurorights.corridor {
+        mental_privacy: "never_export_raw_neural_streams";
+        cognitive_liberty: "no_behavioral_nudging_without_explicit_opt_in";
+        identity_continuity: "no_model_fork_without_controlled_consent";
+        auditability: "all_ai_access_logged_in_local_sqlite";
+    }
+
+    @eco.economic_hooks {
+        eco_credit_eligible: true;
+        max_eco_credit_per_event: "FLOAT<=10.0";
+        responsibility_contribution_hint: [
+            "timely_data_updates",
+            "transparent_opt_in_history"
+        ];
+        public_goods_tags: [
+            "smart_city_routines",
+            "waste_cleanup",
+            "energy_reduction"
+        ];
+    }
+
+    @interop.fhir {
+        fhir_profile: "Observation|Condition|QuestionnaireResponse";
+        fhir_export_allowed: true;
+        fhir_redaction_policy: "strip_direct_identifiers_and_free_text";
+    }
+}
