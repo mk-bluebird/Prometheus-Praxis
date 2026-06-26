@@ -1,3 +1,4 @@
+aln
 alnversion 1.0.0
 alnnamespace ALETHEION.IDENTITY.PPX_NO_IDENTITY_CLASSIFICATION.V1
 
@@ -7,10 +8,10 @@ alnnamespace ALETHEION.IDENTITY.PPX_NO_IDENTITY_CLASSIFICATION.V1
 
 particle crate.identity.continuity.v1
   id             koid.v1
-  crate_name     str.v1
-  version_semver semver.v1
-  git_ref        str.v1
-  enabled        bool.v1
+  cratename      str.v1          # e.g. aletheion-identity-continuity-kernel
+  versionsemver  semver.v1
+  gitref         str.v1          # commit hash or tag
+  enabled        bool.v1         # if false, crate is exempt (migration-only)
 
 -------------------------------------------------------------------------------
 -- 2. Forbidden symbols for continuity-only crates
@@ -25,14 +26,14 @@ enum enum.symbol.kind.v1
 
 particle crate.identity.forbidden.symbol.v1
   id           koid.v1
-  symbol_fq    str.v1
-  symbol_kind  enum.symbol.kind.v1
+  symbolfq     str.v1                # fully-qualified Rust or ALN path
+  symbolkind   enum.symbol.kind.v1
 
 particle crate.identity.forbidden.set.v1
-  id             koid.v1
-  label          str.v1
-  description    str.v1
-  symbols        list.ref.crate.identity.forbidden.symbol.v1
+  id           koid.v1
+  label        str.v1
+  description  str.v1
+  symbols      list.ref.crate.identity.forbidden.symbol.v1
 
 const PPX_FORBIDDEN_IDENTITY_SYMBOLS
   crate.identity.forbidden.set.v1
@@ -40,26 +41,26 @@ const PPX_FORBIDDEN_IDENTITY_SYMBOLS
   description  "Symbols that must never appear in continuity-only identity crates"
   symbols
     crate.identity.forbidden.symbol.v1
-      symbol_fq  "crate::IdentityClass"
-      symbol_kind TYPE
+      symbolfq  "crate::IdentityClass"
+      symbolkind TYPE
     crate.identity.forbidden.symbol.v1
-      symbol_fq  "crate::RiskProfile"
-      symbol_kind TYPE
+      symbolfq  "crate::RiskProfile"
+      symbolkind TYPE
     crate.identity.forbidden.symbol.v1
-      symbol_fq  "crate::EligibilityFlag"
-      symbol_kind TYPE
+      symbolfq  "crate::EligibilityFlag"
+      symbolkind TYPE
     crate.identity.forbidden.symbol.v1
-      symbol_fq  "crate::NeurorightCorridorSpec"
-      symbol_kind TYPE
+      symbolfq  "crate::NeurorightCorridorSpec"
+      symbolkind TYPE
     crate.identity.forbidden.symbol.v1
-      symbol_fq  "crate::AccessDecision"
-      symbol_kind TYPE
+      symbolfq  "crate::AccessDecision"
+      symbolkind TYPE
     crate.identity.forbidden.symbol.v1
-      symbol_fq  "crate::AclMask"
-      symbol_kind TYPE
+      symbolfq  "crate::AclMask"
+      symbolkind TYPE
     crate.identity.forbidden.symbol.v1
-      symbol_fq  "crate::evaluate_access"
-      symbol_kind FUNCTION
+      symbolfq  "crate::evaluate_access"
+      symbolkind FUNCTION
 
 -------------------------------------------------------------------------------
 -- 3. Doctrine: no identity classification / no rights downgrade by metrics
@@ -105,11 +106,11 @@ atom AllowedSink
   field sink TargetType
 
 atom PpxDoctrineAtom
-  field doctrine_id DoctrineId
-  field forbidden_flows list ForbiddenFlow
-  field allowed_uses list AllowedSink
+  field doctrine_id                 DoctrineId
+  field forbidden_flows             list ForbiddenFlow
+  field allowed_uses                list AllowedSink
   field no_rights_downgrade_by_metric bool
-  field notes string
+  field notes                       string
 
 const DOCTRINE_PPX_NO_IDENTITY_CLASSIFICATION DoctrineId
   id "PPX-NO-IDENTITY-CLASSIFICATION"
@@ -162,7 +163,7 @@ const ALLOW_TO_GOVERNANCE_AUDIT AllowedSink
   sink GovernanceAuditLog
 
 const DOCTRINE_PPX_CORE PpxDoctrineAtom
-  doctrine_id DOCTRINE_PPX_NO_IDENTITY_CLASSIFICATION
+  doctrine_id                 DOCTRINE_PPX_NO_IDENTITY_CLASSIFICATION
   forbidden_flows
     FORBID_BRAINDID_SIMILARITY_TO_ACCESS
     FORBID_BRAINDID_SIMILARITY_TO_ACL
@@ -183,43 +184,125 @@ const DOCTRINE_PPX_CORE PpxDoctrineAtom
 -------------------------------------------------------------------------------
 
 particle crate.identity.source.sink.policy.v1
-  id                  koid.v1
-  label               str.v1
-  description         str.v1
-  source_type_names   list.str.v1
-  sink_type_names     list.str.v1
-  allow_paths         bool.v1
+  id               koid.v1
+  label            str.v1
+  description      str.v1
+  sourcetypenames  list.str.v1
+  sinktypenames    list.str.v1
+  allowpaths       bool.v1
 
 const PPX_NO_IDENTITY_CLASSIFICATION_POLICY
   crate.identity.source.sink.policy.v1
   label         "PPX_NO_IDENTITY_CLASSIFICATION"
   description   "No dataflow from continuity metrics to identity or rights sinks"
-  source_type_names
+  sourcetypenames
     "PsychContinuityEvidence"
     "SimilarityScore"
-  sink_type_names
+    "ContinuityDecision"
+  sinktypenames
     "IdentityClass"
     "RiskProfile"
     "EligibilityFlag"
     "NeurorightCorridorSpec"
     "AccessDecision"
     "AclMask"
-  allow_paths   false
+  allowpaths    false
 
 -------------------------------------------------------------------------------
 -- 5. Crate-level invariant binding
 -------------------------------------------------------------------------------
 
 particle crate.identity.invariant.binding.v1
-  id              koid.v1
-  crate_ref       ref.crate.identity.continuity.v1
-  forbidden_set   ref.crate.identity.forbidden.set.v1
-  policy_ref      ref.crate.identity.source.sink.policy.v1
-  required        bool.v1
+  id            koid.v1
+  crate_ref     ref.crate.identity.continuity.v1
+  forbidden_set ref.crate.identity.forbidden.set.v1
+  policy_ref    ref.crate.identity.source.sink.policy.v1
+  required      bool.v1
 
 const BINDING_IDENTITY_CONTINUITY_KERNEL
   crate.identity.invariant.binding.v1
-  crate_ref       ref.crate.identity.continuity.v1 "aletheion-identity-continuity-kernel"
-  forbidden_set   ref.crate.identity.forbidden.set.v1 PPX_FORBIDDEN_IDENTITY_SYMBOLS
-  policy_ref      ref.crate.identity.source.sink.policy.v1 PPX_NO_IDENTITY_CLASSIFICATION_POLICY
-  required        true
+  crate_ref     ref.crate.identity.continuity.v1 "aletheion-identity-continuity-kernel"
+  forbidden_set ref.crate.identity.forbidden.set.v1 PPX_FORBIDDEN_IDENTITY_SYMBOLS
+  policy_ref    ref.crate.identity.source.sink.policy.v1 PPX_NO_IDENTITY_CLASSIFICATION_POLICY
+  required      true
+
+-------------------------------------------------------------------------------
+-- 6. PPX crate-level contract (compact doctrine form)
+-------------------------------------------------------------------------------
+
+particle PpxNoIdentityClassificationContractV1
+  contractid         koid.v1
+  label              str.v1
+  version            u32.v1
+  appliestocrates    list.str.v1
+  forbidden_types    list.str.v1
+  forbidden_sinks    list.str.v1
+  continuity_sources list.str.v1
+  norightsdowngrade  bool.v1
+  createdatutc       time.timestamp.v1
+  updatedatutc       time.timestamp.v1
+
+record PpxNoIdentityClassificationV1
+  contract PpxNoIdentityClassificationContractV1
+
+table PpxNoIdentityClassificationTable
+  rows
+    contract PpxNoIdentityClassificationV1
+      contractid      "PPX-NO-IDENTITY-CLASSIFICATION-001"
+      label           "PPX no identity classification or rights downgrade by continuity metrics"
+      version         1
+      appliestocrates
+        "aletheion-identity-continuity"
+        "aletheion-identity-psych-kernel"
+      forbidden_types
+        "IdentityClass"
+        "RiskScore"
+        "EligibilityFlag"
+        "NeurorightCorridorSpec"
+        "AccessDecision"
+        "AclMask"
+      forbidden_sinks
+        "ALE.ACCESS.DECISION.V1"
+        "ALE.GOV.NEURORIGHTS.CORRIDOR.GATE.V1"
+        "ALE.IDENTITY.CLASS.INFERENCE.V1"
+      continuity_sources
+        "ALE.IDENTITY.PSYCH.CONTINUITY.KERNEL.V1"
+        "ALE.IDENTITY.SIMILARITY.SCORE.V1"
+      norightsdowngrade  true
+      createdatutc       2026-01-01T00:00:00Z
+      updatedatutc       2026-01-01T00:00:00Z
+
+-------------------------------------------------------------------------------
+-- 7. Invariants for CI and static analysis
+-------------------------------------------------------------------------------
+
+invariant PPX_NO_IDENTITY_TYPE_COUPLING_V1
+  forall c    PpxNoIdentityClassificationV1,
+         crate str.v1,
+         t     str.v1
+  where crate in c.contract.appliestocrates
+    and t     in c.contract.forbidden_types
+  implies
+    not uses_type(crate, t)
+
+invariant PPX_NO_IDENTITY_CALLGRAPH_PATH_V1
+  forall c    PpxNoIdentityClassificationV1,
+         src  str.v1,
+         sink str.v1
+  where src  in c.contract.continuity_sources
+    and sink in c.contract.forbidden_sinks
+  implies
+    not has_callgraph_path(src, sink)
+
+invariant PPX_NO_RIGHTS_DOWNGRADE_BY_CONTINUITY_V1
+  forall sbefore ALE.HEALTH.CARE.STATE.V1,
+         safter  ALE.HEALTH.CARE.STATE.V1
+  where sbefore.accountid        = safter.accountid
+    and safter.lastdecisionkind = "CONTINUITY_KERNEL_DECISION"
+  implies
+    safter.basecaretierrank      >= sbefore.basecaretierrank
+    and safter.accessrightssupersetof(sbefore)
+
+# Helper predicates are provided by CI / static-analysis tooling:
+# - uses_type(crate, t)
+# - has_callgraph_path(src, sink)
