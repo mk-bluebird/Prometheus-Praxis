@@ -1,13 +1,79 @@
 # config/config.toml
+
 [database]
+# Primary Postgres database for cross-crate analytics and governance reporting.
 url = "postgres://econet:econet@localhost/econet"
 
 [ecowealth]
+# Enable eco-wealth metrics that couple financial returns to ecological restoration.
 ecoper_joule_enabled = true
 restore_radius_enabled = true
+
+# Cache horizon for plane-weights and eco-wealth factorization in seconds.
 plane_weights_cache_seconds = 3600
+
+# Default summarization mode for large particles in API and CLI outputs.
+# Allowed values: "statistical", "full", "minimal"
 large_particle_summary_level_default = "statistical"
 
 [governance]
+# Spine (ALN + corridors) governance endpoint. Non-actuating, read-only.
 spine_endpoint = "https://governance.eco/spine"
+
+# Refresh interval (seconds) for lane and corridor policy from spine.
 lane_policy_refresh_seconds = 900
+
+[paths]
+# All paths are local-first, relative to the repository root unless absolute.
+# These SQLite DBs are mounted under local-first VFS (e.g., mnt/oss) in production.
+
+# Constellation-wide index of repos, shards, and blast-radius links.
+constellation_index = "db/constellation_index.db"
+
+# Governance event and lane registry (non-actuating in this repo).
+governance_db       = "db/governance.db"
+
+# Health datasets registry (used by health_dataset_registry DDL).
+health_datasets_db  = "db/health_datasets.db"
+
+# Data-as-labor event log, aligned with DataLaborEvent ALN family.
+labor_events_db     = "db/labor_events.db"
+
+[sqlite]
+# Journal and durability settings tuned for local-first, high-read workloads.
+journal_mode     = "WAL"
+synchronous      = "NORMAL"
+busy_timeout_ms  = 5000
+
+[corridors]
+# Default neuroright corridor for AI-chat and data-as-labor workloads.
+default_neuroright_corridor_id = "NEURORIGHT_CHAT_GLOBAL_2026V1"
+
+# Default stake corridors for eco and fiat, used as lower bounds in code and SQL DDL.
+min_stake_eco_default  = 1.0
+min_stake_fiat_default = 5.0
+
+# Safety corridors for labor session duration (seconds).
+max_session_seconds = 3600
+max_daily_seconds   = 14400
+
+# Topic vector dimensionality bounds for text → topic-vector transforms.
+topic_dim_min = 32
+topic_dim_max = 1024
+
+[qf_pool]
+# Quadratic funding pool parameters for eco-wealth and labor payouts.
+epoch_seconds        = 604800      # 7 days
+min_contribution_eco = 0.1
+matching_pool_eco    = 10000.0
+cap_per_worker_eco   = 500.0
+
+# Fraction of stake slashed when neurorights or corridor invariants are violated.
+stake_slash_fraction = 0.2
+
+[api]
+# Local-only bind address for API server; reverse proxies terminate TLS.
+bind_address = "127.0.0.1:8080"
+
+# Upper bound on concurrent in-flight API requests.
+max_concurrent_requests = 512
