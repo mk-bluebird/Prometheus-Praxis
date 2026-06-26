@@ -57,6 +57,7 @@ members = [
     "crates/eco-wealth-portfolio",
     "crates/ai_chat_hashonly_normalizer",
     "crates/ppx_continuity_kernel",
+    "crates/ppx_continuity_mcp"
 ]
 
 resolver = "2"
