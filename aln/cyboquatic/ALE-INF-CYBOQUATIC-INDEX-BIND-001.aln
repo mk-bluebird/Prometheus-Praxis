@@ -1,0 +1,32 @@
+# filename: aln/cyboquatic/ALE-INF-CYBOQUATIC-INDEX-BIND-001.aln
+# destination: eco_restoration_shard/aln/cyboquatic/ALE-INF-CYBOQUATIC-INDEX-BIND-001.aln
+
+namespace ALE.INF.CYBOQUATIC.INDEX.BIND.001
+
+import ALE.ERM.ECOSAFETY.GRAMMAR.001 as EcoSafe
+
+atom CyboAssetRef
+  field asset_code string
+  field site_code  string
+  field corridor   EcoSafe.CorridorId
+  field node       EcoSafe.NodeId
+
+const ASSET_PUMP_07_A CyboAssetRef
+  asset_code "PUMP-07-A"
+  site_code  "PHX-CANAL-SEG-07"
+  corridor   "CORRIDORBIO-FLOWVACSUBSTRATEV1"
+  node       "DTCCYBOSOFTBOT01"
+
+const ASSET_SOFTBOT_MAR_01 CyboAssetRef
+  asset_code "SOFTBOT-MAR-01"
+  site_code  "PHX-MAR-VAULT-01"
+  corridor   "CORRIDORBIO-SOFTBOTSHELLV1"
+  node       "DTCCYBOSOFTBOT02"
+
+rule cybo_assets_must_have_corridors
+  doc "Cross-check that all Cybo assets in index have ecosafety corridors."
+  when ref CyboAssetRef
+  then require EcoSafe.ecosafetynodemusthavecorridor
+       else error "CYBO_INDEX_NODE_MISSING_CORRIDOR" ref.asset_code
+
+end namespace
