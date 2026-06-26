@@ -1,0 +1,232 @@
+# filename: aln/identity/PPX-PsychContinuity-Neurorights-001.aln
+# repo: github.com/mk-bluebird/eco_restoration_shard
+# role: Prometheus-Praxis kernel for psychological continuity, neurorights, and well-being metrics.
+
+namespace PPX.IDENTITY.CONTINUITY.NEURORIGHTS.001
+
+# --------------------------------------------------------------------
+# 1. Core identifiers and DIDs (Sidetree-style, abstracted)
+# --------------------------------------------------------------------
+
+atom BrainDid
+  doc "Decentralized identifier for a brain-identity, anchored via Sidetree-like protocol."
+  field did string              # e.g. did:ppxion:abc...
+  field method string           # e.g. ppxion, ppxsidetree
+  field controller string       # controlling key or Bostrom address
+
+atom BranchId
+  doc "Identifier for a psychological branch derived from a parent BrainDid."
+  field id string               # short branch token
+
+atom BranchPointer
+  doc "Pointer from a parent BrainDid to a branch instance."
+  field parent BrainDid
+  field branch BranchId
+
+# --------------------------------------------------------------------
+# 2. Psychological continuity and branching identity (Cerullo-style)
+# --------------------------------------------------------------------
+
+atom PsychStateRef
+  doc "Reference to a psychological state object (off-chain / external)."
+  field shard_id string         # qpudatashard or external ref
+  field version_tag string      # semantic version of state representation
+
+atom SimilarityScore
+  doc "Similarity S in [0,1] between two psychological states."
+  field value float             # constrained to [0.0, 1.0]
+
+atom ContinuityThreshold
+  doc "Threshold θ_c for psychological continuity."
+  field value float             # e.g. 0.90
+
+atom PsychBranchRelation
+  doc "Logical relation between a parent psych-state and a branch."
+  field parent_state PsychStateRef
+  field branch_state PsychStateRef
+  field score SimilarityScore
+  field threshold ContinuityThreshold
+
+atom BranchStatus
+  enum VALID_DESCENDANT, INVALID_FRAGMENT
+
+rule branching_identity_legitimacy
+  doc "Cerullo-style rule: branch is a valid descendant if similarity >= threshold and neurorights corridor holds."
+  when rel PsychBranchRelation
+  then
+    let is_continuous = rel.score.value >= rel.threshold.value
+    require is_continuous
+      else error "PPX_BRANCH_DISCONTINUOUS"
+  end
+
+# --------------------------------------------------------------------
+# 3. Neurorights corridors (UNESCO-style)
+# --------------------------------------------------------------------
+
+atom NeurorightName
+  enum COGNITIVE_LIBERTY, MENTAL_PRIVACY, MENTAL_INTEGRITY, PSYCHOLOGICAL_CONTINUITY
+
+atom NeurorightStatus
+  enum GUARANTEED, RISKED, VIOLATED
+
+atom NeurorightAssessment
+  doc "Assessment of neuroright status for a given brain-identity in a context."
+  field brain BrainDid
+  field right NeurorightName
+  field status NeurorightStatus
+  field reason string
+  field context_tag string      # e.g. 'BCI-THERAPY-PHX-2026-TRIAL-01'
+
+atom NeurorightsCorridor
+  doc "Corridor specifying allowed states/actions on neurorights dimensions."
+  field id string               # corridor id
+  field cognitive_liberty_min float   # 0.0..1.0, higher = stronger liberty
+  field mental_privacy_min float
+  field mental_integrity_min float
+  field psych_continuity_min float
+  field hard_block_on_violation bool
+
+rule neurorights_corridor_enforcement
+  doc "No corridor, no build: if an application touches brain-identity, a NeurorightsCorridor must exist and be satisfied."
+  when assess NeurorightAssessment
+  then
+    let corridor = lookup_neurorights_corridor assess.context_tag
+    require corridor.id != ""
+      else error "PPX_NEURORIGHTS_NO_CORRIDOR_DEFINED"
+    # NOTE: actual numeric evaluation implemented in Rust/SQL; here we only require presence.
+  end
+
+# --------------------------------------------------------------------
+# 4. Well-being metrics (IEEE 7010)
+# --------------------------------------------------------------------
+
+atom WellBeingComponentName
+  enum HEALTH, AUTONOMY, SAFETY, ENVIRONMENT, EQUITY, SOCIAL_COHESION
+
+atom WellBeingComponent
+  doc "Single well-being component in [0,1] as per IEEE 7010 perspective."
+  field name WellBeingComponentName
+  field value float
+
+atom WellBeingVector
+  doc "Multi-dimensional well-being vector linked to a brain-identity or system."
+  field owner BrainDid
+  field context_tag string      # e.g. 'PPX-HEALTH-REWARD-POOL-2026'
+  field components list WellBeingComponent
+
+rule wellbeing_component_range
+  doc "All well-being components must be within [0,1]."
+  when comp WellBeingComponent
+  then
+    require comp.value >= 0.0 && comp.value <= 1.0
+      else error "PPX_WELLBEING_COMPONENT_OUT_OF_RANGE" comp.name
+  end
+
+# --------------------------------------------------------------------
+# 5. GPAI-style health equity weights (for health reward allocation)
+# --------------------------------------------------------------------
+
+atom EquityScore
+  doc "Equity score in [0,1] capturing impact on fairness and access."
+  field value float
+
+atom HealthRewardCampaign
+  doc "Health campaign that can receive rewards or QF matching."
+  field id string
+  field label string
+  field description string
+  field region string
+  field equity_score EquityScore
+  field wellbeing_context_tag string
+
+rule equity_score_range
+  doc "Equity score must be in [0,1]."
+  when eq EquityScore
+  then
+    require eq.value >= 0.0 && eq.value <= 1.0
+      else error "PPX_EQUITY_SCORE_OUT_OF_RANGE"
+  end
+
+# --------------------------------------------------------------------
+# 6. Brain-identity DID binding and continuity kernel objects
+# --------------------------------------------------------------------
+
+atom BrainIdentityKernel
+  doc "Top-level object binding DIDs, neurorights, continuity, and well-being."
+  field brain BrainDid
+  field primary_state PsychStateRef
+  field continuity_threshold ContinuityThreshold
+  field neurorights_corridor_id string
+  field wellbeing_vector WellBeingVector
+
+rule brain_identity_kernel_wellformed
+  doc "Kernel must be well-formed: all core fields present and thresholds plausible."
+  when k BrainIdentityKernel
+  then
+    require k.brain.did != ""
+      else error "PPX_KERNEL_MISSING_BRAIN_DID"
+    require k.neurorights_corridor_id != ""
+      else error "PPX_KERNEL_MISSING_NEURORIGHTS_CORRIDOR"
+    require k.continuity_threshold.value >= 0.5 && k.continuity_threshold.value <= 1.0
+      else error "PPX_KERNEL_BAD_CONTINUITY_THRESHOLD"
+  end
+
+# --------------------------------------------------------------------
+# 7. Upgrade / evolution gates for Prometheus-Praxis
+# --------------------------------------------------------------------
+
+atom KernelUpgradeProposal
+  doc "Proposal to change continuity, neurorights, or wellbeing settings."
+  field proposal_id string
+  field old_kernel BrainIdentityKernel
+  field new_kernel BrainIdentityKernel
+  field proposer_bostrom_address string
+  field justification string
+
+rule kernel_upgrade_gate
+  doc "No downgrade of neurorights or wellbeing is allowed for a brain-identity."
+  when p KernelUpgradeProposal
+  then
+    let old_theta = p.old_kernel.continuity_threshold.value
+    let new_theta = p.new_kernel.continuity_threshold.value
+
+    require new_theta >= old_theta
+      else error "PPX_KERNEL_CONTINUITY_DOWNGRADE_FORBIDDEN"
+
+    # Well-being and neurorights checks delegated to Rust/SQL for numeric evaluation;
+    # here we only assert the non-downgrade principle.
+  end
+
+# --------------------------------------------------------------------
+# 8. Hooks for CI and external implementations
+# --------------------------------------------------------------------
+
+atom CIKernelCheckRequest
+  field repo_name string
+  field branch_name string
+  field changed_files list string
+
+atom CIKernelCheckResult
+  field ok bool
+  field violations list string
+
+rule ci_kernel_preflight
+  doc "Preflight: fail if any modified brain-identity code removes neurorights corridors or lowers continuity thresholds."
+  when req CIKernelCheckRequest
+  then
+    let result = run_kernel_ci_check req.changed_files
+    require result.ok
+      else error "PPX_KERNEL_CI_PREFLIGHT_FAIL" join result.violations, ";"
+  end
+
+# --------------------------------------------------------------------
+# 9. External function stubs to be implemented in Rust/SQLite
+# --------------------------------------------------------------------
+
+# The following are semantic placeholders, to be implemented by Rust code in this repo:
+#
+# - lookup_neurorights_corridor(context_tag: string) -> NeurorightsCorridor
+# - run_kernel_ci_check(files: list<string>) -> CIKernelCheckResult
+# - plus bindings to Sidetree/Ion-style DID operations outside the chain.
+
+end namespace
