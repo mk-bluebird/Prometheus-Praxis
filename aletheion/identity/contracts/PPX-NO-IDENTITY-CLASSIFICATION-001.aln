@@ -1,0 +1,113 @@
+alnversion 1.0.0
+alnnamespace ALETHEION.IDENTITY.PPX_NO_IDENTITY_CLASSIFICATION.V1
+
+-------------------------------------------------------------------------------
+-- 1. Crate scope and classification
+-------------------------------------------------------------------------------
+
+particle crate.identity.continuity.v1
+  id             koid.v1
+  crate_name     str.v1        -- e.g. "aletheion-identity-continuity-kernel"
+  version_semver semver.v1
+  git_ref        str.v1        -- commit hash or tag
+  enabled        bool.v1       -- if false, crate is exempt (migration only)
+
+-------------------------------------------------------------------------------
+-- 2. Forbidden symbols for continuity-only crates
+-------------------------------------------------------------------------------
+
+particle crate.identity.forbidden.symbol.v1
+  id           koid.v1
+  symbol_fq    str.v1          -- fully qualified Rust path or ALN name
+  symbol_kind  enum.symbol.kind.v1
+
+enum enum.symbol.kind.v1
+  TYPE
+  FUNCTION
+  TRAIT
+  FIELD
+  MODULE
+
+particle crate.identity.forbidden.set.v1
+  id             koid.v1
+  label          str.v1
+  description    str.v1
+  symbols        list.ref.crate.identity.forbidden.symbol.v1
+
+const PPX_FORBIDDEN_IDENTITY_SYMBOLS
+  crate.identity.forbidden.set.v1
+  label        "PPX_NO_IDENTITY_CLASSIFICATION"
+  description  "Symbols that must never appear in continuity-only crates"
+  symbols
+    -- Identity / classification types
+    crate.identity.forbidden.symbol.v1
+      symbol_fq  "crate::IdentityClass"
+      symbol_kind TYPE
+    crate.identity.forbidden.symbol.v1
+      symbol_fq  "crate::RiskProfile"
+      symbol_kind TYPE
+    crate.identity.forbidden.symbol.v1
+      symbol_fq  "crate::EligibilityFlag"
+      symbol_kind TYPE
+
+    -- Access-control / rights sinks
+    crate.identity.forbidden.symbol.v1
+      symbol_fq  "crate::NeurorightCorridorSpec"
+      symbol_kind TYPE
+    crate.identity.forbidden.symbol.v1
+      symbol_fq  "crate::AccessDecision"
+      symbol_kind TYPE
+    crate.identity.forbidden.symbol.v1
+      symbol_fq  "crate::AclMask"
+      symbol_kind TYPE
+    crate.identity.forbidden.symbol.v1
+      symbol_fq  "crate::evaluate_access"
+      symbol_kind FUNCTION
+
+-------------------------------------------------------------------------------
+-- 3. Source–sink invariant definition
+-------------------------------------------------------------------------------
+
+particle crate.identity.source.sink.policy.v1
+  id                  koid.v1
+  label               str.v1
+  description         str.v1
+  source_type_names   list.str.v1   -- e.g. ["PsychContinuityEvidence", "SimilarityScore"]
+  sink_type_names     list.str.v1   -- e.g. ["AccessDecision", "NeurorightCorridorSpec"]
+  allow_paths         bool.v1       -- must be false for PPX_NO_IDENTITY_CLASSIFICATION
+
+const PPX_NO_IDENTITY_CLASSIFICATION_POLICY
+  crate.identity.source.sink.policy.v1
+  label         "PPX_NO_IDENTITY_CLASSIFICATION"
+  description   "No dataflow from continuity sources to identity/rights sinks"
+  source_type_names
+    "PsychContinuityEvidence"
+    "SimilarityScore"
+    "ContinuityDecision"
+  sink_type_names
+    "IdentityClass"
+    "RiskProfile"
+    "EligibilityFlag"
+    "NeurorightCorridorSpec"
+    "AccessDecision"
+    "AclMask"
+  allow_paths   false
+
+-------------------------------------------------------------------------------
+-- 4. Crate-level invariant binding
+-------------------------------------------------------------------------------
+
+particle crate.identity.invariant.binding.v1
+  id              koid.v1
+  crate_ref       ref.crate.identity.continuity.v1
+  forbidden_set   ref.crate.identity.forbidden.set.v1
+  policy_ref      ref.crate.identity.source.sink.policy.v1
+  required        bool.v1              -- must be true in production
+
+-- Example binding (to be instantiated per crate)
+const BINDING_IDENTITY_CONTINUITY_KERNEL
+  crate.identity.invariant.binding.v1
+  crate_ref     ref.crate.identity.continuity.v1 "aletheion-identity-continuity-kernel"
+  forbidden_set ref.crate.identity.forbidden.set.v1 PPX_FORBIDDEN_IDENTITY_SYMBOLS
+  policy_ref    ref.crate.identity.source.sink.policy.v1 PPX_NO_IDENTITY_CLASSIFICATION_POLICY
+  required      true
