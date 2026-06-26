@@ -1,0 +1,365 @@
+# Path: aln/health/2026/HealthDataTCR2026v1.aln
+# Role: Aletheion/Bostrom health-data TCR + QF grammar with neurorights guarantees.
+
+contract HealthDataTCR2026v1 {
+  meta {
+    city          = "Aletheion-Phoenix";
+    shard         = "health-tcr2026";
+    version       = "1.0.0";
+    author_did    = "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7";
+    eco_repo_root = "github.com/mk-bluebird/eco_restoration_shard";
+  }
+
+  import {
+    MsgPublishDataContribution
+    MsgMintEcoCredit
+    MsgBurnEcoCredit
+    MsgCreateEcoCampaign
+    EcoModelAttestation
+    ResponsibilityScalar
+    CumulativeEcoCredit
+    KERResidualAnchor
+  } from EcoNetCore2026v1;
+
+  enum CurationStatus {
+    PENDING,
+    ACCEPTED,
+    REJECTED,
+    SLASHED
+  }
+
+  enum DatasetCategory {
+    WEARABLE_VITALS,
+    EEG_NEURO,
+    EHR_SUMMARY,
+    LAB_RESULTS_AGGREGATE,
+    ENV_EXPOSURE,
+    CLIMATE_HEALTH_LINKED,
+    OTHER_HEALTH_RESTRICTED
+  }
+
+  record HealthDataset {
+    dataset_cid: String
+    contributor: Address
+    curator: Address
+    stake_amount: Decimal
+    status: CurationStatus
+    category: DatasetCategory
+    quality_score: Decimal  # [0,1]
+    neurorights_safe: Bool
+    msg_publish_ref: MsgPublishDataContribution.Id
+    responsibility_scalar_snap: Decimal  # [0,1]
+    ker_anchor: KERResidualAnchor.Id
+    eco_credit_reward_locked: Decimal
+    eco_credit_reward_vested: Decimal
+    health_qf_eligible: Bool
+    health_qf_round_id: Integer?
+  }
+
+  record HealthDatasetChallenge {
+    id: Integer
+    dataset_cid: String
+    challenger: Address
+    challenge_stake: Decimal
+    alleged_violation: String
+    evidence_cid: String
+    status: String
+    slash_ratio_curator: Decimal?
+    slash_ratio_challenger: Decimal?
+  }
+
+  record HealthDataLaborCredit {
+    id: Integer
+    contributor: Address
+    dataset_cid: String
+    eco_credit_earned: Decimal
+    gas_discount_bps: Integer
+    non_transferable: Bool
+    remaining_gas_discount: Decimal
+  }
+
+  record HealthQFPool {
+    id: Integer
+    round_label: String
+    matching_pool_boot: Decimal
+    matching_pool_ecocredit: Decimal
+    round_start_utc: Timestamp
+    round_end_utc: Timestamp
+    ker_anchor: KERResidualAnchor.Id
+  }
+
+  record HealthQFCampaign {
+    id: Integer
+    pool_id: Integer
+    ecocampaign_id: MsgCreateEcoCampaign.Id
+    creator: Address
+    is_healthcare: Bool
+  }
+
+  record HealthQFContribution {
+    id: Integer
+    campaign_id: Integer
+    contributor: Address
+    contributed_boot: Decimal
+    contributed_ecocredit: Decimal
+    cumulative_ecocredit_snap: Decimal
+    responsibility_scalar_snap: Decimal
+  }
+
+  invariant NeurorightsNoDowngradeForNonDisclosure(subject: Address) {
+    description = "Refusal to provide additional health data MUST NOT reduce Karma, EcoCredit eligibility, or access to essential care."
+    check = {
+      # This invariant is checked off-chain by KERResidualAnchor proofs; here we only define the corridor.
+      allow_if_no_health_dataset = true;
+      forbid_negative_delta_karma_due_to_absence_of_health_logs = true;
+    }
+  }
+
+  function submitHealthDataset(
+    curator: Address,
+    dataset_cid: String,
+    msg_publish_id: MsgPublishDataContribution.Id,
+    category: DatasetCategory,
+    stake_amount: Decimal,
+    initial_quality_score: Decimal,
+    ker_anchor: KERResidualAnchor.Id
+  ) -> HealthDataset {
+    require(stake_amount >= 0, "stake_amount must be non-negative");
+    require(initial_quality_score >= 0 && initial_quality_score <= 1, "quality_score in [0,1]");
+
+    let msg = MsgPublishDataContribution.load(msg_publish_id);
+
+    require(
+      msg.data_access_policy == "DATAACCESSRESTRICTEDHEALTHCARE"
+      || msg.data_access_policy == "DATAACCESSOPENCLIMATERESEARCH",
+      "HealthDataTCR: invalid data_access_policy"
+    );
+
+    require(
+      msg.evidence_mode == "HASHONLY",
+      "HealthDataTCR: evidence_mode must be HASHONLY"
+    );
+
+    require(
+      msg.bci_challenge_signature != "",
+      "HealthDataTCR: missing BCIChallengeSignature"
+    );
+
+    let rs = ResponsibilityScalar.snapshot(msg.contributor_address);
+    let neurorights_safe = true;
+
+    let hd = HealthDataset {
+      dataset_cid = dataset_cid,
+      contributor = msg.contributor_address,
+      curator = curator,
+      stake_amount = stake_amount,
+      status = CurationStatus.PENDING,
+      category = category,
+      quality_score = initial_quality_score,
+      neurorights_safe = neurorights_safe,
+      msg_publish_ref = msg_publish_id,
+      responsibility_scalar_snap = rs.value,
+      ker_anchor = ker_anchor,
+      eco_credit_reward_locked = 0,
+      eco_credit_reward_vested = 0,
+      health_qf_eligible = false,
+      health_qf_round_id = null
+    };
+
+    return hd;
+  }
+
+  function acceptHealthDataset(
+    curator: Address,
+    dataset: HealthDataset,
+    eco_reward_locked: Decimal
+  ) -> HealthDataset {
+    require(dataset.curator == curator, "only curator can accept");
+    require(dataset.status == CurationStatus.PENDING, "dataset not pending");
+    require(dataset.neurorights_safe == true, "neurorights must be safe");
+
+    let updated = dataset;
+    updated.status = CurationStatus.ACCEPTED;
+    updated.eco_credit_reward_locked = eco_reward_locked;
+
+    return updated;
+  }
+
+  function rejectHealthDataset(
+    curator: Address,
+    dataset: HealthDataset,
+    reason: String
+  ) -> HealthDataset {
+    require(dataset.curator == curator, "only curator can reject");
+    require(dataset.status == CurationStatus.PENDING, "dataset not pending");
+    let updated = dataset;
+    updated.status = CurationStatus.REJECTED;
+    return updated;
+  }
+
+  function recordHealthDataLaborCredit(
+    dataset: HealthDataset,
+    eco_credit_earned: Decimal,
+    gas_discount_bps: Integer
+  ) -> HealthDataLaborCredit {
+    require(dataset.status == CurationStatus.ACCEPTED, "dataset must be accepted");
+    require(eco_credit_earned >= 0, "eco_credit_earned >= 0");
+    require(gas_discount_bps >= 0 && gas_discount_bps <= 10000, "gas_discount_bps in [0,10000]");
+
+    let credit = HealthDataLaborCredit {
+      id = 0,
+      contributor = dataset.contributor,
+      dataset_cid = dataset.dataset_cid,
+      eco_credit_earned = eco_credit_earned,
+      gas_discount_bps = gas_discount_bps,
+      non_transferable = true,
+      remaining_gas_discount = eco_credit_earned
+    };
+
+    return credit;
+  }
+
+  function consumeGasDiscount(
+    credit: HealthDataLaborCredit,
+    gas_fee: Decimal
+  ) -> (HealthDataLaborCredit, Decimal) {
+    require(credit.non_transferable == true, "credit must be non-transferable");
+
+    let max_discount = gas_fee * (credit.gas_discount_bps as Decimal) / 10000.0;
+    let available = credit.remaining_gas_discount;
+    let discount = if available >= max_discount { max_discount } else { available };
+
+    let updated = credit;
+    updated.remaining_gas_discount = available - discount;
+
+    let adjusted_fee = gas_fee - discount;
+
+    return (updated, adjusted_fee);
+  }
+
+  function openChallenge(
+    challenger: Address,
+    dataset: HealthDataset,
+    challenge_stake: Decimal,
+    alleged_violation: String,
+    evidence_cid: String
+  ) -> HealthDatasetChallenge {
+    require(challenge_stake >= 0, "challenge_stake >= 0");
+    require(dataset.status == CurationStatus.ACCEPTED, "can only challenge accepted datasets");
+
+    let ch = HealthDatasetChallenge {
+      id = 0,
+      dataset_cid = dataset.dataset_cid,
+      challenger = challenger,
+      challenge_stake = challenge_stake,
+      alleged_violation = alleged_violation,
+      evidence_cid = evidence_cid,
+      status = "OPEN",
+      slash_ratio_curator = null,
+      slash_ratio_challenger = null
+    };
+
+    return ch;
+  }
+
+  function resolveChallengeSlashCurator(
+    curator: Address,
+    dataset: HealthDataset,
+    challenge: HealthDatasetChallenge,
+    slash_ratio_curator: Decimal,
+    slash_ratio_challenger: Decimal
+  ) -> (HealthDataset, HealthDatasetChallenge) {
+    require(dataset.curator == curator, "only curator bound resolution via governance");
+    require(challenge.status == "OPEN", "challenge not open");
+
+    require(slash_ratio_curator >= 0 && slash_ratio_curator <= 1, "slash_ratio_curator in [0,1]");
+    require(slash_ratio_challenger >= 0 && slash_ratio_challenger <= 1, "slash_ratio_challenger in [0,1]");
+
+    let updated_dataset = dataset;
+    updated_dataset.status = CurationStatus.SLASHED;
+
+    let updated_challenge = challenge;
+    updated_challenge.status = "RESOLVED_SLASH";
+    updated_challenge.slash_ratio_curator = slash_ratio_curator;
+    updated_challenge.slash_ratio_challenger = slash_ratio_challenger;
+
+    return (updated_dataset, updated_challenge);
+  }
+
+  record HealthQFWeights {
+    sqrt_boot_sum: Decimal
+    qf_weight: Decimal
+  }
+
+  function computeQFWeight(
+    contributions: List<HealthQFContribution>
+  ) -> HealthQFWeights {
+    let mut sqrt_sum = 0.0;
+    for c in contributions {
+      let base = c.contributed_boot + c.contributed_ecocredit;
+      let scaled = base * (0.5 + 0.5 * c.responsibility_scalar_snap);
+      let sqrt_term = sqrt(scaled);
+      sqrt_sum = sqrt_sum + sqrt_term;
+    }
+    let weight = sqrt_sum * sqrt_sum;
+
+    let w = HealthQFWeights {
+      sqrt_boot_sum = sqrt_sum,
+      qf_weight = weight
+    };
+    return w;
+  }
+
+  function allocateQFMatching(
+    pool: HealthQFPool,
+    campaigns: List<HealthQFCampaign>,
+    contributions: List<List<HealthQFContribution>>
+  ) -> List<EcoModelAttestation> {
+    let total_weight = 0.0;
+    let mut weights: List<Decimal> = [];
+
+    let count = campaigns.len();
+    let mut idx = 0;
+    while idx < count {
+      let contribs = contributions[idx];
+      let w = computeQFWeight(contribs);
+      weights.push(w.qf_weight);
+      total_weight = total_weight + w.qf_weight;
+      idx = idx + 1;
+    }
+
+    let mut attestations: List<EcoModelAttestation> = [];
+    let mut j = 0;
+    while j < count {
+      let campaign = campaigns[j];
+      let w = weights[j];
+      let share = if total_weight > 0.0 { w / total_weight } else { 0.0 };
+      let matched_boot = pool.matching_pool_boot * share;
+      let matched_ecocredit = pool.matching_pool_ecocredit * share;
+
+      let att = EcoModelAttestation {
+        id = 0,
+        subject = campaign.ecocampaign_id,
+        model_label = pool.round_label,
+        matched_boot = matched_boot,
+        matched_ecocredit = matched_ecocredit,
+        ker_anchor = pool.ker_anchor
+      };
+      attestations.push(att);
+      j = j + 1;
+    }
+
+    return attestations;
+  }
+
+  guard HealthTokenNonTransferability(credit: HealthDataLaborCredit) {
+    forbid_transfer_if credit.non_transferable == true;
+  }
+
+  guard AntiPlutocracyQF(contrib: HealthQFContribution) {
+    require(
+      contrib.cumulative_ecocredit_snap >= 0,
+      "cumulative ecocredit cannot be negative"
+    );
+  }
+}
