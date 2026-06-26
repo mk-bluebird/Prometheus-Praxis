@@ -1,0 +1,62 @@
+alnversion 1.0.0
+alnnamespace ALE.DATA.LABOR.EVENT.V1
+
+enum LaborSourceKindV1
+  AI_CHAT_SUMMARY
+  BIOSIGNAL_STREAM
+  MOBILITY_TRACE
+  APP_USAGE_SUMMARY
+  SURVEY_RESPONSE
+  CLINIC_DEVICE_EXPORT
+  WEARABLE_METRIC_BUNDLE
+  BEHAVIORAL_LOG_SUMMARY
+  DERIVED_HEALTH_INDEX
+
+enum LaborEvidenceModeV1
+  HASHONLY
+  PSEUDONYMOUS_FEATURES
+  AGGREGATED_STATISTICS
+
+enum LaborTariffTierV1
+  BASELINE
+  ENHANCED_RISKY
+  COMMUNITY_PRIORITY
+  PRO_BONO_RESEARCH
+
+particle DataLaborEventHeaderV1
+  event_id            koid.v1
+  created_at_utc      time.timestamp.v1
+  labor_source_kind   enum.LaborSourceKindV1
+  evidence_mode       enum.LaborEvidenceModeV1
+  hashonly_flag       bool.v1              # MUST be true when evidence_mode = HASHONLY
+  birth_sign_id       ref.ALE.GOV.BIRTH.SIGN.ID.V1
+  brain_did_ref       optional.did.v1
+  related_account_id  str.v1              # pseudonymous DLAccount or scoped hash
+  union_id            optional.str.v1     # Data union membership scope
+  consent_state_id    ref.ALE.CIT.CONSENT.STATE.V1
+  neurorights_policy_id optional.ref.governance.neurorights.policy.v1
+
+particle DataLaborEventMetricsV1
+  labor_span_seconds      u32.v1          # 0–86_400
+  labor_intensity_01      f64.v1          # 0.0–1.0 normalized cognitive/physiological load
+  info_value_01           f64.v1          # 0.0–1.0 marginal knowledge gain estimate
+  risk_cost_01            f64.v1          # 0.0–1.0 neurorights/privacy cost
+  eco_cost_01             f64.v1          # 0.0–1.0 compute/energy footprint
+  labor_value_index_01    f64.v1          # 0.0–1.0 composite LV
+  tariff_tier             enum.LaborTariffTierV1
+  credit_amount_microunits i64.v1         # signed, 1e-6 credit units
+
+particle DataLaborEvidenceRefV1
+  source_shard_id     optional.str.v1     # qpudatashard id or external ref
+  source_local_id     optional.str.v1
+  topic_vector_hash   optional.bytes.v1   # H(topic_vector_bytes)
+  feature_bundle_hash optional.bytes.v1   # H(serialized features)
+  biosignal_stream_hash optional.bytes.v1
+  mobility_trace_hash   optional.bytes.v1
+
+particle DataLaborEventV1
+  header     DataLaborEventHeaderV1
+  metrics    DataLaborEventMetricsV1
+  evidence   DataLaborEvidenceRefV1
+  tags       list.str.v1                 # e.g. ["THERMAPHORA", "SOMAPLEX"]
+  version    u16.v1                      # schema version for forward compat
