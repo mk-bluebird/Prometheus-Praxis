@@ -1,8 +1,8 @@
 // filename: crates/eco-wealth-portfolio/src/healthdata_tcr_core.rs
 
 use chrono::{DateTime, Utc};
+use rust_decimal::prelude::*;
 use rust_decimal::Decimal;
-use rust_decimal::prelude::ToPrimitive;
 use rusqlite::{params, Connection, Result as SqlResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -26,16 +26,17 @@ pub enum LaborSourceKind {
     OtherAccountActivity,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DataLaborEvent {
-    pub id: i64,
-    pub subject_brain: BrainDid,
-    pub source_kind: LaborSourceKind,
-    pub related_account_id: Option<String>,
-    pub created_at_utc: DateTime<Utc>,
-    pub note: String,
+/// High‑level status of a health dataset in the TCR.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum DatasetStatus {
+    Pending,
+    Accepted,
+    Rejected,
+    Slashed,
 }
 
+/// Legacy curation status kept for compatibility with existing records.
+/// Prefer `DatasetStatus` in new core logic.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum CurationStatus {
     Pending,
@@ -55,6 +56,299 @@ pub enum DatasetCategory {
     OtherHealthRestricted,
 }
 
+/// Submission payload for a new dataset entering the TCR core.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HealthDatasetSubmission {
+    pub dataset_id: String,
+    pub contributor_account_id: String,
+    pub curator_account_id: String,
+    pub neurorights_policy_id: String,
+    pub corridor_id: String,
+    pub evidencemode: String,
+    pub neurorights_safe: bool,
+    pub quality_score: Decimal,
+    pub stake_amount: Decimal,
+    pub labor_event_ids: Vec<String>,
+    pub created_at_utc: String,
+}
+
+/// Stored state for a dataset within the pure core.
+/// This is what adapters persist into SQLite.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HealthDatasetState {
+    pub dataset_id: String,
+    pub contributor_account_id: String,
+    pub curator_account_id: String,
+    pub neurorights_policy_id: String,
+    pub corridor_id: String,
+    pub evidencemode: String,
+    pub neurorights_safe: bool,
+    pub quality_score: Decimal,
+    pub stake_amount: Decimal,
+    pub status: DatasetStatus,
+    pub challenge_open: bool,
+    pub labor_event_ids: Vec<String>,
+    pub created_at_utc: String,
+    pub updated_at_utc: String,
+}
+
+/// Context passed in by the caller; no I/O inside the core.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TcrDecisionContext {
+    pub epoch_index: u64,
+    pub min_quality_score: Decimal,
+    pub min_stake_credits: Decimal,
+    pub max_quality_score: Decimal,
+    pub allow_non_neurorights_safe: bool,
+}
+
+/// Curator identifier wrapper for clarity.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CuratorId(pub String);
+
+/// Error type for pure HealthData TCR operations.
+#[derive(Debug, Error)]
+pub enum HealthDatasetTcrError {
+    #[error("dataset already exists: {dataset_id}")]
+    DatasetAlreadyExists { dataset_id: String },
+
+    #[error("dataset not found: {dataset_id}")]
+    DatasetNotFound { dataset_id: String },
+
+    #[error(
+        "invalid state transition for dataset {dataset_id}: {from:?} -> {to:?}"
+    )]
+    InvalidStateTransition {
+        dataset_id: String,
+        from: DatasetStatus,
+        to: DatasetStatus,
+    },
+
+    #[error("neurorights violation for dataset {dataset_id}: {detail}")]
+    NeurorightsViolation { dataset_id: String, detail: String },
+
+    #[error(
+        "quality score out of bounds for dataset {dataset_id}: {quality_score}"
+    )]
+    QualityScoreOutOfBounds {
+        dataset_id: String,
+        quality_score: Decimal,
+    },
+
+    #[error(
+        "insufficient quality score for dataset {dataset_id}: \
+         {quality_score} < {required}"
+    )]
+    InsufficientQualityScore {
+        dataset_id: String,
+        quality_score: Decimal,
+        required: Decimal,
+    },
+
+    #[error(
+        "insufficient stake for dataset {dataset_id}: {stake_amount} < {required}"
+    )]
+    InsufficientStake {
+        dataset_id: String,
+        stake_amount: Decimal,
+        required: Decimal,
+    },
+
+    #[error("challenge window still open for dataset {dataset_id}")]
+    ChallengeWindowOpen { dataset_id: String },
+
+    #[error("challenge window already closed for dataset {dataset_id}")]
+    ChallengeWindowClosed { dataset_id: String },
+
+    #[error(
+        "curator mismatch for dataset {dataset_id}: expected {expected}, got {actual}"
+    )]
+    CuratorMismatch {
+        dataset_id: String,
+        expected: String,
+        actual: String,
+    },
+
+    #[error("internal invariant violation: {detail}")]
+    InvariantViolation { detail: String },
+}
+
+/// Clamp a Decimal into [lo, hi].
+fn clamp_decimal(x: Decimal, lo: Decimal, hi: Decimal) -> Decimal {
+    if x < lo {
+        lo
+    } else if x > hi {
+        hi
+    } else {
+        x
+    }
+}
+
+/// Pure constructor for a new dataset submission into the TCR.
+pub fn submit_health_dataset_core(
+    submission: HealthDatasetSubmission,
+    existing: Option<HealthDatasetState>,
+    ctx: &TcrDecisionContext,
+    now_utc: &str,
+) -> Result<HealthDatasetState, HealthDatasetTcrError> {
+    if existing.is_some() {
+        return Err(HealthDatasetTcrError::DatasetAlreadyExists {
+            dataset_id: submission.dataset_id.clone(),
+        });
+    }
+
+    if !submission.neurorights_safe && !ctx.allow_non_neurorights_safe {
+        return Err(HealthDatasetTcrError::NeurorightsViolation {
+            dataset_id: submission.dataset_id.clone(),
+            detail: "neurorights_safe=false not allowed in this corridor".into(),
+        });
+    }
+
+    if submission.neurorights_safe {
+        let mode = submission.evidencemode.as_str();
+        if mode != "HASHONLY" && mode != "PSEUDONYMOUSFEATURES" {
+            return Err(HealthDatasetTcrError::NeurorightsViolation {
+                dataset_id: submission.dataset_id.clone(),
+                detail: "neurorights_safe dataset must be HASHONLY or PSEUDONYMOUSFEATURES"
+                    .into(),
+            });
+        }
+    }
+
+    let q = clamp_decimal(
+        submission.quality_score,
+        Decimal::ZERO,
+        ctx.max_quality_score,
+    );
+    if q != submission.quality_score {
+        return Err(HealthDatasetTcrError::QualityScoreOutOfBounds {
+            dataset_id: submission.dataset_id.clone(),
+            quality_score: submission.quality_score,
+        });
+    }
+    if q < ctx.min_quality_score {
+        return Err(HealthDatasetTcrError::InsufficientQualityScore {
+            dataset_id: submission.dataset_id.clone(),
+            quality_score: q,
+            required: ctx.min_quality_score,
+        });
+    }
+
+    if submission.stake_amount < ctx.min_stake_credits {
+        return Err(HealthDatasetTcrError::InsufficientStake {
+            dataset_id: submission.dataset_id.clone(),
+            stake_amount: submission.stake_amount,
+            required: ctx.min_stake_credits,
+        });
+    }
+
+    Ok(HealthDatasetState {
+        dataset_id: submission.dataset_id,
+        contributor_account_id: submission.contributor_account_id,
+        curator_account_id: submission.curator_account_id,
+        neurorights_policy_id: submission.neurorights_policy_id,
+        corridor_id: submission.corridor_id,
+        evidencemode: submission.evidencemode,
+        neurorights_safe: submission.neurorights_safe,
+        quality_score: q,
+        stake_amount: submission.stake_amount,
+        status: DatasetStatus::Pending,
+        challenge_open: true,
+        labor_event_ids: submission.labor_event_ids,
+        created_at_utc: submission.created_at_utc,
+        updated_at_utc: now_utc.to_owned(),
+    })
+}
+
+/// Pure transition from Pending → Accepted.
+pub fn accept_health_dataset_core(
+    existing: &HealthDatasetState,
+    curator_id: CuratorId,
+    ctx: &TcrDecisionContext,
+    now_utc: &str,
+) -> Result<HealthDatasetState, HealthDatasetTcrError> {
+    if existing.status != DatasetStatus::Pending {
+        return Err(HealthDatasetTcrError::InvalidStateTransition {
+            dataset_id: existing.dataset_id.clone(),
+            from: existing.status,
+            to: DatasetStatus::Accepted,
+        });
+    }
+
+    if existing.curator_account_id != curator_id.0 {
+        return Err(HealthDatasetTcrError::CuratorMismatch {
+            dataset_id: existing.dataset_id.clone(),
+            expected: existing.curator_account_id.clone(),
+            actual: curator_id.0,
+        });
+    }
+
+    if !existing.neurorights_safe && !ctx.allow_non_neurorights_safe {
+        return Err(HealthDatasetTcrError::NeurorightsViolation {
+            dataset_id: existing.dataset_id.clone(),
+            detail: "attempted to accept neurorights-unsafe dataset".into(),
+        });
+    }
+
+    let mut out = existing.clone();
+    out.status = DatasetStatus::Accepted;
+    out.challenge_open = true;
+    out.updated_at_utc = now_utc.to_owned();
+    Ok(out)
+}
+
+/// Pure transition for rejection / slashing.
+pub fn reject_health_dataset_core(
+    existing: &HealthDatasetState,
+    curator_id: CuratorId,
+    reason_code: &str,
+    now_utc: &str,
+) -> Result<HealthDatasetState, HealthDatasetTcrError> {
+    let target_status = match existing.status {
+        DatasetStatus::Pending => DatasetStatus::Rejected,
+        DatasetStatus::Accepted => DatasetStatus::Slashed,
+        s => {
+            return Err(HealthDatasetTcrError::InvalidStateTransition {
+                dataset_id: existing.dataset_id.clone(),
+                from: s,
+                to: DatasetStatus::Rejected,
+            })
+        }
+    };
+
+    if existing.curator_account_id != curator_id.0 {
+        return Err(HealthDatasetTcrError::CuratorMismatch {
+            dataset_id: existing.dataset_id.clone(),
+            expected: existing.curator_account_id.clone(),
+            actual: curator_id.0,
+        });
+    }
+
+    if reason_code.trim().is_empty() {
+        return Err(HealthDatasetTcrError::InvariantViolation {
+            detail: "reject_health_dataset requires non-empty reason_code".into(),
+        });
+    }
+
+    let mut out = existing.clone();
+    out.status = target_status;
+    out.challenge_open = false;
+    out.updated_at_utc = now_utc.to_owned();
+    Ok(out)
+}
+
+/// DataLaborEvent is kept for backwards‑compatible labor history.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DataLaborEvent {
+    pub id: i64,
+    pub subject_brain: BrainDid,
+    pub source_kind: LaborSourceKind,
+    pub related_account_id: Option<String>,
+    pub created_at_utc: DateTime<Utc>,
+    pub note: String,
+}
+
+/// Legacy on‑chain/TCR dataset view; kept where CID and KER anchors are required.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HealthDataset {
     pub dataset_cid: String,
@@ -165,6 +459,8 @@ pub struct Config {
     pub plutocracy_alpha: f64,
 }
 
+/// Stateful service wiring the pure core to SQLite.
+/// This is non‑pure and should be kept out of the ALN‑pure core.
 pub struct HealthDataTcrService {
     conn: Connection,
     pub config: Config,
@@ -337,7 +633,7 @@ pub fn new_data_labor_event(
     }
 }
 
-pub fn submit_health_dataset(
+pub fn submit_health_dataset_legacy(
     curator: Address,
     dataset_cid: String,
     subject_brain: BrainDid,
@@ -386,7 +682,7 @@ pub fn submit_health_dataset(
     })
 }
 
-pub fn accept_health_dataset(
+pub fn accept_health_dataset_legacy(
     curator: &Address,
     dataset: &HealthDataset,
     eco_reward_locked: Decimal,
@@ -407,7 +703,7 @@ pub fn accept_health_dataset(
     Ok(updated)
 }
 
-pub fn reject_health_dataset(
+pub fn reject_health_dataset_legacy(
     curator: &Address,
     dataset: &HealthDataset,
 ) -> Result<HealthDataset, HealthTcrError> {
