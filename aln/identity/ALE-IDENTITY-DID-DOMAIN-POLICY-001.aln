@@ -1,0 +1,98 @@
+aln
+  alnversion 1.0.0
+  alnnamespace ALE.IDENTITY.DID.DOMAIN.POLICY.V1
+
+contract DidDomainSeparationPolicyV1
+  meta
+    role "Hard constraints on DID reuse across privacy domains for Prometheus-Praxis"
+    ecoreporoot "github.com/mk-bluebird/eco_restoration_shard"
+    status "DRAFT"
+
+  enum PrivacyDomainV1
+    HEALTH_DATA
+    LABOR_DATA
+    ECOSAFETY_TELEMETRY
+    WATER_INFRASTRUCTURE
+    CITY_BEHAVIORAL
+    GOVERNANCE_METADATA
+    TESTING_SANDBOX
+
+  record DomainScopedDidUsage
+    did String               -- any DID method string
+    domain PrivacyDomainV1
+    context_tag String       -- e.g. "health-tcr-2026", "ecosafety-metrocenter-001"
+    created_at_utc Timestamp
+    revoked_at_utc Timestamp?
+    note String?
+
+  invariant SinglePrimaryDomainPerDidV1
+    description """
+    A DID may have at most one primary privacy domain in which it appears
+    directly. Cross-domain linkage must go through aliased DIDs or union
+    governance KOs, never reusing the same DID string.
+    """
+    forall d1 DomainScopedDidUsage, d2 DomainScopedDidUsage .
+      (d1.did == d2.did and d1.domain != d2.domain) implies false
+
+  invariant NoHealthLaborCoLocationV1
+    description """
+    Additional guard: HEALTH_DATA and LABOR_DATA must never share the same
+    raw DID string in any DomainScopedDidUsage rows.
+    """
+    forall d DomainScopedDidUsage .
+      not (d.domain == PrivacyDomainV1.HEALTH_DATA and d.domain == PrivacyDomainV1.LABOR_DATA)
+
+  guard DidReuseAcrossDomainsForbiddenV1 u1 DomainScopedDidUsage, u2 DomainScopedDidUsage
+    description """
+    Guard: fail any attempt to insert or evolve DomainScopedDidUsage such that
+    a DID string is reused across distinct PrivacyDomainV1 values.
+    """
+    require not (u1.did == u2.did and u1.domain != u2.domain)
+
+  function registerDidUsage
+    input did String,
+          domain PrivacyDomainV1,
+          context_tag String,
+          created_at_utc Timestamp,
+          note String?
+    output DomainScopedDidUsage
+    body
+      require did != ""
+      require context_tag != ""
+      let u =
+        DomainScopedDidUsage(
+          did = did,
+          domain = domain,
+          context_tag = context_tag,
+          created_at_utc = created_at_utc,
+          revoked_at_utc = null,
+          note = note
+        )
+      return u
+
+  function revokeDidUsage
+    input u DomainScopedDidUsage,
+          revoked_at_utc Timestamp
+    output DomainScopedDidUsage
+    body
+      require u.revoked_at_utc == null
+      let updated = u
+      updated.revoked_at_utc = revoked_at_utc
+      return updated
+
+  note """
+  Implementation guidance:
+
+  1. All health, ecosafety, water, and behavioral shards must use alias DIDs
+     (see ALE.IDENTITY.BRAINDID.ALIASING.V1) internally. Raw BrainDids or
+     citizen DIDs appear only in the identity governance schemas.
+
+  2. CI must scan ALN and SQL artifacts for direct DID fields and ensure that
+     DomainScopedDidUsage is populated consistently. Any attempt to reuse a
+     DID string across PrivacyDomainV1 values must fail preflight.
+
+  3. This contract does not block the use of union-level identifiers or
+     treaty-governed aggregates that can span domains, provided they are not
+     raw per-person DIDs.
+  """
+end
