@@ -1,0 +1,112 @@
+{
+  "vector_id": "HEALTH-TCR-2026V1-001",
+  "did": "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7",
+  "seed": 123456789,
+  "description": "Happy-path health TCR flow with non-negative credits, monotone gas discounts, and no neurorights/treaty violations.",
+  "base_parameters": {
+    "base_gas_price": "1000.000000",
+    "min_credit": "0.000000",
+    "discount_curve_id": "HEALTH-TCR-DISCOUNT-2026V1"
+  },
+  "inputs": {
+    "datasets": [
+      {
+        "dataset_id": "DATASET-001",
+        "submitter_account_id": "acct-researcher-001",
+        "brain_did": "braindid-0001",
+        "hash_mode": "HASHONLY",
+        "schema_id": "health.dataset.registry.v1",
+        "bytes_hash_hex": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "neurorights_safe": true,
+        "fpic_required": true,
+        "fpic_token_id": "FPIC-TOKEN-001",
+        "governance_scope": {
+          "treaty_ids": ["GODTREATY-NEURO-001"],
+          "birthsign_id": "BIRTHSIGN-PHX-001",
+          "geo_point_wgs84": [33.4484, -112.0740]
+        }
+      }
+    ],
+    "labor_events": [
+      {
+        "event_id": "LABOR-001",
+        "account_id": "acct-researcher-001",
+        "dataset_id": "DATASET-001",
+        "reward_delta": "10.000000",
+        "info_value_01": "0.80",
+        "timestamp_utc": "2026-01-01T00:00:00Z"
+      },
+      {
+        "event_id": "LABOR-002",
+        "account_id": "acct-researcher-001",
+        "dataset_id": "DATASET-001",
+        "reward_delta": "5.000000",
+        "info_value_01": "0.90",
+        "timestamp_utc": "2026-01-02T00:00:00Z"
+      }
+    ],
+    "discount_check_points": [
+      {
+        "label": "no-credits",
+        "total_credits": "0.000000"
+      },
+      {
+        "label": "after-LABOR-001",
+        "total_credits": "10.000000"
+      },
+      {
+        "label": "after-LABOR-002",
+        "total_credits": "15.000000"
+      }
+    ]
+  },
+  "expected_outputs": {
+    "dataset_results": [
+      {
+        "dataset_id": "DATASET-001",
+        "expected_status": "PendingReview",
+        "expected_neurorights_corridor_ok": true,
+        "expected_treaty_gate_decision": "MayRun"
+      }
+    ],
+    "labor_account_states": [
+      {
+        "account_id": "acct-researcher-001",
+        "expected_final_credits": "15.000000",
+        "expected_min_credits_over_time": "0.000000"
+      }
+    ],
+    "discount_results": [
+      {
+        "label": "no-credits",
+        "total_credits": "0.000000",
+        "expected_gas_price": "1000.000000"
+      },
+      {
+        "label": "after-LABOR-001",
+        "total_credits": "10.000000",
+        "expected_gas_price": "950.000000"
+      },
+      {
+        "label": "after-LABOR-002",
+        "total_credits": "15.000000",
+        "expected_gas_price": "925.000000"
+      }
+    ],
+    "invariants": {
+      "credits_never_negative": true,
+      "discount_monotone_non_increasing": true,
+      "no_neuroright_corridor_breach": true,
+      "no_treaty_violation": true
+    }
+  },
+  "bindings": {
+    "rust_tests": [
+      "aletheion/erm/health_tcr/tests/prop_health_credits.rs",
+      "aletheion/erm/health_tcr/tests/discount_curve_tests.rs"
+    ],
+    "aln_catalog_ref": "ALE-ERM-HEALTH-TCR-VECTORS-001",
+    "scenario_kind": "unit",
+    "city_context": "Phoenix-Health-TCR-2026"
+  }
+}
