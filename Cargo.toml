@@ -55,6 +55,7 @@ members = [
     "crates/sensor-telemetry",
     "crates/topology-risk",
     "crates/eco-wealth-portfolio",
+    "crates/ai_chat_hashonly_normalizer",
 ]
 
 resolver = "2"
