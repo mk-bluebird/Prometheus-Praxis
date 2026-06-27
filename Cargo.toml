@@ -33,6 +33,8 @@ members = [
     "crates/econet_governance_guard",
     "crates/econet_governance_spine",
     "crates/econet_overlay",
+    "crates/econet-index-loader",
+    "crates/econet-governance-summary",
     "crates/ecoper-joule",
     "crates/ecoresponseshard",
     "crates/ecorestorationshard",

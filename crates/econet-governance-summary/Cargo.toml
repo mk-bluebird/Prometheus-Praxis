@@ -1,0 +1,18 @@
+[package]
+name = "econet-governance-summary"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+authors = ["mk-bluebird/Cybercore"]
+license = "MIT OR Apache-2.0"
+description = "CLI for summarizing EcoNet reward and governance bindings from ALN shards for auditors."
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+readme = "README.md"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+clap = { version = "4.5", features = ["derive"] }
+
+[features]
+default = []

@@ -1,0 +1,42 @@
+name: econet-governance-summary-ci
+
+on:
+  push:
+    paths:
+      - 'crates/econet-governance-summary/**'
+      - 'qpudatashards/particles/**'
+  pull_request:
+    paths:
+      - 'crates/econet-governance-summary/**'
+      - 'qpudatashards/particles/**'
+
+jobs:
+  audit-governance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.85.0
+
+      - name: Build governance summary CLI
+        run: cargo build -p econet-governance-summary --release
+
+      - name: Run reward governance summary
+        run: cargo run -p econet-governance-summary -- summary reward
+
+      - name: Verify mandatory flags
+        run: |
+          OUTPUT=$(cargo run -p econet-governance-summary -- summary reward 2>&1)
+          if ! echo "$OUTPUT" | grep -q "zero_personal_gain: true"; then
+            echo "CI FAILURE: zero_personal_gain flag is not set to true"
+            exit 1
+          fi
+          if ! echo "$OUTPUT" | grep -q "public_good_sinks_only: true"; then
+            echo "CI FAILURE: public_good_sinks_only flag is not set to true"
+            exit 1
+          fi
+          echo "Governance validation passed"

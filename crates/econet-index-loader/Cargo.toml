@@ -1,0 +1,15 @@
+[package]
+name = "econet-index-loader"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+authors = ["mk-bluebird/Cybercore"]
+license = "MIT OR Apache-2.0"
+description = "Library for loading EcoNet CSV index files into SQLite econet_index table."
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+
+[dependencies]
+rusqlite = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+csv = { workspace = true }
+thiserror = { workspace = true }
