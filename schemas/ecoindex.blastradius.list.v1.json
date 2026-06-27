@@ -1,0 +1,31 @@
+{
+  "name": "ecoindex.blastradius.list.v1",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "gate_token": { "type": "string" },
+      "window_id":  { "type": "string" },
+      "max_radius": { "type": "integer", "minimum": 1, "maximum": 1024 }
+    },
+    "required": ["gate_token", "window_id"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "nodes": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "nodeid":  { "type": "string" },
+            "radius":  { "type": "integer" },
+            "rx":      { "type": "number" },
+            "Vt":      { "type": "number" }
+          },
+          "required": ["nodeid", "radius", "rx", "Vt"]
+        }
+      }
+    },
+    "required": ["nodes"]
+  }
+}
