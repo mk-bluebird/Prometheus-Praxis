@@ -1,0 +1,27 @@
+{
+  "name": "ecosafety.governance.gate.v1",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "chain_id": { "type": "string" },
+      "domains":  {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "reason":  { "type": "string" }
+    },
+    "required": ["chain_id", "domains", "reason"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "gate_token": { "type": "string" },
+      "status":     { "type": "string", "enum": ["OK", "DENIED"] },
+      "violations": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    },
+    "required": ["gate_token", "status"]
+  }
+}
