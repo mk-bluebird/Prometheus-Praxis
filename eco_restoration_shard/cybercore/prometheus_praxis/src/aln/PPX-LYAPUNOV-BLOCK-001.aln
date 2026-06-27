@@ -1,0 +1,88 @@
+// filepath: eco_restoration_shard/cybercore/prometheus_praxis/src/aln/PPX-LYAPUNOV-BLOCK-001.aln
+alnversion 1.0.0
+alnnamespace PPX.LYAPUNOV.BLOCK.V1
+
+------------------------------------------------------------------------------
+-- Core identifiers
+------------------------------------------------------------------------------
+
+particle ppx.lyapunov.block.id.v1
+  id                   str.v1
+  region_id            str.v1          -- e.g., Phoenix region code
+  block_code           str.v1          -- e.g., neighborhood or canal block code
+
+particle ppx.lyapunov.cell.id.v1
+  id                   str.v1
+  block_id             ref.ppx.lyapunov.block.id.v1
+  grid_i               i32.v1
+  grid_j               i32.v1
+
+------------------------------------------------------------------------------
+-- Coefficients and weights
+------------------------------------------------------------------------------
+
+particle ppx.lyapunov.block.coeff.v1
+  id                   str.v1
+  label                str.v1
+  alpha_pfbs           f64.v1          -- α > 0
+  beta_ecoli           f64.v1          -- β > 0
+  gamma_swarm          f64.v1          -- γ > 0
+
+particle ppx.lyapunov.block.weightmap.v1
+  id                   str.v1
+  block_id             ref.ppx.lyapunov.block.id.v1
+  coeff_id             ref.ppx.lyapunov.block.coeff.v1
+  -- Each entry ties a cell to its weight w_i
+  cell_ids             list.ref.ppx.lyapunov.cell.id.v1
+  cell_weights         list.f64.v1     -- aligned with cell_ids, w_i ≥ 0
+
+------------------------------------------------------------------------------
+-- State snapshots
+------------------------------------------------------------------------------
+
+particle ppx.lyapunov.block.snapshot.v1
+  id                   str.v1
+  block_id             ref.ppx.lyapunov.block.id.v1
+  coeff_id             ref.ppx.lyapunov.block.coeff.v1
+  weightmap_id         ref.ppx.lyapunov.block.weightmap.v1
+  timestamputc         time.timestamp.v1
+
+  -- Flattened per-cell arrays, aligned by index with weight map cell_ids.
+  pfbs_conc_values     list.f64.v1     -- PFBS concentrations
+  ecoli_values         list.f64.v1     -- E. coli counts
+  swarm_coverage       list.f64.v1     -- coverage 0–1
+
+  -- Computed Lyapunov value for the block at this time.
+  v_block              f64.v1
+
+------------------------------------------------------------------------------
+-- Policy for ΔV evaluation
+------------------------------------------------------------------------------
+
+particle ppx.lyapunov.block.policy.v1
+  id                   str.v1
+  label                str.v1
+  soft_increase_tol    f64.v1          -- small ΔV allowed (derate band)
+  hard_increase_tol    f64.v1          -- ΔV beyond this ⇒ STOP
+  require_nonincrease  bool.v1         -- if true, policy is strict Lyapunov
+
+------------------------------------------------------------------------------
+-- Evaluation result for a single step
+------------------------------------------------------------------------------
+
+particle ppx.lyapunov.block.step.result.v1
+  id                   str.v1
+  block_id             ref.ppx.lyapunov.block.id.v1
+  policy_id            ref.ppx.lyapunov.block.policy.v1
+  snapshot_before_id   ref.ppx.lyapunov.block.snapshot.v1
+  snapshot_after_id    ref.ppx.lyapunov.block.snapshot.v1
+  vt_before            f64.v1
+  vt_after             f64.v1
+  vt_delta             f64.v1
+  decision             enum.ppx.lyapunov.block.decision.v1
+  reason               str.v1
+
+enum enum.ppx.lyapunov.block.decision.v1
+  ALLOW
+  DERATE
+  STOP
