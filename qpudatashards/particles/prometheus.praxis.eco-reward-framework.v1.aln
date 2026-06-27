@@ -1,0 +1,122 @@
+text aln prometheus.praxis.eco-reward-framework.v1
+
+record PrometheusPraxisDesignArtifact
+  string host_did                    # sovereign host DID (brain-identity)
+  string bostrom_address             # sovereign Bostrom address
+  string prometheus_praxis_id        # Prometheus-Praxis authority ID
+  string perkunos_nexus_id           # Perkunos-Nexus authority ID
+  string cybercore_root_repo         # canonical Cybercore repo URL
+  string design_artifact_id          # unique ID for this report
+  string design_title                # human-readable title
+  string design_file_path            # path to the narrative file in repo
+  string design_class                # e.g., "eco-reward-framework"
+  bool binds_reward_kernel           # true if artifact governs reward kernel
+  bool binds_reward_ffi              # true if artifact governs FFI boundary
+  bool binds_ledger_ingest           # true if artifact governs ledger ingest
+  bool binds_public_good_sinks       # true if artifact governs sink shard
+  bool zero_personal_gain            # enforces zero personal financial gain
+  bool public_good_sinks_only        # enforces public-good-only routing
+  bool roh_ceiling_enforced          # RoH <= 0.30 enforced
+  bool neurorights_compliant         # neurorights constraints enforced
+  string nonrollback_anchor_hex      # anchor for non-rollback of this design
+  string evidence_bundle_id          # hex bundle of proofs and references
+
+# Invariants:
+# - zero_personal_gain must be true.
+# - public_good_sinks_only must be true.
+# - roh_ceiling_enforced must be true.
+# - neurorights_compliant must be true.
+# - nonrollback_anchor_hex and evidence_bundle_id must be non-empty
+#   before this artifact can be treated as authoritative.
+
+
+record PrometheusPraxisDesignBindingReward
+  string design_artifact_id
+  string module_id                   # links to PrometheusPraxisModulePath.module_id
+  string crate_path                  # Rust crate path
+  string aln_shard_path              # ALN shard path
+  bool ffi_non_actuating             # FFI must be non-actuating
+  bool kernel_pure_numeric           # kernel must be pure numeric
+  bool ledger_public_good_only       # ledger must route only to public-good sinks
+  bool kani_monotonicity_required    # monotonicity proof required
+  bool eco_wealth_integral_bound     # eco-wealth integral bound to DID
+
+# Invariants:
+# - ffi_non_actuating must be true for FFI-bound modules.
+# - kernel_pure_numeric must be true for kernel-bound modules.
+# - ledger_public_good_only must be true for ingest modules.
+# - kani_monotonicity_required must be true when compute_rewards is used.
+# - eco_wealth_integral_bound must be true when eco-wealth integrals are present.
+
+
+# Example design artifact row (to be instantiated with real anchors):
+
+record PrometheusPraxisDesignArtifact example_eco_reward_framework
+  host_did                    "didalnorganic-host"
+  bostrom_address             "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+  prometheus_praxis_id        "prometheus-praxis-authority-2026"
+  perkunos_nexus_id           "perkunos-nexus-authority-2026"
+  cybercore_root_repo         "https://github.com/mk-bluebird/eco_restoration_shard"
+  design_artifact_id          "eco-reward-framework-2026-v1"
+  design_title                "A Verifiably Trustworthy EcoNet: Hybrid Framework for Sovereign Rewards in Ecological Repair"
+  design_file_path            "docs/econet/eco-reward-framework-2026-v1.md"
+  design_class                "eco-reward-framework"
+  binds_reward_kernel         true
+  binds_reward_ffi            true
+  binds_ledger_ingest         true
+  binds_public_good_sinks     true
+  zero_personal_gain          true
+  public_good_sinks_only      true
+  roh_ceiling_enforced        true
+  neurorights_compliant       true
+  nonrollback_anchor_hex      "nonrollback-anchor-eco-reward-framework-2026-v1"
+  evidence_bundle_id          "evidence-bundle-eco-reward-framework-2026-v1"
+
+
+# Example bindings tying design to concrete modules:
+
+record PrometheusPraxisDesignBindingReward bind_reward_kernel
+  design_artifact_id          "eco-reward-framework-2026-v1"
+  module_id                   "module-reward-kernel-2026"
+  crate_path                  "crates/econet-reward-kernel"
+  aln_shard_path              "qpudatashards/particles/ppx.reward.spec.v1.aln"
+  ffi_non_actuating           false
+  kernel_pure_numeric         true
+  ledger_public_good_only     false
+  kani_monotonicity_required  true
+  eco_wealth_integral_bound   true
+
+
+record PrometheusPraxisDesignBindingReward bind_reward_ffi
+  design_artifact_id          "eco-reward-framework-2026-v1"
+  module_id                   "module-reward-ffi-2026"
+  crate_path                  "crates/econet-reward-ffi"
+  aln_shard_path              "qpudatashards/particles/prometheus.praxis.public.good.design.v1.aln"
+  ffi_non_actuating           true
+  kernel_pure_numeric         false
+  ledger_public_good_only     false
+  kani_monotonicity_required  true
+  eco_wealth_integral_bound   true
+
+
+record PrometheusPraxisDesignBindingReward bind_ledger_ingest
+  design_artifact_id          "eco-reward-framework-2026-v1"
+  module_id                   "module-ledger-ingest-2026"
+  crate_path                  "crates/econet-ledger-reward-ingest"
+  aln_shard_path              "qpudatashards/particles/econet.public.good.sink.v1.aln"
+  ffi_non_actuating           false
+  kernel_pure_numeric         false
+  ledger_public_good_only     true
+  kani_monotonicity_required  false
+  eco_wealth_integral_bound   true
+
+
+# CI / governance notes:
+# - Any module claiming to implement or modify the EcoNet reward pipeline
+#   must reference this design_artifact_id and pass guards for:
+#   - zero_personal_gain
+#   - public_good_sinks_only
+#   - roh_ceiling_enforced
+#   - neurorights_compliant
+# - Prometheus-Praxis and Perkunos-Nexus jointly veto any change that
+#   weakens these constraints.
