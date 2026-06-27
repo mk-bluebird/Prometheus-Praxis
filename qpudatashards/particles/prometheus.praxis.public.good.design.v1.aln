@@ -1,0 +1,210 @@
+text aln prometheus.praxis.public.good.design.v1
+
+record PrometheusPraxisAuthority
+  string host_did                    # sovereign host DID (brain-identity)
+  string bostrom_address             # sovereign Bostrom address
+  string cybercore_root_repo         # canonical mono-repo URL
+  string prometheus_praxis_id        # unique ID for Prometheus-Praxis authority
+  string perkunos_nexus_id           # unique ID for Perkunos-Nexus authority
+  string aln_migration_tag           # e.g., ALN.MIGRATION.CYBERCORE_AUTHORITY.v1
+  bool is_primary_design_body        # Prometheus-Praxis is primary design authority
+  bool is_primary_governance_body    # Perkunos-Nexus is primary governance authority
+  bool forbid_personal_financial_gain
+  bool forbid_speculative_trading
+  bool enforce_public_good_sinks_only
+
+# Invariants:
+# - is_primary_design_body must be true for Prometheus-Praxis.
+# - is_primary_governance_body must be true for Perkunos-Nexus.
+# - forbid_personal_financial_gain must be true.
+# - forbid_speculative_trading must be true.
+# - enforce_public_good_sinks_only must be true.
+
+
+record PrometheusPraxisDesignBinding
+  string authority_id                # links to PrometheusPraxisAuthority.prometheus_praxis_id
+  string sink_authority_id           # links to PublicGoodSinkAuthority.authority_id
+  string reward_kernel_crate         # e.g., crates/econet-reward-kernel
+  string reward_ffi_crate            # e.g., crates/econet-reward-ffi
+  string ledger_ingest_crate         # e.g., crates/econet-ledger-reward-ingest
+  string design_doc_id               # ID of design documentation (e.g., ERM/eco-restoration doc)
+  bool ffi_non_actuating             # FFI must be non-actuating
+  bool kernel_pure_numeric           # kernel must be pure numeric, side-effect free
+  bool ledger_ingest_public_good_only# ledger ingest must route only to public-good sinks
+  bool kani_monotonicity_proven      # monotonicity proofs must exist for reward behavior
+
+# Invariants:
+# - ffi_non_actuating must be true.
+# - kernel_pure_numeric must be true.
+# - ledger_ingest_public_good_only must be true.
+# - kani_monotonicity_proven must be true before production deployment.
+
+
+record PerkunosNexusGovernanceBinding
+  string authority_id                # links to PrometheusPraxisAuthority.perkunos_nexus_id
+  string sink_authority_id           # links to PublicGoodSinkAuthority.authority_id
+  string corpus_juris_id             # Corpus Juris contract for public-good rewards
+  string eco_wealth_contract_id      # contract governing eco-wealth integrals
+  bool nonrollback_sov_wealth        # eco-wealth cannot be rolled back or detached
+  bool nonrollback_neurorights       # neurorights cannot be rolled back
+  bool enforce_chat_as_labor_floors  # chat-as-labor protections enforced
+
+# Invariants:
+# - nonrollback_sov_wealth must be true.
+# - nonrollback_neurorights must be true.
+# - enforce_chat_as_labor_floors must be true when chat-as-labor sinks exist.
+
+
+record PrometheusPraxisModulePath
+  string module_id                   # unique ID for module
+  string crate_path                  # Rust crate path in Cybercore mono-repo
+  string aln_shard_path              # ALN shard path in qpudatashards/particles
+  string role                        # e.g., "reward-kernel", "ffi-wrapper", "ledger-ingest"
+  bool compiled_under_cybercore      # compiled under Cybercore authority
+  bool bound_to_prometheus_praxis    # design and changes bound to Prometheus-Praxis
+  bool bound_to_perkunos_nexus       # governance bound to Perkunos-Nexus
+
+# Invariants:
+# - compiled_under_cybercore must be true.
+# - bound_to_prometheus_praxis must be true.
+# - bound_to_perkunos_nexus must be true.
+
+
+record PrometheusPraxisDesignGuard
+  string module_id
+  string crate_path
+  string aln_shard_path
+  bool ffi_non_actuating_verified
+  bool kernel_pure_numeric_verified
+  bool ledger_public_good_only_verified
+  bool kani_monotonicity_verified
+  bool allowed
+  string reason
+
+# Guard rules:
+# - allowed = false if ffi_non_actuating_verified is false.
+# - allowed = false if kernel_pure_numeric_verified is false.
+# - allowed = false if ledger_public_good_only_verified is false.
+# - allowed = false if kani_monotonicity_verified is false.
+# - CI must:
+#   - Refuse to deploy any module where allowed = false.
+#   - Ensure FFI, kernel, and ledger ingest abide by public-good-only
+#     and non-actuating constraints.
+
+
+record PerkunosNexusGovernanceGuard
+  string corpus_juris_id
+  string eco_wealth_contract_id
+  bool public_good_sinks_only_enforced
+  bool no_personal_gain_detected
+  bool no_speculation_detected
+  bool nonrollback_sov_wealth_enforced
+  bool nonrollback_neurorights_enforced
+  bool allowed
+  string reason
+
+# Guard rules:
+# - allowed = false if public_good_sinks_only_enforced is false.
+# - allowed = false if no_personal_gain_detected is false.
+# - allowed = false if no_speculation_detected is false.
+# - allowed = false if nonrollback_sov_wealth_enforced is false.
+# - allowed = false if nonrollback_neurorights_enforced is false.
+# - Governance processes must:
+#   - Veto any contract change that weakens these guarantees.
+#   - Log all decisions with evidence bundles referencing Prometheus-Praxis
+#     and Cybercore paths.
+
+
+# Example authority row (to be instantiated with your actual IDs):
+
+record PrometheusPraxisAuthority example_prometheus_praxis_authority
+  host_did                    "didalnorganic-host"
+  bostrom_address             "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+  cybercore_root_repo         "https://github.com/mk-bluebird/eco_restoration_shard"
+  prometheus_praxis_id        "prometheus-praxis-authority-2026"
+  perkunos_nexus_id           "perkunos-nexus-authority-2026"
+  aln_migration_tag           "ALN.MIGRATION.CYBERCORE_AUTHORITY.v1"
+  is_primary_design_body      true
+  is_primary_governance_body  true
+  forbid_personal_financial_gain true
+  forbid_speculative_trading     true
+  enforce_public_good_sinks_only true
+
+
+# Example design binding connecting the public-good sinks and kernel modules:
+
+record PrometheusPraxisDesignBinding example_design_binding
+  authority_id                "prometheus-praxis-authority-2026"
+  sink_authority_id           "econet-public-good-sink-authority-2026"
+  reward_kernel_crate         "crates/econet-reward-kernel"
+  reward_ffi_crate            "crates/econet-reward-ffi"
+  ledger_ingest_crate         "crates/econet-ledger-reward-ingest"
+  design_doc_id               "aletheion-eco-restoration-design-2026"
+  ffi_non_actuating           true
+  kernel_pure_numeric         true
+  ledger_ingest_public_good_only true
+  kani_monotonicity_proven    true
+
+
+# Example governance binding for Perkunos-Nexus:
+
+record PerkunosNexusGovernanceBinding example_governance_binding
+  authority_id                "perkunos-nexus-authority-2026"
+  sink_authority_id           "econet-public-good-sink-authority-2026"
+  corpus_juris_id             "corpus-juris-public-good-reward-2026"
+  eco_wealth_contract_id      "eco-wealth-integral-contract-2026"
+  nonrollback_sov_wealth      true
+  nonrollback_neurorights     true
+  enforce_chat_as_labor_floors true
+
+
+# Example module path rows tying crates and shards to Prometheus-Praxis:
+
+record PrometheusPraxisModulePath module_reward_kernel
+  module_id                   "module-reward-kernel-2026"
+  crate_path                  "crates/econet-reward-kernel"
+  aln_shard_path              "qpudatashards/particles/ppx.reward.spec.v1.aln"
+  role                        "reward-kernel"
+  compiled_under_cybercore    true
+  bound_to_prometheus_praxis  true
+  bound_to_perkunos_nexus     true
+
+
+record PrometheusPraxisModulePath module_reward_ffi
+  module_id                   "module-reward-ffi-2026"
+  crate_path                  "crates/econet-reward-ffi"
+  aln_shard_path              "qpudatashards/particles/prometheus.praxis.public.good.design.v1.aln"
+  role                        "ffi-wrapper"
+  compiled_under_cybercore    true
+  bound_to_prometheus_praxis  true
+  bound_to_perkunos_nexus     true
+
+
+record PrometheusPraxisModulePath module_ledger_ingest
+  module_id                   "module-ledger-ingest-2026"
+  crate_path                  "crates/econet-ledger-reward-ingest"
+  aln_shard_path              "qpudatashards/particles/econet.public.good.sink.v1.aln"
+  role                        "ledger-ingest"
+  compiled_under_cybercore    true
+  bound_to_prometheus_praxis  true
+  bound_to_perkunos_nexus     true
+
+
+# CI / governance notes (non-executable, policy guidance):
+
+# - Prometheus-Praxis is the exclusive design authority for:
+#   - Reward kernel behavior.
+#   - FFI boundaries and JSON schemas.
+#   - Ledger ingestion logic routing to public-good sinks.
+# - Perkunos-Nexus is the exclusive governance authority for:
+#   - Corpus Juris contracts.
+#   - Eco-wealth integrals and sovereign wealth binding.
+#   - Non-rollback of neurorights and chat-as-labor floors.
+# - Cybercore (eco_restoration_shard) is the centralized mono-repo
+#   where these modules live and evolve.
+# - CI must:
+#   - Enforce ffi_non_actuating, kernel_pure_numeric, and
+#     ledger_ingest_public_good_only flags for all modules.
+#   - Reject any change that introduces personal financial gain,
+#     speculative tokens, or detaches eco-wealth from host DID
+#     and Bostrom identity.
