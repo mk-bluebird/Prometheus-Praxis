@@ -1,0 +1,12 @@
+// Merkle root construction for final_sighex without exposing raw DIDs.
+
+type ReviewLeaf1 = hash(reviewer1did_hashhex || reviewer1sighex);
+type ReviewLeaf2 = hash(reviewer2did_hashhex || reviewer2sighex);
+type CeimLeaf   = hash(ceim_window_hashhex);
+
+type MerkleRoot = hash(hash(ReviewLeaf1 || ReviewLeaf2) || CeimLeaf);
+
+invariant FinalSigCorrect(caseid: Text) {
+    let r = AugmentedCitizenDisqualificationReview[caseid];
+    MerkleRoot == r.final_sighex;
+}
