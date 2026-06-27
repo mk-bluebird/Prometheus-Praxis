@@ -1,0 +1,33 @@
+# filename: Cargo.toml
+# destination: ecorestoration_shard/blast_radius_kernel/Cargo.toml
+
+[package]
+name = "blast_radius_kernel"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Non-actuating blast-radius lambda kernel for eco_restoration_shard. Computes segment-level lambda = k/v with eco weights."
+license = "MIT OR Apache-2.0"
+authors = ["Prometheus-Praxis"]
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+
+[lib]
+name = "blast_radius_kernel"
+crate-type = ["rlib", "cdylib"]
+
+[[bin]]
+name = "blast_radius_migrate"
+path = "src/bin/migrate.rs"
+
+[dependencies]
+rusqlite = { version = "0.31", features = ["bundled"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+time = { version = "0.3", features = ["macros", "formatting"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+opt-level = "z"
+debug = false
+panic = "abort"
