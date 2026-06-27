@@ -1,0 +1,7 @@
+id,filename,repo,destination_hint,primary_role,language,brain_identity_relevance,eco_impact_focus
+1,eco-reward-framework-2026-v1.md,mk-bluebird/eco_restoration_shard,PATH_TO_BE_CHOSEN_IN_REPO_ROOT/docs/econet/eco-reward-framework-2026-v1.md,eco_reward_design,text,10,energy_reduction;waste_cleanup;governance_continuity
+2,prometheus.praxis.eco-reward-framework.v1.aln,mk-bluebird/eco_restoration_shard,PATH_TO_BE_CHOSEN_IN_REPO_ROOT/qpudatashards/particles/prometheus.praxis.eco-reward-framework.v1.aln,identity_shard,ALN,10,governance_continuity
+3,econet.public.good.sink.v1.aln,mk-bluebird/eco_restoration_shard,PATH_TO_BE_CHOSEN_IN_REPO_ROOT/qpudatashards/particles/econet.public.good.sink.v1.aln,payment_guard,ALN,9,eco_restoration;waste_cleanup
+4,crates/econet-reward-kernel/src/lib.rs,mk-bluebird/eco_restoration_shard,PATH_TO_BE_CHOSEN_IN_REPO_ROOT/crates/econet-reward-kernel/src/lib.rs,eco_telemetry,Rust,8,energy_reduction
+5,crates/econet-reward-ffi/src/lib.rs,mk-bluebird/eco_restoration_shard,PATH_TO_BE_CHOSEN_IN_REPO_ROOT/crates/econet-reward-ffi/src/lib.rs,ffi_boundary,Rust,8,governance_continuity
+6,crates/econet-ledger-reward-ingest/src/lib.rs,mk-bluebird/eco_restoration_shard,PATH_TO_BE_CHOSEN_IN_REPO_ROOT/crates/econet-ledger-reward-ingest/src/lib.rs,ledger_gating,Rust,9,governance_continuity
