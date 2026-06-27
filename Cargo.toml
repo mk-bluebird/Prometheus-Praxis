@@ -58,6 +58,7 @@ members = [
     "crates/ai_chat_hashonly_normalizer",
     "crates/ppx_continuity_kernel",
     "crates/ppx_continuity_mcp",
+    "crates/blast_radius_kernel",
 ]
 
 resolver = "2"
