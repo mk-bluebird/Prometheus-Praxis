@@ -1,0 +1,45 @@
+// Convex fusion: K_i = w_E E_i + w_C C_i + w_S S_i, with w_E + w_C + w_S = 1.
+
+type KarmaWeights = {
+    w_E: Real,
+    w_C: Real,
+    w_S: Real
+};
+
+invariant WeightsConvex(w: KarmaWeights) {
+    w.w_E >= 0.0 &&
+    w.w_C >= 0.0 &&
+    w.w_S >= 0.0 &&
+    abs((w.w_E + w.w_C + w.w_S) - 1.0) <= 1e-9;
+}
+
+type KarmaComponents = {
+    E_i: Real,  // eco-impact
+    C_i: Real,  // contribution
+    S_i: Real   // security/trust
+};
+
+func KarmaScore(w: KarmaWeights, c: KarmaComponents) -> Real {
+    w.w_E * c.E_i + w.w_C * c.C_i + w.w_S * c.S_i
+}
+
+// UNDERATTACK invariant: S_i frozen.
+invariant UnderAttackFreezesS(identityid: Text) {
+    let u = incident_underattack[identityid];
+    u.state == 'UNDERATTACK' ->
+        u.afterSvictim == u.beforeSvictim;
+}
+
+// Karma floor invariant under UNDERATTACK (no proven harm).
+invariant KarmaFloorUnderAttack(identityid: Text) {
+    let k = augmented_citizen_karma[identityid];
+    let w = KarmaWeights{w_E: 0.4, w_C: 0.3, w_S: 0.3}; // example stable weights.
+    let c = KarmaComponents{E_i: k.currentkarma, C_i: k.currentkarma, S_i: k.currentkarma};
+
+    WeightsConvex(w) &&
+    k.identitytype == 'AugmentedCitizen' &&
+    k.provenharm == 0 &&
+    incident_underattack[identityid].state == 'UNDERATTACK'
+    ->
+    KarmaScore(w, c) >= 0.8;
+}
