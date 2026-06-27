@@ -3,14 +3,14 @@ alnnamespace prometheus.praxis.reward.status.nanoswarm.v1
 
 // ---------- function meta ----------
 particle ppx.function.meta.v1
-  id          koid.v1
-  label       str.v1
-  language    enum.language.v1
-  modulepath  str.v1
-  entrypoint  str.v1
-  domain      enum.function.domain.v1
-  actuating   bool.v1
-  policy_tag  str.v1
+  id             koid.v1
+  label          str.v1
+  language       enum.language.v1
+  modulepath     str.v1
+  entrypoint     str.v1
+  domain         enum.function.domain.v1
+  actuating      bool.v1
+  policy_tag     str.v1
   inputschemaid  koid.v1
   outputschemaid koid.v1
 
@@ -33,17 +33,35 @@ particle ppx.reward.family.status.output.v1
 
 // ---------- concrete instance ----------
 ppx.function.meta.v1 "PPX-NS-REWARD-STATUS-FN"
-  label         "ppx.nanoswarm.reward.family.status.v1"
-  language      LUA
-  modulepath    "runtimelua/prometheus_praxis/reward/ppx_reward_family_status.lua"
-  entrypoint    "get_nanoswarm_reward_family_status"
-  domain        DIAGNOSTIC
-  actuating     false
-  policy_tag    "NON_ACTUATING_DIAGNOSTIC"
-  inputschemaid "PPX-NS-REWARD-STATUS-INPUT"
+  id             "ppx-func-ppx-nanoswarm-reward-family-status-v1"
+  label          "ppx.nanoswarm.reward.family.status.v1"
+  language       LUA
+  modulepath     "runtimelua/prometheus_praxis/reward/ppx_reward_family_status.lua"
+  entrypoint     "get_nanoswarm_reward_family_status"
+  domain         DIAGNOSTIC
+  actuating      false
+  policy_tag     "NON_ACTUATING_DIAGNOSTIC"
+  inputschemaid  "PPX-NS-REWARD-STATUS-INPUT"
   outputschemaid "PPX-NS-REWARD-STATUS-OUTPUT"
 
-// ---------- Prometheus‑Praxis governance rules ----------
+// ---------- schema binding ----------
+ppx.reward.family.status.input.v1 "PPX-NS-REWARD-STATUS-INPUT"
+  family_id  str.v1
+  db_path    str.v1
+
+ppx.reward.family.status.output.v1 "PPX-NS-REWARD-STATUS-OUTPUT"
+  family_id                  str.v1
+  function_count             u32.v1
+  spec_count                 u32.v1
+  asset_count                u32.v1
+  data_as_labor_asset_count  u32.v1
+  mean_ker_score             f64.v1
+  mean_eco_impact_score      f64.v1
+  recent_windows_checked     u32.v1
+  mean_accept_fraction       f64.v1
+  mean_vt_delta              f64.v1
+
+// ---------- Prometheus-Praxis governance rules ----------
 rule reward_family_status_non_actuating
   when f ppx.function.meta.v1 label "ppx.nanoswarm.reward.family.status.v1"
   then require f.actuating false
@@ -56,5 +74,5 @@ rule reward_family_status_domain
 
 rule reward_family_status_schema_present
   when f ppx.function.meta.v1 label "ppx.nanoswarm.reward.family.status.v1"
-  then require f.inputschemaid non-nil and f.outputschemaid non-nil
+  then require f.inputschemaid ! and f.outputschemaid !
   else error "PPX_NS_REWARD_STATUS_MISSING_SCHEMA"
