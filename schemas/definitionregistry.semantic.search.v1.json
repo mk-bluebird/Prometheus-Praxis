@@ -1,0 +1,32 @@
+{
+  "name": "definitionregistry.semantic.search.v1",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "query": { "type": "string" },
+      "top_k": { "type": "integer", "minimum": 1, "maximum": 50 }
+    },
+    "required": ["query"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "results": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "defid":   { "type": "string" },
+            "name":    { "type": "string" },
+            "domain":  { "type": "string" },
+            "summary": { "type": "string" },
+            "aln_path":{ "type": "string" },
+            "score":   { "type": "number" }
+          },
+          "required": ["defid","name","domain","aln_path","score"]
+        }
+      }
+    },
+    "required": ["results"]
+  }
+}
