@@ -1,0 +1,121 @@
+TITLE NeuroLoad Corridor v1
+
+ATOM NeuroLoadCoord.v1
+FIELDS
+    id               String        REQUIRED  ; unique coord id, e.g. "nlc:node:abc123"
+    node_id          String        REQUIRED  ; host or device id
+    value            Float         REQUIRED  ; normalized neuro load in [0,1]
+    minsafe          Float         REQUIRED  ; minimum safe bound
+    maxsafe          Float         REQUIRED  ; maximum safe bound
+    status           Enum          REQUIRED  ; "OK","SoftViolation","HardViolation"
+    timestamp_ns     Integer       REQUIRED  ; monotonic time in nanoseconds
+    k_factor         Float         REQUIRED  ; knowledge-factor in [0,1]
+    e_factor         Float         REQUIRED  ; eco-impact factor in [0,1]
+    r_factor         Float         REQUIRED  ; risk-of-harm factor in [0,1]
+    author_did       String        REQUIRED  ; DID of sovereign author
+    corridor_id      String        OPTIONAL  ; binding to an ecosafety corridor id
+    notes            String        OPTIONAL  ; short human-readable annotation
+UNITS
+    value        unitless    [0,1] normalized
+    minsafe      unitless    [0,1] normalized
+    maxsafe      unitless    [0,1] normalized
+    k_factor     unitless    [0,1]
+    e_factor     unitless    [0,1]
+    r_factor     unitless    [0,1]
+    timestamp_ns ns
+INVARIANTS
+    minsafe >= 0.0
+    maxsafe <= 1.0
+    minsafe <= maxsafe
+    value >= 0.0
+    value <= 1.0
+    k_factor >= 0.0
+    k_factor <= 1.0
+    e_factor >= 0.0
+    e_factor <= 1.0
+    r_factor >= 0.0
+    r_factor <= 1.0
+    status IN {"OK","SoftViolation","HardViolation"}
+
+RULE NeuroLoadStatusUpdate.v1
+INPUT
+    coord  NeuroLoadCoord.v1
+OUTPUT
+    coord  NeuroLoadCoord.v1
+LOGIC
+    IF coord.value < coord.minsafe THEN
+        coord.status = "SoftViolation"
+    ELSE IF coord.value > coord.maxsafe THEN
+        coord.status = "SoftViolation"
+    ELSE
+        coord.status = "OK"
+    ENDIF
+
+RULE NeuroLoadHardStop.v1
+INPUT
+    coord  NeuroLoadCoord.v1
+OUTPUT
+    coord  NeuroLoadCoord.v1
+LOGIC
+    IF coord.value > coord.maxsafe + 0.10 THEN
+        coord.status = "HardViolation"
+    ENDIF
+
+ATOM NeuroLoadCorridorBinding.v1
+FIELDS
+    corridor_id       String   REQUIRED  ; ecosafety corridor id
+    node_id           String   REQUIRED  ; bound host node id
+    minsafe_default   Float    REQUIRED  ; default minsafe in [0,1]
+    maxsafe_default   Float    REQUIRED  ; default maxsafe in [0,1]
+    author_did        String   REQUIRED  ; corridor author DID
+    created_ns        Integer  REQUIRED  ; creation time
+    updated_ns        Integer  REQUIRED  ; last update time
+UNITS
+    minsafe_default   unitless [0,1]
+    maxsafe_default   unitless [0,1]
+INVARIANTS
+    minsafe_default >= 0.0
+    maxsafe_default <= 1.0
+    minsafe_default <= maxsafe_default
+
+SCHEMA NeuroLoadCorridor.v1
+COMPONENTS
+    coord      NeuroLoadCoord.v1
+    binding    NeuroLoadCorridorBinding.v1
+RELATIONS
+    coord.corridor_id == binding.corridor_id
+    coord.node_id     == binding.node_id
+
+POLICY NeuroLoadSovereignty.v1
+FIELDS
+    ko_id           String   REQUIRED  ; knowledge object id
+    author_did      String   REQUIRED  ; sovereign author DID
+    access_class    Enum     REQUIRED  ; "open","restricted","controlled"
+    allowed_roles   List     REQUIRED  ; e.g. ["AugmentedCitizen","ResearchAgent"]
+    allowed_actions List     REQUIRED  ; e.g. ["read","summarize","embed","validate"]
+    chat_cost_unit  Float    REQUIRED  ; base CHAT cost unit
+INVARIANTS
+    access_class IN {"open","restricted","controlled"}
+    chat_cost_unit >= 0.0
+
+RULE NeuroLoadKERUpdate.v1
+INPUT
+    coord  NeuroLoadCoord.v1
+OUTPUT
+    coord  NeuroLoadCoord.v1
+LOGIC
+    IF coord.status == "OK" THEN
+        coord.k_factor = MIN(coord.k_factor + 0.02, 1.0)
+        coord.e_factor = coord.e_factor
+        coord.r_factor = MAX(coord.r_factor - 0.02, 0.0)
+    ELSE IF coord.status == "SoftViolation" THEN
+        coord.k_factor = coord.k_factor
+        coord.e_factor = coord.e_factor
+        coord.r_factor = MIN(coord.r_factor + 0.03, 1.0)
+    ELSE IF coord.status == "HardViolation" THEN
+        coord.k_factor = MAX(coord.k_factor - 0.05, 0.0)
+        coord.e_factor = coord.e_factor
+        coord.r_factor = MIN(coord.r_factor + 0.10, 1.0)
+    ENDIF
+
+END NeuroLoad Corridor v1
