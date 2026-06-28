@@ -1,4 +1,4 @@
-// eco_restoration_shard/src/offroad/neuroload_corridor_v1.rs
+// crates/offroad/neuroload_corridor_v1.rs
 // Rust 2024, rust-version = "1.85", dual-licensed, production-grade module
 // Role: Sovereign off-road NeuroLoad corridor coordinate and validator.
 
