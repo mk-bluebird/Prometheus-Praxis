@@ -62,6 +62,7 @@ members = [
     "crates/ppx_continuity_mcp",
     "crates/blast_radius_kernel",
     "crates/offroad",
+    "crates/vocab_guard",
 ]
 
 resolver = "2"
