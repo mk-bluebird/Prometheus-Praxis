@@ -1,7 +1,11 @@
 [package]
 name = "vocab_guard"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "Sovereign vocabulary guard and index for eco_restoration_shard."
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
