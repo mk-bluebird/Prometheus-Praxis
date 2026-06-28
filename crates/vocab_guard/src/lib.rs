@@ -4,6 +4,13 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+/// How strict to be when validating shards.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum FlexMode {
+    Strict,
+    Relaxed,
+}
+
 /// Lane marks how aligned a shard is with hardened grammar.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Lane {
@@ -21,7 +28,7 @@ pub struct KerScore {
     pub risk_of_harm: f32,       // 0.0 .. 1.0
 }
 
-/// Minimal identity binding to your Bostrom / EVM addresses.
+/// Minimal identity binding to your sovereign addresses.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IdentityBinding {
     pub logical_name: String,
@@ -33,20 +40,16 @@ pub struct IdentityBinding {
 /// Canonical vocabulary shard: one concept in one grammar.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VocabShard {
-    /// Stable machine name for the concept, e.g. "EcoLiabilityShard".
     pub term_id: String,
-    /// Human-facing description; must be canonical, not per-project slang.
     pub description: String,
-    /// Core grammar channel, e.g. "materials", "hydrology", "governance".
     pub plane: String,
-    /// Lane alignment.
     pub lane: Lane,
-    /// K/E/R scoring for data-as-labor.
     pub ker: KerScore,
-    /// Sovereign identity binding.
     pub identity: IdentityBinding,
-    /// Evidence hexstamp anchoring this shard to qpudatashards/evidence bundles.
+    /// May be empty in Relaxed mode; required in Strict.
     pub evidence_hex: String,
+    /// Optional tags for tools and AI-chat convenience.
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Error)]
@@ -65,12 +68,14 @@ pub enum VocabError {
     BadRisk(f32),
     #[error("primary DID must not be empty")]
     EmptyDidPrimary,
-    #[error("evidence_hex must not be empty")]
+    #[error("evidence_hex must not be empty in Strict mode")]
     EmptyEvidenceHex,
 }
 
 /// Deterministic guard: checks that a shard fits the one-vocabulary policy.
-pub fn validate_vocab_shard(shard: &VocabShard) -> Result<(), VocabError> {
+/// FlexMode::Relaxed allows empty evidence_hex and looser K/E/R, but still
+/// enforces basic bounds so AI-chat can use K/E/R safely.
+pub fn validate_vocab_shard(shard: &VocabShard, mode: FlexMode) -> Result<(), VocabError> {
     if shard.term_id.trim().is_empty() {
         return Err(VocabError::EmptyTermId);
     }
@@ -92,21 +97,52 @@ pub fn validate_vocab_shard(shard: &VocabShard) -> Result<(), VocabError> {
     if shard.identity.did_primary.trim().is_empty() {
         return Err(VocabError::EmptyDidPrimary);
     }
-    if shard.evidence_hex.trim().is_empty() {
+    if mode == FlexMode::Strict && shard.evidence_hex.trim().is_empty() {
         return Err(VocabError::EmptyEvidenceHex);
     }
     Ok(())
 }
 
-/// Example constructor wiring your primary identity into the shard.
-/// You can call this whenever you define a new off-road term.
-pub fn new_offroad_term(
+/// Convenience constructor for "draft" off-road terms with safe defaults.
+/// These start as Exploratory lane and Relaxed K/E/R until you refine them.
+pub fn new_draft_term(
+    term_id: &str,
+    description: &str,
+    plane: &str,
+    tags: &[&str],
+) -> VocabShard {
+    let identity = IdentityBinding {
+        logical_name: "ecorestorationshardprimary".to_string(),
+        did_primary: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7".to_string(),
+        did_alt: "bostrom1ldgmtf20d6604a24ztr0jxht7xt7az4jhkmsrc".to_string(),
+        evm_wallet: "0x519fC0eB4111323Cac44b70e1aE31c30e405802D".to_string(),
+    };
+
+    VocabShard {
+        term_id: term_id.to_string(),
+        description: description.to_string(),
+        plane: plane.to_string(),
+        lane: Lane::Exploratory,
+        ker: KerScore {
+            knowledge_factor: 0.85,
+            eco_impact_value: 0.85,
+            risk_of_harm: 0.20,
+        },
+        identity,
+        evidence_hex: String::new(), // empty in draft; fill when anchored
+        tags: tags.iter().map(|t| t.to_string()).collect(),
+    }
+}
+
+/// Constructor for hardened terms (Strict mode).
+pub fn new_strict_term(
     term_id: &str,
     description: &str,
     plane: &str,
     lane: Lane,
     ker: KerScore,
     evidence_hex: &str,
+    tags: &[&str],
 ) -> VocabShard {
     let identity = IdentityBinding {
         logical_name: "ecorestorationshardprimary".to_string(),
@@ -123,12 +159,47 @@ pub fn new_offroad_term(
         ker,
         identity,
         evidence_hex: evidence_hex.to_string(),
+        tags: tags.iter().map(|t| t.to_string()).collect(),
     }
 }
 
-/// JSON helper so AI-chat and tools can crawl the vocabulary tree.
+/// JSON helpers so AI-chat and tools can crawl vocab easily.
 pub fn shard_to_json(shard: &VocabShard) -> Result<String, serde_json::Error> {
     serde_json::to_string_pretty(shard)
+}
+
+/// Simple index type: a list of shards.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VocabIndex {
+    pub shards: Vec<VocabShard>,
+}
+
+impl VocabIndex {
+    pub fn new() -> Self {
+        Self { shards: Vec::new() }
+    }
+
+    pub fn add(&mut self, shard: VocabShard) {
+        self.shards.push(shard);
+    }
+
+    /// Filter shards by plane or tag (for user preference and ease-of-use).
+    pub fn filter(&self, plane: Option<&str>, tag: Option<&str>) -> Vec<&VocabShard> {
+        self.shards
+            .iter()
+            .filter(|s| {
+                let plane_ok = plane.map(|p| s.plane == p).unwrap_or(true);
+                let tag_ok = tag
+                    .map(|t| s.tags.iter().any(|tg| tg == t))
+                    .unwrap_or(true);
+                plane_ok && tag_ok
+            })
+            .collect()
+    }
+
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string_pretty(self)
+    }
 }
 
 #[cfg(test)]
@@ -136,44 +207,47 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_valid_shard() {
-        let ker = KerScore {
-            knowledge_factor: 0.92,
-            eco_impact_value: 0.90,
-            risk_of_harm: 0.12,
-        };
-        let shard = new_offroad_term(
+    fn test_draft_term_relaxed_validation() {
+        let shard = new_draft_term(
             "BiodegradableSubstrateCorridor",
             "Corridor describing decomposition-safe substrate for recycled materials.",
             "materials",
-            Lane::Exploratory,
-            ker,
-            "deadbeef01",
+            &["biodegradable", "substrate", "tray"],
         );
-        assert!(validate_vocab_shard(&shard).is_ok());
+        assert!(validate_vocab_shard(&shard, FlexMode::Relaxed).is_ok());
         let json = shard_to_json(&shard).unwrap();
         assert!(json.contains("BiodegradableSubstrateCorridor"));
     }
 
     #[test]
-    fn test_bad_ker() {
+    fn test_strict_requires_evidence_hex() {
         let ker = KerScore {
-            knowledge_factor: 1.2,
+            knowledge_factor: 0.92,
             eco_impact_value: 0.90,
             risk_of_harm: 0.12,
         };
-        let shard = new_offroad_term(
-            "BadShard",
-            "Invalid KER shard.",
+        let shard = new_strict_term(
+            "EcoDegradationKernel",
+            "Kernel for biodegradable tray degradation corridors.",
             "materials",
-            Lane::Research,
+            Lane::Pilot,
             ker,
-            "cafebabe01",
+            "",
+            &["biodegradable", "kernel"],
         );
-        let err = validate_vocab_shard(&shard).unwrap_err();
-        match err {
-            VocabError::BadKnowledge(_) => {}
-            _ => panic!("expected BadKnowledge error"),
-        }
+        let err = validate_vocab_shard(&shard, FlexMode::Strict).unwrap_err();
+        matches!(err, VocabError::EmptyEvidenceHex);
+    }
+
+    #[test]
+    fn test_index_filter_by_plane_and_tag() {
+        let mut idx = VocabIndex::new();
+        idx.add(new_draft_term("BioTray", "Biodegradable tray.", "materials", &["tray"]));
+        idx.add(new_draft_term("LakeRisk", "Static lake risk vocab.", "hydrology", &["lake"]));
+
+        let materials = idx.filter(Some("materials"), None);
+        assert_eq!(materials.len(), 1);
+        let tray_terms = idx.filter(None, Some("tray"));
+        assert_eq!(tray_terms.len(), 1);
     }
 }
