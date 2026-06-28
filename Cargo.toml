@@ -63,6 +63,7 @@ members = [
     "crates/blast_radius_kernel",
     "crates/offroad",
     "crates/vocab_guard",
+    "crates/host-sovereignty-envelope",
 ]
 
 resolver = "2"
