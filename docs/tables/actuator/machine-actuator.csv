@@ -1,0 +1,6 @@
+"Machine","x1x_1x1​","x2x_2x2​","Actuator / uuu","Typical corridors (illustrative)"
+"Smartflower POP‑e","Panel azimuth error (rad)","Battery SOC deviation from 60–80% target","Panel drive torque or angle rate command","Wind speed, azimuth angle, SOC 20–90% bounds"
+"Smartflower POP‑e (alt)","Panel elevation error","Inverter thermal margin","Panel elevation drive","Elevation angle, module temp < rated max"
+"ALLU Transformer","Rotor torque proxy (or feed loading)","Outlet particle size deviation from target","Feeder speed / hydraulic flow","Torque/vibration limits, size corridor"
+"Two‑tank station","Tank 1 level deviation","Tank 2 level deviation","Pump PWM duty","Min/max levels, maximum rate-of-change"
+"Irrigation pod","Reservoir head deviation","Root‑zone volumetric moisture deviation","Valve duty / pump RPM","Wilting point, field capacity, reservoir overflow"
