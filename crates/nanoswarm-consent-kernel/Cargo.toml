@@ -1,0 +1,19 @@
+# Filename: crates/nanoswarm-consent-kernel/Cargo.toml
+
+[package]
+name = "nanoswarm-consent-kernel"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "FPIC consent kernel for nanoswarm brownfield plans in Prometheus-Praxis, backed by community governance SQLite shard."
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+
+[dependencies]
+rusqlite = { version = "0.31.0", features = ["bundled"] }
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
+thiserror = "1.0.64"
+
+[features]
+default = []
