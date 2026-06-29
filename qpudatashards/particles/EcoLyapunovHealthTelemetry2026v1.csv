@@ -1,0 +1,4 @@
+nodeid,region,lat,lon,medium,nodetype,twindowstart,twindowend,x1_name,x2_name,x1_raw,x2_raw,x1_unit,x2_unit,V,command,u_unit,health_mean_V,health_frac_V_up,corridor_violation_frac,ecoimpactscore,ecoimpactlevel,kerdeployable,lane,evidencehex,signinghex
+PHX-SMARTFLOWER-01,PHX-District-1,33.4600,-112.0700,air-solar,SMARTFLOWER,2026-06-29T14:00:00Z,2026-06-29T14:05:00Z,panel_az_err,batt_soc_err,0.05,0.00,rad,fraction,0.003,0.10,pu,0.004,0.02,0.00,0.88,High,TRUE,PROD,0xa1b2c3d4e5f67890,0x9f8e7d6c5b4a3210
+PHX-ALLU-CRUSH-01,PHX-Soil-Yard-A,33.4200,-112.1300,soil,ALLU-TRANSFORMER,2026-06-29T14:00:00Z,2026-06-29T14:05:00Z,torque_proxy,size_err,0.60,0.10,pu,mm,0.120,0.65,pu,0.135,0.40,0.05,0.81,Medium,TRUE,PROD,0x1122334455667788,0x8f7e6d5c4b3a2910
+PHX-TANK-PAIR-01,PHX-Water-Yard-3,33.4800,-112.0400,water,TWO-TANK,2026-06-29T14:00:00Z,2026-06-29T14:05:00Z,h1_dev,h2_dev,-0.03,0.02,m,m,0.002,0.20,pu,0.003,0.03,0.00,0.90,High,TRUE,PROD,0xf0e1d2c3b4a59687,0x1234567890abcdef
