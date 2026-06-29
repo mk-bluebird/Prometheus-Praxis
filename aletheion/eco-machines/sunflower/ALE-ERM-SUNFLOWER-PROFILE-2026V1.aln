@@ -1,0 +1,86 @@
+aln ALE-ERM-SUNFLOWER-PROFILE-2026V1.aln
+namespace ALE.ERM.SUNFLOWER.PROFILE.2026V1
+
+doc """
+Sunflower POPe–class solar-irrigation unit profile, including
+mechanical parameters, Lyapunov corridors, and pollinator (bee) habitat
+and behavior scoring envelopes, for use in eco-wealth allocation and
+ERM slices.
+"""
+
+atom SunflowerMechanicalProfileV1
+  doc "Static mechanical and electrical parameters for one sunflower unit."
+  field unit_id string                 ; e.g. SF-PHX-RES-001
+  field site_id string                 ; link to cybosite / canal segment [file:74]
+  field panel_area_m2 f64
+  field tracker_axis_count u32
+  field rated_dc_kw f64
+  field gear_ratio f64
+  field max_panel_tilt_deg f64
+  field max_panel_yaw_deg f64
+  field wind_cutout_speed_mps f64
+  field battery_capacity_kwh f64
+  field inverter_efficiency_01 f64
+  field corridor_id string             ; link into ecosafety corridor ALN [file:79]
+  field kernel_version string          ; control kernel version e.g. SUNFLOWER-KERN-2026V1
+  field evidence_hex string            ; hex stamp committing to design dossier [file:74]
+
+atom SunflowerLyapunovCorridorV1
+  doc "Lyapunov and ecosafety corridor for sunflower eco-machine."
+  field corridor_id string             ; foreign key into ecosafety grammar [file:79]
+  field vt_min f64                     ; minimum admissible Lyapunov value
+  field vt_max f64                     ; maximum admissible Lyapunov value
+  field vt_tolerance f64               ; allowed numerical slack
+  field roh_max_01 f64                 ; risk-of-harm ceiling, e.g. 0.30 [file:74]
+  field ve_max_01 f64                  ; eco-impact ceiling, e.g. 0.30
+  field carbon_negative_required bool  ; must be carbon-negative over window
+  field restoration_ok_required bool   ; must improve restoration metrics
+  field notes string
+
+atom BeeHabitatBand enum
+  Optimal
+  Adequate
+  Marginal
+  Hostile
+
+atom BeeActivityBand enum
+  High
+  Medium
+  Low
+  None
+
+atom BeeCorridorBindingV1
+  doc "Binding from sunflower unit to bee habitat corridors and scoring envelopes."
+  field unit_id string
+  field corridor_id string             ; same as Lyapunov corridor id when coupled
+  field bee_species_code string        ; e.g. APIS-MELLIFERA, NATIVE-BEE-MIX
+  field habitat_band BeeHabitatBand
+  field activity_band BeeActivityBand
+  field min_flower_diversity u32       ; minimum species count in support polygon
+  field min_flowering_days_per_year u32
+  field pesticide_free_01 f64          ; fraction of days pesticide-free in radius
+  field water_source_distance_m f64    ; nearest clean water source
+  field nocturnal_light_pollution_01 f64 ; normalized light pollution impact
+  field notes string
+
+atom BeeHBScoreCorridorV1
+  doc """
+Corridor definition for BeeHBScore (Habitat-Behavior score). HB is a scalar in [0,1]
+derived from local telemetry and ALN evidence. This corridor makes 'no corridor, no act'
+enforceable at the Rust layer.
+"""
+  field corridor_id string
+  field hb_min_01 f64               ; minimum acceptable score to allow actuation
+  field hb_warn_01 f64              ; warning threshold
+  field hb_max_01 f64               ; logical upper bound (usually 1.0)
+  field roh_max_01 f64              ; risk ceiling for bee-related actions
+  field eco_weight f64              ; weight in eco-wealth aggregation
+  field evidence_hex string         ; hex anchor for derivation of these thresholds
+  field notes string
+
+document SunflowerProfileV1
+  doc "Top-level ALN document joining mechanical, Lyapunov, and bee corridors."
+  field mechanical SunflowerMechanicalProfileV1
+  field lyapunov SunflowerLyapunovCorridorV1
+  field bee_binding BeeCorridorBindingV1
+  field bee_hb_corridor BeeHBScoreCorridorV1
