@@ -84,6 +84,7 @@ members = [
     "crates/topology-risk",
     "crates/vocab_guard",
     "crates/zoning-shards",
+    "crates/consent-kernel",
 ]
 
 resolver = "2"
