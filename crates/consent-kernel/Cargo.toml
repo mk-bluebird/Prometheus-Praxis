@@ -1,0 +1,32 @@
+[package]
+name = "consent-kernel"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "Sovereign eco-data consent state machine for Prometheus-Praxis, bound to primary Bostrom address with Kani-verified invariants."
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+authors = ["Prometheus-Praxis <maintainers@eco-restoration-shard.local>"]
+
+[lib]
+name = "consent_kernel"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1.0.203", features = ["derive"] }
+ed25519-dalek = { version = "2.1.1", default-features = false, features = ["std"] }
+
+[dev-dependencies]
+kani-verifier = "0.67.0"
+serde_json = { version = "1.0.120" }
+
+[features]
+default = []
+# Enable this when running formal verification with Kani.
+kani = []
+
+[package.metadata]
+# Declare role within Prometheus-Praxis / Cybercore for indexing.
+prometheus_praxis.role = "sovereign_consent_kernel"
+prometheus_praxis.layer = "cybercore-governance"
+prometheus_praxis.domain = "eco-data-routing"
