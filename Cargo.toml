@@ -7,88 +7,127 @@ members = [
     # Root eco_restoration_shard crate (code in ecorestorationshard/)
     "ecorestorationshard",
 
-    # Crates under `crates/` (matching actual directory names exactly)
+    # Crates under `crates/` (matching actual directory names exactly, per repo listing) [file:70]
     "crates/adaptive-corridors",
     "crates/ai_chat_hashonly_normalizer",
     "crates/bioscale-fairness-validator",
-    "crates/bioscale-evolution-cli",
-    "crates/blacklist-filter",
-    "crates/blast-radius",
-    "crates/blast-radius-kernel",
+    "crates/bioscale_evolution_cli",
+    "crates/blacklist_filter",
+    "crates/blast_radius_kernel",
+    "crates/blastradius",
     "crates/bostrom-cli",
     "crates/bostrom-signer",
     "crates/cargo-blast-radius",
     "crates/city-pass",
     "crates/community-governance",
     "crates/constellation-logic-auto",
-    "crates/consent-kernel",
     "crates/cross-constellation-index",
-    "crates/cyboquatic-benchmark-tool",
+
+    # Directories that have src/ subdirs in listing – we point to crate root dir only. [file:70]
     "crates/cyboquatic-ecosafety-core",
-    "crates/cyboquatic-index",
-    "crates/cyboquatic-spine",
-    "crates/datalake-core",
-    "crates/definition-registry-checker",
+    "crates/cyboquatic_benchmark_tool",
+    "crates/cyboquatic_index",
+    "crates/cyboquatic_lane_replay",
+    "crates/cyboquatic_spine",
+
+    "crates/datalake_core",
+    "crates/definition_registry_checker",
     "crates/disaster-scenarios",
     "crates/eco-chat-ffi",
-    "crates/eco-guard-spine",
+
+    # eco-governance-spine/src -> crate root under crates/eco-governance-spine [file:70]
+    "crates/eco-governance-spine",
+
     "crates/eco-ledger-particles",
-    "crates/eco-per-joule",
     "crates/eco-pricing",
-    "crates/eco-r-axis-verifier",
     "crates/eco-restoration-governance",
-    "crates/eco-restoration-index",
-    "crates/eco-restoration-shard",
-    "crates/eco-restoration-shard-config",
     "crates/eco-wealth-portfolio",
-    "crates/eco-zk-aggregate",
-    "crates/ecocybo-planner",
-    "crates/econet-blastradius-spine",
-    "crates/econet-ceim-phoenix-water",
-    "crates/econet-ecowealth",
-    "crates/econet-governance-guard",
-    "crates/econet-governance-spine",
-    "crates/econet-index",
-    "crates/econet-index-loader",
-    "crates/econet-ker",
-    "crates/econet-overlay",
+
+    # eco_guard_spine/src -> crates/eco_guard_spine [file:70]
+    "crates/eco_guard_spine",
+
+    # eco_r_axis_verifier/src -> crates/eco_r_axis_verifier [file:70]
+    "crates/eco_r_axis_verifier",
+
+    "crates/eco_restoration_index",
+    "crates/eco_restoration_shard",
+    "crates/eco_restoration_shard_config",
+
+    # eco_zk_aggregate/src -> crates/eco_zk_aggregate [file:70]
+    "crates/eco_zk_aggregate",
+
+    "crates/ecocybo_planner",
     "crates/econet-governance-summary",
+
+    # econet-hardware/lua is not a Rust crate; omitted from workspace.members. [file:70]
+
+    "crates/econet-index-loader",
+
+    # econet-index/src -> crates/econet-index [file:70]
+    "crates/econet-index",
+
+    # econet_blastradius_spine/src -> crates/econet_blastradius_spine [file:70]
+    "crates/econet_blastradius_spine",
+
+    # econet_ceim_phoenixwater/src -> crates/econet_ceim_phoenixwater [file:70]
+    "crates/econet_ceim_phoenixwater",
+
+    # econet_ecowealth/src -> crates/econet_ecowealth [file:70]
+    "crates/econet_ecowealth",
+
+    "crates/econet_governance_guard",
+    "crates/econet_governance_spine",
+    "crates/econet_ker",
+    "crates/econet_overlay",
+    "crates/ecoper-joule",
     "crates/ecoresponseshard",
     "crates/ecorestorationshard",
+
+    # ecosafety-core/src -> crates/ecosafety-core [file:70]
     "crates/ecosafety-core",
-    "crates/ecosafety-sqlite-index",
+
+    # ecosafety_sqlite_index/src -> crates/ecosafety_sqlite_index [file:70]
+    "crates/ecosafety_sqlite_index",
+
     "crates/education-prompts",
     "crates/energy-metrics",
     "crates/ersilogger",
+
+    # federated-ker/src -> crates/federated-ker [file:70]
     "crates/federated-ker",
+
     "crates/governance-guard",
     "crates/host-sovereignty-envelope",
     "crates/hydraulics-kernels",
     "crates/hydrology-constraints",
-    "crates/ker-deployable",
-    "crates/ker-residual",
     "crates/ker-score-lab",
-    "crates/lake-risk-init",
+    "crates/kerdeployable",
+    "crates/kerresidual",
+    "crates/lake_risk_init",
     "crates/lane-governance",
     "crates/large-particle-registry",
     "crates/neuromorphic-risk",
     "crates/offroad",
     "crates/plane-weights",
-    "crates/ppx-continuity-kernel",
-    "crates/ppx-continuity-mcp",
+    "crates/ppx_continuity_kernel",
+    "crates/ppx_continuity_mcp",
+    "crates/ppx_minimal_identity_kernel",
+
+    # prometheus-praxis/src and prometheus_praxis – keep only the canonical crate directory once.
     "crates/prometheus-praxis",
-    "crates/psychrisk-engine",
+    "crates/prometheus_praxis",
+
+    "crates/psychrisk_engine",
     "crates/restoration-radius",
+
+    # round-trip-verify/tests suggests tests-only subdir; root crate dir is crates/round-trip-verify. [file:70]
     "crates/round-trip-verify",
+
     "crates/sensor-health",
     "crates/sensor-telemetry",
     "crates/topology-risk",
-    "crates/vocab-guard",
-    "crates/zoning-shards"
-    "crates/nanoswarm-consent-kernel",
-    "crates/ecosafety-nanoswarm-urban-core"
-    "crates/water_telemetry_ingest",
-    "crates/titan-metrics-core",
+    "crates/vocab_guard",
+    "crates/zoning-shards",
 ]
 
 resolver = "2"
@@ -104,37 +143,51 @@ version      = "0.2.0"
 description  = "Eco restoration shard repository with Cyboquatic eco-machinery, KER governance, and EcoNet constellation indexing."
 
 [workspace.dependencies]
-# Core non-actuating stack, pinned for deterministic builds
-rusqlite   = { version = "0.31.0", default-features = false, features = ["bundled"] }
-serde      = { version = "1.0.203", features = ["derive"] }
-serde_json = "1.0.120"
-serde_yaml = "0.9.32"
-chrono     = { version = "0.4.38", features = ["serde"] }
-thiserror  = "1.0.57"
-log        = "0.4.21"
-env_logger = "0.11.3"
+# Core non-actuating stack, pinned for deterministic builds. [file:70]
+rusqlite      = { version = "0.31.0", default-features = false, features = ["bundled"] }
+serde         = { version = "1.0.203", features = ["derive"] }
+serde_json    = "1.0.120"
+serde_yaml    = "0.9.32"
+chrono        = { version = "0.4.38", features = ["serde"] }
+thiserror     = "1.0.57"
+log           = "0.4.21"
+env_logger    = "0.11.3"
 
 # Graph and hex utilities
-petgraph = "0.6.5"
-hex      = "0.4.3"
+petgraph      = "0.6.5"
+hex           = "0.4.3"
 
 # Crypto and signatures
 ed25519-dalek = "2.1.0"
 
 # Async runtime (non-networked, research band only)
-tokio = { version = "1.38.0", features = ["rt", "macros", "time", "io-util", "sync", "fs"] }
+tokio         = { version = "1.38.0", features = ["rt", "macros", "time", "io-util", "sync", "fs"] }
 
 # Proc-macro toolchain for internal derives
-proc-macro2 = "1.0.85"
-quote       = "1.0.36"
-syn         = { version = "2.0.72", features = ["full"] }
+proc-macro2   = "1.0.85"
+quote         = "1.0.36"
+syn           = { version = "2.0.72", features = ["full"] }
 
-# Kani verifier (never optional)
-kani = { version = "0.67.0" }
+# ALN / MCP integration (non-optional at workspace level; individual crates gate usage via features).
+# If you decide ALN/MCP must be globally present, keep these; otherwise you can drop them while
+# keeping Kani mandatory. [file:70]
+aln-core      = { version = "0.1.0", package = "aletheion-aln-core" }
+mcp-core      = { version = "0.1.0", package = "aletheion-mcp-core" }
+
+# Kani verifier (never optional at workspace level). [file:70]
+kani          = { version = "0.67.0" }
 
 [workspace.dev-dependencies]
 serde_json = "1.0.120"
 csv        = "1.3.0"
+kani       = { version = "0.67.0" }
+
+[workspace.features]
+# Workspace-level feature toggles for integration; not used to make Kani optional.
+default = ["sqlite", "aln"]
+sqlite  = ["rusqlite"]
+aln     = ["aln-core"]
+mcp     = ["mcp-core"]
 
 [workspace.lints.rust]
 unsafe_code  = "forbid"
@@ -175,11 +228,11 @@ tag-prefix = "v"
 sign-tag   = true
 
 [workspace.metadata.aln]
-min_schema_version = "1.0.0"
-hex_anchor         = "0xECO2026RESTORATIONSHARD_bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
-roh_ceiling        = 0.30
+minschemaversion = "1.0.0"
+hexanchor        = "0xECO2026RESTORATIONSHARD_bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+rohceiling       = 0.30
 
-# Root crate: ecorestorationshard
+# Root crate: ecorestorationshard [file:70]
 
 [package]
 name         = "ecorestorationshard"
@@ -203,7 +256,7 @@ path = "ecorestorationshard/src/bin/restorationindextool.rs"
 
 [features]
 # Default strictly non-actuating index surface.
-default       = ["nonactuating"]
+default     = ["nonactuating"]
 nonactuating = []
 
 [dependencies]
@@ -219,11 +272,14 @@ petgraph      = { workspace = true }
 hex           = { workspace = true }
 ed25519-dalek = { workspace = true }
 tokio         = { workspace = true }
+aln-core      = { workspace = true }
+mcp-core      = { workspace = true }
 kani          = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
 csv        = { workspace = true }
+kani       = { workspace = true }
 
 [patch.crates-io]
 # Reserved for audited security / compatibility patches.
