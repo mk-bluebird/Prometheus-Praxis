@@ -1,0 +1,93 @@
+aln EcoSmartflowerLyapunovHealthTelemetry2026v1
+meta
+  version 1.0.0
+  planes TITAN
+  groundinghex 0x736d617274666c6f7765725f6c7961705f6865616c74685f32303236
+end
+
+doctype EcoSmartflowerLyapunovSample2026v1
+  string nodeid              // e.g., PHX-SMARTFLOWER-01
+  string region              // e.g., PHX-District-1
+  float  lat                 // degrees
+  float  lon                 // degrees
+
+  string medium              // e.g., air-solar
+  string nodetype            // e.g., SMARTFLOWER
+
+  datetime twindowstart      // window start UTC
+  datetime twindowend        // window end UTC
+
+  // State names and raw values at window representative (e.g., median or last sample)
+  string x1_name             // e.g., panel_azimuth_error
+  string x2_name             // e.g., batt_soc_error
+  float  x1_raw              // raw x1 in native units
+  float  x2_raw              // raw x2 in native units
+  string x1_unit             // e.g., rad
+  string x2_unit             // e.g., fraction
+
+  // Representative command (e.g., mean over window)
+  float  u_raw               // actuator command, normalized or native
+  string u_unit              // e.g., pu, deg/s
+
+  // Lyapunov residual and health statistics over the window
+  float  V_window_mean       // mean V over window
+  float  V_window_max        // max V over window
+  float  frac_V_up           // fraction of steps with V_{k+1} > V_k
+  float  corridor_violation_frac // fraction of samples outside safety corridors
+
+  // Eco-impact and governance
+  float  ecoimpactscore      // 0.0 .. 1.0, district-normalized
+  string ecoimpactlevel      // e.g., Low, Medium, High
+
+  bool   kerdeployable       // TRUE if node usable in KER/Titan planning
+  string lane                // e.g., PROD, TEST, PILOT
+
+  // Provenance and evidence
+  hex    evidencehex         // binds telemetry to firmware, corridor, kernelversion
+  hex    signinghex          // optional signature or registry pointer
+end
+
+metainvariants
+  // Coordinates must be valid lat/lon in a reasonable Phoenix-centric range
+  invariant lat  -90.0
+  invariant lat  90.0
+  invariant lon  -180.0
+  invariant lon  180.0
+
+  // Time window must be non-empty and ordered
+  invariant twindowend >= twindowstart
+
+  // Lyapunov statistics must be non-negative, fractions in [0,1]
+  invariant V_window_mean  0.0
+  invariant V_window_max   0.0
+  invariant frac_V_up      0.0
+  invariant frac_V_up      1.0
+  invariant corridor_violation_frac 0.0
+  invariant corridor_violation_frac 1.0
+
+  // Eco-impact score normalized to [0,1]
+  invariant ecoimpactscore 0.0
+  invariant ecoimpactscore 1.0
+end
+
+clause EcoSmartflowerNoHealthNoProd2026v1
+  // No Lyapunov health, no production lane
+  forall sample in EcoSmartflowerLyapunovSample2026v1 .
+    if not kerdeployable
+    then deny(sample.nodeid, "smartflower_no_kerdeployable")
+
+clause EcoSmartflowerUnstableDerateStop2026v1
+  // High instability or corridor violations => derate/stop recommendation
+  forall sample in EcoSmartflowerLyapunovSample2026v1 .
+    if sample.frac_V_up > 0.20
+       or sample.V_window_mean > 0.20
+       or sample.corridor_violation_frac > 0.10
+    then recommend_derate(sample.nodeid, "smartflower_lyapunov_trend")
+
+clause EcoSmartflowerEcoImpactPriority2026v1
+  // Prioritize upgrades for nodes that are stable and have high eco-impact
+  forall sample in EcoSmartflowerLyapunovSample2026v1 .
+    if sample.frac_V_up < 0.05
+       and sample.corridor_violation_frac < 0.05
+       and sample.ecoimpactscore > 0.70
+    then prioritize_investment(sample.nodeid, "smartflower_high_ecoimpact")
