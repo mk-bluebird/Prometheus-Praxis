@@ -1,0 +1,75 @@
+record_type: link_compensated_batch
+version: 1
+domain: grid_energy_storage
+
+records:
+  - url: "https://www.tesla.com/megapack"
+    device_key: "Tesla Megapack 2 XL"
+    eco_impact_score: 0.73
+    energy_saved_kwh_per_ton_ds_min: null
+    energy_saved_kwh_per_ton_ds_max: null
+    co2_offset_kg_per_ton_ds_min: null
+    co2_offset_kg_per_ton_ds_max: null
+    energy_saved_kwh_per_1000m3_min: null
+    energy_saved_kwh_per_1000m3_max: null
+    co2_offset_kg_per_1000m3_min: null
+    co2_offset_kg_per_1000m3_max: null
+    energy_saved_kwh_per_m3_reuse_min: null
+    energy_saved_kwh_per_m3_reuse_max: null
+    co2_offset_kg_per_m3_reuse_min: null
+    co2_offset_kg_per_m3_reuse_max: null
+    hex_proof: "0xa1b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff11"
+
+  - url: "https://fluenceenergy.com/product/gridstack-pro/"
+    device_key: "Fluence Gridstack Pro"
+    eco_impact_score: 0.71
+    energy_saved_kwh_per_ton_ds_min: null
+    energy_saved_kwh_per_ton_ds_max: null
+    co2_offset_kg_per_ton_ds_min: null
+    co2_offset_kg_per_ton_ds_max: null
+    energy_saved_kwh_per_1000m3_min: null
+    energy_saved_kwh_per_1000m3_max: null
+    co2_offset_kg_per_1000m3_min: null
+    co2_offset_kg_per_1000m3_max: null
+    energy_saved_kwh_per_m3_reuse_min: null
+    energy_saved_kwh_per_m3_reuse_max: null
+    co2_offset_kg_per_m3_reuse_min: null
+    co2_offset_kg_per_m3_reuse_max: null
+    hex_proof: "0xb2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff1122"
+
+  - url: "https://redflow.com/products/zbm3/"
+    device_key: "Redflow ZBM3 zinc-bromine flow battery"
+    eco_impact_score: 0.67
+    energy_saved_kwh_per_ton_ds_min: null
+    energy_saved_kwh_per_ton_ds_max: null
+    co2_offset_kg_per_ton_ds_min: null
+    co2_offset_kg_per_ton_ds_max: null
+    energy_saved_kwh_per_1000m3_min: null
+    energy_saved_kwh_per_1000m3_max: null
+    co2_offset_kg_per_1000m3_min: null
+    co2_offset_kg_per_1000m3_max: null
+    energy_saved_kwh_per_m3_reuse_min: null
+    energy_saved_kwh_per_m3_reuse_max: null
+    co2_offset_kg_per_m3_reuse_min: null
+    co2_offset_kg_per_m3_reuse_max: null
+    hex_proof: "0xc3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff112233"
+
+  - url: "https://en.pylontech.com.cn/pro/"
+    device_key: "Pylontech US2000C 48V LiFePO4 rack module"
+    eco_impact_score: 0.74
+    energy_saved_kwh_per_ton_ds_min: null
+    energy_saved_kwh_per_ton_ds_max: null
+    co2_offset_kg_per_ton_ds_min: null
+    co2_offset_kg_per_ton_ds_max: null
+    energy_saved_kwh_per_1000m3_min: null
+    energy_saved_kwh_per_1000m3_max: null
+    co2_offset_kg_per_1000m3_min: null
+    co2_offset_kg_per_1000m3_max: null
+    energy_saved_kwh_per_m3_reuse_min: null
+    energy_saved_kwh_per_m3_reuse_max: null
+    co2_offset_kg_per_m3_reuse_min: null
+    co2_offset_kg_per_m3_reuse_max: null
+    hex_proof: "0xd4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff11223344"
+
+karma_reflection:
+  concatenated_hex_proofs: "0xa1b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff11|0xb2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff1122|0xc3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff112233|0xd4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff11223344"
