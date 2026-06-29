@@ -1,0 +1,41 @@
+record_type: link_compensated_batch
+version: 1
+domain: iot_edge_and_sensor_platforms
+
+records:
+  - url: "https://www.libelium.com/iot-products/waspmote-plug-sense/"
+    device_key: "Libelium Waspmote Plug & Sense! Smart Environment PRO"
+    eco_impact_score: 0.59
+    energy_saved_kwh_per_ton_ds_min: null
+    energy_saved_kwh_per_ton_ds_max: null
+    co2_offset_kg_per_ton_ds_min: null
+    co2_offset_kg_per_ton_ds_max: null
+    energy_saved_kwh_per_1000m3_min: null
+    energy_saved_kwh_per_1000m3_max: null
+    co2_offset_kg_per_1000m3_min: null
+    co2_offset_kg_per_1000m3_max: null
+    energy_saved_kwh_per_m3_reuse_min: null
+    energy_saved_kwh_per_m3_reuse_max: null
+    co2_offset_kg_per_m3_reuse_min: null
+    co2_offset_kg_per_m3_reuse_max: null
+    hex_proof: "0xecc1d2f30495ab67123489bcdeff1029384756aa55bbccddeeff001122334455"
+
+  - url: "https://store.arduino.cc/products/portenta-h7"
+    device_key: "Arduino Portenta H7 with Vision Shield"
+    eco_impact_score: 0.62
+    energy_saved_kwh_per_ton_ds_min: null
+    energy_saved_kwh_per_ton_ds_max: null
+    co2_offset_kg_per_ton_ds_min: null
+    co2_offset_kg_per_ton_ds_max: null
+    energy_saved_kwh_per_1000m3_min: null
+    energy_saved_kwh_per_1000m3_max: null
+    co2_offset_kg_per_1000m3_min: null
+    co2_offset_kg_per_1000m3_max: null
+    energy_saved_kwh_per_m3_reuse_min: null
+    energy_saved_kwh_per_m3_reuse_max: null
+    co2_offset_kg_per_m3_reuse_min: null
+    co2_offset_kg_per_m3_reuse_max: null
+    hex_proof: "0xfdd2e3f415a6bc7823459acdef001123984756aa55bbccddeeff001122334466"
+
+karma_reflection:
+  concatenated_hex_proofs: "0xecc1d2f30495ab67123489bcdeff1029384756aa55bbccddeeff001122334455|0xfdd2e3f415a6bc7823459acdef001123984756aa55bbccddeeff001122334466"
