@@ -87,6 +87,7 @@ members = [
     "crates/zoning-shards"
     "crates/nanoswarm-consent-kernel",
     "crates/ecosafety-nanoswarm-urban-core"
+    "crates/water_telemetry_ingest",
 ]
 
 resolver = "2"
