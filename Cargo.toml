@@ -85,6 +85,8 @@ members = [
     "crates/topology-risk",
     "crates/vocab-guard",
     "crates/zoning-shards"
+    "crates/nanoswarm-consent-kernel",
+    "crates/ecosafety-nanoswarm-urban-core"
 ]
 
 resolver = "2"
