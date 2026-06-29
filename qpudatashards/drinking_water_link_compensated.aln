@@ -1,0 +1,75 @@
+record_type: link_compensated_batch
+version: 1
+domain: drinking_water_treatment
+
+records:
+  - url: "https://www.pall.com/en/water/food-and-beverage/ultrafiltration-systems/aria-fb.html"
+    device_key: "Pall Aria FB hollow-fiber UF system"
+    eco_impact_score: 0.66
+    energy_saved_kwh_per_ton_ds_min: null
+    energy_saved_kwh_per_ton_ds_max: null
+    co2_offset_kg_per_ton_ds_min: null
+    co2_offset_kg_per_ton_ds_max: null
+    energy_saved_kwh_per_1000m3_min: null
+    energy_saved_kwh_per_1000m3_max: null
+    co2_offset_kg_per_1000m3_min: null
+    co2_offset_kg_per_1000m3_max: null
+    energy_saved_kwh_per_m3_reuse_min: 0.05
+    energy_saved_kwh_per_m3_reuse_max: 0.15
+    co2_offset_kg_per_m3_reuse_min: 0.025
+    co2_offset_kg_per_m3_reuse_max: 0.075
+    hex_proof: "0x8a91c9f4d2b657e3a4d0f1bce6aa37e1c1b3ff0e74b2a8d8e2d7fdc9b5884112"
+
+  - url: "https://www.trojanuv.com/products/ultraviolet-uv-disinfection-systems/municipal-wastewater/solo-lamp.html"
+    device_key: "TrojanUV Solo Lamp system"
+    eco_impact_score: 0.70
+    energy_saved_kwh_per_ton_ds_min: null
+    energy_saved_kwh_per_ton_ds_max: null
+    co2_offset_kg_per_ton_ds_min: null
+    co2_offset_kg_per_ton_ds_max: null
+    energy_saved_kwh_per_1000m3_min: 10
+    energy_saved_kwh_per_1000m3_max: 30
+    co2_offset_kg_per_1000m3_min: 5
+    co2_offset_kg_per_1000m3_max: 15
+    energy_saved_kwh_per_m3_reuse_min: null
+    energy_saved_kwh_per_m3_reuse_max: null
+    co2_offset_kg_per_m3_reuse_min: null
+    co2_offset_kg_per_m3_reuse_max: null
+    hex_proof: "0x6e0fa4a8b39d4c9ce21d7cc6c8ef3a10b5b1e4c6a7d2d8517f3f9071e2d8b3c4"
+
+  - url: "https://www.hach.com/p-sc200-universal-controller/LXV400.99.00001"
+    device_key: "Hach SC200 Universal Controller"
+    eco_impact_score: 0.55
+    energy_saved_kwh_per_ton_ds_min: null
+    energy_saved_kwh_per_ton_ds_max: null
+    co2_offset_kg_per_ton_ds_min: null
+    co2_offset_kg_per_ton_ds_max: null
+    energy_saved_kwh_per_1000m3_min: 2
+    energy_saved_kwh_per_1000m3_max: 8
+    co2_offset_kg_per_1000m3_min: 1
+    co2_offset_kg_per_1000m3_max: 4
+    energy_saved_kwh_per_m3_reuse_min: null
+    energy_saved_kwh_per_m3_reuse_max: null
+    co2_offset_kg_per_m3_reuse_min: null
+    co2_offset_kg_per_m3_reuse_max: null
+    hex_proof: "0x2fd941a7e19c0e3a4f8772df10f1b3b87a51e2e4c91d6ba05c779b74ce1125a9"
+
+  - url: "https://www.endress.com/en/field-instruments-overview/flow/electromagnetic-flow-meter-promag-w-400"
+    device_key: "Endress+Hauser Promag W 400 electromagnetic flow meter"
+    eco_impact_score: 0.69
+    energy_saved_kwh_per_ton_ds_min: null
+    energy_saved_kwh_per_ton_ds_max: null
+    co2_offset_kg_per_ton_ds_min: null
+    co2_offset_kg_per_ton_ds_max: null
+    energy_saved_kwh_per_1000m3_min: 5
+    energy_saved_kwh_per_1000m3_max: 20
+    co2_offset_kg_per_1000m3_min: 2.5
+    co2_offset_kg_per_1000m3_max: 10
+    energy_saved_kwh_per_m3_reuse_min: null
+    energy_saved_kwh_per_m3_reuse_max: null
+    co2_offset_kg_per_m3_reuse_min: null
+    co2_offset_kg_per_m3_reuse_max: null
+    hex_proof: "0xaa781bd6f3c0e2d4b7a1c93e5f2d098c6d5a1e0b4c2f7d9e1c3b4a5d6e7f809"
+
+karma_reflection:
+  concatenated_hex_proofs: "0x8a91c9f4d2b657e3a4d0f1bce6aa37e1c1b3ff0e74b2a8d8e2d7fdc9b5884112|0x6e0fa4a8b39d4c9ce21d7cc6c8ef3a10b5b1e4c6a7d2d8517f3f9071e2d8b3c4|0x2fd941a7e19c0e3a4f8772df10f1b3b87a51e2e4c91d6ba05c779b74ce1125a9|0xaa781bd6f3c0e2d4b7a1c93e5f2d098c6d5a1e0b4c2f7d9e1c3b4a5d6e7f809"
