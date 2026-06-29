@@ -11,51 +11,52 @@ members = [
     "crates/adaptive-corridors",
     "crates/ai_chat_hashonly_normalizer",
     "crates/bioscale-fairness-validator",
-    "crates/bioscale_evolution_cli",
-    "crates/blacklist_filter",
-    "crates/blast_radius_kernel",
-    "crates/blastradius",
+    "crates/bioscale-evolution-cli",
+    "crates/blacklist-filter",
+    "crates/blast-radius",
+    "crates/blast-radius-kernel",
     "crates/bostrom-cli",
     "crates/bostrom-signer",
     "crates/cargo-blast-radius",
     "crates/city-pass",
     "crates/community-governance",
     "crates/constellation-logic-auto",
+    "crates/consent-kernel",
     "crates/cross-constellation-index",
-    "crates/cyboquatic_benchmark_tool",
-    "crates/cyboquatic_index",
-    "crates/cyboquatic_spine",
-    "crates/datalake_core",
-    "crates/definition_registry_checker",
+    "crates/cyboquatic-benchmark-tool",
+    "crates/cyboquatic-ecosafety-core",
+    "crates/cyboquatic-index",
+    "crates/cyboquatic-spine",
+    "crates/datalake-core",
+    "crates/definition-registry-checker",
     "crates/disaster-scenarios",
     "crates/eco-chat-ffi",
+    "crates/eco-guard-spine",
     "crates/eco-ledger-particles",
+    "crates/eco-per-joule",
     "crates/eco-pricing",
+    "crates/eco-r-axis-verifier",
     "crates/eco-restoration-governance",
+    "crates/eco-restoration-index",
+    "crates/eco-restoration-shard",
+    "crates/eco-restoration-shard-config",
     "crates/eco-wealth-portfolio",
-    "crates/eco_guard_spine",
-    "crates/eco_r_axis_verifier",
-    "crates/eco_restoration_index",
-    "crates/eco_restoration_shard",
-    "crates/eco_restoration_shard_config",
-    "crates/eco_zk_aggregate",
-    "crates/ecocybo_planner",
-    "crates/econet-governance-summary",
-    "crates/econet-index-loader",
-    "crates/econet-governance-summary",
-    "crates/econet_governance_guard",
-    "crates/econet_governance_spine",
-    "crates/econet_ker",
-    "crates/econet_overlay",
+    "crates/eco-zk-aggregate",
+    "crates/ecocybo-planner",
+    "crates/econet-blastradius-spine",
+    "crates/econet-ceim-phoenix-water",
+    "crates/econet-ecowealth",
+    "crates/econet-governance-guard",
+    "crates/econet-governance-spine",
     "crates/econet-index",
-    "crates/econet_blastradius_spine",
-    "crates/econet_ceim_phoenixwater",
-    "crates/econet_ecowealth",
-    "crates/ecoper-joule",
+    "crates/econet-index-loader",
+    "crates/econet-ker",
+    "crates/econet-overlay",
+    "crates/econet-governance-summary",
     "crates/ecoresponseshard",
     "crates/ecorestorationshard",
     "crates/ecosafety-core",
-    "crates/ecosafety_sqlite_index",
+    "crates/ecosafety-sqlite-index",
     "crates/education-prompts",
     "crates/energy-metrics",
     "crates/ersilogger",
@@ -64,27 +65,26 @@ members = [
     "crates/host-sovereignty-envelope",
     "crates/hydraulics-kernels",
     "crates/hydrology-constraints",
+    "crates/ker-deployable",
+    "crates/ker-residual",
     "crates/ker-score-lab",
-    "crates/kerdeployable",
-    "crates/kerresidual",
-    "crates/lake_risk_init",
+    "crates/lake-risk-init",
     "crates/lane-governance",
     "crates/large-particle-registry",
     "crates/neuromorphic-risk",
     "crates/offroad",
     "crates/plane-weights",
-    "crates/ppx_continuity_kernel",
-    "crates/ppx_continuity_mcp",
-    "crates/prometheus_praxis",
-    "crates/psychrisk_engine",
+    "crates/ppx-continuity-kernel",
+    "crates/ppx-continuity-mcp",
+    "crates/prometheus-praxis",
+    "crates/psychrisk-engine",
     "crates/restoration-radius",
     "crates/round-trip-verify",
     "crates/sensor-health",
     "crates/sensor-telemetry",
     "crates/topology-risk",
-    "crates/vocab_guard",
-    "crates/zoning-shards",
-    "crates/consent-kernel",
+    "crates/vocab-guard",
+    "crates/zoning-shards"
 ]
 
 resolver = "2"
@@ -101,10 +101,10 @@ description  = "Eco restoration shard repository with Cyboquatic eco-machinery, 
 
 [workspace.dependencies]
 # Core non-actuating stack, pinned for deterministic builds
-rusqlite   = { version = "0.31", default-features = false, features = ["bundled"] }
-serde      = { version = "1.0.197", features = ["derive"] }
-serde_json = "1.0.115"
-serde_yaml = "0.9"
+rusqlite   = { version = "0.31.0", default-features = false, features = ["bundled"] }
+serde      = { version = "1.0.203", features = ["derive"] }
+serde_json = "1.0.120"
+serde_yaml = "0.9.32"
 chrono     = { version = "0.4.38", features = ["serde"] }
 thiserror  = "1.0.57"
 log        = "0.4.21"
@@ -115,19 +115,22 @@ petgraph = "0.6.5"
 hex      = "0.4.3"
 
 # Crypto and signatures
-ed25519-dalek = "2.1"
+ed25519-dalek = "2.1.0"
 
 # Async runtime (non-networked, research band only)
-tokio = { version = "1.38", features = ["rt", "macros", "time", "io-util", "sync", "fs"] }
+tokio = { version = "1.38.0", features = ["rt", "macros", "time", "io-util", "sync", "fs"] }
 
 # Proc-macro toolchain for internal derives
-proc-macro2 = "1.0"
-quote       = "1.0"
-syn         = { version = "2.0", features = ["full"] }
+proc-macro2 = "1.0.85"
+quote       = "1.0.36"
+syn         = { version = "2.0.72", features = ["full"] }
+
+# Kani verifier (never optional)
+kani = { version = "0.67.0" }
 
 [workspace.dev-dependencies]
-serde_json = "1.0.115"
-csv        = "1.3"
+serde_json = "1.0.120"
+csv        = "1.3.0"
 
 [workspace.lints.rust]
 unsafe_code  = "forbid"
@@ -191,27 +194,28 @@ path       = "ecorestorationshard/src/lib.rs"
 crate-type = ["rlib"]
 
 [[bin]]
-name = "restoration_index_tool"
-path = "ecorestorationshard/src/bin/restoration_index_tool.rs"
+name = "restorationindextool"
+path = "ecorestorationshard/src/bin/restorationindextool.rs"
 
 [features]
 # Default strictly non-actuating index surface.
-default       = ["non_actuating"]
-non_actuating = []
+default       = ["nonactuating"]
+nonactuating = []
 
 [dependencies]
-rusqlite   = { workspace = true }
-serde      = { workspace = true }
-serde_json = { workspace = true }
-serde_yaml = { workspace = true }
-chrono     = { workspace = true }
-thiserror  = { workspace = true }
-log        = { workspace = true }
-env_logger = { workspace = true }
-petgraph   = { workspace = true }
-hex        = { workspace = true }
+rusqlite      = { workspace = true }
+serde         = { workspace = true }
+serde_json    = { workspace = true }
+serde_yaml    = { workspace = true }
+chrono        = { workspace = true }
+thiserror     = { workspace = true }
+log           = { workspace = true }
+env_logger    = { workspace = true }
+petgraph      = { workspace = true }
+hex           = { workspace = true }
 ed25519-dalek = { workspace = true }
-tokio      = { workspace = true }
+tokio         = { workspace = true }
+kani          = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
