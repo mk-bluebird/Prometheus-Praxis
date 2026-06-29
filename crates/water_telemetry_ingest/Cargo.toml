@@ -1,0 +1,47 @@
+# Filename: crates/water_telemetry_ingest/Cargo.toml
+# Destination: eco_restoration_shard/crates/water_telemetry_ingest/Cargo.toml
+
+[package]
+name = "water_telemetry_ingest"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+authors = ["mk-bluebird <bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7>"]
+description = "Ingests water.tank.telemetry.v1 particles from edge controllers and computes Lyapunov health indices for Phoenix smart-city ERM."
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+keywords = ["water", "telemetry", "lyapunov", "smart-city", "ecosafety"]
+categories = ["science", "embedded", "visualization"]
+readme = "../../README.md"
+
+[lib]
+name = "water_telemetry_ingest"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[dependencies]
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
+
+[features]
+default = []
+# Optional feature to enable JSON export helpers in the future.
+json_export = ["serde_json"]
+
+[profile.dev]
+opt-level = 1
+debug = true
+overflow-checks = true
+
+[profile.release]
+opt-level = 3
+debug = false
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+overflow-checks = true
+
+[package.metadata.kani]
+# Kani must never be optional; pin version precisely.
+version = "0.67"
+enabled = true
