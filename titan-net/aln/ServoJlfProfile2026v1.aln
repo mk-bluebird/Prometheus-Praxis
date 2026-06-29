@@ -1,0 +1,110 @@
+aln ServoJlfProfile2026v1
+meta
+  version 1.0.0
+  planes TITAN
+  groundinghex 0x534552564f5f4a4c465f4c59515f4b45525f323032365f725f7461752b725f615f4a3b436c664362663b56455f434f525249444f52
+end
+
+doctype ServoJlfHealthCoord2026v1
+  string nodeid              -- Jetson / servo controller ID
+  string axisid              -- single-axis identifier
+  float r_tau                -- normalized torque residual [0,1]
+  float r_a                  -- normalized CNN anomaly [0,1]
+  float Jk                   -- JLF scalar at sample k
+  float Jsafe                -- safe band upper bound
+  float Jwarn                -- warning / fault barrier
+  float Jmax                 -- absolute maximum allowed
+  float w_tau                -- weight for r_tau^2
+  float w_a                  -- weight for r_a^2
+  float vtbefore             -- Lyapunov residual before sample (Titan-style)
+  float vtafter              -- Lyapunov residual after sample
+  string evidencehex         -- binds health sample to raw telemetry + kernelversion
+end
+
+doctype ServoJlfClfCbfParam2026v1
+  string nodeid
+  string axisid
+  float alpha_clf            -- discrete CLF decay factor (0,1)
+  float alpha_cbf            -- discrete CBF (JLF) factor (0,1)
+  float dt                   -- control period (seconds)
+  float u_min                -- min torque command
+  float u_max                -- max torque command
+  float rho_clf              -- CLF slack weight
+  float rho_J                -- JLF slack weight (safety priority)
+  string kernelversion       -- CLF–CBF QP kernel version tag
+  string evidencehex         -- binds parameters to governance decision
+end
+
+doctype ServoJlfProfile2026v1
+  string nodeid
+  string axisid
+  float r_tau_rawmax         -- max expected |torque residual| under healthy
+  float r_a_rawmax           -- max expected CNN anomaly under healthy
+  float Jsafe                -- safe J band
+  float Jwarn                -- fault barrier J band
+  float Jmax                 -- hard J cap
+  float w_tau                -- weight for r_tau
+  float w_a                  -- weight for r_a
+  float alpha_clf
+  float alpha_cbf
+  float dt
+  float u_min
+  float u_max
+  float rho_clf
+  float rho_J
+  float expected_vt_delta    -- predicted Vt_next - Vt_before (should be <= 0)
+  string titanmetrics_shardfamily  -- e.g. TitanMetrics2026v1
+  string corridorid          -- Titan corridor this servo belongs to
+  string kernelversion
+  string evidencehex
+end
+
+section invariants
+
+invariant ServoJlfHealthCorridor2026v1
+  description "Health coordinates, JLF energy, and Lyapunov residual stay in 0–1 and corridor-safe bounds."
+  condition
+    forall h in ServoJlfHealthCoord2026v1.
+      h.r_tau >= 0.0 and h.r_tau <= 1.0 and
+      h.r_a   >= 0.0 and h.r_a   <= 1.0 and
+      h.Jsafe >= 0.0 and
+      h.Jwarn >  h.Jsafe and
+      h.Jmax  >  h.Jwarn and
+      h.Jk    >= 0.0 and h.Jk <= h.Jmax and
+      h.vtafter <= h.vtbefore
+  end
+end
+
+invariant ServoJlfProfileCorridor2026v1
+  description "Profile weights and bands are positive, ordered, and tied to TitanMetrics corridor caps."
+  condition
+    forall p in ServoJlfProfile2026v1.
+      p.r_tau_rawmax  > 0.0 and
+      p.r_a_rawmax    > 0.0 and
+      p.Jsafe         >= 0.0 and
+      p.Jwarn         >  p.Jsafe and
+      p.Jmax          >  p.Jwarn and
+      p.w_tau         >= 0.0 and
+      p.w_a           >= 0.0 and
+      p.alpha_clf     > 0.0 and p.alpha_clf < 1.0 and
+      p.alpha_cbf     > 0.0 and p.alpha_cbf < 1.0 and
+      p.dt            > 0.0 and
+      p.u_min         < p.u_max and
+      p.rho_clf       > 0.0 and
+      p.rho_J         > 0.0 and
+      p.expected_vt_delta <= 0.0
+  end
+end
+
+invariant ServoJlfLyapunovConsistency2026v1
+  description "Servo JLF profile must not widen TitanMetrics corridor or violate Lyapunov non-expansion."
+  condition
+    forall p in ServoJlfProfile2026v1, m in TitanMetricsCorridor2026v1.
+      -- JLF bands must be compatible with Titan Lyapunov minimum
+      p.Jmax >= m.lyapmin and
+      -- Servo expected Vt delta must be non-positive (monotone stability)
+      p.expected_vt_delta <= 0.0
+  end
+end
+
+end
