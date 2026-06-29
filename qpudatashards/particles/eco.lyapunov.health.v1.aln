@@ -1,0 +1,23 @@
+particle eco.lyapunov.health.v1
+  // Bind to telemetry CSV shard
+  requires qpudatashard qpudatashards/particles/EcoLyapunovHealthTelemetry2026v1.csv
+  field evidencehex hex
+  field nodeid string
+  field V float
+  field health_mean_V float
+  field health_frac_V_up float
+  field ecoimpactscore float
+  field kerdeployable bool
+  field lane string
+
+  // No corridor, no build: health rows must exist before governance uses a node
+  clause ?no-health-no-build
+    forall n .
+      not exists row in shard where row.nodeid = n
+      => deny(n, "missing_lyapunov_health")
+
+  // Lyapunov-based derate/stop suggestion (city side can interpret)
+  clause ?unstable-derate-stop
+    forall row in shard .
+      if row.health_frac_V_up > 0.20 or row.health_mean_V > 0.20
+      then recommend_derate(row.nodeid, "lyapunov_trend")
