@@ -1,0 +1,91 @@
+alnversion 1.0.0
+alnnamespace ecosafety.nanoswarm.urban.core.v1
+
+-------------------------------------------------------------------------------
+Koid and time utility
+-------------------------------------------------------------------------------
+
+particle koid.v1
+    id str.v1
+
+particle time.timestamp.v1
+    millis_since_unix_epoch i64.v1
+
+-------------------------------------------------------------------------------
+KER triplet
+-------------------------------------------------------------------------------
+
+particle ecosafety.ker.triplet.v1
+    id koid.v1
+    k f64.v1        # Knowledge-factor [0,1]
+    e f64.v1        # Eco-impact [0,1]
+    r f64.v1        # Risk-of-harm [0,1]
+
+-------------------------------------------------------------------------------
+Corridor bands and risk coordinate
+-------------------------------------------------------------------------------
+
+particle ecosafety.corridor.bands.v1
+    id koid.v1
+    varid str.v1           # variable name, e.g. "pollutant_error"
+    units str.v1           # e.g. "mg/L"
+    safe f64.v1            # lower safe bound
+    gold f64.v1            # preferred target
+    hard f64.v1            # hard limit
+    weight f64.v1          # contribution weight in residual
+    lyapchannel u8.v1      # index in Lyapunov residual vector
+
+particle ecosafety.risk.coord.v1
+    id koid.v1
+    riskscalar f64.v1      # normalized risk in [0,1]
+    sigma f64.v1           # uncertainty estimate
+    bandsid ref.ecosafety.corridor.bands.v1
+
+-------------------------------------------------------------------------------
+Shared shard row base
+-------------------------------------------------------------------------------
+
+particle ecosafety.shard.row.base.v1
+    id koid.v1
+    shardid str.v1
+    timestamputc time.timestamp.v1
+    objectid str.v1
+    kerid ref.ecosafety.ker.triplet.v1
+
+-------------------------------------------------------------------------------
+Nanoswarm-urban shard row: Lyapunov, RoH, Lipschitz, FPIC
+-------------------------------------------------------------------------------
+
+particle ecosafety.nanoswarm.urban.shard.row.v1
+    id koid.v1
+    baseid ref.ecosafety.shard.row.base.v1
+
+    # Lyapunov barrier diagnostics
+    vbarrierprev f64.v1
+    vbarriernext f64.v1
+    barrierstepok bool.v1
+
+    # RoH MPC diagnostics
+    rohglobalmax f64.v1
+    rohallow bool.v1
+
+    # Lipschitz aliasing diagnostics
+    lipschitzspatial f64.v1
+    lipschitztemporal f64.v1
+    aliasingmarginconcentration f64.v1
+
+    # FPIC consent diagnostics
+    fpicdecision enum.fpic.decision.v1
+    fpicleaftokenid koid.v1?
+
+-------------------------------------------------------------------------------
+FPIC decision enum (for nanoswarm brownfield consent kernel)
+-------------------------------------------------------------------------------
+
+enum enum.fpic.decision.v1
+    UNSET
+    ALLOW
+    STOP_NO_PLAN_BINDING
+    STOP_PLAN_STALE
+    STOP_BROKEN_CHAIN
+    STOP_SCOPE_MISMATCH
