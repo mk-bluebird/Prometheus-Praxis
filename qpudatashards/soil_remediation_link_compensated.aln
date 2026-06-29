@@ -1,0 +1,75 @@
+record_type: link_compensated_batch
+version: 1
+domain: soil_remediation_and_brownfields
+
+records:
+  - url: "https://www.allu.net/products/allu-transformer/"
+    device_key: "ALLU Transformer M-Series screener crusher"
+    eco_impact_score: 0.64
+    energy_saved_kwh_per_ton_ds_min: null
+    energy_saved_kwh_per_ton_ds_max: null
+    co2_offset_kg_per_ton_ds_min: null
+    co2_offset_kg_per_ton_ds_max: null
+    energy_saved_kwh_per_1000m3_min: null
+    energy_saved_kwh_per_1000m3_max: null
+    co2_offset_kg_per_1000m3_min: null
+    co2_offset_kg_per_1000m3_max: null
+    energy_saved_kwh_per_m3_reuse_min: null
+    energy_saved_kwh_per_m3_reuse_max: null
+    co2_offset_kg_per_m3_reuse_min: null
+    co2_offset_kg_per_m3_reuse_max: null
+    hex_proof: "0xe7c1a2b3d4f5061728394a5b6c7d8e9f00112233445566778899aabbccddeeff0"
+
+  - url: "https://www.terex.com/ecotec/en/products/soil-washing"
+    device_key: "Terex Ecotec TTS 620 soil washing plant"
+    eco_impact_score: 0.69
+    energy_saved_kwh_per_ton_ds_min: null
+    energy_saved_kwh_per_ton_ds_max: null
+    co2_offset_kg_per_ton_ds_min: null
+    co2_offset_kg_per_ton_ds_max: null
+    energy_saved_kwh_per_1000m3_min: null
+    energy_saved_kwh_per_1000m3_max: null
+    co2_offset_kg_per_1000m3_min: null
+    co2_offset_kg_per_1000m3_max: null
+    energy_saved_kwh_per_m3_reuse_min: null
+    energy_saved_kwh_per_m3_reuse_max: null
+    co2_offset_kg_per_m3_reuse_min: null
+    co2_offset_kg_per_m3_reuse_max: null
+    hex_proof: "0xf8d2b3c4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff01"
+
+  - url: "https://www.generalkinematics.com/products/vibra-drum/"
+    device_key: "General Kinematics Vibra-Drum thermal sand reclaimer"
+    eco_impact_score: 0.52
+    energy_saved_kwh_per_ton_ds_min: null
+    energy_saved_kwh_per_ton_ds_max: null
+    co2_offset_kg_per_ton_ds_min: null
+    co2_offset_kg_per_ton_ds_max: null
+    energy_saved_kwh_per_1000m3_min: null
+    energy_saved_kwh_per_1000m3_max: null
+    co2_offset_kg_per_1000m3_min: null
+    co2_offset_kg_per_1000m3_max: null
+    energy_saved_kwh_per_m3_reuse_min: null
+    energy_saved_kwh_per_m3_reuse_max: null
+    co2_offset_kg_per_m3_reuse_min: null
+    co2_offset_kg_per_m3_reuse_max: null
+    hex_proof: "0xa9e3c4d5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff02"
+
+  - url: "https://www.doosanequipment.com/products/crawler-excavators/dx225lc-7/"
+    device_key: "Doosan DX225LC-7 crawler excavator"
+    eco_impact_score: 0.45
+    energy_saved_kwh_per_ton_ds_min: null
+    energy_saved_kwh_per_ton_ds_max: null
+    co2_offset_kg_per_ton_ds_min: null
+    co2_offset_kg_per_ton_ds_max: null
+    energy_saved_kwh_per_1000m3_min: null
+    energy_saved_kwh_per_1000m3_max: null
+    co2_offset_kg_per_1000m3_min: null
+    co2_offset_kg_per_1000m3_max: null
+    energy_saved_kwh_per_m3_reuse_min: null
+    energy_saved_kwh_per_m3_reuse_max: null
+    co2_offset_kg_per_m3_reuse_min: null
+    co2_offset_kg_per_m3_reuse_max: null
+    hex_proof: "0xbaf4d5e6f708192a3b4c5d6e7f809112233445566778899aabbccddeeff0304"
+
+karma_reflection:
+  concatenated_hex_proofs: "0xe7c1a2b3d4f5061728394a5b6c7d8e9f00112233445566778899aabbccddeeff0|0xf8d2b3c4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff01|0xa9e3c4d5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff02|0xbaf4d5e6f708192a3b4c5d6e7f809112233445566778899aabbccddeeff0304"
