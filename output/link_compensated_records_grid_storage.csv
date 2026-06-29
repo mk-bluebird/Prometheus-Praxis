@@ -1,0 +1,5 @@
+url,device_key,eco_impact_score,energy_saved_kwh_per_ton_ds,co2_offset_kg_per_ton_ds,energy_saved_kwh_per_1000m3,co2_offset_kg_per_1000m3,energy_saved_kwh_per_m3_reuse,co2_offset_kg_per_m3_reuse
+https://www.tesla.com/megapack,"Tesla Megapack 2 XL",0.73,"","","","","",""
+https://fluenceenergy.com/product/gridstack-pro/,"Fluence Gridstack Pro",0.71,"","","","","",""
+https://redflow.com/products/zbm3/,"Redflow ZBM3 zinc-bromine flow battery",0.67,"","","","","",""
+https://en.pylontech.com.cn/pro/,"Pylontech US2000C 48V LiFePO4 rack module",0.74,"","","","","",""
