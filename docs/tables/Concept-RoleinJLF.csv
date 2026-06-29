@@ -1,0 +1,7 @@
+"Concept","Role in JLF"
+"Lyapunov FD (Vemuri, Polycarpou)","Basis for residual and V˙\dot VV˙‑based incipient fault detection. kybernetika"
+"Multiple Lyapunov (Polycarpou, Trunov)","Isolation bank triggered when JLF crosses its barrier. sciencedirect"
+"Isermann residuals","Health indicators fused into the JLF scalar. sciencedirect"
+"CBF safe set (Ames et al.)","JLF defines a forward‑invariant “fault safe set” to stay inside. ames.caltech+1"
+"Jetson edge AI (NVIDIA, Zhang)","Platform for hybrid physics+CNN JLF computation at the edge. sciencedirectthis-research-focuses-on-advan-vLVvkrrNTb2JutPpY.NN1w.md"
+"Titan Lyapunov residual","Template for JLF as weighted quadratic over normalized risk coordinates with non‑expansion and corridor caps. 1ff1f8c6-9da7-4b3b-a37d-4902af47e382.md+1"
