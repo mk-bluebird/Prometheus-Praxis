@@ -4,7 +4,7 @@
 // Role: EcoSmartflowerLyapunovSample2026v1 CSV ingestion and basic eco/Lyapunov helpers.
 //
 // Edition and rust-version are controlled at the workspace level (edition = 2024, rust-version = "1.85").
-// Kani verifier version is unified at workspace level (kani-verifier = "0.56.0") per Prometheus-Praxis rules.
+// Kani verifier version is unified at workspace level per Prometheus-Praxis rules.
 
 #![deny(unsafe_code)]
 #![allow(clippy::needless_return)]
@@ -14,12 +14,11 @@ use std::io::BufReader;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
-
 use thiserror::Error;
 
 /// Single Smartflower sample row for 2026 Lyapunov / eco-per-joule analysis.
 ///
-/// This is intentionally minimal, and stable, so KER/Titan tools can derive
+/// This is intentionally minimal and stable, so KER/Titan tools can derive
 /// higher-level metrics without touching raw CSV directly.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EcoSmartflowerLyapunovSample2026v1 {
@@ -47,9 +46,7 @@ pub struct EcoSmartflowerLyapunovSample2026v1 {
     /// Normalized dust/fouling index in [0, 1], 0 = clean, 1 = heavily fouled.
     pub dust_index_0_1: f64,
 
-    /// Optional eco score in [0, 1] capturing combined eco-impact for this sample.
-    /// If not present in CSV, this can default via derived scoring (e.g., energy output
-    /// per ecological footprint). Kept as a scalar for easy fusion into KER.
+    /// Eco score in [0, 1] capturing combined eco-impact for this sample.
     pub eco_score_0_1: f64,
 }
 
@@ -63,10 +60,7 @@ pub enum EcoSmartflowerCsvError {
     Csv(#[from] csv::Error),
 
     #[error("Constraint violation in row {row_index}: {msg}")]
-    Constraint {
-        row_index: usize,
-        msg: String,
-    },
+    Constraint { row_index: usize, msg: String },
 }
 
 /// Load EcoSmartflowerLyapunovSample2026v1 rows from a CSV file.
@@ -86,9 +80,6 @@ pub fn load_smartflower_csv<P: AsRef<Path>>(
     for (idx, result) in csv_reader.deserialize().enumerate() {
         let row: EcoSmartflowerLyapunovSample2026v1 = result?;
 
-        // Basic scalar constraints aligned with other eco/Lyapunov types:
-        // - Output, irradiance, wind speed non-negative.
-        // - Dust index and eco score in [0, 1].
         if row.pv_output_kw < 0.0 {
             return Err(EcoSmartflowerCsvError::Constraint {
                 row_index: idx,
@@ -128,28 +119,20 @@ pub fn load_smartflower_csv<P: AsRef<Path>>(
 
 /// Compute a simple per-sample eco-per-joule efficiency metric.
 ///
-/// This returns a dimensionless scalar proportional to:
+/// Returns a dimensionless scalar proportional to:
 ///   pv_output_kw / irradiance_w_per_m2,
-/// with a small epsilon to avoid division-by-zero. It can be used as
-/// a component in a Lyapunov-like eco stability envelope.
+/// with a small epsilon to avoid division-by-zero.
 pub fn eco_efficiency_per_sample(sample: &EcoSmartflowerLyapunovSample2026v1) -> f64 {
-    // pv_output_kw ~ kW, irradiance_w_per_m2 ~ W/m^2. This is not a strict
-    // physical efficiency, but a normalized ratio you can further scale.
     let eps = 1e-9;
     sample.pv_output_kw / (sample.irradiance_w_per_m2 + eps)
 }
 
 /// Simple Lyapunov-like scalar for Smartflower eco/thermal state.
 ///
-/// Example structure:
-///   V_t = w_p * pv_norm^2 + w_T * (delta_T)^2 + w_d * dust_index^2
+/// V_t = w_p * pv_norm^2 + w_T * (delta_T)^2 + w_d * dust_index^2
 /// where:
 ///   pv_norm  = pv_output_kw / pv_ref_kw
 ///   delta_T  = panel_temp_c - temp_ref_c
-///   dust_index in [0, 1].
-///
-/// This is intentionally simple; more complex Koopman/ISS models can be
-/// built on top and share the same sample type.
 pub fn lyapunov_scalar_for_sample(
     sample: &EcoSmartflowerLyapunovSample2026v1,
     pv_ref_kw: f64,
@@ -160,19 +143,13 @@ pub fn lyapunov_scalar_for_sample(
 ) -> f64 {
     let pv_ref = if pv_ref_kw <= 0.0 { 1.0 } else { pv_ref_kw };
     let pv_norm = sample.pv_output_kw / pv_ref;
-
     let delta_t = sample.panel_temp_c - temp_ref_c;
-
     let dust = sample.dust_index_0_1;
 
-    // All weights are assumed non-negative; caller is responsible for
-    // choosing stable values. This function does no guard decisions,
-    // it only computes V_t.
     w_p * pv_norm * pv_norm + w_t * delta_t * delta_t + w_d * dust * dust
 }
 
-/// Aggregate eco-efficiency and Lyapunov scalars over a set of samples.
-/// These helpers are useful for Titan metrics dashboards or KER aggregates.
+/// Aggregate eco-efficiency over a set of samples.
 pub fn aggregate_eco_efficiency(samples: &[EcoSmartflowerLyapunovSample2026v1]) -> f64 {
     if samples.is_empty() {
         return 0.0;
@@ -184,6 +161,7 @@ pub fn aggregate_eco_efficiency(samples: &[EcoSmartflowerLyapunovSample2026v1]) 
     acc / (samples.len() as f64)
 }
 
+/// Aggregate Lyapunov scalar over a set of samples.
 pub fn aggregate_lyapunov_scalar(
     samples: &[EcoSmartflowerLyapunovSample2026v1],
     pv_ref_kw: f64,
@@ -205,28 +183,12 @@ pub fn aggregate_lyapunov_scalar(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs::File;
+    use std::io::Write;
+    use std::path::PathBuf;
 
-    #[test]
-    fn eco_efficiency_is_non_negative_for_valid_sample() {
-        let s = EcoSmartflowerLyapunovSample2026v1 {
-            sample_timestamp_utc: 1_777_000_000,
-            smartflower_id: "PHX-SMARTFLOWER-001".to_string(),
-            region: "PHX-NORTH-GATEWAY".to_string(),
-            pv_output_kw: 4.0,
-            irradiance_w_per_m2: 800.0,
-            panel_temp_c: 45.0,
-            wind_speed_mps: 3.0,
-            dust_index_0_1: 0.2,
-            eco_score_0_1: 0.8,
-        };
-
-        let eff = eco_efficiency_per_sample(&s);
-        assert!(eff >= 0.0);
-    }
-
-    #[test]
-    fn lyapunov_scalar_grows_with_temp_and_dust() {
-        let clean = EcoSmartflowerLyapunovSample2026v1 {
+    fn sample_clean() -> EcoSmartflowerLyapunovSample2026v1 {
+        EcoSmartflowerLyapunovSample2026v1 {
             sample_timestamp_utc: 1_777_000_000,
             smartflower_id: "PHX-SMARTFLOWER-001".to_string(),
             region: "PHX-NORTH-GATEWAY".to_string(),
@@ -236,9 +198,11 @@ mod tests {
             wind_speed_mps: 3.0,
             dust_index_0_1: 0.0,
             eco_score_0_1: 0.9,
-        };
+        }
+    }
 
-        let dusty_hot = EcoSmartflowerLyapunovSample2026v1 {
+    fn sample_dusty_hot() -> EcoSmartflowerLyapunovSample2026v1 {
+        EcoSmartflowerLyapunovSample2026v1 {
             sample_timestamp_utc: 1_777_000_100,
             smartflower_id: "PHX-SMARTFLOWER-001".to_string(),
             region: "PHX-NORTH-GATEWAY".to_string(),
@@ -248,7 +212,20 @@ mod tests {
             wind_speed_mps: 3.0,
             dust_index_0_1: 0.5,
             eco_score_0_1: 0.6,
-        };
+        }
+    }
+
+    #[test]
+    fn eco_efficiency_is_non_negative_for_valid_sample() {
+        let s = sample_clean();
+        let eff = eco_efficiency_per_sample(&s);
+        assert!(eff >= 0.0);
+    }
+
+    #[test]
+    fn lyapunov_scalar_grows_with_temp_and_dust() {
+        let clean = sample_clean();
+        let dusty_hot = sample_dusty_hot();
 
         let v_clean = lyapunov_scalar_for_sample(&clean, 4.0, 35.0, 1.0, 1.0, 1.0);
         let v_dusty_hot = lyapunov_scalar_for_sample(&dusty_hot, 4.0, 35.0, 1.0, 1.0, 1.0);
@@ -264,5 +241,46 @@ mod tests {
             aggregate_lyapunov_scalar(&empty, 4.0, 35.0, 1.0, 1.0, 1.0),
             0.0
         );
+    }
+
+    #[test]
+    fn load_smartflower_csv_parses_minimal_sample() {
+        let mut path = PathBuf::from(env!("CARGO_TARGET_TMPDIR"));
+        path.push("eco_solar_smartflower_sample_2026.csv");
+
+        let mut file = File::create(&path).expect("failed to create temp CSV");
+
+        let csv_content = "\
+sample_timestamp_utc,smartflower_id,region,pv_output_kw,irradiance_w_per_m2,panel_temp_c,wind_speed_mps,dust_index_0_1,eco_score_0_1
+1777000000,PHX-SMARTFLOWER-001,PHX-NORTH-GATEWAY,4.2,820.0,46.5,3.2,0.18,0.86
+";
+
+        file.write_all(csv_content.as_bytes())
+            .expect("failed to write temp CSV");
+
+        let samples = load_smartflower_csv(&path).expect("CSV load failed");
+        assert_eq!(samples.len(), 1);
+
+        let s = &samples[0];
+        assert_eq!(s.smartflower_id, "PHX-SMARTFLOWER-001");
+        assert_eq!(s.region, "PHX-NORTH-GATEWAY");
+        assert!((s.pv_output_kw - 4.2).abs() < 1e-6);
+        assert!((s.irradiance_w_per_m2 - 820.0).abs() < 1e-6);
+        assert!((s.panel_temp_c - 46.5).abs() < 1e-6);
+        assert!((s.wind_speed_mps - 3.2).abs() < 1e-6);
+        assert!((s.dust_index_0_1 - 0.18).abs() < 1e-6);
+        assert!((s.eco_score_0_1 - 0.86).abs() < 1e-6);
+
+        let eff = eco_efficiency_per_sample(s);
+        assert!(eff >= 0.0);
+
+        let v = lyapunov_scalar_for_sample(s, 4.0, 40.0, 1.0, 1.0, 1.0);
+        assert!(v > 0.0);
+
+        let agg_eff = aggregate_eco_efficiency(&samples);
+        assert!((agg_eff - eff).abs() < 1e-9);
+
+        let agg_v = aggregate_lyapunov_scalar(&samples, 4.0, 40.0, 1.0, 1.0, 1.0);
+        assert!((agg_v - v).abs() < 1e-9);
     }
 }
