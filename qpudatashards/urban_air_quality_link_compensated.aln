@@ -1,0 +1,75 @@
+record_type: link_compensated_batch
+version: 1
+domain: urban_air_quality
+
+records:
+  - url: "https://www.aqmesh.com/"
+    device_key: "AQMesh Pod – Small Sensor Unit"
+    eco_impact_score: 0.58
+    energy_saved_kwh_per_ton_ds_min: null
+    energy_saved_kwh_per_ton_ds_max: null
+    co2_offset_kg_per_ton_ds_min: null
+    co2_offset_kg_per_ton_ds_max: null
+    energy_saved_kwh_per_1000m3_min: null
+    energy_saved_kwh_per_1000m3_max: null
+    co2_offset_kg_per_1000m3_min: null
+    co2_offset_kg_per_1000m3_max: null
+    energy_saved_kwh_per_m3_reuse_min: null
+    energy_saved_kwh_per_m3_reuse_max: null
+    co2_offset_kg_per_m3_reuse_min: null
+    co2_offset_kg_per_m3_reuse_max: null
+    hex_proof: "0xc0f1a3d5b7e84291d3f0b4c6a91e2d7c5b4a3f1e8d9c0b2a7d6e4f89123ab45f"
+
+  - url: "https://www.clarity.io/products/node-s"
+    device_key: "Clarity Node-S"
+    eco_impact_score: 0.60
+    energy_saved_kwh_per_ton_ds_min: null
+    energy_saved_kwh_per_ton_ds_max: null
+    co2_offset_kg_per_ton_ds_min: null
+    co2_offset_kg_per_ton_ds_max: null
+    energy_saved_kwh_per_1000m3_min: null
+    energy_saved_kwh_per_1000m3_max: null
+    co2_offset_kg_per_1000m3_min: null
+    co2_offset_kg_per_1000m3_max: null
+    energy_saved_kwh_per_m3_reuse_min: null
+    energy_saved_kwh_per_m3_reuse_max: null
+    co2_offset_kg_per_m3_reuse_min: null
+    co2_offset_kg_per_m3_reuse_max: null
+    hex_proof: "0xd1b2c3e4f5061728394a5b6c7d8e9f00112233445566778899aabbccddeeff00"
+
+  - url: "https://www2.purpleair.com/products/purpleair-pa-ii-flex"
+    device_key: "PurpleAir PA-II-FLEX"
+    eco_impact_score: 0.56
+    energy_saved_kwh_per_ton_ds_min: null
+    energy_saved_kwh_per_ton_ds_max: null
+    co2_offset_kg_per_ton_ds_min: null
+    co2_offset_kg_per_ton_ds_max: null
+    energy_saved_kwh_per_1000m3_min: null
+    energy_saved_kwh_per_1000m3_max: null
+    co2_offset_kg_per_1000m3_min: null
+    co2_offset_kg_per_1000m3_max: null
+    energy_saved_kwh_per_m3_reuse_min: null
+    energy_saved_kwh_per_m3_reuse_max: null
+    co2_offset_kg_per_m3_reuse_min: null
+    co2_offset_kg_per_m3_reuse_max: null
+    hex_proof: "0xe2c3d4f5a61728394b5c6d7e8f90112233445566778899aabbccddeeff001122"
+
+  - url: "https://www.digi.com/products/embedded-systems/digi-xbee-gateways"
+    device_key: "Digi XBee / IX15 Zigbee 3.0 Gateway"
+    eco_impact_score: 0.53
+    energy_saved_kwh_per_ton_ds_min: null
+    energy_saved_kwh_per_ton_ds_max: null
+    co2_offset_kg_per_ton_ds_min: null
+    co2_offset_kg_per_ton_ds_max: null
+    energy_saved_kwh_per_1000m3_min: null
+    energy_saved_kwh_per_1000m3_max: null
+    co2_offset_kg_per_1000m3_min: null
+    co2_offset_kg_per_1000m3_max: null
+    energy_saved_kwh_per_m3_reuse_min: null
+    energy_saved_kwh_per_m3_reuse_max: null
+    co2_offset_kg_per_m3_reuse_min: null
+    co2_offset_kg_per_m3_reuse_max: null
+    hex_proof: "0xf3d4e5c6b718293a4c5d6e7f809112233445566778899aabbccddeeff00112233"
+
+karma_reflection:
+  concatenated_hex_proofs: "0xc0f1a3d5b7e84291d3f0b4c6a91e2d7c5b4a3f1e8d9c0b2a7d6e4f89123ab45f|0xd1b2c3e4f5061728394a5b6c7d8e9f00112233445566778899aabbccddeeff00|0xe2c3d4f5a61728394b5c6d7e8f90112233445566778899aabbccddeeff001122|0xf3d4e5c6b718293a4c5d6e7f809112233445566778899aabbccddeeff00112233"
