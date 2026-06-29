@@ -1,0 +1,19 @@
+# Filename: crates/ecosafety-nanoswarm-urban-core/Cargo.toml
+
+[package]
+name = "ecosafety-nanoswarm-urban-core"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "Prometheus-Praxis ecosafety spine for nanoswarm urban restoration: Lyapunov barrier, RoH MPC guard, Lipschitz aliasing, FPIC consent, and KER shards."
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+
+[dependencies]
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
+rusqlite = { version = "0.31.0", features = ["bundled"] }
+thiserror = "1.0.64"
+
+[features]
+default = []
