@@ -4,6 +4,7 @@
 //       metrics/telemetry into KER evidence bundles for macro-governance.
 
 #![forbid(unsafe_code)]
+#![warn(missing_docs)]
 
 pub mod praxis_governance_kernel;
 
@@ -25,21 +26,37 @@ use praxis_governance_kernel::{
     RohSnapshot,
 };
 
+pub mod guards;
+pub mod logging;
+pub mod metrics;
+pub mod planner;
+pub mod types;
+
+pub use guards::{CompositeGuards, GuardError, PrometheusGuards};
+pub use logging::{DecisionLog, DecisionLogger, VeritasChainClient};
+pub use planner::{DefaultPrometheusPlanner, ExecutionPlan, PlanStep, PrometheusPlanner};
+pub use types::{Bounded01, PrometheusTask, TaskKind};
+
 use prometheus_praxis_ker::{
-    KnowledgeEvidence,
     EcoImpactEvidence,
-    RiskEvidence,
     KerOutput,
+    KnowledgeEvidence,
+    RiskEvidence,
     compute_ker,
 };
 
-/// Telemetry snapshot for one host/workflow, derived from Prometheus gauges/counters.
+/// Prometheus-Praxis: Adaptive Implementation Engine
+///
+/// This crate provides the non-actuating planning, guard, and logging layers
+/// for the Synoptic Network, translating high-level strategic goals into
+/// verifiable, neurorights-safe task graphs that can be audited and replayed
+/// from KER evidence bundles.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PraxisTelemetrySnapshot {
     /// RoH scalar for this host or workflow (0..1).
     pub roh_scalar: Decimal,
 
-    /// Tsafe corridor distance / safety margin (0..1); larger is safer.
+    /// Corridor safety margin (0..1); larger is safer.
     pub tsafe_signed_distance: Decimal,
 
     /// City-object Lyapunov residual V_t for this governed object.
@@ -54,11 +71,13 @@ pub struct PraxisTelemetrySnapshot {
     /// Prometheus-derived KER outputs for this workflow.
     pub ker_output: KerOutput,
 
-    /// Domain and lane metadata for this action.
+    /// Domain metadata for this action.
     pub domain: ActionDomain,
+
+    /// Lane metadata for this action.
     pub lane: ActionLane,
 
-    /// ALN envelope shard describing corridors / treaties.
+    /// ALN envelope shard describing corridors and treaties.
     pub aln_envelope: AlnShardId,
 
     /// Time at which telemetry snapshot was assembled.
@@ -67,32 +86,50 @@ pub struct PraxisTelemetrySnapshot {
 
 /// Minimal metric bag modelled on Prometheus gauges/counters for KER mapping.
 ///
-/// In a real deployment, this would be fed by Prometheus registries or
-/// a JSON snapshot API, but here it is a pure struct for Kani and CI wiring.
+/// In a deployment, this would typically be fed by Prometheus registries or
+/// a JSON snapshot API, but here it is a pure struct for verifier and CI wiring.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PraxisMetricBag {
-    // Knowledge-related metrics
+    /// Fraction of models deployed that have passed validation (0..1).
     pub validated_model_coverage: Decimal,
+
+    /// Consistency of telemetry streams and invariants (0..1).
     pub telemetry_consistency: Decimal,
+
+    /// Fraction of envelopes backed by formal proofs (0..1).
     pub proof_backed_envelopes: Decimal,
 
-    // Eco-impact metrics
+    /// Net carbon reduction contribution (0..1).
     pub carbon_reduction: Decimal,
+
+    /// Net gain in water safety corridor metrics (0..1).
     pub water_safety_gain: Decimal,
+
+    /// Net biodiversity gain signal (0..1).
     pub biodiversity_gain: Decimal,
 
-    // Risk metrics (guard/aliasing/Lyapunov violations)
+    /// Rate of guard violations over the last window (0..1).
     pub guard_violation_rate: Decimal,
+
+    /// Fraction of actions executed in thin safety margins (0..1).
     pub thin_margin_fraction: Decimal,
+
+    /// Tail risk for Lyapunov residual excursions (0..1).
     pub lyapunov_tail_risk: Decimal,
 
-    // RoH and Tsafe gauges
+    /// RoH scalar for the governed object (0..1).
     pub roh_scalar: Decimal,
+
+    /// Signed safety margin in corridor space (0..1).
     pub tsafe_signed_distance: Decimal,
 
-    // Lyapunov residual gauges
+    /// Current Lyapunov residual for the object.
     pub lyapunov_v_current: Decimal,
+
+    /// Predicted Lyapunov residual after proposed action.
     pub lyapunov_v_next: Decimal,
+
+    /// Epsilon band for Lyapunov residual tolerance.
     pub lyapunov_epsilon: Decimal,
 }
 
@@ -142,10 +179,10 @@ impl PraxisMetricBag {
     }
 }
 
-/// High-level governance facade over PraxisGovernanceKernel.
+/// High-level governance facade over `PraxisGovernanceKernel`.
 ///
 /// This struct owns a kernel instance and exposes domain-specific validation
-/// functions that only depend on metric-derived telemetry.
+/// functions that depend only on metric-derived telemetry snapshots.
 #[derive(Debug, Clone)]
 pub struct PrometheusPraxisGovernance {
     kernel: PraxisGovernanceKernel,
@@ -160,7 +197,7 @@ impl PrometheusPraxisGovernance {
 
     /// Validate a macro action based on Prometheus-derived telemetry.
     ///
-    /// This is the canonical entry point for EcoNet / city-object integration.
+    /// This is the canonical entry point for EcoNet and city-object integration.
     pub fn validate_from_telemetry(
         &self,
         action_id: String,
@@ -237,7 +274,6 @@ mod tests {
             aln,
         );
 
-        // Basic sanity: KER outputs are bounded, Lyapunov epsilon respected.
         assert!(snap.ker_output.k >= Decimal::ZERO && snap.ker_output.k <= Decimal::ONE);
         assert!(snap.ker_output.e >= Decimal::ZERO && snap.ker_output.e <= Decimal::ONE);
         assert!(snap.ker_output.r >= Decimal::ZERO && snap.ker_output.r <= Decimal::ONE);
