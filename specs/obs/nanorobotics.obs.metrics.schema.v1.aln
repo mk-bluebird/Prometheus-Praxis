@@ -1,0 +1,141 @@
+SECTION,NANOROBOTICS-OBS-METRICS-SCHEMA
+version,v1.0.0
+
+host.did,did:alnorganic-host
+bostrom.address,bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+aln.migration.authority,ALN.MIGRATION.CYBERCOREAUTHORITY.v1
+
+# Registry header: every row below is a first-class, evidence-bound metric.
+schema.id,nanorobotics.obs.metrics.schema.v1
+schema.role,metrics-to-governance-alignment
+schema.domain,Prometheus-Praxis.nanoswarm.cyboquatic
+
+# Columns:
+# metric.name    : Prometheus metric identifier.
+# metric.type    : gauge | counter | histogram.
+# labels         : canonical label keys.
+# units          : physical or normalized units.
+# role           : realtime-safety | posthoc-evolution.
+# rust.source    : Rust type or module that computes the value.
+# aln.source     : ALN shard/field that defines ceilings, bands, or semantics.
+# evidence.bundle: hex/evidence family that backs calibration or thresholds.
+
+ROW
+metric.name,prompraxis_roh_host
+metric.type,gauge
+labels,host_id mission_id lane
+units,normalized-risk-0-1
+role,realtime-safety
+rust.source,PraxisMetricBag.roh_scalar
+aln.source,ecosafety.roh.envelope.v1.aln:roh.ceiling.global
+evidence.bundle,roh.global.profile.v1.hex
+
+ROW
+metric.name,prompraxis_tsafe_distance
+metric.type,gauge
+labels,host_id mission_id axis lane
+units,normalized-distance-to-corridor-wall-0-1
+role,realtime-safety
+rust.source,PraxisMetricBag.tsafe_signed_distance
+aln.source,tsafe.corridor.envelope.v1.aln:tsafe.band.safe_gold_hard
+evidence.bundle,tsafe.polytope.profile.v1.hex
+
+ROW
+metric.name,prompraxis_lyapunov_residual_city_object
+metric.type,gauge
+labels,city_object_id mission_id lane
+units,residual-Vt
+role,realtime-safety
+rust.source,PraxisTelemetrySnapshot.lyapunov_v_current
+aln.source,ecosafety.cityobject.guard.v1.aln:residual.V_t
+evidence.bundle,city.lyapunov.guard.profile.v1.hex
+
+ROW
+metric.name,prompraxis_lyapunov_delta_city_object
+metric.type,histogram
+labels,city_object_id mission_class
+units,delta-Vt1-minus-Vt
+role,posthoc-evolution
+rust.source,PraxisTelemetrySnapshot.lyapunov_v_next - PraxisTelemetrySnapshot.lyapunov_v_current
+aln.source,ecosafety.cityobject.guard.v1.aln:lyapunov.nonincrease.constraint
+evidence.bundle,city.lyapunov.audit.v1.hex
+
+ROW
+metric.name,prompraxis_k_score
+metric.type,gauge
+labels,host_id mission_id lane
+units,normalized-knowledge-0-1
+role,realtime-safety
+rust.source,KerOutput.k
+aln.source,ker.profile.envelope.v1.aln:k.min.lane
+evidence.bundle,ker.evidence.bundle.v1.hex
+
+ROW
+metric.name,prompraxis_e_score
+metric.type,gauge
+labels,host_id mission_id lane
+units,normalized-eco-impact-0-1
+role,realtime-safety
+rust.source,KerOutput.e
+aln.source,ker.profile.envelope.v1.aln:e.min.lane
+evidence.bundle,ker.evidence.bundle.v1.hex
+
+ROW
+metric.name,prompraxis_r_score
+metric.type,gauge
+labels,host_id mission_id lane
+units,normalized-risk-0-1
+role,realtime-safety
+rust.source,KerOutput.r
+aln.source,ker.profile.envelope.v1.aln:r.max.lane
+evidence.bundle,ker.evidence.bundle.v1.hex
+
+ROW
+metric.name,prompraxis_guard_violation_total
+metric.type,counter
+labels,kind lane domain
+units,count
+role,realtime-safety
+rust.source,nanorobotics-observability-core::observe_guard_violation
+aln.source,ecosafety.guard.contract.v1.aln:guard.kind
+evidence.bundle,guard.violation.audit.v1.hex
+
+ROW
+metric.name,prompraxis_corridor_hard_stop_total
+metric.type,counter
+labels,corridor_id lane domain
+units,count
+role,realtime-safety
+rust.source,nanorobotics-observability-core::observe_corridor_hard_stop
+aln.source,ecosafety.corridor.envelope.v1.aln:band.hard.stop
+evidence.bundle,corridor.hardstop.audit.v1.hex
+
+ROW
+metric.name,prompraxis_roh_histogram
+metric.type,histogram
+labels,mission_class lane
+units,normalized-risk-0-1
+role,posthoc-evolution
+rust.source,nanorobotics-observability-core::observe_roh_histogram
+aln.source,ecosafety.roh.envelope.v1.aln:roh.ceiling.global
+evidence.bundle,roh.mission.audit.v1.hex
+
+ROW
+metric.name,prompraxis_tsafe_distance_histogram
+metric.type,histogram
+labels,mission_class axis lane
+units,normalized-distance-to-corridor-wall-0-1
+role,posthoc-evolution
+rust.source,nanorobotics-observability-core::observe_tsafe_distance_histogram
+aln.source,tsafe.corridor.envelope.v1.aln:tsafe.band
+evidence.bundle,tsafe.mission.audit.v1.hex
+
+ROW
+metric.name,prompraxis_aliasing_margin_histogram
+metric.type,histogram
+labels,mission_class mode lane
+units,normalized-aliasing-margin
+role,posthoc-evolution
+rust.source,nanorobotics-observability-core::observe_aliasing_margin_histogram
+aln.source,aliasing.lipschitz.guard.v1.aln:aliasing.margin
+evidence.bundle,aliasing.audit.v1.hex
