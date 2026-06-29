@@ -1,0 +1,2 @@
+nodeid,region,lat,lon,medium,nodetype,twindowstart,twindowend,x1_name,x2_name,x1_raw,x2_raw,x1_unit,x2_unit,u_raw,u_unit,V_window_mean,V_window_max,frac_V_up,corridor_violation_frac,ecoimpactscore,ecoimpactlevel,kerdeployable,lane,evidencehex,signinghex
+PHX-SMARTFLOWER-01,PHX-District-1,33.4600,-112.0700,air-solar,SMARTFLOWER,2026-06-29T14:00:00Z,2026-06-29T14:05:00Z,panel_azimuth_error,batt_soc_error,0.035,-0.020,rad,fraction,0.18,pu,0.0042,0.0125,0.03,0.02,0.82,High,TRUE,PROD,0xa1b2c3d4e5f67890,0x9f8e7d6c5b4a3210
