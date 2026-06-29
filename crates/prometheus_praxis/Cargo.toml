@@ -3,24 +3,29 @@ name = "prometheus_praxis"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
-license = "AGPL-3.0-or-later"
+license = "MIT OR Apache-2.0"
+authors = ["mk-bluebird <bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7>"]
 description = "Prometheus-Praxis adaptive implementation engine under Cybercore authority."
-repository = "https://github.com/mk-bluebird/Cybercore.git"
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
 
 [features]
 default = ["metrics"]
-metrics = ["prometheus"]
+metrics = ["dep:prometheus"]
 
 [dependencies]
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-thiserror = "1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
 prometheus = { version = "0.13", optional = true }
-once_cell = "1"
+once_cell = "1.19"
+rust_decimal = { version = "1.35", features = ["serde-with-str"] }
+chrono = { version = "0.4", features = ["serde"] }
 
-transhuman_rights_core = { path = "../transhuman-rights-core" }   # from your stack [file:14]
-bioscale_metrics       = { path = "../bioscale-metrics" }          # Bounded01 etc. [file:14]
-aln_runtime            = { path = "../aln-runtime" }               # your ALN loader/binder [file:14]
-veritas_chain_client   = { path = "../veritas-chain-client" }      # append-only hex-trace logging [file:1][file:14]
-equality_payment_guard = { path = "../equality-payment-guard" }    # BioPay/EqualityCredit [file:15]
-aug_fingerprint_guard  = { path = "../aug-fingerprint-guard" }     # POS / BioPay layer [file:11][file:13]
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[lints.clippy]
+all = "warn"
+pedantic = "warn"
+nursery = "warn"
