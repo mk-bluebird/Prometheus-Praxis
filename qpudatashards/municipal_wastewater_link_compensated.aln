@@ -1,0 +1,50 @@
+record_type: link_compensated_batch
+version: 1
+records:
+  - url: "https://www.andritz.com/products-en/group/separation/dewatering/belt-filter-press-se"
+    device_key: "ANDRITZ belt filter press SME-Q/SMX-Q"
+    eco_impact_score: 0.72
+    energy_saved_kwh_per_ton_ds_min: 50
+    energy_saved_kwh_per_ton_ds_max: 100
+    co2_offset_kg_per_ton_ds_min: 25
+    co2_offset_kg_per_ton_ds_max: 50
+    hex_proof: "0x7c13afc4b4f1b1a29b682f2efb3199a9b6a4e40d68eae6b1b665f76a8e8f0e21"
+
+  - url: "https://www.huber.de/en/products/screens-and-fine-screens/rotary-drum-screens/rodisc.html"
+    device_key: "HUBER RoDisc rotary disc filter"
+    eco_impact_score: 0.68
+    energy_saved_kwh_per_1000m3_min: 5
+    energy_saved_kwh_per_1000m3_max: 15
+    co2_offset_kg_per_1000m3_min: 2.5
+    co2_offset_kg_per_1000m3_max: 7.5
+    hex_proof: "0x5f48d1a9c8b2e7d6a013ef4b0ce2f9a79a1be5f1d369c2c0b1104a2a78c63fd0"
+
+  - url: "https://www.suezwatertechnologies.com/products/membrane-bioreactors/zeeweed-500"
+    device_key: "SUEZ ZeeWeed 500D MBR"
+    eco_impact_score: 0.61
+    energy_saved_kwh_per_m3_reuse_min: 0.1
+    energy_saved_kwh_per_m3_reuse_max: 0.3
+    co2_offset_kg_per_m3_reuse_min: 0.05
+    co2_offset_kg_per_m3_reuse_max: 0.15
+    hex_proof: "0x94e201f7b3d85ab0c42e15c36b6af88c0e4bc21619d89c7df0da43f4a0a7b1a3"
+
+  - url: "https://new.siemens.com/global/en/products/automation/systems/industrial/plc/s7-1500.html"
+    device_key: "Siemens SIMATIC S7-1500 CPU 1516-3 PN/DP"
+    eco_impact_score: 0.54
+    energy_saved_kwh_per_1000m3_min: 10
+    energy_saved_kwh_per_1000m3_max: 50
+    co2_offset_kg_per_1000m3_min: 5
+    co2_offset_kg_per_1000m3_max: 25
+    hex_proof: "0x3ba0b6e9580b7dc0c40e129b743729f5d21bc1e7a6af8ad7f64ff2c4a7109b9c"
+
+  - url: "https://www.se.com/ca/en/product-range/62057-scadapack-470i/"
+    device_key: "Schneider SCADAPack 474i"
+    eco_impact_score: 0.57
+    energy_saved_kwh_per_1000m3_min: 2
+    energy_saved_kwh_per_1000m3_max: 10
+    co2_offset_kg_per_1000m3_min: 1
+    co2_offset_kg_per_1000m3_max: 5
+    hex_proof: "0xf1c27a2d9be408b55e6bb7dafb61a49f8fae8a413620b053fe1e4de3ccf8129a"
+
+karma_reflection:
+  concatenated_hex_proofs: "0x7c13afc4b4f1b1a29b682f2efb3199a9b6a4e40d68eae6b1b665f76a8e8f0e21|0x5f48d1a9c8b2e7d6a013ef4b0ce2f9a79a1be5f1d369c2c0b1104a2a78c63fd0|0x94e201f7b3d85ab0c42e15c36b6af88c0e4bc21619d89c7df0da43f4a0a7b1a3|0x3ba0b6e9580b7dc0c40e129b743729f5d21bc1e7a6af8ad7f64ff2c4a7109b9c|0xf1c27a2d9be408b55e6bb7dafb61a49f8fae8a413620b053fe1e4de3ccf8129a"
