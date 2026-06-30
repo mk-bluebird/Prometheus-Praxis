@@ -1,0 +1,70 @@
+# filename: qpudatashards/particles/SmartflowerTelemetryRingBuffer_v1.aln
+# destination: qpudatashards/particles
+
+shard SmartflowerTelemetryRingBuffer_v1 {
+    meta {
+        region_id        = "PhoenixBasin:SmartflowerPOP-e:SF-001";
+        hardware_class   = "SmartflowerPOP-e";
+        telemetry_source = "STM32F4_Cortex-M4_SPSC_RingBuffer";
+        version          = "1.0.0";
+        evidence_hex     = "0xa3f5c7e9b1d20468c7e4a9d2b5f81357";
+        signing_hex      = "0x519fC0eB4111323Cac44b70e1aE31c30e405802D";
+        knowledge_factor_K = 0.94;
+        eco_impact_E       = 0.87;
+        risk_of_harm_R     = 0.18;
+    }
+
+    schema TelemetrySample {
+        field timestamp_ticks : u32;   # system tick count
+        field petal_angle_deg : f32;   # Smartflower petal angle
+        field motor_current_A : f32;   # drive current
+        field wind_speed_ms   : f32;   # local wind speed
+        field barrier_value_B : f32;   # safety corridor barrier function
+        field lyapunov_V      : f32;   # Lyapunov performance envelope
+        field flags           : u32;   # bitfield: override states, faults
+    }
+
+    ring_buffer {
+        capacity = 1024;
+        index_type = "u32";
+        discipline  = "SPSC";
+        producer_id = "ControlLoop_ISR";
+        consumer_id = "TelemetryTask_Background";
+        head_atomic_order_release   = true;
+        tail_atomic_order_release   = true;
+        head_load_memory_order      = "acquire";
+        tail_load_memory_order      = "relaxed";
+    }
+
+    corridors {
+        # Safety corridor on barrier function B(x)
+        barrier_B_safe_min = -0.10;
+        barrier_B_safe_max =  0.80;
+        barrier_B_hard_max =  1.00;
+
+        # Lyapunov envelope V(x)
+        lyapunov_V_safe_max = 0.50;
+        lyapunov_V_derate   = 0.70;
+        lyapunov_V_shutdown = 1.00;
+    }
+
+    eco_kernel {
+        # Energy production vs derate/shutdown decisions
+        metric eco_per_joule {
+            definition = "net_eco_benefit / electrical_energy_output";
+            source     = "ALN_KER_non_actuating_queries";
+        }
+
+        # Link telemetry to CEIM/ker residuals in Phoenix basin
+        ceim_bridge_node = "PhoenixMAR_PFBS_GilaSalinity";
+    }
+
+    governance {
+        non_actuating = true;
+        allowed_queries = [
+            "SELECT avg(petal_angle_deg) WHERE time_window",
+            "SELECT max(wind_speed_ms) WHERE barrier_value_B > 0.7",
+            "COMPARE eco_per_joule BETWEEN SmartflowerTelemetryRingBuffer_v1 AND MegapackTelemetry_v1"
+        ];
+    }
+}
