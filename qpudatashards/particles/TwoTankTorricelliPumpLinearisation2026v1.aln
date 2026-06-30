@@ -1,0 +1,49 @@
+# qpudatashards/particles/TwoTankTorricelliPumpLinearisation2026v1.aln
+
+particle TwoTankTorricelliPumpLinearisation2026v1 {
+  header {
+    nodeid        : "PHX-TWOTANK-TOR-PUMP-01";
+    region        : "PHX-West-Basin";
+    lat           : 33.4500;
+    lon           : -112.1500;
+    medium        : "water";
+    nodetype      : "TwoTankHydraulic";
+    kernelversion : "TorricelliLinearisation-v1";
+  }
+
+  hydraulics {
+    A1           : A1;      # m2, lower tank area
+    A2           : A2;      # m2, upper tank area
+    Cd           : Cd;      # discharge coefficient
+    Ao           : Ao;      # outlet area
+    g            : 9.81;    # m/s2
+    h1_star      : h1_star; # operating point level
+    qp_set       : qp_set;  # diaphragm pump set flow
+  }
+
+  models {
+    nonlinear_outflow : "qTor(h1) = Cd * Ao * sqrt(2 * g * h1)";
+    linear_outflow    : "qLin(h1) = qTor(h1_star) + (Cd * Ao * sqrt(2 * g) / (2 * sqrt(h1_star))) * (h1 - h1_star)";
+    validity_corridor {
+      h1_min_frac  : 0.05;        # minimum fraction of h1_star for 5% error bound
+      h1_min       : "0.05 * h1_star";
+      max_rel_err  : 0.05;        # 5% allowed divergence
+    }
+  }
+
+  eco_metrics {
+    ecoscore_E  : 0.90;
+    knowledge_K : 0.94;
+    risk_R      : 0.13;
+  }
+
+  governance {
+    corridorpresent : true;
+    safestep        : "use linear model only if h1 >= h1_min";
+    kerdeployable   : true;
+    lane            : "PROD";
+    vtmax           : 0.13;
+    evidencehex     : "0xa1b2c3d4e5f67890";
+    signinghex      : "0x8f7e6d5c4b3a2910";
+  }
+}
