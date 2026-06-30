@@ -1,0 +1,75 @@
+# qpudatashards/particles/TerexTTS620SoilWashControl2026v1.aln
+
+particle TerexTTS620SoilWashControl2026v1 {
+  header {
+    nodeid        : "PHX-SOILWASH-TTS620-01";
+    region        : "PHX-West-Basin";
+    lat           : 33.4500;
+    lon           : -112.1500;
+    medium        : "soil-wash-water";
+    nodetype      : "SoilWashPlant";
+    kernelversion : "LyapunovKER-SoilWash-v1";
+  }
+
+  state_space {
+    nx : 2;
+    nu : 1;
+
+    # x1 = r - r_star, x2 = T - T_star
+    A  : [
+      [-a11,  a12],
+      [ a21, -a22]
+    ];
+
+    B  : [
+      [ b1 ],
+      [ b2 ]
+    ];
+
+    Q  : [
+      [ qr, 0.0 ],
+      [ 0.0, qT ]
+    ];
+
+    R  : [ ru ];
+  }
+
+  riccati_solution {
+    P : [
+      [ p11, p12 ],
+      [ p12, p22 ]
+    ];
+
+    K : [ k1, k2 ];  # K = [k1 k2] = R^{-1} B^T P
+
+    clf {
+      Vx      : "x^T P x";
+      dVdt    : "- x^T (Q + K^T R K) x";
+      stable  : true;
+    }
+  }
+
+  eco_metrics {
+    r_target    : r_star;
+    T_target    : T_star;
+    ecoscore_E  : 0.90;
+    knowledge_K : 0.94;
+    risk_R      : 0.13;
+
+    corridors {
+      r_turb_min : T_min;
+      r_turb_max : T_max;
+      r_turb     : " (T - T_min) / (T_max - T_min) ";
+    }
+  }
+
+  governance {
+    corridorpresent : true;
+    safestep        : "V(t+dt) <= V(t)";
+    kerdeployable   : true;
+    lane            : "PROD";
+    vtmax           : 0.13;
+    evidencehex     : "0xa1b2c3d4e5f67890";
+    signinghex      : "0x8f7e6d5c4b3a2910";
+  }
+}
