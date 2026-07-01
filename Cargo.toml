@@ -115,7 +115,6 @@ members = [
     "crates/ppx_minimal_identity_kernel",
 
     # prometheus-praxis/src and prometheus_praxis – keep only the canonical crate directory once.
-    "crates/prometheus-praxis",
     "crates/prometheus_praxis",
     "crates/prometheus_praxis_ai",
 
