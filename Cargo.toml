@@ -22,6 +22,7 @@ members = [
     "crates/community-governance",
     "crates/constellation-logic-auto",
     "crates/cross-constellation-index",
+    "crates/cyboquatic_blastradius_spine",
 
     # Directories that have src/ subdirs in listing – we point to crate root dir only. [file:70]
     "crates/cyboquatic-ecosafety-core",
