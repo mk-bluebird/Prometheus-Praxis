@@ -1,20 +1,18 @@
 // eco_restoration_shard/crates/cyboquatic_spine/src/lib.rs
 // Rust edition 2024
 //
-// Purpose:
-// - Non-actuating cdylib that opens the Cyboquatic eco spine SQLite DB read-only.
-// - Exposes JSON-returning C ABI functions for KER targets, blast-radius overlays,
-//   workload windows, biodegradable substrate summaries, and governance guards.
+// Non-actuating cdylib that opens the Cyboquatic eco spine SQLite DB read-only.
+// Exposes JSON-returning C ABI functions for KER targets, blast-radius overlays,
+// workload windows, biodegradable substrate summaries, and governance guards.
 
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 
-use std::ffi::{CStr, CString};
-use std::os::raw::c_char;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, OpenFlags, OptionalExtension, Row};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 fn utc_now_seconds() -> i64 {
@@ -24,36 +22,66 @@ fn utc_now_seconds() -> i64 {
         .as_secs() as i64
 }
 
-fn open_ro_db(db_path: &str) -> rusqlite::Result<Connection> {
-    Connection::open_with_flags(
-        Path::new(db_path),
-        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
-    )
+#[derive(Debug, Error)]
+pub enum SpineError {
+    #[error("SQLite error: {0}")]
+    Sqlite(#[from] rusqlite::Error),
+    #[error("Time parse error: {0}")]
+    TimeParse(#[from] chrono::ParseError),
+    #[error("Schema mismatch: {0}")]
+    SchemaMismatch(String),
+    #[error("Missing definition registry entry for id={0}")]
+    MissingDefinitionRegistry(String),
+    #[error("Missing lane status for shard={0}")]
+    MissingLaneStatus(String),
+    #[error("Missing KER residual for shard={0}")]
+    MissingKerResidual(String),
+    #[error("Missing plane weights for shard={0}")]
+    MissingPlaneWeights(String),
+    #[error("Missing blast radius for shard={0}")]
+    MissingBlastRadius(String),
+    #[error("Missing eco wealth statement for steward={0}")]
+    MissingEcoWealth(String),
+    #[error("Missing Cyboquatic metrics for node={0}")]
+    MissingCyboquaticMetrics(String),
+    #[error("Lane not admissible: {0}")]
+    LaneNotAdmissible(String),
+    #[error("Cyboquatic guard failed: {0}")]
+    CyboquaticGuardFailed(String),
 }
 
-unsafe fn cstr_to_str(ptr: *const c_char) -> Result<&'static str, &'static str> {
-    if ptr.is_null() {
-        return Err("null pointer");
-    }
-    CStr::from_ptr(ptr).to_str().map_err(|_| "invalid UTF-8")
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MachineryBlastRadius {
+    pub machine_id: String,
+    pub kind: String,
+    pub region: String,
+    pub lane: String,
+    pub max_node_radius: f64,
+    pub max_region_radius: f64,
+    pub max_energy_radius: f64,
+    pub max_carbon_radius: f64,
+    pub max_biodiv_radius: f64,
+    pub vt_radius_sum: f64,
 }
 
-fn to_json_c_string<T: Serialize>(val: &T) -> *mut c_char {
-    match serde_json::to_string(val) {
-        Ok(json) => match CString::new(json) {
-            Ok(s) => s.into_raw(),
-            Err(_) => std::ptr::null_mut(),
-        },
-        Err(_) => std::ptr::null_mut(),
-    }
-}
-
-fn error_json(msg: &str) -> *mut c_char {
-    #[derive(Serialize)]
-    struct ErrWrap<'a> {
-        error: &'a str,
-    }
-    to_json_c_string(&ErrWrap { error: msg })
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NodeWindowSummary {
+    pub node_id: String,
+    pub region: String,
+    pub window_start_utc: DateTime<Utc>,
+    pub window_end_utc: DateTime<Utc>,
+    pub total_e_req_j: f64,
+    pub total_e_used_j: f64,
+    pub total_carbon_kg: f64,
+    pub total_pollutant_mass_kg: f64,
+    pub mean_vt_before: f64,
+    pub mean_vt_after: f64,
+    pub mean_roh_scalar: f64,
+    pub accepts: u64,
+    pub derates: u64,
+    pub rejects: u64,
+    pub delta_vt: f64,
+    pub pollutant_per_kj: f64,
 }
 
 #[derive(Debug, Serialize)]
@@ -113,8 +141,6 @@ pub struct SubstrateSummaryEntry {
     pub deployable_count: i64,
     pub window_count: i64,
 }
-
-// Governance spine types
 
 #[derive(Debug, Clone)]
 pub struct KerResidual {
@@ -184,8 +210,6 @@ pub struct CyboquaticMetrics {
     pub restoration_ok: bool,
 }
 
-// Expected schema description for minimal verification.
-
 #[derive(Debug, Clone)]
 pub struct ExpectedTable {
     pub name: String,
@@ -209,43 +233,101 @@ pub struct SchemaVerifier<'a> {
     expected: ExpectedSchema,
 }
 
-#[derive(Debug, Error)]
-pub enum SpineError {
-    #[error("SQLite error: {0}")]
-    SQLite(#[from] rusqlite::Error),
+impl<'a> SchemaVerifier<'a> {
+    pub fn verify(&self) -> Result<(), String> {
+        for table in &self.expected.tables {
+            self.verify_table(table)?;
+        }
+        Ok(())
+    }
 
-    #[error("Schema mismatch: {0}")]
-    SchemaMismatch(String),
+    fn verify_table(&self, table: &ExpectedTable) -> Result<(), String> {
+        let pragma_sql = format!("PRAGMA table_info({})", table.name);
+        let mut stmt = self.conn.prepare(&pragma_sql).map_err(|e| e.to_string())?;
+        let mut rows = stmt.query([]).map_err(|e| e.to_string())?;
+        let mut actual_cols: Vec<ExpectedColumn> = Vec::new();
+        
+        while let Some(row) = rows.next().map_err(|e| e.to_string())? {
+            actual_cols.push(map_table_info_row(&row)?);
+        }
 
-    #[error("Missing definition registry entry for id={0}")]
-    MissingDefinitionRegistry(String),
+        for expected_col in &table.columns {
+            let actual = actual_cols
+                .iter()
+                .find(|c| c.name == expected_col.name)
+                .ok_or_else(|| {
+                    format!(
+                        "missing column '{}' on table '{}'",
+                        expected_col.name, table.name
+                    )
+                })?;
 
-    #[error("Missing lane status for shard={0}")]
-    MissingLaneStatus(String),
-
-    #[error("Missing KER residual for shard={0}")]
-    MissingKerResidual(String),
-
-    #[error("Missing plane weights for shard={0}")]
-    MissingPlaneWeights(String),
-
-    #[error("Missing blast radius for shard={0}")]
-    MissingBlastRadius(String),
-
-    #[error("Missing eco wealth statement for steward={0}")]
-    MissingEcoWealth(String),
-
-    #[error("Missing Cyboquatic metrics for node={0}")]
-    MissingCyboquaticMetrics(String),
-
-    #[error("Lane not admissible: {0}")]
-    LaneNotAdmissible(String),
-
-    #[error("Cyboquatic guard failed: {0}")]
-    CyboquaticGuardFailed(String),
+            if actual.not_null != expected_col.not_null {
+                return Err(format!(
+                    "column '{}' on table '{}' has notnull={}, expected={}",
+                    expected_col.name, table.name, actual.not_null, expected_col.not_null
+                ));
+            }
+        }
+        Ok(())
+    }
 }
 
-#[derive(Debug)]
+fn map_table_info_row(row: &Row<'_>) -> Result<ExpectedColumn, String> {
+    let name: String = row.get(1).map_err(|e| e.to_string())?;
+    let datatype: String = row.get(2).map_err(|e| e.to_string())?;
+    let notnull_flag: i64 = row.get(3).map_err(|e| e.to_string())?;
+    Ok(ExpectedColumn {
+        name,
+        datatype,
+        not_null: notnull_flag != 0,
+    })
+}
+
+pub fn cyboquatic_expected_schema() -> ExpectedSchema {
+    let tables = vec![
+        ExpectedTable {
+            name: "lanestatusshard".to_string(),
+            columns: vec![
+                ExpectedColumn { name: "shardid".to_string(), datatype: "TEXT".to_string(), not_null: true },
+                ExpectedColumn { name: "region".to_string(), datatype: "TEXT".to_string(), not_null: true },
+                ExpectedColumn { name: "lane".to_string(), datatype: "TEXT".to_string(), not_null: true },
+                ExpectedColumn { name: "verdict".to_string(), datatype: "TEXT".to_string(), not_null: true },
+                ExpectedColumn { name: "kerk".to_string(), datatype: "REAL".to_string(), not_null: true },
+                ExpectedColumn { name: "kere".to_string(), datatype: "REAL".to_string(), not_null: true },
+                ExpectedColumn { name: "kerr".to_string(), datatype: "REAL".to_string(), not_null: true },
+                ExpectedColumn { name: "residualvt".to_string(), datatype: "REAL".to_string(), not_null: true },
+                ExpectedColumn { name: "maxstalenesshours".to_string(), datatype: "INTEGER".to_string(), not_null: true },
+                ExpectedColumn { name: "expiresutc".to_string(), datatype: "INTEGER".to_string(), not_null: true },
+                ExpectedColumn { name: "carbonnegativeok".to_string(), datatype: "INTEGER".to_string(), not_null: true },
+                ExpectedColumn { name: "restorationok".to_string(), datatype: "INTEGER".to_string(), not_null: true },
+            ],
+        },
+        ExpectedTable {
+            name: "definitionregistry".to_string(),
+            columns: vec![
+                ExpectedColumn { name: "defid".to_string(), datatype: "TEXT".to_string(), not_null: true },
+                ExpectedColumn { name: "logicalname".to_string(), datatype: "TEXT".to_string(), not_null: true },
+                ExpectedColumn { name: "repopath".to_string(), datatype: "TEXT".to_string(), not_null: true },
+                ExpectedColumn { name: "category".to_string(), datatype: "TEXT".to_string(), not_null: true },
+                ExpectedColumn { name: "frozen".to_string(), datatype: "INTEGER".to_string(), not_null: true },
+            ],
+        },
+        ExpectedTable {
+            name: "kerresidual".to_string(),
+            columns: vec![
+                ExpectedColumn { name: "shardid".to_string(), datatype: "TEXT".to_string(), not_null: true },
+                ExpectedColumn { name: "region".to_string(), datatype: "TEXT".to_string(), not_null: true },
+                ExpectedColumn { name: "kerk".to_string(), datatype: "REAL".to_string(), not_null: true },
+                ExpectedColumn { name: "kere".to_string(), datatype: "REAL".to_string(), not_null: true },
+                ExpectedColumn { name: "kerr".to_string(), datatype: "REAL".to_string(), not_null: true },
+                ExpectedColumn { name: "residualvt".to_string(), datatype: "REAL".to_string(), not_null: true },
+            ],
+        },
+    ];
+    ExpectedSchema { tables }
+}
+
 pub struct CyboquaticSpine {
     conn: Connection,
     expected_schema: ExpectedSchema,
@@ -254,6 +336,7 @@ pub struct CyboquaticSpine {
 impl CyboquaticSpine {
     pub fn open<P: AsRef<Path>>(path: P, expected_schema: ExpectedSchema) -> Result<Self, SpineError> {
         let conn = Connection::open(path)?;
+        conn.execute_batch("PRAGMA foreign_keys = ON;")?;
         let spine = Self { conn, expected_schema };
         spine.verify_schema()?;
         Ok(spine)
@@ -267,26 +350,110 @@ impl CyboquaticSpine {
         verifier.verify().map_err(SpineError::SchemaMismatch)
     }
 
+    pub fn list_machinery_blastradius(&self) -> Result<Vec<MachineryBlastRadius>, SpineError> {
+        let mut stmt = self.conn.prepare(
+            r#"SELECT machine_id, kind, region, lane,
+                      max_node_radius, max_region_radius, max_energy_radius,
+                      max_carbon_radius, max_biodiv_radius, vt_radius_sum
+               FROM v_cybo_mach_blastradius_agg"#,
+        )?;
+
+        let iter = stmt.query_map([], |row| {
+            Ok(MachineryBlastRadius {
+                machine_id: row.get(0)?,
+                kind: row.get(1)?,
+                region: row.get(2)?,
+                lane: row.get(3)?,
+                max_node_radius: row.get(4)?,
+                max_region_radius: row.get(5)?,
+                max_energy_radius: row.get(6)?,
+                max_carbon_radius: row.get(7)?,
+                max_biodiv_radius: row.get(8)?,
+                vt_radius_sum: row.get(9)?,
+            })
+        })?;
+
+        let mut out = Vec::new();
+        for r in iter {
+            out.push(r?);
+        }
+        Ok(out)
+    }
+
+    pub fn summarize_node_region(
+        &self,
+        node_id: &str,
+        region: &str,
+    ) -> Result<Option<NodeWindowSummary>, SpineError> {
+        let mut stmt = self.conn.prepare(
+            r#"SELECT node_id, region, window_start_utc, window_end_utc,
+                      total_e_req_j, total_e_used_j, total_carbon_kg, total_pollutant_mass_kg,
+                      mean_vt_before, mean_vt_after, mean_roh_scalar,
+                      accepts, derates, rejects
+               FROM v_cybo_mach_node_window
+               WHERE node_id = ?1 AND region = ?2"#,
+        )?;
+
+        let res = stmt.query_row(params![node_id, region], |row| {
+            let start: String = row.get(2)?;
+            let end: String = row.get(3)?;
+            let start_dt = start.parse::<DateTime<Utc>>()?;
+            let end_dt = end.parse::<DateTime<Utc>>()?;
+
+            let total_e_used: f64 = row.get(5)?;
+            let total_poll: f64 = row.get(7)?;
+            let pollutant_per_kj = if total_e_used > 0.0 {
+                total_poll / (total_e_used / 1000.0)
+            } else {
+                0.0
+            };
+
+            let mean_vt_before: f64 = row.get(8)?;
+            let mean_vt_after: f64 = row.get(9)?;
+            let delta_vt = mean_vt_after - mean_vt_before;
+
+            Ok(NodeWindowSummary {
+                node_id: row.get(0)?,
+                region: row.get(1)?,
+                window_start_utc: start_dt,
+                window_end_utc: end_dt,
+                total_e_req_j: row.get(4)?,
+                total_e_used_j: total_e_used,
+                total_carbon_kg: row.get(6)?,
+                total_pollutant_mass_kg: total_poll,
+                mean_vt_before,
+                mean_vt_after,
+                mean_roh_scalar: row.get(10)?,
+                accepts: row.get::<_, i64>(11)? as u64,
+                derates: row.get::<_, i64>(12)? as u64,
+                rejects: row.get::<_, i64>(13)? as u64,
+                delta_vt,
+                pollutant_per_kj,
+            })
+        });
+
+        match res {
+            Ok(summary) => Ok(Some(summary)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(SpineError::Sqlite(e)),
+        }
+    }
+
     pub fn get_ker_residual(&self, shard_id: &str) -> Result<KerResidual, SpineError> {
         let mut stmt = self.conn.prepare(
             "SELECT shardid, region, kerk, kere, kerr, residualvt \
-             FROM vresidualkernel \
-             WHERE shardid = ?1",
+             FROM vresidualkernel WHERE shardid = ?1",
         )?;
         let opt: Option<KerResidual> = stmt
             .query_row(params![shard_id], map_ker_residual)
             .optional()?;
-        match opt {
-            Some(r) => Ok(r),
-            None => Err(SpineError::MissingKerResidual(shard_id.to_string())),
-        }
+        opt.ok_or_else(|| SpineError::MissingKerResidual(shard_id.to_string()))
     }
 
     pub fn get_plane_weights(&self, shard_id: &str) -> Result<Vec<PlaneWeight>, SpineError> {
         let mut stmt = self.conn.prepare(
             "SELECT planename, weight, nonoffsettable \
-             FROM vplaneweights \
-             WHERE shardid = ?1",
+             FROM vplaneweights WHERE shardid = ?1",
         )?;
         let mut rows = stmt.query(params![shard_id])?;
         let mut result = Vec::new();
@@ -303,32 +470,24 @@ impl CyboquaticSpine {
     pub fn get_blast_radius(&self, shard_id: &str) -> Result<BlastRadius, SpineError> {
         let mut stmt = self.conn.prepare(
             "SELECT shardid, radiusmeters, adjacencycount \
-             FROM vshardblast \
-             WHERE shardid = ?1",
+             FROM vshardblast WHERE shardid = ?1",
         )?;
         let opt: Option<BlastRadius> = stmt
             .query_row(params![shard_id], map_blast_radius)
             .optional()?;
-        match opt {
-            Some(b) => Ok(b),
-            None => Err(SpineError::MissingBlastRadius(shard_id.to_string())),
-        }
+        opt.ok_or_else(|| SpineError::MissingBlastRadius(shard_id.to_string()))
     }
 
     pub fn get_lane_status(&self, shard_id: &str) -> Result<LaneStatus, SpineError> {
         let mut stmt = self.conn.prepare(
             "SELECT shardid, region, lane, verdict, kerk, kere, kerr, residualvt, \
                     maxstalenesshours, expiresutc, carbonnegativeok, restorationok \
-             FROM vlaneadmissibility \
-             WHERE shardid = ?1",
+             FROM vlaneadmissibility WHERE shardid = ?1",
         )?;
         let opt: Option<LaneStatus> = stmt
             .query_row(params![shard_id], map_lane_status)
             .optional()?;
-        match opt {
-            Some(ls) => Ok(ls),
-            None => Err(SpineError::MissingLaneStatus(shard_id.to_string())),
-        }
+        opt.ok_or_else(|| SpineError::MissingLaneStatus(shard_id.to_string()))
     }
 
     pub fn get_definition_registry_entry(
@@ -337,16 +496,12 @@ impl CyboquaticSpine {
     ) -> Result<DefinitionRegistryEntry, SpineError> {
         let mut stmt = self.conn.prepare(
             "SELECT defid, logicalname, repopath, category, frozen \
-             FROM definitionregistry \
-             WHERE defid = ?1",
+             FROM definitionregistry WHERE defid = ?1",
         )?;
         let opt: Option<DefinitionRegistryEntry> = stmt
             .query_row(params![def_id], map_definition_registry)
             .optional()?;
-        match opt {
-            Some(e) => Ok(e),
-            None => Err(SpineError::MissingDefinitionRegistry(def_id.to_string())),
-        }
+        opt.ok_or_else(|| SpineError::MissingDefinitionRegistry(def_id.to_string()))
     }
 
     pub fn get_eco_wealth_latest(
@@ -355,16 +510,12 @@ impl CyboquaticSpine {
     ) -> Result<EcoWealthStatement, SpineError> {
         let mut stmt = self.conn.prepare(
             "SELECT stewarddid, shardid, wealthscore, keffective, eeffective, reffective \
-             FROM vstewardecowealthlatest \
-             WHERE stewarddid = ?1",
+             FROM vstewardecowealthlatest WHERE stewarddid = ?1",
         )?;
         let opt: Option<EcoWealthStatement> = stmt
             .query_row(params![steward_did], map_eco_wealth)
             .optional()?;
-        match opt {
-            Some(e) => Ok(e),
-            None => Err(SpineError::MissingEcoWealth(steward_did.to_string())),
-        }
+        opt.ok_or_else(|| SpineError::MissingEcoWealth(steward_did.to_string()))
     }
 
     pub fn get_cyboquatic_metrics(
@@ -373,18 +524,12 @@ impl CyboquaticSpine {
     ) -> Result<CyboquaticMetrics, SpineError> {
         let mut stmt = self.conn.prepare(
             "SELECT nodeid, shardid, ecoperjoule, carbonnegativeok, restorationok \
-             FROM vcyboquaticecoperjoule \
-             WHERE nodeid = ?1",
+             FROM vcyboquaticecoperjoule WHERE nodeid = ?1",
         )?;
         let opt: Option<CyboquaticMetrics> = stmt
             .query_row(params![node_id], map_cyboquatic)
             .optional()?;
-        match opt {
-            Some(m) => Ok(m),
-            None => Err(SpineError::MissingCyboquaticMetrics(
-                node_id.to_string(),
-            )),
-        }
+        opt.ok_or_else(|| SpineError::MissingCyboquaticMetrics(node_id.to_string()))
     }
 
     pub fn check_cyboquatic_node_allowed(
@@ -394,13 +539,11 @@ impl CyboquaticSpine {
     ) -> Result<(), SpineError> {
         let lane = self.get_lane_status(shard_id)?;
         let now = utc_now_seconds();
-        let lane_guard_result =
-            lane_guard_check(&lane, LaneFilter::ExactProdOrExpProd, now);
+        let lane_guard_result = lane_guard_check(&lane, LaneFilter::ExactProdOrExpProd, now);
+        
         if !lane_guard_result.admissible {
             return Err(SpineError::LaneNotAdmissible(
-                lane_guard_result
-                    .reason
-                    .unwrap_or_else(|| "lane not admissible".to_string()),
+                lane_guard_result.reason.unwrap_or_else(|| "lane not admissible".to_string()),
             ));
         }
 
@@ -418,252 +561,18 @@ impl CyboquaticSpine {
         let mt_result = Mt6883Guard::check(&mt_inputs);
         if !mt_result.allowed {
             return Err(SpineError::CyboquaticGuardFailed(
-                mt_result
-                    .reason
-                    .unwrap_or_else(|| "mt6883 guard failed".to_string()),
+                mt_result.reason.unwrap_or_else(|| "mt6883 guard failed".to_string()),
             ));
         }
 
         let cybo_guard_result = cyboquatic_guard_check(&cybo);
         if !cybo_guard_result.allowed {
             return Err(SpineError::CyboquaticGuardFailed(
-                cybo_guard_result
-                    .reason
-                    .unwrap_or_else(|| "cyboquatic guard failed".to_string()),
+                cybo_guard_result.reason.unwrap_or_else(|| "cyboquatic guard failed".to_string()),
             ));
         }
 
         Ok(())
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum LaneFilter {
-    ExactProd,
-    ExactExpProd,
-    ExactProdOrExpProd,
-}
-
-#[derive(Debug, Clone)]
-pub struct KerGuardInputs {
-    pub old_k: f64,
-    pub old_e: f64,
-    pub old_r: f64,
-    pub new_k: f64,
-    pub new_e: f64,
-    pub new_r: f64,
-}
-
-#[derive(Debug, Clone)]
-pub struct KerGuardResult {
-    pub ok: bool,
-    pub reason: Option<String>,
-}
-
-pub struct KerUpgradeGuard;
-
-impl KerUpgradeGuard {
-    pub fn check(inputs: &KerGuardInputs) -> KerGuardResult {
-        if inputs.new_k < inputs.old_k {
-            return KerGuardResult {
-                ok: false,
-                reason: Some(format!(
-                    "new K {:.6} < old K {:.6}",
-                    inputs.new_k, inputs.old_k
-                )),
-            };
-        }
-        if inputs.new_e < inputs.old_e {
-            return KerGuardResult {
-                ok: false,
-                reason: Some(format!(
-                    "new E {:.6} < old E {:.6}",
-                    inputs.new_e, inputs.old_e
-                )),
-            };
-        }
-        if inputs.new_r > inputs.old_r {
-            return KerGuardResult {
-                ok: false,
-                reason: Some(format!(
-                    "new R {:.6} > old R {:.6}",
-                    inputs.new_r, inputs.old_r
-                )),
-            };
-        }
-        KerGuardResult { ok: true, reason: None }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct LaneGuardInputs {
-    pub lane_status: LaneStatus,
-    pub filter: LaneFilter,
-    pub now_utc: i64,
-}
-
-#[derive(Debug, Clone)]
-pub struct LaneGuardResult {
-    pub admissible: bool,
-    pub reason: Option<String>,
-}
-
-fn lane_guard_check(
-    lane_status: &LaneStatus,
-    filter: LaneFilter,
-    now_utc: i64,
-) -> LaneGuardResult {
-    let expired = now_utc > lane_status.expires_utc;
-    if expired {
-        return LaneGuardResult {
-            admissible: false,
-            reason: Some("lane verdict is stale".to_string()),
-        };
-    }
-
-    match filter {
-        LaneFilter::ExactProd => {
-            if lane_status.lane != "PROD" {
-                return LaneGuardResult {
-                    admissible: false,
-                    reason: Some(format!("lane is not PROD: {}", lane_status.lane)),
-                };
-            }
-        }
-        LaneFilter::ExactExpProd => {
-            if lane_status.lane != "EXPPROD" {
-                return LaneGuardResult {
-                    admissible: false,
-                    reason: Some(format!("lane is not EXPPROD: {}", lane_status.lane)),
-                };
-            }
-        }
-        LaneFilter::ExactProdOrExpProd => {
-            if lane_status.lane != "PROD" && lane_status.lane != "EXPPROD" {
-                return LaneGuardResult {
-                    admissible: false,
-                    reason: Some(format!(
-                        "lane is not PROD or EXPPROD: {}",
-                        lane_status.lane
-                    )),
-                };
-            }
-        }
-    }
-
-    if !lane_status.carbon_negative_ok {
-        return LaneGuardResult {
-            admissible: false,
-            reason: Some("carbonnegativeok is false".to_string()),
-        };
-    }
-    if !lane_status.restoration_ok {
-        return LaneGuardResult {
-            admissible: false,
-            reason: Some("restorationok is false".to_string()),
-        };
-    }
-
-    LaneGuardResult {
-        admissible: true,
-        reason: None,
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Mt6883GuardInputs {
-    pub ker: KerResidual,
-    pub lane: LaneStatus,
-    pub blast: BlastRadius,
-    pub plane_weights: Vec<PlaneWeight>,
-}
-
-#[derive(Debug, Clone)]
-pub struct Mt6883GuardResult {
-    pub allowed: bool,
-    pub reason: Option<String>,
-}
-
-pub struct Mt6883Guard;
-
-impl Mt6883Guard {
-    pub fn check(inputs: &Mt6883GuardInputs) -> Mt6883GuardResult {
-        if inputs.ker.k < 0.90 {
-            return Mt6883GuardResult {
-                allowed: false,
-                reason: Some("K below 0.90".to_string()),
-            };
-        }
-        if inputs.ker.e < 0.90 {
-            return Mt6883GuardResult {
-                allowed: false,
-                reason: Some("E below 0.90".to_string()),
-            };
-        }
-        if inputs.ker.r > 0.13 {
-            return Mt6883GuardResult {
-                allowed: false,
-                reason: Some("R above 0.13".to_string()),
-            };
-        }
-
-        if inputs.blast.radius_meters > 0.0 && inputs.blast.adjacency_count > 0 {
-            if inputs.ker.r > 0.10 {
-                return Mt6883GuardResult {
-                    allowed: false,
-                    reason: Some(
-                        "blast radius too large for residual R".to_string(),
-                    ),
-                };
-            }
-        }
-
-        let non_offsettable_violation = inputs.plane_weights.iter().any(|p| {
-            p.non_offsettable && p.weight <= 0.0
-        });
-        if non_offsettable_violation {
-            return Mt6883GuardResult {
-                allowed: false,
-                reason: Some("non-offsettable plane weight invalid".to_string()),
-            };
-        }
-
-        Mt6883GuardResult {
-            allowed: true,
-            reason: None,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct CyboquaticGuardResult {
-    pub allowed: bool,
-    pub reason: Option<String>,
-}
-
-fn cyboquatic_guard_check(metrics: &CyboquaticMetrics) -> CyboquaticGuardResult {
-    if !metrics.carbon_negative_ok {
-        return CyboquaticGuardResult {
-            allowed: false,
-            reason: Some("carbonnegativeok flag is false".to_string()),
-        };
-    }
-    if !metrics.restoration_ok {
-        return CyboquaticGuardResult {
-            allowed: false,
-            reason: Some("restorationok flag is false".to_string()),
-        };
-    }
-    if metrics.eco_per_joule <= 0.0 {
-        return CyboquaticGuardResult {
-            allowed: false,
-            reason: Some("ecoperjoule must be positive".to_string()),
-        };
-    }
-
-    CyboquaticGuardResult {
-        allowed: true,
-        reason: None,
     }
 }
 
@@ -714,9 +623,7 @@ fn map_lane_status(row: &Row<'_>) -> Result<LaneStatus, rusqlite::Error> {
     })
 }
 
-fn map_definition_registry(
-    row: &Row<'_>,
-) -> Result<DefinitionRegistryEntry, rusqlite::Error> {
+fn map_definition_registry(row: &Row<'_>) -> Result<DefinitionRegistryEntry, rusqlite::Error> {
     let frozen_int: i64 = row.get(4)?;
     Ok(DefinitionRegistryEntry {
         def_id: row.get(0)?,
@@ -750,213 +657,159 @@ fn map_cyboquatic(row: &Row<'_>) -> Result<CyboquaticMetrics, rusqlite::Error> {
     })
 }
 
-impl<'a> SchemaVerifier<'a> {
-    pub fn verify(&self) -> Result<(), String> {
-        for table in &self.expected.tables {
-            self.verify_table(table)?;
+#[derive(Debug, Clone, Copy)]
+pub enum LaneFilter {
+    ExactProd,
+    ExactExpProd,
+    ExactProdOrExpProd,
+}
+
+#[derive(Debug, Clone)]
+pub struct KerGuardInputs {
+    pub old_k: f64,
+    pub old_e: f64,
+    pub old_r: f64,
+    pub new_k: f64,
+    pub new_e: f64,
+    pub new_r: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct KerGuardResult {
+    pub ok: bool,
+    pub reason: Option<String>,
+}
+
+pub struct KerUpgradeGuard;
+
+impl KerUpgradeGuard {
+    pub fn check(inputs: &KerGuardInputs) -> KerGuardResult {
+        if inputs.new_k < inputs.old_k {
+            return KerGuardResult { ok: false, reason: Some(format!("new K {:.6} < old K {:.6}", inputs.new_k, inputs.old_k)) };
         }
-        Ok(())
+        if inputs.new_e < inputs.old_e {
+            return KerGuardResult { ok: false, reason: Some(format!("new E {:.6} < old E {:.6}", inputs.new_e, inputs.old_e)) };
+        }
+        if inputs.new_r > inputs.old_r {
+            return KerGuardResult { ok: false, reason: Some(format!("new R {:.6} > old R {:.6}", inputs.new_r, inputs.old_r)) };
+        }
+        KerGuardResult { ok: true, reason: None }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct LaneGuardInputs {
+    pub lane_status: LaneStatus,
+    pub filter: LaneFilter,
+    pub now_utc: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct LaneGuardResult {
+    pub admissible: bool,
+    pub reason: Option<String>,
+}
+
+fn lane_guard_check(lane_status: &LaneStatus, filter: LaneFilter, now_utc: i64) -> LaneGuardResult {
+    if now_utc > lane_status.expires_utc {
+        return LaneGuardResult { admissible: false, reason: Some("lane verdict is stale".to_string()) };
     }
 
-    fn verify_table(&self, table: &ExpectedTable) -> Result<(), String> {
-        let pragma_sql = format!("PRAGMA table_info({})", table.name);
-        let mut stmt = self.conn.prepare(&pragma_sql).map_err(|e| e.to_string())?;
-        let mut rows = stmt.query([]).map_err(|e| e.to_string())?;
-        let mut actual_cols: Vec<ExpectedColumn> = Vec::new();
-        while let Some(row) = rows.next().map_err(|e| e.to_string())? {
-            actual_cols.push(map_table_info_row(&row)?);
+    match filter {
+        LaneFilter::ExactProd => {
+            if lane_status.lane != "PROD" {
+                return LaneGuardResult { admissible: false, reason: Some(format!("lane is not PROD: {}", lane_status.lane)) };
+            }
+        }
+        LaneFilter::ExactExpProd => {
+            if lane_status.lane != "EXPPROD" {
+                return LaneGuardResult { admissible: false, reason: Some(format!("lane is not EXPPROD: {}", lane_status.lane)) };
+            }
+        }
+        LaneFilter::ExactProdOrExpProd => {
+            if lane_status.lane != "PROD" && lane_status.lane != "EXPPROD" {
+                return LaneGuardResult { admissible: false, reason: Some(format!("lane is not PROD or EXPPROD: {}", lane_status.lane)) };
+            }
+        }
+    }
+
+    if !lane_status.carbon_negative_ok {
+        return LaneGuardResult { admissible: false, reason: Some("carbonnegativeok is false".to_string()) };
+    }
+    if !lane_status.restoration_ok {
+        return LaneGuardResult { admissible: false, reason: Some("restorationok is false".to_string()) };
+    }
+
+    LaneGuardResult { admissible: true, reason: None }
+}
+
+#[derive(Debug, Clone)]
+pub struct Mt6883GuardInputs {
+    pub ker: KerResidual,
+    pub lane: LaneStatus,
+    pub blast: BlastRadius,
+    pub plane_weights: Vec<PlaneWeight>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Mt6883GuardResult {
+    pub allowed: bool,
+    pub reason: Option<String>,
+}
+
+pub struct Mt6883Guard;
+
+impl Mt6883Guard {
+    pub fn check(inputs: &Mt6883GuardInputs) -> Mt6883GuardResult {
+        if inputs.ker.k < 0.90 {
+            return Mt6883GuardResult { allowed: false, reason: Some("K below 0.90".to_string()) };
+        }
+        if inputs.ker.e < 0.90 {
+            return Mt6883GuardResult { allowed: false, reason: Some("E below 0.90".to_string()) };
+        }
+        if inputs.ker.r > 0.13 {
+            return Mt6883GuardResult { allowed: false, reason: Some("R above 0.13".to_string()) };
         }
 
-        for expected_col in &table.columns {
-            let found = actual_cols.iter().find(|c| c.name == expected_col.name);
-            let actual = match found {
-                Some(c) => c,
-                None => {
-                    return Err(format!(
-                        "missing column '{}' on table '{}'",
-                        expected_col.name, table.name
-                    ))
-                }
-            };
-            if actual.not_null != expected_col.not_null {
-                return Err(format!(
-                    "column '{}' on table '{}' has notnull={}, expected={}",
-                    expected_col.name, table.name, actual.not_null, expected_col.not_null
-                ));
+        if inputs.blast.radius_meters > 0.0 && inputs.blast.adjacency_count > 0 {
+            if inputs.ker.r > 0.10 {
+                return Mt6883GuardResult { allowed: false, reason: Some("blast radius too large for residual R".to_string()) };
             }
         }
 
-        Ok(())
+        let non_offsettable_violation = inputs.plane_weights.iter().any(|p| p.non_offsettable && p.weight <= 0.0);
+        if non_offsettable_violation {
+            return Mt6883GuardResult { allowed: false, reason: Some("non-offsettable plane weight invalid".to_string()) };
+        }
+
+        Mt6883GuardResult { allowed: true, reason: None }
     }
 }
 
-fn map_table_info_row(row: &Row<'_>) -> Result<ExpectedColumn, String> {
-    let name: String = row.get(1).map_err(|e| e.to_string())?;
-    let datatype: String = row.get(2).map_err(|e| e.to_string())?;
-    let notnull_flag: i64 = row.get(3).map_err(|e| e.to_string())?;
-    Ok(ExpectedColumn {
-        name,
-        datatype,
-        not_null: notnull_flag != 0,
-    })
+#[derive(Debug, Clone)]
+pub struct CyboquaticGuardResult {
+    pub allowed: bool,
+    pub reason: Option<String>,
 }
 
-pub fn cyboquatic_expected_schema() -> ExpectedSchema {
-    let tables = vec![
-        ExpectedTable {
-            name: "lanestatusshard".to_string(),
-            columns: vec![
-                ExpectedColumn {
-                    name: "shardid".to_string(),
-                    datatype: "TEXT".to_string(),
-                    not_null: true,
-                },
-                ExpectedColumn {
-                    name: "region".to_string(),
-                    datatype: "TEXT".to_string(),
-                    not_null: true,
-                },
-                ExpectedColumn {
-                    name: "lane".to_string(),
-                    datatype: "TEXT".to_string(),
-                    not_null: true,
-                },
-                ExpectedColumn {
-                    name: "verdict".to_string(),
-                    datatype: "TEXT".to_string(),
-                    not_null: true,
-                },
-                ExpectedColumn {
-                    name: "kerk".to_string(),
-                    datatype: "REAL".to_string(),
-                    not_null: true,
-                },
-                ExpectedColumn {
-                    name: "kere".to_string(),
-                    datatype: "REAL".to_string(),
-                    not_null: true,
-                },
-                ExpectedColumn {
-                    name: "kerr".to_string(),
-                    datatype: "REAL".to_string(),
-                    not_null: true,
-                },
-                ExpectedColumn {
-                    name: "residualvt".to_string(),
-                    datatype: "REAL".to_string(),
-                    not_null: true,
-                },
-                ExpectedColumn {
-                    name: "maxstalenesshours".to_string(),
-                    datatype: "INTEGER".to_string(),
-                    not_null: true,
-                },
-                ExpectedColumn {
-                    name: "expiresutc".to_string(),
-                    datatype: "INTEGER".to_string(),
-                    not_null: true,
-                },
-                ExpectedColumn {
-                    name: "carbonnegativeok".to_string(),
-                    datatype: "INTEGER".to_string(),
-                    not_null: true,
-                },
-                ExpectedColumn {
-                    name: "restorationok".to_string(),
-                    datatype: "INTEGER".to_string(),
-                    not_null: true,
-                },
-            ],
-        },
-        ExpectedTable {
-            name: "definitionregistry".to_string(),
-            columns: vec![
-                ExpectedColumn {
-                    name: "defid".to_string(),
-                    datatype: "TEXT".to_string(),
-                    not_null: true,
-                },
-                ExpectedColumn {
-                    name: "logicalname".to_string(),
-                    datatype: "TEXT".to_string(),
-                    not_null: true,
-                },
-                ExpectedColumn {
-                    name: "repopath".to_string(),
-                    datatype: "TEXT".to_string(),
-                    not_null: true,
-                },
-                ExpectedColumn {
-                    name: "category".to_string(),
-                    datatype: "TEXT".to_string(),
-                    not_null: true,
-                },
-                ExpectedColumn {
-                    name: "frozen".to_string(),
-                    datatype: "INTEGER".to_string(),
-                    not_null: true,
-                },
-            ],
-        },
-        ExpectedTable {
-            name: "kerresidual".to_string(),
-            columns: vec![
-                ExpectedColumn {
-                    name: "shardid".to_string(),
-                    datatype: "TEXT".to_string(),
-                    not_null: true,
-                },
-                ExpectedColumn {
-                    name: "region".to_string(),
-                    datatype: "TEXT".to_string(),
-                    not_null: true,
-                },
-                ExpectedColumn {
-                    name: "kerk".to_string(),
-                    datatype: "REAL".to_string(),
-                    not_null: true,
-                },
-                ExpectedColumn {
-                    name: "kere".to_string(),
-                    datatype: "REAL".to_string(),
-                    not_null: true,
-                },
-                ExpectedColumn {
-                    name: "kerr".to_string(),
-                    datatype: "REAL".to_string(),
-                    not_null: true,
-                },
-                ExpectedColumn {
-                    name: "residualvt".to_string(),
-                    datatype: "REAL".to_string(),
-                    not_null: true,
-                },
-            ],
-        },
-    ];
-
-    ExpectedSchema { tables }
+fn cyboquatic_guard_check(metrics: &CyboquaticMetrics) -> CyboquaticGuardResult {
+    if !metrics.carbon_negative_ok {
+        return CyboquaticGuardResult { allowed: false, reason: Some("carbonnegativeok flag is false".to_string()) };
+    }
+    if !metrics.restoration_ok {
+        return CyboquaticGuardResult { allowed: false, reason: Some("restorationok flag is false".to_string()) };
+    }
+    if metrics.eco_per_joule <= 0.0 {
+        return CyboquaticGuardResult { allowed: false, reason: Some("ecoperjoule must be positive".to_string()) };
+    }
+    CyboquaticGuardResult { allowed: true, reason: None }
 }
-
-// Query helpers for C ABI JSON surfaces
 
 fn query_ker_for_node(conn: &Connection, node_id: &str) -> rusqlite::Result<KerTarget> {
     let mut stmt = conn.prepare(
-        r#"
-        SELECT
-            node_id,
-            AVG(k_metric) AS k_metric,
-            AVG(e_metric) AS e_metric,
-            AVG(r_metric) AS r_metric,
-            MAX(vt_max)   AS vt_max,
-            MAX(ker_deployable) AS ker_deployable
-        FROM cybo_substrate_window
-        WHERE node_id = ?1
-        GROUP BY node_id
-        LIMIT 1
-        "#,
+        r#"SELECT node_id, AVG(k_metric), AVG(e_metric), AVG(r_metric), MAX(vt_max), MAX(ker_deployable)
+           FROM cybo_substrate_window WHERE node_id = ?1 GROUP BY node_id LIMIT 1"#,
     )?;
-
     stmt.query_row([node_id], |row| {
         let ker_deployable_i: i64 = row.get(5)?;
         Ok(KerTarget {
@@ -972,22 +825,12 @@ fn query_ker_for_node(conn: &Connection, node_id: &str) -> rusqlite::Result<KerT
 
 fn query_blastradius_for_node(conn: &Connection, node_id: &str) -> rusqlite::Result<Vec<BlastRadiusEntry>> {
     let mut stmt = conn.prepare(
-        r#"
-        SELECT
-            source_type,
-            source_id,
-            target_type,
-            target_id,
-            impact_plane,
-            impact_score_sum,
-            vt_sensitivity_mean,
-            link_count
-        FROM v_cybo_node_blastradius
-        WHERE target_type = 'NODE' AND target_id = ?1
-        ORDER BY impact_plane, source_type, source_id
-        "#,
+        r#"SELECT source_type, source_id, target_type, target_id, impact_plane, 
+                  impact_score_sum, vt_sensitivity_mean, link_count
+           FROM v_cybo_node_blastradius
+           WHERE target_type = 'NODE' AND target_id = ?1
+           ORDER BY impact_plane, source_type, source_id"#,
     )?;
-
     let rows = stmt.query_map([node_id], |row| {
         Ok(BlastRadiusEntry {
             source_type: row.get(0)?,
@@ -1000,266 +843,187 @@ fn query_blastradius_for_node(conn: &Connection, node_id: &str) -> rusqlite::Res
             link_count: row.get(7)?,
         })
     })?;
-
     let mut out = Vec::new();
-    for r in rows {
-        out.push(r?);
-    }
+    for r in rows { out.push(r?); }
     Ok(out)
 }
 
 fn query_workload_windows_for_node(conn: &Connection, node_id: &str) -> rusqlite::Result<Vec<WorkloadWindowEntry>> {
     let mut stmt = conn.prepare(
-        r#"
-        SELECT
-            node_id,
-            channel,
-            window_start_utc,
-            window_end_utc,
-            total_requests_j,
-            total_surplus_j,
-            accepted_requests_j,
-            rejected_requests_j,
-            rerouted_requests_j,
-            mean_vt_before,
-            mean_vt_after,
-            mean_delta_vt,
-            mean_r_carbon,
-            mean_r_biodiv,
-            mean_r_materials,
-            mean_r_water,
-            accept_fraction
-        FROM v_cybo_workload_window
-        WHERE node_id = ?1
-        ORDER BY channel, window_start_utc
-        "#,
+        r#"SELECT node_id, channel, window_start_utc, window_end_utc, total_requests_j, total_surplus_j,
+                  accepted_requests_j, rejected_requests_j, rerouted_requests_j, mean_vt_before, mean_vt_after,
+                  mean_delta_vt, mean_r_carbon, mean_r_biodiv, mean_r_materials, mean_r_water, accept_fraction
+           FROM v_cybo_workload_window WHERE node_id = ?1 ORDER BY channel, window_start_utc"#,
     )?;
-
     let rows = stmt.query_map([node_id], |row| {
         Ok(WorkloadWindowEntry {
-            node_id: row.get(0)?,
-            channel: row.get(1)?,
-            window_start_utc: row.get(2)?,
-            window_end_utc: row.get(3)?,
-            total_requests_j: row.get(4)?,
-            total_surplus_j: row.get(5)?,
-            accepted_requests_j: row.get(6)?,
-            rejected_requests_j: row.get(7)?,
-            rerouted_requests_j: row.get(8)?,
-            mean_vt_before: row.get(9)?,
-            mean_vt_after: row.get(10)?,
-            mean_delta_vt: row.get(11)?,
-            mean_r_carbon: row.get(12).ok(),
-            mean_r_biodiv: row.get(13).ok(),
-            mean_r_materials: row.get(14).ok(),
-            mean_r_water: row.get(15).ok(),
+            node_id: row.get(0)?, channel: row.get(1)?, window_start_utc: row.get(2)?, window_end_utc: row.get(3)?,
+            total_requests_j: row.get(4)?, total_surplus_j: row.get(5)?, accepted_requests_j: row.get(6)?,
+            rejected_requests_j: row.get(7)?, rerouted_requests_j: row.get(8)?, mean_vt_before: row.get(9)?,
+            mean_vt_after: row.get(10)?, mean_delta_vt: row.get(11)?, mean_r_carbon: row.get(12).ok(),
+            mean_r_biodiv: row.get(13).ok(), mean_r_materials: row.get(14).ok(), mean_r_water: row.get(15).ok(),
             accept_fraction: row.get(16).ok(),
         })
     })?;
-
     let mut out = Vec::new();
-    for r in rows {
-        out.push(r?);
-    }
+    for r in rows { out.push(r?); }
     Ok(out)
 }
 
 fn query_substrate_summary_for_node(conn: &Connection, node_id: &str) -> rusqlite::Result<Vec<SubstrateSummaryEntry>> {
     let mut stmt = conn.prepare(
-        r#"
-        SELECT
-            node_id,
-            material_id,
-            first_start_utc,
-            last_end_utc,
-            mean_k,
-            mean_e,
-            mean_r,
-            vt_min,
-            vt_max,
-            deployable_count,
-            window_count
-        FROM v_cybo_substrate_summary
-        WHERE node_id = ?1
-        ORDER BY material_id
-        "#,
+        r#"SELECT node_id, material_id, first_start_utc, last_end_utc, mean_k, mean_e, mean_r, 
+                  vt_min, vt_max, deployable_count, window_count
+           FROM v_cybo_substrate_summary WHERE node_id = ?1 ORDER BY material_id"#,
     )?;
-
     let rows = stmt.query_map([node_id], |row| {
         Ok(SubstrateSummaryEntry {
-            node_id: row.get(0)?,
-            material_id: row.get(1)?,
-            first_start_utc: row.get(2)?,
-            last_end_utc: row.get(3)?,
-            mean_k: row.get(4)?,
-            mean_e: row.get(5)?,
-            mean_r: row.get(6)?,
-            vt_min: row.get(7)?,
-            vt_max: row.get(8)?,
-            deployable_count: row.get(9)?,
-            window_count: row.get(10)?,
+            node_id: row.get(0)?, material_id: row.get(1)?, first_start_utc: row.get(2)?, last_end_utc: row.get(3)?,
+            mean_k: row.get(4)?, mean_e: row.get(5)?, mean_r: row.get(6)?, vt_min: row.get(7)?, vt_max: row.get(8)?,
+            deployable_count: row.get(9)?, window_count: row.get(10)?,
         })
     })?;
-
     let mut out = Vec::new();
-    for r in rows {
-        out.push(r?);
-    }
+    for r in rows { out.push(r?); }
     Ok(out)
 }
 
-// C ABI surfaces
+mod ffi {
+    #![allow(unsafe_code)]
+    use super::*;
+    use std::ffi::{CStr, CString};
+    use std::os::raw::c_char;
+    use std::path::Path;
+    use rusqlite::{Connection, OpenFlags};
 
-#[no_mangle]
-pub unsafe extern "C" fn cybo_get_ker_for_node(
-    db_path: *const c_char,
-    node_id: *const c_char,
-) -> *mut c_char {
-    let db = match cstr_to_str(db_path) {
-        Ok(s) => s,
-        Err(m) => return error_json(m),
-    };
-    let node = match cstr_to_str(node_id) {
-        Ok(s) => s,
-        Err(m) => return error_json(m),
-    };
-    let conn = match open_ro_db(db) {
-        Ok(c) => c,
-        Err(_) => return error_json("failed to open SQLite spine"),
-    };
-    match query_ker_for_node(&conn, node) {
-        Ok(row) => to_json_c_string(&row),
-        Err(_) => error_json("node not found or no substrate windows"),
-    }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn cybo_get_blastradius_for_node(
-    db_path: *const c_char,
-    node_id: *const c_char,
-) -> *mut c_char {
-    let db = match cstr_to_str(db_path) {
-        Ok(s) => s,
-        Err(m) => return error_json(m),
-    };
-    let node = match cstr_to_str(node_id) {
-        Ok(s) => s,
-        Err(m) => return error_json(m),
-    };
-    let conn = match open_ro_db(db) {
-        Ok(c) => c,
-        Err(_) => return error_json("failed to open SQLite spine"),
-    };
-    match query_blastradius_for_node(&conn, node) {
-        Ok(rows) => to_json_c_string(&rows),
-        Err(_) => error_json("blast-radius query failed"),
-    }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn cybo_get_workload_windows_for_node(
-    db_path: *const c_char,
-    node_id: *const c_char,
-) -> *mut c_char {
-    let db = match cstr_to_str(db_path) {
-        Ok(s) => s,
-        Err(m) => return error_json(m),
-    };
-    let node = match cstr_to_str(node_id) {
-        Ok(s) => s,
-        Err(m) => return error_json(m),
-    };
-    let conn = match open_ro_db(db) {
-        Ok(c) => c,
-        Err(_) => return error_json("failed to open SQLite spine"),
-    };
-    match query_workload_windows_for_node(&conn, node) {
-        Ok(rows) => to_json_c_string(&rows),
-        Err(_) => error_json("workload window query failed"),
-    }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn cybo_get_substrate_summary_for_node(
-    db_path: *const c_char,
-    node_id: *const c_char,
-) -> *mut c_char {
-    let db = match cstr_to_str(db_path) {
-        Ok(s) => s,
-        Err(m) => return error_json(m),
-    };
-    let node = match cstr_to_str(node_id) {
-        Ok(s) => s,
-        Err(m) => return error_json(m),
-    };
-    let conn = match open_ro_db(db) {
-        Ok(c) => c,
-        Err(_) => return error_json("failed to open SQLite spine"),
-    };
-    match query_substrate_summary_for_node(&conn, node) {
-        Ok(rows) => to_json_c_string(&rows),
-        Err(_) => error_json("substrate summary query failed"),
-    }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn cybo_check_node_allowed(
-    db_path: *const c_char,
-    node_id: *const c_char,
-    shard_id: *const c_char,
-) -> *mut c_char {
-    #[derive(Serialize)]
-    struct GuardResultPayload {
-        allowed: bool,
-        reason: Option<String>,
+    fn cstr_to_str(ptr: *const c_char) -> Result<&'static str, &'static str> {
+        if ptr.is_null() { return Err("null pointer"); }
+        unsafe { CStr::from_ptr(ptr) }.to_str().map_err(|_| "invalid UTF-8")
     }
 
-    let db = match cstr_to_str(db_path) {
-        Ok(s) => s,
-        Err(m) => return error_json(m),
-    };
-    let node = match cstr_to_str(node_id) {
-        Ok(s) => s,
-        Err(m) => return error_json(m),
-    };
-    let shard = match cstr_to_str(shard_id) {
-        Ok(s) => s,
-        Err(m) => return error_json(m),
-    };
-
-    let conn = match open_ro_db(db) {
-        Ok(c) => c,
-        Err(_) => return error_json("failed to open SQLite spine"),
-    };
-
-    let spine = match CyboquaticSpine::open(db, cyboquatic_expected_schema()) {
-        Ok(s) => s,
-        Err(e) => {
-            return to_json_c_string(&GuardResultPayload {
-                allowed: false,
-                reason: Some(format!("schema or spine error: {}", e)),
-            })
+    fn to_json_c_string<T: Serialize>(val: &T) -> *mut c_char {
+        match serde_json::to_string(val) {
+            Ok(json) => match CString::new(json) {
+                Ok(s) => s.into_raw(),
+                Err(_) => std::ptr::null_mut(),
+            },
+            Err(_) => std::ptr::null_mut(),
         }
-    };
-
-    let result = match spine.check_cyboquatic_node_allowed(node, shard) {
-        Ok(()) => GuardResultPayload {
-            allowed: true,
-            reason: None,
-        },
-        Err(e) => GuardResultPayload {
-            allowed: false,
-            reason: Some(e.to_string()),
-        },
-    };
-
-    to_json_c_string(&result)
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn cybo_free_json(ptr: *mut c_char) {
-    if ptr.is_null() {
-        return;
     }
-    let _ = CString::from_raw(ptr);
+
+    fn error_json(msg: &str) -> *mut c_char {
+        #[derive(Serialize)]
+        struct ErrWrap<'a> { error: &'a str }
+        to_json_c_string(&ErrWrap { error: msg })
+    }
+
+    fn open_ro_db(db_path: &str) -> rusqlite::Result<Connection> {
+        Connection::open_with_flags(
+            Path::new(db_path),
+            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
+    }
+
+    #[no_mangle]
+    pub extern "C" fn cybo_list_machinery_blastradius_json(db_path: *const c_char) -> *mut c_char {
+        let db = match cstr_to_str(db_path) { Ok(s) => s, Err(m) => return error_json(m) };
+        let spine = match CyboquaticSpine::open(db, cyboquatic_expected_schema()) {
+            Ok(s) => s,
+            Err(e) => return error_json(&format!("spine error: {}", e)),
+        };
+        match spine.list_machinery_blastradius() {
+            Ok(data) => to_json_c_string(&data),
+            Err(_) => error_json("machinery blast-radius query failed"),
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn cybo_summarize_node_region_json(
+        db_path: *const c_char, node_id: *const c_char, region: *const c_char,
+    ) -> *mut c_char {
+        let db = match cstr_to_str(db_path) { Ok(s) => s, Err(m) => return error_json(m) };
+        let node = match cstr_to_str(node_id) { Ok(s) => s, Err(m) => return error_json(m) };
+        let regn = match cstr_to_str(region) { Ok(s) => s, Err(m) => return error_json(m) };
+        let spine = match CyboquaticSpine::open(db, cyboquatic_expected_schema()) {
+            Ok(s) => s,
+            Err(e) => return error_json(&format!("spine error: {}", e)),
+        };
+        match spine.summarize_node_region(node, regn) {
+            Ok(summary) => to_json_c_string(&summary),
+            Err(_) => error_json("node region summary query failed"),
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn cybo_get_ker_for_node(db_path: *const c_char, node_id: *const c_char) -> *mut c_char {
+        let db = match cstr_to_str(db_path) { Ok(s) => s, Err(m) => return error_json(m) };
+        let node = match cstr_to_str(node_id) { Ok(s) => s, Err(m) => return error_json(m) };
+        let conn = match open_ro_db(db) { Ok(c) => c, Err(_) => return error_json("failed to open SQLite spine") };
+        match query_ker_for_node(&conn, node) {
+            Ok(row) => to_json_c_string(&row),
+            Err(_) => error_json("node not found or no substrate windows"),
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn cybo_get_blastradius_for_node(db_path: *const c_char, node_id: *const c_char) -> *mut c_char {
+        let db = match cstr_to_str(db_path) { Ok(s) => s, Err(m) => return error_json(m) };
+        let node = match cstr_to_str(node_id) { Ok(s) => s, Err(m) => return error_json(m) };
+        let conn = match open_ro_db(db) { Ok(c) => c, Err(_) => return error_json("failed to open SQLite spine") };
+        match query_blastradius_for_node(&conn, node) {
+            Ok(rows) => to_json_c_string(&rows),
+            Err(_) => error_json("blast-radius query failed"),
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn cybo_get_workload_windows_for_node(db_path: *const c_char, node_id: *const c_char) -> *mut c_char {
+        let db = match cstr_to_str(db_path) { Ok(s) => s, Err(m) => return error_json(m) };
+        let node = match cstr_to_str(node_id) { Ok(s) => s, Err(m) => return error_json(m) };
+        let conn = match open_ro_db(db) { Ok(c) => c, Err(_) => return error_json("failed to open SQLite spine") };
+        match query_workload_windows_for_node(&conn, node) {
+            Ok(rows) => to_json_c_string(&rows),
+            Err(_) => error_json("workload window query failed"),
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn cybo_get_substrate_summary_for_node(db_path: *const c_char, node_id: *const c_char) -> *mut c_char {
+        let db = match cstr_to_str(db_path) { Ok(s) => s, Err(m) => return error_json(m) };
+        let node = match cstr_to_str(node_id) { Ok(s) => s, Err(m) => return error_json(m) };
+        let conn = match open_ro_db(db) { Ok(c) => c, Err(_) => return error_json("failed to open SQLite spine") };
+        match query_substrate_summary_for_node(&conn, node) {
+            Ok(rows) => to_json_c_string(&rows),
+            Err(_) => error_json("substrate summary query failed"),
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn cybo_check_node_allowed(
+        db_path: *const c_char, node_id: *const c_char, shard_id: *const c_char,
+    ) -> *mut c_char {
+        #[derive(Serialize)]
+        struct GuardResultPayload { allowed: bool, reason: Option<String> }
+
+        let db = match cstr_to_str(db_path) { Ok(s) => s, Err(m) => return error_json(m) };
+        let node = match cstr_to_str(node_id) { Ok(s) => s, Err(m) => return error_json(m) };
+        let shard = match cstr_to_str(shard_id) { Ok(s) => s, Err(m) => return error_json(m) };
+
+        let spine = match CyboquaticSpine::open(db, cyboquatic_expected_schema()) {
+            Ok(s) => s,
+            Err(e) => return to_json_c_string(&GuardResultPayload { allowed: false, reason: Some(format!("schema or spine error: {}", e)) }),
+        };
+
+        let result = match spine.check_cyboquatic_node_allowed(node, shard) {
+            Ok(()) => GuardResultPayload { allowed: true, reason: None },
+            Err(e) => GuardResultPayload { allowed: false, reason: Some(e.to_string()) },
+        };
+        to_json_c_string(&result)
+    }
+
+    #[no_mangle]
+    pub extern "C" fn cybo_free_json(ptr: *mut c_char) {
+        if ptr.is_null() { return; }
+        unsafe { let _ = CString::from_raw(ptr); }
+    }
 }
