@@ -117,6 +117,7 @@ members = [
     # prometheus-praxis/src and prometheus_praxis – keep only the canonical crate directory once.
     "crates/prometheus-praxis",
     "crates/prometheus_praxis",
+    "crates/prometheus_praxis_ai",
 
     "crates/psychrisk_engine",
     "crates/restoration-radius",
