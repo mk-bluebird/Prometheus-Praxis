@@ -5,6 +5,7 @@
 -- Minimal LuaJIT FFI harness for the EcoNet Cyboquatic read-only cdylib.
 -- Visual-only JSON access for KER targets, blast-radius overlays,
 -- workload trends, and Cyboquatic eco-metrics. No actuation.
+-- Extended with AI-chat specialized functions.
 
 local ffi = require("ffi")
 
@@ -13,6 +14,13 @@ char* econet_get_ker_targets(const char* dbpath, const char* reponame);
 char* econet_get_blast_radius_for_node(const char* dbpath, const char* nodeid);
 char* econet_get_workload_trends_for_node(const char* dbpath, const char* nodeid);
 char* econet_get_cybo_node_eco_metrics(const char* dbpath, const char* nodeid);
+
+-- AI-Chat specialized FFI functions
+char* econet_get_repo_manifest_agent(const char* dbpath, const char* reponame);
+char* econet_get_agent_safe_catalog(const char* dbpath, const char* reponame);
+char* econet_get_node_window(const char* dbpath, const char* nodeid);
+char* econet_get_blastradius_summary(const char* dbpath, const char* nodeid);
+
 void  econet_free_json(char* ptr);
 ]]
 
@@ -60,6 +68,40 @@ function M.get_cybo_node_eco_metrics(dbpath, nodeid)
     return nil, "dbpath and nodeid are required"
   end
   local c = lib.econet_get_cybo_node_eco_metrics(dbpath, nodeid)
+  return read_json_ptr(c)
+end
+
+-- AI-Chat specialized functions
+
+function M.get_repo_manifest_agent(dbpath, reponame)
+  if dbpath == nil or reponame == nil then
+    return nil, "dbpath and reponame are required"
+  end
+  local c = lib.econet_get_repo_manifest_agent(dbpath, reponame)
+  return read_json_ptr(c)
+end
+
+function M.get_agent_safe_catalog(dbpath, reponame)
+  if dbpath == nil or reponame == nil then
+    return nil, "dbpath and reponame are required"
+  end
+  local c = lib.econet_get_agent_safe_catalog(dbpath, reponame)
+  return read_json_ptr(c)
+end
+
+function M.get_node_window(dbpath, nodeid)
+  if dbpath == nil or nodeid == nil then
+    return nil, "dbpath and nodeid are required"
+  end
+  local c = lib.econet_get_node_window(dbpath, nodeid)
+  return read_json_ptr(c)
+end
+
+function M.get_blastradius_summary(dbpath, nodeid)
+  if dbpath == nil or nodeid == nil then
+    return nil, "dbpath and nodeid are required"
+  end
+  local c = lib.econet_get_blastradius_summary(dbpath, nodeid)
   return read_json_ptr(c)
 end
 
