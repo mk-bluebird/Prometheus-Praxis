@@ -1,0 +1,115 @@
+aln
+alnversion 1.0.0
+alnnamespace ecosafety.workload.node.window.v1
+
+-----------------------------------------------------------------------
+Utility particles (reused from ecosafety.nanoswarm.urban.core.v1)
+-----------------------------------------------------------------------
+
+particle koid.v1
+  id str.v1
+
+particle time.timestamp.v1
+  millissinceunixepoch i64.v1
+
+particle ecosafety.ker.triplet.v1
+  id koid.v1
+  k f64.v1        -- Knowledge-factor 0..1
+  e f64.v1        -- Eco-impact 0..1
+  r f64.v1        -- Risk-of-harm 0..1
+
+particle ecosafety.shard.row.base.v1
+  id koid.v1
+  shardid str.v1
+  timestamputc time.timestamp.v1
+  objectid str.v1
+  kerid ref.ecosafety.ker.triplet.v1
+
+-----------------------------------------------------------------------
+Workload node window particle (mirrors WorkloadNodeWindow struct)
+-----------------------------------------------------------------------
+
+particle ecosafety.workload.node.window.v1
+  id koid.v1
+
+  -- Base shard identity (shardid, window-close timestamp, objectid, KER).
+  baseid ref.ecosafety.shard.row.base.v1
+
+  -- Node / asset identification.
+  nodeid str.v1                -- Logical node, pump, softrobot, etc.
+  assetid str.v1?              -- Optional Cyboquatic asset id.
+
+  -- Window bounds (UTC, seconds since UNIX epoch).
+  window_start_utc time.timestamp.v1
+  window_end_utc   time.timestamp.v1
+
+  -- Energy totals (Joules), aligned with workloadledger.
+  energy_req_j     f64.v1
+  energy_surplus_j f64.v1
+
+  -- Workload fractions (0..1) for this window.
+  accepted_fraction f64.v1
+  rejected_fraction f64.v1
+  rerouted_fraction f64.v1
+
+  -- Lyapunov residual traces.
+  mean_vt_before   f64.v1
+  mean_vt_after    f64.v1
+  mean_delta_vt    f64.v1
+
+  -- Risk scalars (0..1), optional.
+  mean_r_carbon f64.v1?
+  mean_r_biodiv f64.v1?
+
+  -- Corridor semantics and decision-mode.
+  corridor_status str.v1  -- "SATISFIED" | "SOFTVIOLATION" | "HARDVIOLATION"
+  decision_mode   str.v1  -- "ALLOW" | "DERATE" | "STOP"
+
+  -- Window-level KER triplet (can equal base KER or be derived).
+  window_ker_id ref.ecosafety.ker.triplet.v1
+
+-----------------------------------------------------------------------
+Rules (executable constraints agents can rely on)
+-----------------------------------------------------------------------
+
+rule workload_window_time_order
+  -- Require window_end_utc >= window_start_utc.
+  when w ecosafety.workload.node.window.v1
+  then require w.window_end_utc.millissinceunixepoch
+              >= w.window_start_utc.millissinceunixepoch
+       else error ECOSAFETY_WORKLOAD_WINDOW_TIME_ORDER
+
+rule workload_window_fractions_bounds
+  -- Fractions must lie in [0,1] individually.
+  when w ecosafety.workload.node.window.v1
+  then require w.accepted_fraction >= 0.0
+             && w.accepted_fraction <= 1.0
+       else error ECOSAFETY_WORKLOAD_ACCEPTED_FRACTION_OUT_OF_RANGE
+
+       require w.rejected_fraction >= 0.0
+             && w.rejected_fraction <= 1.0
+       else error ECOSAFETY_WORKLOAD_REJECTED_FRACTION_OUT_OF_RANGE
+
+       require w.rerouted_fraction >= 0.0
+             && w.rerouted_fraction <= 1.0
+       else error ECOSAFETY_WORKLOAD_REROUTED_FRACTION_OUT_OF_RANGE
+
+rule workload_window_corridor_semantics
+  -- Corridor status and decision mode must be in allowed sets.
+  when w ecosafety.workload.node.window.v1
+  then require w.corridor_status in
+              [ SATISFIED, SOFTVIOLATION, HARDVIOLATION ]
+       else error ECOSAFETY_WORKLOAD_CORRIDOR_STATUS_INVALID
+
+       require w.decision_mode in
+              [ ALLOW, DERATE, STOP ]
+       else error ECOSAFETY_WORKLOAD_DECISION_MODE_INVALID
+
+rule workload_window_delta_vt_consistency
+  -- mean_delta_vt must equal mean_vt_after - mean_vt_before, within tolerance.
+  when w ecosafety.workload.node.window.v1
+  then require abs(
+              w.mean_delta_vt
+              - (w.mean_vt_after - w.mean_vt_before)
+         ) <= 1e-9
+       else error ECOSAFETY_WORKLOAD_DELTA_VT_INCONSISTENT
