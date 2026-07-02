@@ -3,33 +3,24 @@
 // purpose:
 //   Rust helper for loading db/blastradius_spine.sql into an in-memory SQLite
 //   connection, and exposing safe read-only queries for Rust, Lua, C++, Kotlin.
-//
-// Cargo.toml (excerpt) for this crate:
-//
-// [package]
-// name = "econet_blastradius_spine"
-// version = "0.1.0"
-// edition = "2021"
-//
-// [dependencies]
-// rusqlite = { version = "0.31", features = ["bundled"] }
-// serde = { version = "1.0", features = ["derive"] }
-// serde_json = "1.0"
-//
-// [lib]
-// name = "econet_blastradius_spine"
-// crate-type = ["rlib", "cdylib"]
 
-use rusqlite::{Connection, Error as SqlError, Row};
+// rust-version: 1.85, edition 2024, dual-licensed MIT OR Apache-2.0
+#![forbid(unsafe_code)]
+
+use rusqlite::{params, Connection, Error as SqlError, Row};
 use serde::{Deserialize, Serialize};
+use std::ffi::{CStr, CString};
 use std::fs;
+use std::os::raw::c_char;
 use std::path::{Path, PathBuf};
+use thiserror::Error;
 
 #[derive(Debug)]
 pub enum SpineError {
     Sql(SqlError),
     Io(std::io::Error),
     MissingSchema(String),
+    Json(serde_json::Error),
 }
 
 impl From<SqlError> for SpineError {
@@ -41,6 +32,12 @@ impl From<SqlError> for SpineError {
 impl From<std::io::Error> for SpineError {
     fn from(e: std::io::Error) -> Self {
         SpineError::Io(e)
+    }
+}
+
+impl From<serde_json::Error> for SpineError {
+    fn from(e: serde_json::Error) -> Self {
+        SpineError::Json(e)
     }
 }
 
@@ -88,12 +85,170 @@ pub struct ShardEcoImprovement {
     pub always_improve_ok: bool,
 }
 
+/// Consistent error type for the cross-spine kernel.
+#[derive(Debug, Error)]
+pub enum CrossSpineError {
+    #[error("SQLite error: {0}")]
+    Sqlite(#[from] rusqlite::Error),
+
+    #[error("JSON error: {0}")]
+    Json(#[from] serde_json::Error),
+
+    #[error("Invalid argument: {0}")]
+    InvalidArg(String),
+
+    #[error("Missing data: {0}")]
+    MissingData(String),
+}
+
+/// KER-weighted blast radius snapshot for a single machine or shard.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KerBlastRadiusSnapshot {
+    pub machine_id: String,
+    pub region: String,
+    pub lane: String,
+    pub carbon_radius: f64,
+    pub biodiversity_radius: f64,
+    pub k_score: f64,
+    pub e_score: f64,
+    pub r_score: f64,
+    pub vt_residual: f64,
+    pub roh_scalar: f64,
+    pub ker_weighted_carbon_radius: f64,
+    pub ker_weighted_biodiversity_radius: f64,
+}
+
+/// Simple weighting rule: scale radii by K and Eco impact, damp by R and RoH.
+fn ker_weight_radius(base_radius: f64, k: f64, e: f64, r: f64, roh: f64) -> f64 {
+    if base_radius <= 0.0 {
+        return 0.0;
+    }
+    let k_clamped = k.clamp(0.0, 1.0);
+    let e_clamped = e.clamp(0.0, 1.0);
+    let r_clamped = r.max(0.0);
+    let roh_clamped = roh.max(0.0);
+
+    let gain = (k_clamped * e_clamped).max(0.0);
+    let penalty = 1.0 + r_clamped + roh_clamped;
+    base_radius * gain / penalty
+}
+
+/// Internal helper: fetch raw carbon / biodiversity radii from Cyboquatic spine.
+fn fetch_cyboquatic_radii(
+    conn: &Connection,
+    machine_id: &str,
+) -> Result<(f64, f64, String, String), CrossSpineError> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT
+            machineid,
+            region,
+            lane,
+            MAX(CASE WHEN impactplane = 'CARBON' THEN impactscoresum ELSE 0.0 END) AS carbon_radius,
+            MAX(CASE WHEN impactplane = 'BIODIVERSITY' THEN impactscoresum ELSE 0.0 END) AS biodiversity_radius
+        FROM vmachineblastradius
+        WHERE machineid = ?1
+        GROUP BY machineid, region, lane
+        "#,
+    )?;
+
+    let row = stmt.query_row([machine_id], |row| {
+        let mid: String = row.get(0)?;
+        let region: String = row.get(1)?;
+        let lane: String = row.get(2)?;
+        let carbon: f64 = row.get(3)?;
+        let biodiv: f64 = row.get(4)?;
+        Ok((carbon, biodiv, region, lane))
+    })?;
+
+    Ok(row)
+}
+
+/// Internal helper: fetch KER and Lyapunov / RoH scalars from EcoNet governance spine.
+fn fetch_governance_ker(
+    conn: &Connection,
+    machine_id: &str,
+) -> Result<(f64, f64, f64, f64, f64), CrossSpineError> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT
+            kscore,
+            escore,
+            rscore,
+            vt_residual,
+            roh_scalar
+        FROM vgov_machine_ker_window
+        WHERE machineid = ?1
+        ORDER BY window_end_utc DESC
+        LIMIT 1
+        "#,
+    )?;
+
+    let row = stmt.query_row([machine_id], |row| {
+        let k: f64 = row.get(0)?;
+        let e: f64 = row.get(1)?;
+        let r: f64 = row.get(2)?;
+        let vt: f64 = row.get(3)?;
+        let roh: f64 = row.get(4)?;
+        Ok((k, e, r, vt, roh))
+    })?;
+
+    Ok(row)
+}
+
+/// Core kernel: load both spines over a single SQLite DB and synthesize a snapshot.
+pub fn blast_radius_kernel(
+    db_path: &str,
+    machine_id: &str,
+) -> Result<KerBlastRadiusSnapshot, CrossSpineError> {
+    if db_path.is_empty() {
+        return Err(CrossSpineError::InvalidArg(
+            "db_path must not be empty".to_string(),
+        ));
+    }
+    if machine_id.is_empty() {
+        return Err(CrossSpineError::InvalidArg(
+            "machine_id must not be empty".to_string(),
+        ));
+    }
+
+    let conn = Connection::open(db_path)?;
+
+    let (carbon_radius, biodiversity_radius, region, lane) =
+        fetch_cyboquatic_radii(&conn, machine_id)?;
+
+    let (k_score, e_score, r_score, vt_residual, roh_scalar) =
+        fetch_governance_ker(&conn, machine_id)?;
+
+    let ker_weighted_carbon_radius =
+        ker_weight_radius(carbon_radius, k_score, e_score, r_score, roh_scalar);
+
+    let ker_weighted_biodiversity_radius =
+        ker_weight_radius(biodiversity_radius, k_score, e_score, r_score, roh_scalar);
+
+    Ok(KerBlastRadiusSnapshot {
+        machine_id: machine_id.to_string(),
+        region,
+        lane,
+        carbon_radius,
+        biodiversity_radius,
+        k_score,
+        e_score,
+        r_score,
+        vt_residual,
+        roh_scalar,
+        ker_weighted_carbon_radius,
+        ker_weighted_biodiversity_radius,
+    })
+}
+
+/// Shard-level Eco blast and improvement spine over v_shard_* views.
 pub struct BlastRadiusSpine {
     conn: Connection,
 }
 
 impl BlastRadiusSpine {
-    /// Initialize an in-memory SQLite DB and load blastradius_spine.sql plus core schema.
+    /// Initialize an in-memory SQLite DB and load db/blastradius_spine.sql plus core schema.
     /// `root` should be the repo root where db/blastradius_spine.sql lives.
     pub fn new_in_memory(root: impl AsRef<Path>) -> Result<Self, SpineError> {
         let root = root.as_ref();
@@ -153,7 +308,7 @@ impl BlastRadiusSpine {
               AND restoration_score >= ?2
             "#,
         )?;
-        let rows = stmt.query_map((region, min_restoration_score), |row| {
+        let rows = stmt.query_map(params![region, min_restoration_score], |row| {
             Ok(row_to_eco_blast(row))
         })?;
         let mut out = Vec::new();
@@ -188,7 +343,7 @@ impl BlastRadiusSpine {
               AND always_improve_ok = 1
             "#,
         )?;
-        let rows = stmt.query_map([lane], |row| Ok(row_to_improvement(row)))?;
+        let rows = stmt.query_map(params![lane], |row| Ok(row_to_improvement(row)))?;
         let mut out = Vec::new();
         for r in rows {
             out.push(r?);
@@ -202,12 +357,14 @@ impl BlastRadiusSpine {
         min_restoration_score: f64,
     ) -> Result<String, SpineError> {
         let data = self.list_eco_blast_for_region(region, min_restoration_score)?;
-        Ok(serde_json::to_string_pretty(&data).unwrap())
+        let json = serde_json::to_string_pretty(&data)?;
+        Ok(json)
     }
 
     pub fn to_json_improvement(&self, lane: &str) -> Result<String, SpineError> {
         let data = self.list_always_improve_ok(lane)?;
-        Ok(serde_json::to_string_pretty(&data).unwrap())
+        let json = serde_json::to_string_pretty(&data)?;
+        Ok(json)
     }
 }
 
@@ -260,13 +417,61 @@ fn row_to_improvement(row: &Row<'_>) -> ShardEcoImprovement {
     }
 }
 
+/// C-FFI surface returning a JSON string for machine-level KER blast radius.
+/// Non-actuating and suitable for AI-chat / external agents.
+#[no_mangle]
+pub extern "C" fn cyboquatic_blastradius_spine(
+    db_path: *const c_char,
+    machine_id: *const c_char,
+) -> *mut c_char {
+    if db_path.is_null() || machine_id.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    let db = match unsafe { CStr::from_ptr(db_path) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let mid = match unsafe { CStr::from_ptr(machine_id) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let snapshot = match blast_radius_kernel(db, mid) {
+        Ok(s) => s,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let json = match serde_json::to_string(&snapshot) {
+        Ok(j) => j,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    match CString::new(json) {
+        Ok(cstr) => cstr.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Freeing function for JSON strings allocated by cyboquatic_blastradius_spine.
+#[no_mangle]
+pub extern "C" fn econet_governance_spine_free_string(ptr: *mut c_char) {
+    if ptr.is_null() {
+        return;
+    }
+    unsafe {
+        let _ = CString::from_raw(ptr);
+    }
+}
+
+/// C-FFI: initialize in-memory spine and return region Eco blast as JSON.
 #[no_mangle]
 pub extern "C" fn econet_blastradius_spine_init_json(
-    root_path_utf8: *const i8,
-    region_utf8: *const i8,
+    root_path_utf8: *const c_char,
+    region_utf8: *const c_char,
     min_restoration_score: f64,
-) -> *mut i8 {
-    use std::ffi::{CStr, CString};
+) -> *mut c_char {
     if root_path_utf8.is_null() || region_utf8.is_null() {
         return std::ptr::null_mut();
     }
@@ -279,17 +484,20 @@ pub extern "C" fn econet_blastradius_spine_init_json(
         .and_then(|spine| spine.to_json_eco_blast(&region, min_restoration_score));
 
     match result {
-        Ok(json) => CString::new(json).unwrap().into_raw(),
+        Ok(json) => match CString::new(json) {
+            Ok(cstr) => cstr.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
         Err(_) => std::ptr::null_mut(),
     }
 }
 
+/// C-FFI: initialize in-memory spine and return lane improvements as JSON.
 #[no_mangle]
 pub extern "C" fn econet_blastradius_spine_improvement_json(
-    root_path_utf8: *const i8,
-    lane_utf8: *const i8,
-) -> *mut i8 {
-    use std::ffi::{CStr, CString};
+    root_path_utf8: *const c_char,
+    lane_utf8: *const c_char,
+) -> *mut c_char {
     if root_path_utf8.is_null() || lane_utf8.is_null() {
         return std::ptr::null_mut();
     }
@@ -302,13 +510,17 @@ pub extern "C" fn econet_blastradius_spine_improvement_json(
         .and_then(|spine| spine.to_json_improvement(&lane));
 
     match result {
-        Ok(json) => CString::new(json).unwrap().into_raw(),
+        Ok(json) => match CString::new(json) {
+            Ok(cstr) => cstr.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
         Err(_) => std::ptr::null_mut(),
     }
 }
 
+/// Free JSON strings allocated by econet_blastradius_spine_* FFI surfaces.
 #[no_mangle]
-pub extern "C" fn econet_blastradius_spine_free_string(ptr: *mut i8) {
+pub extern "C" fn econet_blastradius_spine_free_string(ptr: *mut c_char) {
     if ptr.is_null() {
         return;
     }
