@@ -151,6 +151,114 @@ pub struct CyboRestorationEntry {
     pub restorationok: bool,
 }
 
+/// AI manifest entry for repo metadata.
+#[derive(Debug, Serialize)]
+pub struct RepoManifestAgent {
+    /// Repository name.
+    pub reponame: String,
+    /// GitHub slug.
+    pub githubslug: String,
+    /// Role band (SPINE, RESEARCH, GOV, etc.).
+    pub roleband: String,
+    /// Default lane.
+    pub lanedefault: String,
+    /// Non-actuating flag.
+    pub nonactuatingonly: i32,
+    /// Region code.
+    pub region: String,
+    /// DID owner.
+    pub didowner: String,
+    /// Aggregated primary languages.
+    pub primarylanguages: String,
+    /// Contracts summary.
+    pub contractssummary: String,
+    /// KER target K.
+    pub kertargetk: f64,
+    /// KER target E.
+    pub kertargete: f64,
+    /// KER target R.
+    pub kertargetr: f64,
+    /// Computed risk band.
+    pub riskband: String,
+    /// AI capability flag.
+    pub aicapabilityflag: String,
+}
+
+/// AI-safe catalog entry.
+#[derive(Debug, Serialize)]
+pub struct AgentSafeCatalogEntry {
+    /// Normalized object ID.
+    pub objectid: String,
+    /// Object kind (VIEW, FFI, SQLPATTERN, etc.).
+    pub objectkind: String,
+    /// Repository name.
+    pub reponame: String,
+    /// Role band.
+    pub roleband: String,
+    /// Lane scope.
+    pub lanescope: String,
+    /// AI capability level.
+    pub aicapabilitylevel: String,
+    /// Path or handle.
+    pub path_or_handle: String,
+    /// Contracts summary.
+    pub contractssummary: String,
+    /// Status.
+    pub status: String,
+    /// Risk band.
+    pub riskband: String,
+}
+
+/// Workload node window entry for AI diagnostics.
+#[derive(Debug, Serialize)]
+pub struct NodeWindowEntry {
+    /// Node identifier.
+    pub nodeid: String,
+    /// Channel label.
+    pub channel: String,
+    /// Window start UTC.
+    pub window_start_utc: String,
+    /// Window end UTC.
+    pub window_end_utc: String,
+    /// Total requested energy.
+    pub total_ereqj: f64,
+    /// Total surplus energy.
+    pub total_esurplusj: f64,
+    /// Mean vt before.
+    pub mean_vtbefore: f64,
+    /// Mean vt after.
+    pub mean_vtafter: f64,
+    /// Mean delta vt.
+    pub mean_delta_vt: f64,
+    /// Accept fraction.
+    pub accept_fraction: f64,
+    /// Vt improved flag.
+    pub vt_improved: i32,
+    /// Carbon safe flag.
+    pub carbon_safe: i32,
+}
+
+/// Blast-radius summary entry for AI.
+#[derive(Debug, Serialize)]
+pub struct BlastRadiusSummaryEntry {
+    /// Node identifier.
+    pub nodeid: String,
+    /// Target type.
+    pub targettype: String,
+    /// Target ID.
+    pub targetid: String,
+    /// Impact type.
+    pub impacttype: String,
+    /// Total impact score.
+    pub total_impact_score: f64,
+    /// Mean vt sensitivity.
+    pub mean_vt_sensitivity: f64,
+    /// Vt sensitivity band.
+    pub vt_sensitivity_band: String,
+    /// Safety step OK flag.
+    pub safestepok: i32,
+}
+
 /// Open a SQLite database strictly in read-only, non-mutex mode for the spine.
 fn open_ro_db(db_path: &str) -> Result<Connection, SpineError> {
     Connection::open_with_flags(
@@ -526,6 +634,261 @@ pub extern "C" fn econet_free_json(ptr: *mut c_char) {
     }
     unsafe {
         let _ = CString::from_raw(ptr);
+    }
+}
+
+//-----------------------------------------------------------------------------
+// AI-Chat specialized FFI functions
+//-----------------------------------------------------------------------------
+
+/// Query the AI manifest view for a given repo.
+fn query_repo_manifest_agent(conn: &Connection, reponame: &str) -> Result<RepoManifestAgent, SpineError> {
+    let mut stmt = conn
+        .prepare(
+            r#"
+            SELECT reponame, githubslug, roleband, lanedefault, nonactuatingonly,
+                   COALESCE(region, ''), didowner, primarylanguages, contractssummary,
+                   kertargetk, kertargete, kertargetr, riskband, aicapabilityflag
+            FROM veconet_repo_manifest_agent
+            WHERE reponame = ?1
+            LIMIT 1
+            "#,
+        )
+        .map_err(|e| SpineError::Query(e.to_string()))?;
+
+    let row = stmt
+        .query_row([reponame], |r| {
+            Ok(RepoManifestAgent {
+                reponame: r.get(0)?,
+                githubslug: r.get(1)?,
+                roleband: r.get(2)?,
+                lanedefault: r.get(3)?,
+                nonactuatingonly: r.get(4)?,
+                region: r.get(5)?,
+                didowner: r.get(6)?,
+                primarylanguages: r.get(7)?,
+                contractssummary: r.get(8)?,
+                kertargetk: r.get(9)?,
+                kertargete: r.get(10)?,
+                kertargetr: r.get(11)?,
+                riskband: r.get(12)?,
+                aicapabilityflag: r.get(13)?,
+            })
+        })
+        .map_err(|e| SpineError::Query(e.to_string()))?;
+
+    Ok(row)
+}
+
+/// Query the AI-safe catalog for a given repo.
+fn query_agent_safe_catalog(conn: &Connection, reponame: &str) -> Result<Vec<AgentSafeCatalogEntry>, SpineError> {
+    let mut stmt = conn
+        .prepare(
+            r#"
+            SELECT objectid, objectkind, reponame, roleband, lanescope,
+                   aicapabilitylevel, path_or_handle, contractssummary, status, riskband
+            FROM v_agent_safe_catalog
+            WHERE reponame = ?1
+            ORDER BY objectkind, objectid
+            "#,
+        )
+        .map_err(|e| SpineError::Query(e.to_string()))?;
+
+    let rows = stmt
+        .query_map([reponame], |r| {
+            Ok(AgentSafeCatalogEntry {
+                objectid: r.get(0)?,
+                objectkind: r.get(1)?,
+                reponame: r.get(2)?,
+                roleband: r.get(3)?,
+                lanescope: r.get(4)?,
+                aicapabilitylevel: r.get(5)?,
+                path_or_handle: r.get(6)?,
+                contractssummary: r.get(7)?,
+                status: r.get(8)?,
+                riskband: r.get(9)?,
+            })
+        })
+        .map_err(|e| SpineError::Query(e.to_string()))?;
+
+    let mut out = Vec::new();
+    for row in rows {
+        out.push(row.map_err(|e| SpineError::Query(e.to_string()))?);
+    }
+    Ok(out)
+}
+
+/// Query node workload window from vcyboworkloadnodewindow.
+fn query_node_window(
+    conn: &Connection,
+    nodeid: &str,
+) -> Result<Vec<NodeWindowEntry>, SpineError> {
+    let mut stmt = conn
+        .prepare(
+            r#"
+            SELECT nodeid, channel, window_start_utc, window_end_utc,
+                   total_ereqj, total_esurplusj,
+                   mean_vtbefore, mean_vtafter, mean_delta_vt,
+                   accept_fraction, vt_improved, carbon_safe
+            FROM vcyboworkloadnodewindow
+            WHERE nodeid = ?1
+            ORDER BY channel
+            "#,
+        )
+        .map_err(|e| SpineError::Query(e.to_string()))?;
+
+    let rows = stmt
+        .query_map([nodeid], |r| {
+            Ok(NodeWindowEntry {
+                nodeid: r.get(0)?,
+                channel: r.get(1)?,
+                window_start_utc: r.get::<_, String>(2)?,
+                window_end_utc: r.get::<_, String>(3)?,
+                total_ereqj: r.get(4)?,
+                total_esurplusj: r.get(5)?,
+                mean_vtbefore: r.get(6)?,
+                mean_vtafter: r.get(7)?,
+                mean_delta_vt: r.get(8)?,
+                accept_fraction: r.get(9)?,
+                vt_improved: r.get(10)?,
+                carbon_safe: r.get(11)?,
+            })
+        })
+        .map_err(|e| SpineError::Query(e.to_string()))?;
+
+    let mut out = Vec::new();
+    for row in rows {
+        out.push(row.map_err(|e| SpineError::Query(e.to_string()))?);
+    }
+    Ok(out)
+}
+
+/// Query blast-radius summary from vmachine_blastradius.
+fn query_blastradius_summary(conn: &Connection, nodeid: &str) -> Result<Vec<BlastRadiusSummaryEntry>, SpineError> {
+    let mut stmt = conn
+        .prepare(
+            r#"
+            SELECT nodeid, targettype, targetid, impacttype,
+                   total_impact_score, mean_vt_sensitivity,
+                   vt_sensitivity_band, safestepok
+            FROM vmachine_blastradius
+            WHERE nodeid = ?1
+            ORDER BY impacttype, total_impact_score DESC
+            "#,
+        )
+        .map_err(|e| SpineError::Query(e.to_string()))?;
+
+    let rows = stmt
+        .query_map([nodeid], |r| {
+            Ok(BlastRadiusSummaryEntry {
+                nodeid: r.get(0)?,
+                targettype: r.get(1)?,
+                targetid: r.get(2)?,
+                impacttype: r.get(3)?,
+                total_impact_score: r.get(4)?,
+                mean_vt_sensitivity: r.get(5)?,
+                vt_sensitivity_band: r.get(6)?,
+                safestepok: r.get(7)?,
+            })
+        })
+        .map_err(|e| SpineError::Query(e.to_string()))?;
+
+    let mut out = Vec::new();
+    for row in rows {
+        out.push(row.map_err(|e| SpineError::Query(e.to_string()))?);
+    }
+    Ok(out)
+}
+
+/// Public C ABI: get repo manifest for AI chat as JSON.
+#[no_mangle]
+pub extern "C" fn econet_get_repo_manifest_agent(
+    dbpath: *const c_char,
+    reponame: *const c_char,
+) -> *mut c_char {
+    let dbpath_str = match cstr_to_str(dbpath) {
+        Ok(s) => s,
+        Err(e) => return error_json_internal(&e.to_string()),
+    };
+    let reponame_str = match cstr_to_str(reponame) {
+        Ok(s) => s,
+        Err(e) => return error_json_internal(&e.to_string()),
+    };
+
+    match open_ro_db(dbpath_str)
+        .and_then(|conn| query_repo_manifest_agent(&conn, reponame_str))
+    {
+        Ok(val) => to_json_cstring(val),
+        Err(e) => error_json_internal(&e.to_string()),
+    }
+}
+
+/// Public C ABI: get AI-safe catalog for a repo as JSON array.
+#[no_mangle]
+pub extern "C" fn econet_get_agent_safe_catalog(
+    dbpath: *const c_char,
+    reponame: *const c_char,
+) -> *mut c_char {
+    let dbpath_str = match cstr_to_str(dbpath) {
+        Ok(s) => s,
+        Err(e) => return error_json_internal(&e.to_string()),
+    };
+    let reponame_str = match cstr_to_str(reponame) {
+        Ok(s) => s,
+        Err(e) => return error_json_internal(&e.to_string()),
+    };
+
+    match open_ro_db(dbpath_str)
+        .and_then(|conn| query_agent_safe_catalog(&conn, reponame_str))
+    {
+        Ok(val) => to_json_cstring(val),
+        Err(e) => error_json_internal(&e.to_string()),
+    }
+}
+
+/// Public C ABI: get node workload window as JSON array.
+#[no_mangle]
+pub extern "C" fn econet_get_node_window(
+    dbpath: *const c_char,
+    nodeid: *const c_char,
+) -> *mut c_char {
+    let dbpath_str = match cstr_to_str(dbpath) {
+        Ok(s) => s,
+        Err(e) => return error_json_internal(&e.to_string()),
+    };
+    let nodeid_str = match cstr_to_str(nodeid) {
+        Ok(s) => s,
+        Err(e) => return error_json_internal(&e.to_string()),
+    };
+
+    match open_ro_db(dbpath_str)
+        .and_then(|conn| query_node_window(&conn, nodeid_str))
+    {
+        Ok(val) => to_json_cstring(val),
+        Err(e) => error_json_internal(&e.to_string()),
+    }
+}
+
+/// Public C ABI: get blast-radius summary for a node as JSON array.
+#[no_mangle]
+pub extern "C" fn econet_get_blastradius_summary(
+    dbpath: *const c_char,
+    nodeid: *const c_char,
+) -> *mut c_char {
+    let dbpath_str = match cstr_to_str(dbpath) {
+        Ok(s) => s,
+        Err(e) => return error_json_internal(&e.to_string()),
+    };
+    let nodeid_str = match cstr_to_str(nodeid) {
+        Ok(s) => s,
+        Err(e) => return error_json_internal(&e.to_string()),
+    };
+
+    match open_ro_db(dbpath_str)
+        .and_then(|conn| query_blastradius_summary(&conn, nodeid_str))
+    {
+        Ok(val) => to_json_cstring(val),
+        Err(e) => error_json_internal(&e.to_string()),
     }
 }
 
