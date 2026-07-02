@@ -1,0 +1,8 @@
+"Component","Role"
+"StewardIdentityPayload","Minimal DID + lane + region + time payload. 9a684d92-2c23-4891-b1e0-61a5f9d79b48.md"
+"canonical_identity_json","Stable JSON for signing, following canonicalization. abb758ad-96df-4004-b99e-691657f53f60.md"
+"bostrom_signer","Signs payload, returns signature_hex, signer_key_id. abb758ad-96df-4004-b99e-691657f53f60.md"
+"StewardIdentityEnvelope","Payload + signature bound to ShardIndex. 9a684d92-2c23-4891-b1e0-61a5f9d79b48.md"
+"ppx_minimal_identity_kernel_open","FFI to open DB and attach signed identity. 9a684d92-2c23-4891-b1e0-61a5f9d79b48.md"
+"ppx_minimal_identity_kernel_get_envelope","FFI to retrieve envelope for auditing. 9a684d92-2c23-4891-b1e0-61a5f9d79b48.md"
+"steward_query_audit SQL view","Governance surface for per‑steward query logs. 9a684d92-2c23-4891-b1e0-61a5f9d79b48.md"
