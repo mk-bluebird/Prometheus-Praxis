@@ -4,11 +4,16 @@
 #![forbid(unsafe_code)]
 
 use std::collections::HashMap;
+use std::ffi::{CStr, CString};
+use std::os::raw::c_char;
 use std::path::PathBuf;
+use std::ptr;
 
 use thiserror::Error;
 
-use rusqlite::{params, Connection, Row};
+use rusqlite::{params, Connection, OpenFlags, OptionalExtension, Row};
+use serde::Serialize;
+use serde_json::json;
 
 mod guards;
 mod schema;
@@ -47,6 +52,15 @@ pub enum SpineError {
 
     #[error("Missing cyboquatic metrics for node '{0}'")]
     MissingCyboquaticMetrics(String),
+
+    #[error("UTF-8 conversion error")]
+    Utf8,
+
+    #[error("JSON serialization error: {0}")]
+    Json(#[from] serde_json::Error),
+
+    #[error("Invalid argument: {0}")]
+    InvalidArgument(String),
 }
 
 #[derive(Debug, Clone)]
@@ -125,7 +139,8 @@ pub struct GovernanceSpine {
 
 impl GovernanceSpine {
     pub fn open(db_path: &PathBuf, expected_schema: ExpectedSchema) -> Result<Self, SpineError> {
-        let conn = Connection::open(db_path)?;
+        let flags = OpenFlags::SQLITE_OPEN_READONLY | OpenFlags::SQLITE_OPEN_NOMUTEX;
+        let conn = Connection::open_with_flags(db_path, flags)?;
         let spine = GovernanceSpine { conn, expected_schema };
         spine.verify_schema()?;
         Ok(spine)
@@ -156,10 +171,7 @@ impl GovernanceSpine {
         }
     }
 
-    pub fn get_plane_weights(
-        &self,
-        shard_id: &str,
-    ) -> Result<Vec<PlaneWeight>, SpineError> {
+    pub fn get_plane_weights(&self, shard_id: &str) -> Result<Vec<PlaneWeight>, SpineError> {
         let mut stmt = self.conn.prepare(
             "SELECT plane_name,
                     weight,
@@ -387,5 +399,328 @@ pub fn load_expected_schema() -> ExpectedSchema {
         "kerresidual".to_string(),
         ExpectedTable::kerresidual(),
     );
+
     ExpectedSchema { tables }
+}
+
+// --- FFI + AI context surface -----------------------------------------------
+
+#[repr(C)]
+pub struct ShardIndex {
+    conn: Connection,
+}
+
+impl ShardIndex {
+    fn new(db_path: &str) -> Result<Self, SpineError> {
+        let flags = OpenFlags::SQLITE_OPEN_READONLY | OpenFlags::SQLITE_OPEN_NOMUTEX;
+        let conn = Connection::open_with_flags(db_path, flags)?;
+        Ok(ShardIndex { conn })
+    }
+}
+
+fn cstr_to_str(ptr: *const c_char) -> Result<&'static str, SpineError> {
+    if ptr.is_null() {
+        return Err(SpineError::Utf8);
+    }
+    let cstr = unsafe { CStr::from_ptr(ptr) };
+    cstr.to_str().map_err(|_| SpineError::Utf8)
+}
+
+fn to_json_cstring<T>(value: &T) -> *mut c_char
+where
+    T: Serialize,
+{
+    match serde_json::to_string(value) {
+        Ok(json_str) => match CString::new(json_str) {
+            Ok(cstr) => cstr.into_raw(),
+            Err(_) => ptr::null_mut(),
+        },
+        Err(_) => ptr::null_mut(),
+    }
+}
+
+fn error_json_internal(msg: &str) -> *mut c_char {
+    let payload = json!({ "error": msg }).to_string();
+    match CString::new(payload) {
+        Ok(cstr) => cstr.into_raw(),
+        Err(_) => ptr::null_mut(),
+    }
+}
+
+macro_rules! impl_ffi_query {
+    (
+        $(#[$attr:meta])*
+        pub extern "C" fn $name:ident ( $($arg_name:ident : $arg_type:ty),* ) -> *mut c_char
+        $body:block
+    ) => {
+        $(#[$attr])*
+        pub extern "C" fn $name($($arg_name : $arg_type),*) -> *mut c_char {
+            $(
+                if $arg_name.is_null() {
+                    return error_json_internal("Invalid null pointer provided to function");
+                }
+            )*
+
+            let result: Result<_, SpineError> = { $body };
+
+            match result {
+                Ok(value) => to_json_cstring(&value),
+                Err(e) => error_json_internal(&e.to_string()),
+            }
+        }
+    };
+}
+
+#[derive(Debug, Serialize)]
+pub struct RepoManifest {
+    pub reponame: String,
+    pub roleband: String,
+    pub lane: String,
+    pub description: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SafeObject {
+    pub name: String,
+    pub kind: String,
+    pub roleband: String,
+    pub lanes: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct WorkloadNodeWindow {
+    pub nodeid: String,
+    pub region: String,
+    pub window_start_utc: String,
+    pub window_end_utc: String,
+    pub total_req_j: f64,
+    pub total_surplus_j: f64,
+    pub mean_vt_before: f64,
+    pub mean_vt_after: f64,
+    pub mean_rcarbon: Option<f64>,
+    pub mean_rbiodiv: Option<f64>,
+    pub accepts: u64,
+    pub rejects: u64,
+    pub reroutes: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BlastRadiusSummary {
+    pub nodeid: String,
+    pub max_carbon_radius: f64,
+    pub max_biodiv_radius: f64,
+    pub vt_radius_sum: f64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AiContextBundle {
+    pub manifest: RepoManifest,
+    pub safe_catalog: Vec<SafeObject>,
+    pub workload_window: WorkloadNodeWindow,
+    pub blast_radius: BlastRadiusSummary,
+}
+
+fn query_repo_manifest(conn: &Connection, reponame: &str) -> Result<RepoManifest, SpineError> {
+    if reponame.is_empty() {
+        return Err(SpineError::InvalidArgument(
+            "Repository name cannot be empty".to_string(),
+        ));
+    }
+
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT reponame, roleband, lane, description
+        FROM veconet_repo_manifest_agent
+        WHERE reponame = ?1
+        "#,
+    )?;
+
+    let row = stmt.query_row([reponame], |row| {
+        Ok(RepoManifest {
+            reponame: row.get(0)?,
+            roleband: row.get(1)?,
+            lane: row.get(2)?,
+            description: row.get(3)?,
+        })
+    })?;
+
+    Ok(row)
+}
+
+fn query_safe_catalog(conn: &Connection, reponame: &str) -> Result<Vec<SafeObject>, SpineError> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT objectname, kind, roleband, lanes
+        FROM vagentsafecatalog
+        WHERE reponame = ?1
+        "#,
+    )?;
+
+    let rows = stmt.query_map([reponame], |row| {
+        Ok(SafeObject {
+            name: row.get(0)?,
+            kind: row.get(1)?,
+            roleband: row.get(2)?,
+            lanes: row.get(3)?,
+        })
+    })?;
+
+    let mut out = Vec::new();
+    for r in rows {
+        out.push(r?);
+    }
+    Ok(out)
+}
+
+fn query_workload_node_window(
+    conn: &Connection,
+    nodeid: &str,
+) -> Result<WorkloadNodeWindow, SpineError> {
+    if nodeid.is_empty() {
+        return Err(SpineError::InvalidArgument(
+            "Node ID cannot be empty".to_string(),
+        ));
+    }
+
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT
+            nodeid,
+            region,
+            windowstartutc,
+            windowendutc,
+            totalreqj,
+            totalsurplusj,
+            meanvtbefore,
+            meanvtafter,
+            meanrcarbon,
+            meanrbiodiv,
+            accepts,
+            rejects,
+            reroutes
+        FROM vcyboworkloadnodewindow
+        WHERE nodeid = ?1
+        "#,
+    )?;
+
+    let row = stmt.query_row([nodeid], |row| {
+        Ok(WorkloadNodeWindow {
+            nodeid: row.get(0)?,
+            region: row.get(1)?,
+            window_start_utc: row.get(2)?,
+            window_end_utc: row.get(3)?,
+            total_req_j: row.get(4)?,
+            total_surplus_j: row.get(5)?,
+            mean_vt_before: row.get(6)?,
+            mean_vt_after: row.get(7)?,
+            mean_rcarbon: row.get(8).ok(),
+            mean_rbiodiv: row.get(9).ok(),
+            accepts: row.get(10)?,
+            rejects: row.get(11)?,
+            reroutes: row.get(12)?,
+        })
+    })?;
+
+    Ok(row)
+}
+
+fn query_blast_radius_summary(
+    conn: &Connection,
+    nodeid: &str,
+) -> Result<BlastRadiusSummary, SpineError> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT
+            nodeid,
+            maxcarbonradius,
+            maxbiodivradius,
+            vtradiussum
+        FROM vshardblastradius
+        WHERE nodeid = ?1
+        "#,
+    )?;
+
+    let row = stmt.query_row([nodeid], |row| {
+        Ok(BlastRadiusSummary {
+            nodeid: row.get(0)?,
+            max_carbon_radius: row.get(1)?,
+            max_biodiv_radius: row.get(2)?,
+            vt_radius_sum: row.get(3)?,
+        })
+    })?;
+
+    Ok(row)
+}
+
+#[no_mangle]
+pub extern "C" fn econet_open_index(dbpath: *const c_char) -> *mut ShardIndex {
+    if dbpath.is_null() {
+        return ptr::null_mut();
+    }
+
+    let dbpath_str = match cstr_to_str(dbpath) {
+        Ok(s) => s,
+        Err(_) => return ptr::null_mut(),
+    };
+
+    match ShardIndex::new(dbpath_str) {
+        Ok(handle) => Box::into_raw(Box::new(handle)),
+        Err(_) => ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn econet_close_index(handle: *mut ShardIndex) {
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        let _ = Box::from_raw(handle);
+    }
+}
+
+impl_ffi_query! {
+    #[no_mangle]
+    pub extern "C" fn econet_get_ai_context_bundle(
+        handle: *mut ShardIndex,
+        nodeid: *const c_char,
+        reponame: *const c_char,
+    ) -> *mut c_char
+    {
+        if handle.is_null() {
+            return Err(SpineError::InvalidArgument(
+                "Invalid null handle provided to econet_get_ai_context_bundle".to_string(),
+            ));
+        }
+
+        let nodeid_str = cstr_to_str(nodeid)?;
+        let reponame_str = cstr_to_str(reponame)?;
+
+        if nodeid_str.is_empty() {
+            return Err(SpineError::InvalidArgument(
+                "Node ID cannot be empty".to_string(),
+            ));
+        }
+        if reponame_str.is_empty() {
+            return Err(SpineError::InvalidArgument(
+                "Repository name cannot be empty".to_string(),
+            ));
+        }
+
+        let shard_index = unsafe { &*handle };
+
+        let manifest = query_repo_manifest(&shard_index.conn, reponame_str)?;
+        let safe_catalog = query_safe_catalog(&shard_index.conn, reponame_str)?;
+        let workload_window = query_workload_node_window(&shard_index.conn, nodeid_str)?;
+        let blast_radius = query_blast_radius_summary(&shard_index.conn, nodeid_str)?;
+
+        let bundle = AiContextBundle {
+            manifest,
+            safe_catalog,
+            workload_window,
+            blast_radius,
+        };
+
+        Ok(bundle)
+    }
 }
