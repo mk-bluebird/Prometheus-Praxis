@@ -1,0 +1,154 @@
+aln
+alnversion 1.0.0
+alnnamespace prometheus.praxis.functioncatalog.workloadwindow.v1
+
+-----------------------------------------------------------------------
+Language and function meta particles
+-----------------------------------------------------------------------
+
+particle language.v1
+  name str.v1       -- LUA | RUST | KOTLIN | SQL | ALN
+
+particle ppx.function.meta.v1
+  id koid.v1
+  label str.v1
+  language language.v1
+  modulepath str.v1      -- e.g. "crates/ecosafety-nanoswarm-urban-core/src/workload_window.rs"
+  entrypoint str.v1      -- e.g. "list_workload_node_windows"
+  nonactuating bool.v1
+  ecosafetyguardrequired bool.v1
+  neurorightsguardrequired bool.v1
+  inputschemaid koid.v1
+  outputschemaid koid.v1
+  kerhintk f32.v1
+  kerhinte f32.v1
+  kerhintr f32.v1
+
+-----------------------------------------------------------------------
+Input / output schemas aligned with SQL and ALN particles
+-----------------------------------------------------------------------
+
+particle ecosafety.workload.window.list.input.v1
+  id koid.v1
+  shardid str.v1?       -- optional filter
+  nodeid str.v1?        -- optional filter
+  assetid str.v1?       -- optional filter
+  window_start_utc_min time.timestamp.v1?
+  window_end_utc_max   time.timestamp.v1?
+
+particle ecosafety.workload.window.summary.input.v1
+  id koid.v1
+  nodeid str.v1
+  window_start_utc time.timestamp.v1
+  window_end_utc   time.timestamp.v1
+
+particle ecosafety.workload.window.summary.output.v1
+  id koid.v1
+  nodeid str.v1
+  window_count u32.v1
+  mean_energy_req_j f64.v1
+  mean_energy_surplus_j f64.v1
+  mean_accepted_fraction f64.v1
+  mean_rejected_fraction f64.v1
+  mean_rerouted_fraction f64.v1
+  mean_vt_before f64.v1
+  mean_vt_after  f64.v1
+  mean_delta_vt  f64.v1
+  hard_violation_count u32.v1
+  soft_violation_count u32.v1
+
+-----------------------------------------------------------------------
+Function entries (Rust and Lua, nonactuating, diagnostic-only)
+-----------------------------------------------------------------------
+
+particle ecosafety.workload.node.window.list.function.v1
+  meta ppx.function.meta.v1
+  inputs ecosafety.workload.window.list.input.v1
+  outputs ecosafety.workload.node.window.v1
+
+particle ecosafety.workload.node.window.summary.function.v1
+  meta ppx.function.meta.v1
+  inputs ecosafety.workload.window.summary.input.v1
+  outputs ecosafety.workload.window.summary.output.v1
+
+-----------------------------------------------------------------------
+Concrete instances: Rust and Lua implementations
+-----------------------------------------------------------------------
+
+particle ecosafety.workload.node.window.list.rust.v1
+  meta ppx.function.meta.v1
+  inputs ecosafety.workload.window.list.input.v1
+  outputs ecosafety.workload.node.window.v1
+  -- Rust implementation in ecosafety-nanoswarm-urban-core crate.
+  label ecosafety.workload.node.window.list.v1
+  language name RUST
+  modulepath "crates/ecosafety-nanoswarm-urban-core/src/workload_window_query.rs"
+  entrypoint "list_workload_node_windows"
+  nonactuating true
+  ecosafetyguardrequired false
+  neurorightsguardrequired false
+  inputschemaid ecosafety.workload.window.list.input.v1
+  outputschemaid ecosafety.workload.node.window.v1
+  kerhintk 0.94
+  kerhinte 0.91
+  kerhintr 0.11
+
+particle ecosafety.workload.node.window.list.lua.v1
+  meta ppx.function.meta.v1
+  inputs ecosafety.workload.window.list.input.v1
+  outputs ecosafety.workload.node.window.v1
+  label ecosafety.workload.node.window.list.v1.lua
+  language name LUA
+  modulepath "runtime/lua/prometheus_praxis/workloadwindow_client.lua"
+  entrypoint "get_workload_node_windows"
+  nonactuating true
+  ecosafetyguardrequired false
+  neurorightsguardrequired false
+  inputschemaid ecosafety.workload.window.list.input.v1
+  outputschemaid ecosafety.workload.node.window.v1
+  kerhintk 0.94
+  kerhinte 0.91
+  kerhintr 0.11
+
+particle ecosafety.workload.node.window.summary.rust.v1
+  meta ppx.function.meta.v1
+  inputs ecosafety.workload.window.summary.input.v1
+  outputs ecosafety.workload.window.summary.output.v1
+  label ecosafety.workload.node.window.summary.v1
+  language name RUST
+  modulepath "crates/ecosafety-nanoswarm-urban-core/src/workload_window_summary.rs"
+  entrypoint "summarize_workload_node_window"
+  nonactuating true
+  ecosafetyguardrequired false
+  neurorightsguardrequired false
+  inputschemaid ecosafety.workload.window.summary.input.v1
+  outputschemaid ecosafety.workload.window.summary.output.v1
+  kerhintk 0.94
+  kerhinte 0.91
+  kerhintr 0.11
+
+particle ecosafety.workload.node.window.summary.lua.v1
+  meta ppx.function.meta.v1
+  inputs ecosafety.workload.window.summary.input.v1
+  outputs ecosafety.workload.window.summary.output.v1
+  label ecosafety.workload.node.window.summary.v1.lua
+  language name LUA
+  modulepath "runtime/lua/prometheus_praxis/workloadwindow_client.lua"
+  entrypoint "summarize_workload_node_window"
+  nonactuating true
+  ecosafetyguardrequired false
+  neurorightsguardrequired false
+  inputschemaid ecosafety.workload.window.summary.input.v1
+  outputschemaid ecosafety.workload.window.summary.output.v1
+  kerhintk 0.94
+  kerhinte 0.91
+  kerhintr 0.11
+
+-----------------------------------------------------------------------
+Rules: enforce nonactuating diagnostics in this catalog
+-----------------------------------------------------------------------
+
+rule workloadwindow_functions_nonactuating
+  when f ppx.function.meta.v1
+  then require f.nonactuating == true
+       else error PPX_WORKLOADWINDOW_FUNCTION_MUST_BE_NONACTUATING
