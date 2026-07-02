@@ -1,0 +1,7 @@
+"Component","Purpose"
+"vstewardecowealthlatest","Per‑steward eco‑wealth statements per shard. 9a684d92-2c23-4891-b1e0-61a5f9d79b48.md"
+"EcoWealthStatement","Rust mapping of steward eco‑wealth row. 9a684d92-2c23-4891-b1e0-61a5f9d79b48.md"
+"EcoWealthPortfolioSummary","Aggregated portfolio metrics per shard. 9a684d92-2c23-4891-b1e0-61a5f9d79b48.md"
+"query_ecowealth_portfolio","Internal aggregator over vstewardecowealthlatest. 9a684d92-2c23-4891-b1e0-61a5f9d79b48.md"
+"econet_ecowealth_portfolio_for_shard","FFI entrypoint, wrapped via implffiquery!. 9a684d92-2c23-4891-b1e0-61a5f9d79b48.md"
+"eco‑wealth‑portfolio.shard.v1 ALN","Identity/wiring shard connecting view and FFI. 9a684d92-2c23-4891-b1e0-61a5f9d79b48.md"
