@@ -3,6 +3,9 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(test)]
+#![allow(unsafe_code)]
+
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -399,6 +402,31 @@ pub fn load_expected_schema() -> ExpectedSchema {
         "kerresidual".to_string(),
         ExpectedTable::kerresidual(),
     );
+    // AI-facing views
+    tables.insert(
+        "vresidualkernel".to_string(),
+        ExpectedTable::vresidualkernel(),
+    );
+    tables.insert(
+        "vshardblast".to_string(),
+        ExpectedTable::vshardblast(),
+    );
+    tables.insert(
+        "vlaneadmissibility".to_string(),
+        ExpectedTable::vlaneadmissibility(),
+    );
+    tables.insert(
+        "vcyboquaticecoperjoule".to_string(),
+        ExpectedTable::vcyboquaticecoperjoule(),
+    );
+    tables.insert(
+        "veconet_repo_manifest_agent".to_string(),
+        ExpectedTable::veconet_repo_manifest_agent(),
+    );
+    tables.insert(
+        "vagentsafecatalog".to_string(),
+        ExpectedTable::vagentsafecatalog(),
+    );
 
     ExpectedSchema { tables }
 }
@@ -722,5 +750,44 @@ impl_ffi_query! {
         };
 
         Ok(bundle)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ffi::CString;
+
+    #[test]
+    fn test_error_json_internal_with_special_chars() {
+        let msg = "Error with \"quotes\", newlines\nand\ttabs, and backslashes\\here";
+        let ptr = error_json_internal(msg);
+        assert!(!ptr.is_null());
+
+        // Convert pointer back to CString for inspection (without dropping it prematurely)
+        let cstr = unsafe { CStr::from_ptr(ptr) };
+        let json_str = cstr.to_str().unwrap();
+        let result: serde_json::Value = serde_json::from_str(json_str).expect("JSON should be valid");
+        
+        assert!(result.get("error").is_some());
+        assert_eq!(result["error"], msg);
+        
+        // Clean up the allocated memory
+        unsafe { let _ = CString::from_raw(ptr); }
+    }
+
+    #[test]
+    fn test_cstr_to_str_valid_utf8() {
+        let input = CString::new("hello world").unwrap();
+        let result = cstr_to_str(input.as_ptr());
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "hello world");
+    }
+
+    #[test]
+    fn test_cstr_to_str_null_pointer() {
+        let result = cstr_to_str(std::ptr::null());
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), SpineError::Utf8));
     }
 }

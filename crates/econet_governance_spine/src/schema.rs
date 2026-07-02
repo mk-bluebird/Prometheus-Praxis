@@ -243,6 +243,240 @@ impl ExpectedTable {
             foreign_keys: Vec::new(),
         }
     }
+
+    pub fn vresidualkernel() -> Self {
+        ExpectedTable {
+            name: "vresidualkernel".to_string(),
+            columns: vec![
+                ExpectedColumn {
+                    name: "shard_id".to_string(),
+                    data_type: "TEXT".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "region".to_string(),
+                    data_type: "TEXT".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "ker_k".to_string(),
+                    data_type: "REAL".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "ker_e".to_string(),
+                    data_type: "REAL".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "ker_r".to_string(),
+                    data_type: "REAL".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "residual_vt".to_string(),
+                    data_type: "REAL".to_string(),
+                    not_null: true,
+                },
+            ],
+            foreign_keys: Vec::new(),
+        }
+    }
+
+    pub fn vshardblast() -> Self {
+        ExpectedTable {
+            name: "vshardblast".to_string(),
+            columns: vec![
+                ExpectedColumn {
+                    name: "nodeid".to_string(),
+                    data_type: "TEXT".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "maxcarbonradius".to_string(),
+                    data_type: "REAL".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "maxbiodivradius".to_string(),
+                    data_type: "REAL".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "vtradiussum".to_string(),
+                    data_type: "REAL".to_string(),
+                    not_null: true,
+                },
+            ],
+            foreign_keys: Vec::new(),
+        }
+    }
+
+    pub fn vlaneadmissibility() -> Self {
+        ExpectedTable {
+            name: "vlaneadmissibility".to_string(),
+            columns: vec![
+                ExpectedColumn {
+                    name: "shard_id".to_string(),
+                    data_type: "TEXT".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "region".to_string(),
+                    data_type: "TEXT".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "lane".to_string(),
+                    data_type: "TEXT".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "verdict".to_string(),
+                    data_type: "TEXT".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "ker_k".to_string(),
+                    data_type: "REAL".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "ker_e".to_string(),
+                    data_type: "REAL".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "ker_r".to_string(),
+                    data_type: "REAL".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "residual_vt".to_string(),
+                    data_type: "REAL".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "max_staleness_hours".to_string(),
+                    data_type: "INTEGER".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "expires_utc".to_string(),
+                    data_type: "INTEGER".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "carbonnegativeok".to_string(),
+                    data_type: "INTEGER".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "restorationok".to_string(),
+                    data_type: "INTEGER".to_string(),
+                    not_null: true,
+                },
+            ],
+            foreign_keys: Vec::new(),
+        }
+    }
+
+    pub fn vcyboquaticecoperjoule() -> Self {
+        ExpectedTable {
+            name: "vcyboquaticecoperjoule".to_string(),
+            columns: vec![
+                ExpectedColumn {
+                    name: "node_id".to_string(),
+                    data_type: "TEXT".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "shard_id".to_string(),
+                    data_type: "TEXT".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "eco_per_joule".to_string(),
+                    data_type: "REAL".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "carbonnegativeok".to_string(),
+                    data_type: "INTEGER".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "restorationok".to_string(),
+                    data_type: "INTEGER".to_string(),
+                    not_null: true,
+                },
+            ],
+            foreign_keys: Vec::new(),
+        }
+    }
+
+    pub fn veconet_repo_manifest_agent() -> Self {
+        ExpectedTable {
+            name: "veconet_repo_manifest_agent".to_string(),
+            columns: vec![
+                ExpectedColumn {
+                    name: "reponame".to_string(),
+                    data_type: "TEXT".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "roleband".to_string(),
+                    data_type: "TEXT".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "lane".to_string(),
+                    data_type: "TEXT".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "description".to_string(),
+                    data_type: "TEXT".to_string(),
+                    not_null: true,
+                },
+            ],
+            foreign_keys: Vec::new(),
+        }
+    }
+
+    pub fn vagentsafecatalog() -> Self {
+        ExpectedTable {
+            name: "vagentsafecatalog".to_string(),
+            columns: vec![
+                ExpectedColumn {
+                    name: "objectname".to_string(),
+                    data_type: "TEXT".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "kind".to_string(),
+                    data_type: "TEXT".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "roleband".to_string(),
+                    data_type: "TEXT".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "lanes".to_string(),
+                    data_type: "TEXT".to_string(),
+                    not_null: true,
+                },
+                ExpectedColumn {
+                    name: "reponame".to_string(),
+                    data_type: "TEXT".to_string(),
+                    not_null: true,
+                },
+            ],
+            foreign_keys: Vec::new(),
+        }
+    }
 }
 
 impl<'a> SchemaVerifier<'a> {
