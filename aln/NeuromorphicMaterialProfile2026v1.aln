@@ -1,0 +1,71 @@
+aln
+meta
+  version 2026v1
+  plane   ECO_RESTORATION
+  groundinghex 0x4e4555524f4d4f52504849435f4d4154455249414c5f50524f46494c45_2026
+end
+
+doctype NeuromorphicMaterialProfile2026v1
+  string profileId          ; hex or UUID bound to paper_id + device_label
+  string paperId            ; e.g. NATURE_S41928_2019_0260_4
+  string deviceLabel        ; Loihi_v1_core
+  string materialSystem     ; HfO2_RRAM, PCM_GST, etc.
+
+  enum EnergyBand
+    ULTRA_LOW
+    LOW
+    MEDIUM
+    HIGH
+  end
+
+  enum EnduranceBand
+    LOW       ; < 1e6
+    MID       ; 1e6–1e9
+    HIGH      ; > 1e9
+  end
+
+  enum VariabilityBand
+    STABLE
+    MODERATE
+    UNSTABLE
+  end
+
+  enum EcoImpactBand
+    E0_0_25   ; 0.0–0.25
+    E0_25_0_5 ; 0.25–0.5
+    E0_5_0_75 ; 0.5–0.75
+    E0_75_1_0 ; 0.75–1.0
+  end
+
+  EnergyBand      energyBand
+  EnduranceBand   enduranceBand
+  VariabilityBand variabilityBand
+  EcoImpactBand   ecoImpactBand
+
+  bool   isCompensated
+  string compensationSourceUrl
+  string compensationMethod
+  string evidenceHex          ; 10-hex proof chain from link_compensator
+
+end
+
+invariant EcoImpactWithinCaps
+  description Eco impact bands must respect global Veco caps.
+  ; Example: forbid highest band if Veco cap < 0.75.
+  expr
+    forall p in NeuromorphicMaterialProfile2026v1
+      if p.ecoImpactBand == E0_75_1_0 then
+        assert globalVecoCap >= 0.75
+      end
+    end
+end
+
+invariant CompensatedProfilesMonotone
+  description Compensated profiles may tighten but never widen corridors.
+  expr
+    forall p in NeuromorphicMaterialProfile2026v1
+      if p.isCompensated then
+        assert CorridorPlan2026v1(p.profileId).vtAfter <= CorridorPlan2026v1(p.profileId).vtBefore
+      end
+    end
+end
