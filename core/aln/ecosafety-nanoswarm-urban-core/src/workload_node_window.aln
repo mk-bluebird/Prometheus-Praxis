@@ -18,6 +18,26 @@ particle ecosafety.ker.triplet.v1
   e f64.v1        -- Eco-impact 0..1
   r f64.v1        -- Risk-of-harm 0..1
 
+-----------------------------------------------------------------------
+Metadata particle for KER hints (informational, non-binding)
+-----------------------------------------------------------------------
+
+particle ecosafety.workload.node.window.meta.v1
+  id koid.v1
+  k_hint f64.v1
+  e_hint f64.v1
+  r_hint f64.v1
+
+-----------------------------------------------------------------------
+Default KER hints instance for workload node window diagnostics
+-----------------------------------------------------------------------
+
+particle ecosafety.workload.node.window.default.meta.v1
+  id koid.v1
+  k_hint 0.94
+  e_hint 0.91
+  r_hint 0.11
+
 particle ecosafety.shard.row.base.v1
   id koid.v1
   shardid str.v1
