@@ -5,10 +5,52 @@
 name = "econet_governance_spine"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "EcoNet governance spine: lane status, KER guards, schema verification."
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+categories = ["science", "governance", "environment"]
+keywords = ["econet", "governance", "lane", "ker", "prometheus-praxis"]
+
+[lib]
+name = "econet_governance_spine"
+path = "src/lib.rs"
+crate-type = ["rlib"]
 
 [dependencies]
-rusqlite = { version = "0.31", features = ["bundled"] }
-thiserror = "1.0"
+rusqlite = { version = "0.31.0", features = ["bundled", "chrono"] }
+thiserror = "1.0.63"
+
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
+
+# If you are already using chrono for expiresutc etc. in GovernanceSpine,
+# keep this consistent with other crates; otherwise you can drop it from
+# rusqlite's features and add chrono here explicitly.
+chrono = { version = "0.4.38", features = ["clock"] }
+
+[dev-dependencies]
+# Kani must never be optional; include it explicitly for verification runs.
+kani = "0.67.0"
+
+# Optional, but useful for tests; include only if you already use them in tests.
+# anyhow = "1.0.86"
 
 [features]
+# No runtime feature flags; governance spine behavior must be deterministic.
 default = []
+
+# Implementation notes (not part of the TOML structure, but documenting paths):
+# Source files (all under src/, matching your existing layout):
+#   src/lib.rs
+#   src/guards.rs
+#   src/lane_governance.rs
+#   src/schema.rs
+#
+# This crate is intended to be part of the eco_restoration_shard workspace.
+# The workspace-level Cargo.toml should include:
+#   [workspace]
+#   members = [
+#       "crates/econet_governance_spine",
+#       # ... other crates ...
+#   ]
