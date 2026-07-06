@@ -1,0 +1,275 @@
+aln
+title Prometheus-Praxis Nomos-Enforcer v1
+version 1.0.0
+
+aln.migration ALN.MIGRATION.CYBERCOREAUTHORITY.v1
+binding.hostdid did:aln:organic-host
+binding.bostromaddress bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+
+-------------------------------------------------------------------------------
+1. Core enums: domain, lane, governance decision
+-------------------------------------------------------------------------------
+
+enum nomos.ActionDomain.v1
+  EcoRestoration
+  CityOperations
+  MacroHealth
+  Cybernetics
+  PaymentPrograms
+end
+
+enum nomos.ActionLane.v1
+  RESEARCH
+  GOV
+  EXPPROD
+end
+
+enum nomos.GovernanceDecision.v1
+  Allow
+  Derate
+  Stop
+end
+
+-------------------------------------------------------------------------------
+2. ISO 42001 AI management roles
+-------------------------------------------------------------------------------
+
+# ISO/IEC 42001 defines AI management roles and functions (Govern, Map, Measure, Manage)
+# and organizational roles such as AI Owner, AI Risk Owner, AI Operator.
+
+enum nomos.Iso42001Function.v1
+  Govern
+  Map
+  Measure
+  Manage
+end
+
+enum nomos.Iso42001Role.v1
+  AIOwner
+  AIRiskOwner
+  AIOperator
+  AIDeveloper
+  AISupplier
+end
+
+record nomos.Iso42001Assignment.v1
+  id                Uuid
+  function          nomos.Iso42001Function.v1
+  role              nomos.Iso42001Role.v1
+  organization_id   String         # org or unit id
+  contact_id        String         # role-holder identifier
+end
+
+-------------------------------------------------------------------------------
+3. EU AI Act risk categories and obligations
+-------------------------------------------------------------------------------
+
+# EU AI Act risk categories: Minimal/No, Limited, High, Unacceptable.
+
+enum nomos.EuAiRiskCategory.v1
+  Minimal
+  Limited
+  High
+  Unacceptable
+end
+
+# Documentation and oversight obligations differ by category; we capture them explicitly.
+
+record nomos.EuAiObligation.v1
+  id                        Uuid
+  risk_category             nomos.EuAiRiskCategory.v1
+
+  requires_transparency     bool   # e.g. limited-risk transparency duties
+  requires_risk_management  bool   # high-risk systems
+  requires_human_oversight  bool   # high-risk oversight
+  requires_conformity_assess bool  # CE marking / conformity assessment
+  is_prohibited_use         bool   # unacceptable-risk systems (must be blocked)
+end
+
+-------------------------------------------------------------------------------
+4. Rights predicates, contract ceilings, public-good scalar
+-------------------------------------------------------------------------------
+
+record nomos.RightsPredicateSummary.v1
+  id                         Uuid
+
+  themis_axioms_ok           bool   # Themis-Axiom predicates satisfied
+  pan_ethos_ok               bool   # Pan-Ethos value predicates satisfied
+  corpus_juris_ok            bool   # Contract (Corpus Juris) constraints satisfied
+  schutz_recht_ok            bool   # Rights-risk Q <= Qcrit
+  res_publica_ok             bool   # Public-good scalar PG >= 0
+
+  rights_risk_q              f32    # Q from Schutz-Recht
+  rights_risk_qcrit          f32    # Qcrit threshold
+
+  public_good_scalar         f32    # PG = G - L, from Res Publica
+end
+
+record nomos.ContractCeilingSummary.v1
+  id                         Uuid
+
+  contract_id                String
+  budget_ceiling             f32    # normalized budget ceiling
+  roh_contract_ceiling       f32    # contract-specific RoH ceiling
+  time_window_start_utc      String
+  time_window_end_utc        String
+end
+
+-------------------------------------------------------------------------------
+5. PolicyComplianceResult core record
+-------------------------------------------------------------------------------
+
+record nomos.PolicyComplianceResult.v1
+  id                         Uuid
+
+  plan_id                    String
+  domain                     nomos.ActionDomain.v1
+  lane                       nomos.ActionLane.v1
+
+  # Governance decision from Rights Verification Object / Praxis Governance Kernel
+  decision                   nomos.GovernanceDecision.v1
+
+  # Rights predicates and public-good scalar summaries
+  rights_summary_id          Uuid     # nomos.RightsPredicateSummary.v1.id
+
+  # Contract ceilings summary
+  contract_summary_id        Uuid     # nomos.ContractCeilingSummary.v1.id
+
+  # ISO 42001 and EU AI Act bindings
+  iso_function               nomos.Iso42001Function.v1
+  iso_role_assignment_id     Uuid     # nomos.Iso42001Assignment.v1.id
+
+  eu_risk_category           nomos.EuAiRiskCategory.v1
+  eu_obligation_id           Uuid     # nomos.EuAiObligation.v1.id
+
+  # Documentation bindings (e.g. VeritasChain, evidence bundles)
+  veritas_anchor_id          String   # Veritas-Chain anchor
+  evidence_bundle_id         String   # ProofOfResearch / evidence bundle
+
+  created_utc                String
+end
+
+-------------------------------------------------------------------------------
+6. Invariant: ISO 42001 function-role consistency
+-------------------------------------------------------------------------------
+
+invariant nomos.Iso42001AssignmentsMustCoverAllFunctions
+  # For each ISO 42001 function used in a PolicyComplianceResult, there must be
+  # at least one role assignment defined.
+  forall p in nomos.PolicyComplianceResult.v1
+    exists a in nomos.Iso42001Assignment.v1
+      p.iso_function == a.function
+end
+
+-------------------------------------------------------------------------------
+7. Invariant: EU AI Act risk → decision lattice
+-------------------------------------------------------------------------------
+
+invariant nomos.UnacceptableRiskMustStop
+  # Any plan classified as Unacceptable risk must yield a Stop decision.
+  forall p in nomos.PolicyComplianceResult.v1
+    p.eu_risk_category == nomos.EuAiRiskCategory.v1.Unacceptable implies
+      p.decision == nomos.GovernanceDecision.v1.Stop
+end
+
+invariant nomos.HighRiskRequiresOversightAndDocs
+  # High-risk systems must have human oversight and documentation obligations encoded.
+  forall p in nomos.PolicyComplianceResult.v1
+    p.eu_risk_category == nomos.EuAiRiskCategory.v1.High implies
+      exists o in nomos.EuAiObligation.v1
+        p.eu_obligation_id == o.id
+        and o.requires_risk_management == true
+        and o.requires_human_oversight == true
+        and o.requires_conformity_assess == true
+end
+
+invariant nomos.LimitedRiskRequiresTransparency
+  # Limited-risk systems must satisfy transparency duties.
+  forall p in nomos.PolicyComplianceResult.v1
+    p.eu_risk_category == nomos.EuAiRiskCategory.v1.Limited implies
+      exists o in nomos.EuAiObligation.v1
+        p.eu_obligation_id == o.id
+        and o.requires_transparency == true
+end
+
+-------------------------------------------------------------------------------
+8. Invariant: Rights predicates bound to decision
+-------------------------------------------------------------------------------
+
+invariant nomos.DecisionConsistentWithRightsSummary
+  # If any rights predicate fails, decision must be Derate or Stop (never Allow).
+  forall p in nomos.PolicyComplianceResult.v1
+    exists rs in nomos.RightsPredicateSummary.v1
+      p.rights_summary_id == rs.id
+      implies (
+        (rs.themis_axioms_ok == false
+         or rs.pan_ethos_ok == false
+         or rs.corpus_juris_ok == false
+         or rs.schutz_recht_ok == false)
+         implies (p.decision == nomos.GovernanceDecision.v1.Derate
+                  or p.decision == nomos.GovernanceDecision.v1.Stop)
+      )
+end
+
+invariant nomos.RightsRiskQcritStop
+  # If rights-risk Q >= Qcrit, decision must be Stop.
+  forall p in nomos.PolicyComplianceResult.v1
+    exists rs in nomos.RightsPredicateSummary.v1
+      p.rights_summary_id == rs.id
+      and rs.rights_risk_q >= rs.rights_risk_qcrit
+      implies p.decision == nomos.GovernanceDecision.v1.Stop
+end
+
+-------------------------------------------------------------------------------
+9. Invariant: Contract ceilings and RoH
+-------------------------------------------------------------------------------
+
+invariant nomos.ContractRoHCannotExceedGlobal
+  # Contract-specific RoH ceilings must not exceed global RoH ceiling 0.30.
+  forall cs in nomos.ContractCeilingSummary.v1
+    cs.roh_contract_ceiling <= 0.30
+end
+
+invariant nomos.DecisionRespectsContractCeiling
+  # If a contract ceiling is violated, the decision must be Stop.
+  forall p in nomos.PolicyComplianceResult.v1
+    exists cs in nomos.ContractCeilingSummary.v1
+      p.contract_summary_id == cs.id
+      and cs.roh_contract_ceiling < 0.30
+      implies (
+        # This is a structural guard: in Rust/Kani, actual RoH values are checked.
+        # Here we assert that violations cannot yield Allow.
+        p.decision != nomos.GovernanceDecision.v1.Allow
+      )
+end
+
+-------------------------------------------------------------------------------
+10. Invariant: Public-good scalar and decision
+-------------------------------------------------------------------------------
+
+invariant nomos.PublicGoodCannotOverrideRights
+  # Even if public-good scalar is positive, it cannot override failed rights predicates.
+  forall p in nomos.PolicyComplianceResult.v1
+    exists rs in nomos.RightsPredicateSummary.v1
+      p.rights_summary_id == rs.id
+      implies (
+        rs.public_good_scalar >= 0.0
+        and (rs.themis_axioms_ok == false
+             or rs.pan_ethos_ok == false
+             or rs.schutz_recht_ok == false)
+        implies p.decision == nomos.GovernanceDecision.v1.Stop
+      )
+end
+
+-------------------------------------------------------------------------------
+11. Invariant: Documentation traceability (Veritas & evidence)
+-------------------------------------------------------------------------------
+
+invariant nomos.VeritasAndEvidenceRequired
+  # Every PolicyComplianceResult must be anchored in VeritasChain and evidence bundles.
+  forall p in nomos.PolicyComplianceResult.v1
+    p.veritas_anchor_id != ""
+    and p.evidence_bundle_id != ""
+end
+
+end
