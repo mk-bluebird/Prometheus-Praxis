@@ -1,10 +1,6 @@
 // FILE: crates/prometheus_praxis/tests/ecorestoration_gaia_kani.rs
-// ROLE: Kani harnesses for Gaia corridor thresholds and autopause logic.
-//
-// PROPERTIES:
-//   1. If multiple metric breaches occur, autopause_reason_for == Combined.
-//   2. If any single metric exceeds its ALN threshold, autopause_reason_for
-//      is not None (i.e., it never misses a breach).
+// ROLE: Kani harnesses for Gaia corridor thresholds, autopause logic,
+//       and consecutive-breach preflight blocking.
 
 use rust_decimal::Decimal;
 
@@ -13,6 +9,32 @@ use prometheus_praxis::ecorestoration::gaia_snapshot::{GaiaSentinelSnapshot, Aut
 
 fn d(v: f32) -> Decimal {
     Decimal::from_f32(v).unwrap()
+}
+
+/// Simple breach-counter model for a tile.
+/// This stays in tests to avoid polluting core types.
+#[derive(Clone, Copy)]
+struct GaiaBreachCounters {
+    pub moisture_breach_days: i32,
+    pub heat_drought_breach_days: i32,
+    pub flood_breach_events: i32,
+    pub fire_breach_events: i32,
+}
+
+/// Preflight guard: should sorties be blocked for this tile,
+/// given thresholds and current breach counters?
+///
+/// Blocking rule:
+/// - If any counter > corresponding max_consecutive_* field, block (return true).
+/// - Otherwise, allow (return false).
+fn preflight_block_for_counters(
+    thresholds: &GaiaCorridorThresholds,
+    counters: &GaiaBreachCounters,
+) -> bool {
+    counters.moisture_breach_days > thresholds.max_consecutive_moisture_breach_days
+        || counters.heat_drought_breach_days > thresholds.max_consecutive_heat_drought_breach_days
+        || counters.flood_breach_events > thresholds.max_consecutive_flood_breach_events
+        || counters.fire_breach_events > thresholds.max_consecutive_fire_breach_events
 }
 
 /// Helper: construct a conservative default thresholds bundle.
@@ -65,32 +87,26 @@ fn proof_autopause_combined_for_multiple_breaches() {
     let thresholds = mk_thresholds();
     let mut snap = mk_symbolic_snapshot();
 
-    // Let Kani vary all metrics, but we enforce two breaches via assumptions.
-
-    // Breach soil moisture: snapshot value below threshold.
     snap.soil_moisture_idx = d(0.10);
     kani::assume(snap.soil_moisture_idx < thresholds.soil_moisture_pause_threshold);
 
-    // Breach flood risk: snapshot value above threshold.
     snap.flood_risk_idx = d(0.90);
     kani::assume(snap.flood_risk_idx > thresholds.flood_risk_pause_threshold);
 
     let reason = thresholds.autopause_reason_for(&snap);
-
-    // With at least two distinct breaches, reason must be Combined.
     kani::assert!(matches!(reason, AutopauseReason::Combined));
 }
 
 /// Proof 2: No missed breach.
 ///
 /// For each single metric, if it breaches its threshold, autopause_reason_for
-/// must not be None. This is checked per metric so any missed mapping is caught.
+/// must not be None.
 #[kani::proof]
 fn proof_autopause_not_none_for_any_single_breach() {
     let thresholds = mk_thresholds();
     let mut snap = mk_symbolic_snapshot();
 
-    // Case 1: soil moisture breach only.
+    // Soil moisture breach only.
     snap.soil_moisture_idx = d(0.10);
     kani::assume(snap.soil_moisture_idx < thresholds.soil_moisture_pause_threshold);
     snap.flood_risk_idx = d(0.0);
@@ -100,7 +116,7 @@ fn proof_autopause_not_none_for_any_single_breach() {
     let reason_moisture = thresholds.autopause_reason_for(&snap);
     kani::assert!(!matches!(reason_moisture, AutopauseReason::None));
 
-    // Case 2: heat + drought breach only.
+    // Heat + drought breach only.
     snap = mk_symbolic_snapshot();
     snap.heat_budget_idx = d(0.90);
     snap.drought_idx = d(0.80);
@@ -112,7 +128,7 @@ fn proof_autopause_not_none_for_any_single_breach() {
     let reason_heat_drought = thresholds.autopause_reason_for(&snap);
     kani::assert!(!matches!(reason_heat_drought, AutopauseReason::None));
 
-    // Case 3: flood risk breach only.
+    // Flood breach only.
     snap = mk_symbolic_snapshot();
     snap.flood_risk_idx = d(0.90);
     kani::assume(snap.flood_risk_idx > thresholds.flood_risk_pause_threshold);
@@ -123,7 +139,7 @@ fn proof_autopause_not_none_for_any_single_breach() {
     let reason_flood = thresholds.autopause_reason_for(&snap);
     kani::assert!(!matches!(reason_flood, AutopauseReason::None));
 
-    // Case 4: fire risk breach only.
+    // Fire breach only.
     snap = mk_symbolic_snapshot();
     snap.fire_risk_idx = d(0.90);
     kani::assume(snap.fire_risk_idx > thresholds.fire_risk_pause_threshold);
@@ -133,4 +149,63 @@ fn proof_autopause_not_none_for_any_single_breach() {
     snap.drought_idx = d(0.0);
     let reason_fire = thresholds.autopause_reason_for(&snap);
     kani::assert!(!matches!(reason_fire, AutopauseReason::None));
+}
+
+/// Proof 3: Once counters exceed limits, preflight must block.
+///
+/// If any counter is strictly greater than its configured maximum,
+/// preflight_block_for_counters must return true (block sorties).
+#[kani::proof]
+fn proof_preflight_block_when_counters_exceed_limits() {
+    let thresholds = mk_thresholds();
+
+    // Symbolic counters; Kani will vary them.
+    let counters = GaiaBreachCounters {
+        moisture_breach_days: kani::any(),
+        heat_drought_breach_days: kani::any(),
+        flood_breach_events: kani::any(),
+        fire_breach_events: kani::any(),
+    };
+
+    // Assume at least one counter exceeds its corresponding maximum.
+    let over_moisture =
+        counters.moisture_breach_days > thresholds.max_consecutive_moisture_breach_days;
+    let over_heat_drought =
+        counters.heat_drought_breach_days > thresholds.max_consecutive_heat_drought_breach_days;
+    let over_flood =
+        counters.flood_breach_events > thresholds.max_consecutive_flood_breach_events;
+    let over_fire =
+        counters.fire_breach_events > thresholds.max_consecutive_fire_breach_events;
+
+    kani::assume(over_moisture || over_heat_drought || over_flood || over_fire);
+
+    let block = preflight_block_for_counters(&thresholds, &counters);
+    kani::assert!(block);
+}
+
+/// Proof 4: When all counters are within limits, preflight must allow.
+///
+/// If all counters are <= their configured maximums,
+/// preflight_block_for_counters must return false (no block).
+#[kani::proof]
+fn proof_preflight_allow_when_counters_within_limits() {
+    let thresholds = mk_thresholds();
+
+    let counters = GaiaBreachCounters {
+        moisture_breach_days: kani::any(),
+        heat_drought_breach_days: kani::any(),
+        flood_breach_events: kani::any(),
+        fire_breach_events: kani::any(),
+    };
+
+    kani::assume(counters.moisture_breach_days <= thresholds.max_consecutive_moisture_breach_days);
+    kani::assume(
+        counters.heat_drought_breach_days
+            <= thresholds.max_consecutive_heat_drought_breach_days,
+    );
+    kani::assume(counters.flood_breach_events <= thresholds.max_consecutive_flood_breach_events);
+    kani::assume(counters.fire_breach_events <= thresholds.max_consecutive_fire_breach_events);
+
+    let block = preflight_block_for_counters(&thresholds, &counters);
+    kani::assert!(!block);
 }
