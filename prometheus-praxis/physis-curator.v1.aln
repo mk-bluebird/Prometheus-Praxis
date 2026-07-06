@@ -1,0 +1,290 @@
+aln
+title Prometheus-Praxis Physis-Curator v1
+version 1.0.0
+
+aln.migration ALN.MIGRATION.CYBERCOREAUTHORITY.v1
+binding.hostdid did:aln:organic-host
+binding.bostromaddress bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+
+-------------------------------------------------------------------------------
+1. Core enums: biome, step type, lane, status
+-------------------------------------------------------------------------------
+
+enum physis.BiomeType.v1
+  Desert
+  Grassland
+  Wetland
+  Forest
+  Mangrove
+  UrbanBrownfield
+  Riparian
+  Coastal
+end
+
+enum physis.RestorationLane.v1
+  RESEARCH
+  PILOT
+  PRODUCTION
+end
+
+enum physis.StepType.v1
+  DroneSortie
+  SoilAmendment
+  Seeding
+  MangrovePlanting
+  WetlandRehydration
+  FOGChannelCleanup
+  InSituBioremediation
+end
+
+enum physis.ScenarioStatus.v1
+  Draft
+  Approved
+  Scheduled
+  Executing
+  Completed
+  Suspended
+end
+
+-------------------------------------------------------------------------------
+2. Soil & aquifer Lyapunov references
+-------------------------------------------------------------------------------
+
+record physis.SoilLyapunovConfig.v1
+  id                    Uuid
+  vref                  f32        # reference V_soil
+  max_delta_v           f32        # |V_soil_next - V_soil_current| <= max_delta_v
+  max_slope             f32        # <= 0 for non-increase
+end
+
+record physis.SoilLyapunovSnapshot.v1
+  id                    Uuid
+  site_id               String
+  depth_profile_id      String     # reference to soil depth profile ALN
+  timestamputc          String
+  V_soil_current        f32
+  V_soil_next           f32
+  delta_V_soil          f32
+end
+
+record physis.AquiferLyapunovConfig.v1
+  id                    Uuid
+  vref                  f32
+  max_delta_v           f32
+  max_slope             f32
+end
+
+record physis.AquiferLyapunovSnapshot.v1
+  id                    Uuid
+  aquifer_id            String
+  timestamputc          String
+  V_aquifer_current     f32
+  V_aquifer_next        f32
+  delta_V_aquifer       f32
+end
+
+-------------------------------------------------------------------------------
+3. Scenario and step schema
+-------------------------------------------------------------------------------
+
+record physis.RestorationScenario.v1
+  id                    Uuid
+
+  site_id               String          # unique site or corridor id
+  biome_type            physis.BiomeType.v1
+  lane                  physis.RestorationLane.v1
+
+  nova_terra_scenario   String          # reference id to simulation scenario
+  description           String
+
+  # KER targets for the scenario
+  k_target              f32
+  e_target              f32
+  r_target              f32
+
+  roh_ceiling           f32            # must respect global 0.30 ceiling
+  ker_profile_ref_id    Uuid           # lane KER profile, if shared with Kairos
+
+  psat_profile_id       String         # psat.P7007Profile.v1.id for high-risk work
+
+  soil_config_id        Uuid           # physis.SoilLyapunovConfig.v1.id
+  aquifer_config_id     Uuid           # physis.AquiferLyapunovConfig.v1.id (optional)
+
+  created_utc           String
+  status                physis.ScenarioStatus.v1
+end
+
+record physis.RestorationStep.v1
+  id                    Uuid
+  scenario_id           Uuid
+
+  steptype              physis.StepType.v1
+  lane                  physis.RestorationLane.v1
+
+  # inputs
+  drone_class           String         # e.g. seed-drone-class-id, optional
+  seed_mix_id           String         # seed mix catalog id, optional
+  amendment_recipe_id   String         # soil amendment recipe id, optional
+  mangrove_variant_id   String         # mangrove genotype/stock id, optional
+
+  chthonios_bundle_id   String         # soil/aquifer sensor bundle id (Chthónios)
+  soil_snapshot_id      Uuid           # SoilLyapunovSnapshot before step
+  aquifer_snapshot_id   Uuid           # AquiferLyapunovSnapshot before step (optional)
+
+  psat_profile_id       String         # psat.P7007Profile.v1.id if nanoswarms/heavy machinery
+
+  planned_start_utc     String
+  planned_end_utc       String
+
+  created_utc           String
+end
+
+-------------------------------------------------------------------------------
+4. Nanoswarm/heavy machinery classification
+-------------------------------------------------------------------------------
+
+record physis.StepRiskProfile.v1
+  id                    Uuid
+  step_id               Uuid
+
+  uses_nanoswarms       bool
+  uses_heavy_machinery  bool
+  involves_bci          bool          # e.g. augmented operators
+
+  psat_profile_id       String        # required when any of the above is true
+end
+
+-------------------------------------------------------------------------------
+5. Binding to Chthónios soil/aquifer health
+-------------------------------------------------------------------------------
+
+record physis.ChthoniosBinding.v1
+  id                    Uuid
+  chthonios_bundle_id   String        # bundle id from Chthónios-Monitor
+  site_id               String
+  soil_node_ids         list[String]  # soil sensor node ids
+  aquifer_node_ids      list[String]  # aquifer sensor ids
+end
+
+-------------------------------------------------------------------------------
+6. Invariants: PSAT for high-risk steps
+-------------------------------------------------------------------------------
+
+invariant physis.PsatRequiredForNanoswarmAndMachinerySteps
+  # Any step that uses nanoswarms, heavy machinery, or BCI must carry a PSAT profile.
+  forall s in physis.StepRiskProfile.v1
+    (s.uses_nanoswarms == true
+     or s.uses_heavy_machinery == true
+     or s.involves_bci == true) implies
+      s.psat_profile_id != ""
+end
+
+invariant physis.PsatMonotonePerScenario
+  # Within a scenario, PSAT profiles must not weaken over time for nanoswarm/heavy steps.
+  # (Operationalized by requiring consistent psat_profile_id across evolution;
+  #  actual monotone risk proofs live in Rust/Kani using PSAT envelopes.)
+  forall s1 in physis.StepRiskProfile.v1
+    forall s2 in physis.StepRiskProfile.v1
+      s1.step_id != s2.step_id
+      and s1.psat_profile_id != ""
+      and s2.psat_profile_id != ""
+      implies s1.psat_profile_id == s2.psat_profile_id
+end
+
+-------------------------------------------------------------------------------
+7. Soil Lyapunov non-increase (local residual)
+-------------------------------------------------------------------------------
+
+invariant physis.SoilLyapunovNonIncrease
+  # Soil Lyapunov residual must respect non-increase with bounded noise.
+  forall snap in physis.SoilLyapunovSnapshot.v1
+    exists cfg in physis.SoilLyapunovConfig.v1
+      snap.delta_V_soil == snap.V_soil_next - snap.V_soil_current
+      and snap.delta_V_soil <= cfg.max_delta_v
+      and snap.V_soil_next <= snap.V_soil_current + cfg.max_delta_v
+      and snap.V_soil_next <= snap.V_soil_current
+end
+
+invariant physis.AquiferLyapunovNonIncrease
+  # Aquifer Lyapunov residual must respect non-increase with bounded noise.
+  forall snap in physis.AquiferLyapunovSnapshot.v1
+    exists cfg in physis.AquiferLyapunovConfig.v1
+      snap.delta_V_aquifer == snap.V_aquifer_next - snap.V_aquifer_current
+      and snap.delta_V_aquifer <= cfg.max_delta_v
+      and snap.V_aquifer_next <= snap.V_aquifer_current + cfg.max_delta_v
+      and snap.V_aquifer_next <= snap.V_aquifer_current
+end
+
+-------------------------------------------------------------------------------
+8. Scenario scheduling invariants: only improving soil/aquifer
+-------------------------------------------------------------------------------
+
+invariant physis.ScenarioRequiresSoilSensors
+  # A scenario cannot reach Scheduled without at least one soil Lyapunov snapshot.
+  forall sc in physis.RestorationScenario.v1
+    sc.status == physis.ScenarioStatus.v1.Scheduled implies
+      exists snap in physis.SoilLyapunovSnapshot.v1
+        snap.site_id == sc.site_id
+end
+
+invariant physis.ScenarioRequiresNonIncreasingSoil
+  # Scheduled scenarios must show non-increasing soil Lyapunov V_soil.
+  forall sc in physis.RestorationScenario.v1
+    sc.status == physis.ScenarioStatus.v1.Scheduled implies
+      exists snap in physis.SoilLyapunovSnapshot.v1
+        snap.site_id == sc.site_id
+        and snap.V_soil_next <= snap.V_soil_current
+end
+
+invariant physis.ScenarioRequiresNonIncreasingAquiferWhenBound
+  # If an aquifer is bound, scheduled scenarios must also show non-increasing V_aquifer.
+  forall sc in physis.RestorationScenario.v1
+    sc.status == physis.ScenarioStatus.v1.Scheduled
+    and sc.aquifer_config_id != "" implies
+      exists snap in physis.AquiferLyapunovSnapshot.v1
+        snap.aquifer_id == sc.site_id   # or corridor-specific aquifer id mapping
+        and snap.V_aquifer_next <= snap.V_aquifer_current
+end
+
+-------------------------------------------------------------------------------
+9. RoH and lane constraints
+-------------------------------------------------------------------------------
+
+record physis.LaneKerProfileRef.v1
+  id                    Uuid
+  lane                  physis.RestorationLane.v1
+  roh_ceiling           f32
+  k_min                 f32
+  e_min                 f32
+  r_max                 f32
+end
+
+invariant physis.GlobalRohCeiling
+  # Scenario RoH ceilings and lane profiles must respect global RoH ceiling (e.g. 0.30).
+  forall sc in physis.RestorationScenario.v1
+    sc.roh_ceiling <= 0.30
+end
+
+invariant physis.LaneKerConsistency
+  # Lane KER thresholds must be structurally consistent with RoH and per-lane constraints.
+  forall p in physis.LaneKerProfileRef.v1
+    p.k_min  >= 0.0
+    and p.e_min  >= 0.0
+    and p.r_max  >= 0.0
+    and p.r_max  <= p.roh_ceiling
+    and p.roh_ceiling <= 0.30
+end
+
+invariant physis.ScenarioWithinLaneProfile
+  # A scenario marked Scheduled must have K/E/R within its lane profile before execution.
+  forall sc in physis.RestorationScenario.v1
+    sc.status == physis.ScenarioStatus.v1.Scheduled implies
+      exists p in physis.LaneKerProfileRef.v1
+        sc.lane == p.lane
+        and sc.roh_ceiling <= p.roh_ceiling
+        and sc.r_target    <= p.r_max
+        and sc.k_target    >= p.k_min
+        and sc.e_target    >= p.e_min
+end
+
+end
