@@ -116,6 +116,7 @@ members = [
     "crates/lake_risk_init",
     "crates/lane-governance",
     "crates/large-particle-registry",
+    "crates/link_compensator",
     "crates/neuromorphic-risk",
     "crates/offroad",
     "crates/plane-weights",
