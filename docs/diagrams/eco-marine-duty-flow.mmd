@@ -1,18 +1,18 @@
 flowchart TD
   subgraph Backend[Backend: Rust + ALN]
-    KER[KER and RoH metrics (ALE-METRICS-KER-001)]
-    ECOVAL[EcoValue snapshots (ALE-METRICS-ECO-VALUE-001)]
-    MRTX[MarineRestorationTx (ALE-TRUST-MARINE-RESTORATION-TX-001)]
-    EUNRR[EUNRRComplianceEnvelope (ALE-GOV-EU-NRR-COMPLIANCE-001)]
-    API[Eco / Marine JSON APIs]
+    KER["KER and RoH metrics (ALE-METRICS-KER-001)"]
+    ECOVAL["EcoValue snapshots (ALE-METRICS-ECO-VALUE-001)"]
+    MRTX["MarineRestorationTx (ALE-TRUST-MARINE-RESTORATION-TX-001)"]
+    EUNRR["EUNRRComplianceEnvelope (ALE-GOV-EU-NRR-COMPLIANCE-001)"]
+    API["Eco / Marine JSON APIs"]
   end
 
-  subgraph Browser[AI-native browser duty system]
-    TS_PAYLOAD[TileSpacePayload JSON]
-    TILE_ADAPTER[TileSpace adapter (tile-space-adapter.js)]
-    TILE_DUTY[TileSpaceDuty (tile-space-duty.js)]
-    MARINE_DUTY[MarineTxDuty (marine-tx-duty.js)]
-    XR_UI[Virtual ocean corridors XR layer]
+  subgraph Browser["AI-native browser duty system"]
+    TS_PAYLOAD["TileSpacePayload JSON"]
+    TILE_ADAPTER["TileSpace adapter (tile-space-adapter.js)"]
+    TILE_DUTY["TileSpaceDuty (tile-space-duty.js)"]
+    MARINE_DUTY["MarineTxDuty (marine-tx-duty.js)"]
+    XR_UI["Virtual ocean corridors XR layer"]
   end
 
   KER --> ECOVAL
@@ -28,7 +28,7 @@ flowchart TD
   TILE_DUTY --> MARINE_DUTY
 
   MARINE_DUTY --> XR_UI
-  XR_UI --> XR_UI_BADGES[Badges and overlays: COMPLIANT / BLOCKED / PARTIAL + EcoValue score]
+  XR_UI --> XR_UI_BADGES["Badges and overlays: COMPLIANT / BLOCKED / PARTIAL + EcoValue score"]
 
   classDef backend fill:#e0f3ff,stroke:#006fbb,stroke-width:1px;
   classDef browser fill:#f5f0ff,stroke:#5a2ea6,stroke-width:1px;
