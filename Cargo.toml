@@ -24,6 +24,13 @@ members = [
     "crates/cross-constellation-index",
     "crates/cyboquatic_blastradius_spine",
 
+    # Prometheus-Praxis and related crates (canonical dirs)
+    "crates/prometheus_praxis",
+    "crates/prometheus_praxis_ai",
+    "crates/prometheus_praxis_semantics",
+    "crates/prometheus_praxis_collective_feed",
+    "crates/prometheus_praxis_provenance",
+
     # Crates with src/ subdirs under `crates/`
     "crates/cyboquatic-ecosafety-core",
     "crates/cyboquatic_benchmark_tool",
@@ -116,13 +123,6 @@ members = [
     "crates/ppx_continuity_mcp",
     "crates/ppx_minimal_identity_kernel",
 
-    # prometheus-praxis crates (canonical dirs)
-    "crates/prometheus_praxis",
-    "crates/prometheus_praxis_ai",
-    "crates/prometheus_praxis_semantics",
-    "crates/prometheus_praxis_collective_feed",
-    "crates/prometheus_praxis_provenance",
-
     "crates/psychrisk_engine",
     "crates/restoration-radius",
 
@@ -166,7 +166,7 @@ hex           = "0.4.3"
 # Crypto and signatures (non-blacklisted primitives).
 ed25519-dalek = "2.1.0"
 
-# Async runtime (non-networked, research band only by policy).
+# Async runtime (non-networked by policy; used for timers, fs, etc.).
 tokio         = { version = "1.38.0", features = ["rt", "macros", "time", "io-util", "sync", "fs"] }
 
 # Proc-macro toolchain for internal derives.
@@ -237,7 +237,7 @@ hexanchor        = "0xECO2026RESTORATIONSHARD_bostrom18sd2ujv24ual9c9pshtxys6j8k
 rohceiling       = 0.30
 
 [workspace.metadata]
-ecosafety.non_actuating_only = true
+ecosafety.non_actuating_only   = true
 ecosafety.ecorestoration_spine = true
 
 # Root crate: ecorestorationshard (index / harness for the constellation).
