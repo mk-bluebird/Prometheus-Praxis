@@ -1,0 +1,40 @@
+# eco_restoration_shard/crates/prometheus_praxis_provenance/Cargo.toml
+
+[package]
+name = "prometheus_praxis_provenance"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "Provenance Anchor for Prometheus-Praxis: non-actuating, invariant-first logging of governance decisions with Veritas-Chain and Janus-Veritas bindings."
+authors = ["bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"]
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+keywords = ["governance", "provenance", "audit", "non-actuating"]
+
+[lib]
+name = "prometheus_praxis_provenance"
+path = "src/lib.rs"
+
+[dependencies]
+chrono = { workspace = true }
+rust_decimal = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+
+# Core governance types can be shared from the main crate if desired.
+# For now, this crate is self-contained; you may later switch to:
+# prometheus_praxis = { path = "../prometheus_praxis" }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+kani = { version = "0.67", default-features = false }
+
+[package.metadata.ai_governance]
+standard = "ISO/IEC 42001"
+scope = "Governance Spine - Provenance"
+control_mapping = ["9.2", "10", "11", "A.8.3"]
+purpose = "Anchors every governance decision as an immutable ProvenanceRecord, supporting monitoring, nonconformity handling, and technical documentation."
+
+[package.metadata.eu_ai_act]
+risk_roles = ["documentation_generator", "audit_anchor"]
+articles_supported = ["11"]
+risk_categories = ["High", "Limited", "Minimal"]
