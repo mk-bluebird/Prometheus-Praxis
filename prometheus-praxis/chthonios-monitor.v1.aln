@@ -1,0 +1,268 @@
+aln
+title Prometheus-Praxis Chthónios-Monitor v1
+version 1.0.0
+
+aln.migration   ALN.MIGRATION.CYBERCOREAUTHORITY.v1
+binding.hostdid did:aln:organic-host
+binding.bostromaddress bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+
+-------------------------------------------------------------------------------
+1. Core enums and identities
+-------------------------------------------------------------------------------
+
+enum chthonios.SoilType.v1
+  Alluvium
+  Colluvium
+  Loam
+  Clay
+  Sand
+  Silt
+  Peat
+  AnthropogenicFill
+end
+
+enum chthonios.SampleSourceKind.v1
+  ManualBorehole
+  MonitoringWell
+  Vibrocore
+  ConePenetrometerPoreWater
+  Lysimeter
+  OtherInstrument
+end
+
+enum chthonios.BioIndicatorKind.v1
+  MicrobialBiomass
+  NematodeCommunity
+  RootDensity
+  MycorrhizalColonization
+  MacroinvertebrateDiversity
+  EarthwormDensity
+  BiofilmActivity
+end
+
+enum chthonios.ContaminantClass.v1
+  Hydrocarbon
+  ChlorinatedSolvent
+  HeavyMetal
+  Nutrient
+  Salinity
+  PFAS
+  Other
+end
+
+enum chthonios.RestorationInterventionKind.v1
+  Bioremediation
+  Phytoremediation
+  SoilFlushing
+  PermeableReactiveBarrier
+  Aeration
+  OrganicAmendment
+  ExcavationBackfill
+  NaturalAttenuation
+end
+
+-------------------------------------------------------------------------------
+2. Subsurface sample record
+-------------------------------------------------------------------------------
+
+record chthonios.SubsurfaceSample.v1
+  id                 Uuid
+  site_id            String          # logical site / corridor ID
+  aquifer_id         String          # hydrostratigraphic unit ID
+  sample_source      chthonios.SampleSourceKind.v1
+
+  depth_m            f32             # depth below ground surface
+  depth_uncertainty_m f32            # +/- uncertainty
+
+  soil_type          chthonios.SoilType.v1
+  lithologic_note    optional String # free text note
+
+  # Geochemical profile (normalized 0..1 corridors)
+  ph_normalized      f32             # 0 acidic .. 1 alkaline corridor
+  redox_normalized   f32             # 0 strongly reducing .. 1 strongly oxidizing
+  conductivity_norm  f32             # normalized EC corridor
+  organic_carbon_norm f32            # normalized TOC corridor
+  dissolved_oxygen_norm f32          # DO corridor
+
+  # Contaminant and restoration residuals
+  contaminant_class  chthonios.ContaminantClass.v1
+  contaminant_load_norm f32         # 0 clean .. 1 highly contaminated
+  restoration_residual_norm f32     # residual from restoration target 0 best .. 1 worst
+
+  # Biological indicators
+  bio_indicator_kinds  list chthonios.BioIndicatorKind.v1
+  bio_health_norm      f32          # 0 collapse .. 1 healthy biota
+
+  # Data quality and missingness
+  missing_fraction     f32          # 0 no missing .. 1 fully missing
+  data_quality_flag    String       # e.g. "OK", "SUSPECT", "INVALID"
+
+  collected_utc        String       # ISO-8601 timestamp
+end
+
+-------------------------------------------------------------------------------
+3. Subsurface Lyapunov index
+-------------------------------------------------------------------------------
+
+# Analogous to the air-quality Lyapunov index: V_sub encodes subsurface health.
+# Lower V_sub means healthier, stable subsurface conditions.
+
+record chthonios.SubsurfaceLyapunov.v1
+  id                 Uuid
+  site_id            String
+  aquifer_id         String
+
+  time_utc           String         # observation time
+
+  # Scalar Lyapunov index and residuals
+  v_sub              f32            # current Lyapunov scalar V_sub
+  v_sub_prev         f32            # previous V_sub
+  v_sub_residual     f32            # V_sub - V_sub_prev
+
+  # Corridor bounds for this site / aquifer
+  v_sub_min          f32            # best (healthiest) allowed value
+  v_sub_max          f32            # worst allowed corridor bound
+
+  # Missingness and uncertainty
+  missing_fraction   f32            # inherited / aggregated from samples
+  uncertainty_norm   f32            # 0 low uncertainty .. 1 high
+
+  # Derived risk components
+  pollution_norm     f32            # aggregated contaminant residual
+  restoration_norm   f32            # aggregated restoration residual
+end
+
+-------------------------------------------------------------------------------
+4. Chthónios monitor envelope for Physis-Curator
+-------------------------------------------------------------------------------
+
+record chthonios.MonitorEnvelope.v1
+  id                 Uuid
+  site_id            String
+  aquifer_id         String
+
+  # Acceptable corridors for V_sub
+  v_sub_min          f32
+  v_sub_max          f32
+
+  # Acceptable missingness and uncertainty
+  max_missing_fraction f32          # e.g. 0.20
+  max_uncertainty_norm f32          # e.g. 0.30
+
+  # Link to controlling governance envelopes
+  roh_envelope_ref   String         # e.g. ecosafety.roh.envelope.v1.aln
+  tsafe_envelope_ref optional String
+  lyapunov_envelope_ref String      # links to generic Lyapunov envelope
+
+  # Flags for Physis-Curator gating
+  require_additional_monitoring_when_unknown bool
+  require_additional_monitoring_when_out_of_corridor bool
+end
+
+-------------------------------------------------------------------------------
+5. Invariants: Lyapunov non-increase under healthy interventions
+-------------------------------------------------------------------------------
+
+# 5.1 Non-increase of V_sub under declared healthy interventions
+#
+# For any pair of consecutive Lyapunov observations where a restoration
+# intervention is applied and classified as "healthy", V_sub must not
+# increase beyond a small residual band.
+
+invariant chthonios.VSubNonIncreaseUnderHealthyIntervention
+  forall s1 in chthonios.SubsurfaceLyapunov.v1,
+         s2 in chthonios.SubsurfaceLyapunov.v1
+
+    # same site / aquifer, s2 later than s1
+    s1.site_id == s2.site_id
+    and s1.aquifer_id == s2.aquifer_id
+    and s1.time_utc < s2.time_utc
+
+    # joined with a restoration intervention record
+    # (conceptual join; actual intervention record lives in Physis-Curator lanes)
+    implies
+
+      # Non-increase in V_sub within residual band epsilon
+      s2.v_sub <= s1.v_sub + 0.02
+end
+
+# 5.2 Pollution and missingness as risk contributions
+#
+# V_sub must monotonically reflect both pollution and missing data:
+# increasing pollution_norm or missing_fraction must not decrease V_sub.
+
+invariant chthonios.PollutionAndMissingnessMonotoneRisk
+  forall s in chthonios.SubsurfaceLyapunov.v1
+
+    # If pollution_norm increases, V_sub must not decrease
+    # (conceptual: compared to previous state; here we encode as trend constraint)
+    s.pollution_norm >= 0.0
+    and s.missing_fraction >= 0.0
+    implies s.v_sub >= 0.0
+end
+
+-------------------------------------------------------------------------------
+6. Gating Physis-Curator scheduling on V_sub and missingness
+-------------------------------------------------------------------------------
+
+# 6.1 Block actions when V_sub is outside safe corridors
+
+invariant chthonios.BlockActionsWhenVSubOutsideCorridor
+  forall m in chthonios.MonitorEnvelope.v1,
+         s in chthonios.SubsurfaceLyapunov.v1
+
+    s.site_id == m.site_id
+    and s.aquifer_id == m.aquifer_id
+
+    # If V_sub is outside the corridor, Physis-Curator must not schedule new actions
+    and (s.v_sub < m.v_sub_min or s.v_sub > m.v_sub_max)
+    implies m.require_additional_monitoring_when_out_of_corridor == true
+end
+
+# 6.2 Block actions when V_sub is poorly known (high missingness)
+
+invariant chthonios.BlockActionsWhenVSubPoorlyKnown
+  forall m in chthonios.MonitorEnvelope.v1,
+         s in chthonios.SubsurfaceLyapunov.v1
+
+    s.site_id == m.site_id
+    and s.aquifer_id == m.aquifer_id
+
+    # High missingness or high uncertainty triggers monitoring requirement
+    and (s.missing_fraction > m.max_missing_fraction
+         or s.uncertainty_norm > m.max_uncertainty_norm)
+    implies m.require_additional_monitoring_when_unknown == true
+end
+
+# 6.3 Physis-Curator scheduling guard (conceptual binding)
+#
+# Any Physis-Curator action referencing site_id / aquifer_id must check that:
+# - V_sub is within [v_sub_min, v_sub_max]
+# - missing_fraction <= max_missing_fraction
+# - uncertainty_norm <= max_uncertainty_norm
+# or else the action must be deferred in favor of additional monitoring.
+
+invariant chthonios.PhysisCuratorSchedulingGuard
+  forall m in chthonios.MonitorEnvelope.v1,
+         s in chthonios.SubsurfaceLyapunov.v1
+
+    s.site_id == m.site_id
+    and s.aquifer_id == m.aquifer_id
+
+    implies
+
+      # Scheduling condition: inside corridor and sufficiently known
+      (
+        s.v_sub >= m.v_sub_min
+        and s.v_sub <= m.v_sub_max
+        and s.missing_fraction <= m.max_missing_fraction
+        and s.uncertainty_norm <= m.max_uncertainty_norm
+      )
+      # If these conditions fail, governance kernels must Derate/Stop
+      or (
+        m.require_additional_monitoring_when_unknown == true
+        or m.require_additional_monitoring_when_out_of_corridor == true
+      )
+end
+
+end
