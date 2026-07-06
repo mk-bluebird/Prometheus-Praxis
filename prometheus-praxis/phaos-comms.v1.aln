@@ -1,0 +1,257 @@
+aln
+title Prometheus-Praxis Pháos-Comms v1
+version 1.0.0
+
+aln.migration   ALN.MIGRATION.CYBERCOREAUTHORITY.v1
+binding.hostdid did:aln:organic-host
+binding.bostromaddress bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+
+-------------------------------------------------------------------------------
+1. Core enums and identifiers
+-------------------------------------------------------------------------------
+
+enum phaos.Domain.v1
+  EcoRestoration
+  CityOperations
+  MacroHealth
+  Cybernetics
+  Governance
+  Research
+end
+
+enum phaos.ActionLane.v1
+  Research
+  Pilot
+  Production
+end
+
+# Message types allowed on these channels: explicitly non-actuating.
+enum phaos.MessageType.v1
+  GovernanceDecision   # Allow/Derate/Stop decisions, policies
+  Telemetry            # Metrics, KER, RoH, Lyapunov residuals
+  EvidenceBundle       # ProofOfResearch, PSAT, Veritas shards
+  AuditEvent           # Logs, appeals, contract events
+  Configuration        # Non-actuating configuration / envelopes
+end
+
+# High-level PQC algorithm classes (names only, no math).
+enum phaos.PQCSchemeClass.v1
+  KyberKEM
+  DilithiumSignature
+  FalconSignature
+  SphincsPlusSignature
+  ClassicMcEliece
+  BIKE
+  HQC
+  OtherNistPqc
+end
+
+# Explicit blacklist of forbidden primitives.
+enum phaos.BlacklistedPrimitive.v1
+  BlakeFamily          # includes BLAKE2, BLAKE3
+  Sha3_256
+  Argon2
+  Exergy
+  Tsafe
+  DigitalTwinFamily
+  Googolswarm
+  TsafeVariant
+end
+
+-------------------------------------------------------------------------------
+2. CommsChannelProfile.v1
+-------------------------------------------------------------------------------
+
+record phaos.CommsChannelProfile.v1
+  id                   Uuid
+  channel_id           String          # logical channel identifier
+  domain               phaos.Domain.v1
+  lane                 phaos.ActionLane.v1
+
+  # Transport / addressing
+  endpoint_label       String          # logical endpoint name only (no URI)
+  veritas_chain_ref    optional String # Veritas-Chain shard for audit
+
+  # PQC scheme selection (names only)
+  pqc_class            phaos.PQCSchemeClass.v1
+  pqc_scheme_id        String          # e.g. "ML-KEM-768", "Dilithium-3"
+  key_rotation_policy  String          # descriptive, e.g. "daily", "per-session"
+
+  # Latency bounds for this channel
+  latency_min_ms       f32
+  latency_max_ms       f32
+
+  # Allowed message types (non-actuating only)
+  allowed_message_types list phaos.MessageType.v1
+
+  # Governance flags
+  governance_relevant  bool            # true for rights/gov kernels
+  read_only_to_actuators bool          # must be true for governance_relevant
+  nonactuating_repo_channel bool       # must be true for this repo
+
+  # Blacklist assertion: this channel uses no forbidden primitives
+  forbidden_primitives list phaos.BlacklistedPrimitive.v1
+end
+
+-------------------------------------------------------------------------------
+3. CommsAuditRecord.v1
+-------------------------------------------------------------------------------
+
+record phaos.CommsAuditRecord.v1
+  id                   Uuid
+  channel_id           String          # FK to CommsChannelProfile.v1.channel_id
+
+  # Anchor to Veritas-Chain / QPU data shard
+  veritas_shard_id     String          # hex or logical ID
+  veritas_chain_ref    String          # chain name / corridor
+
+  # PQC parameters recorded for audit
+  pqc_class            phaos.PQCSchemeClass.v1
+  pqc_scheme_id        String
+  key_rotation_event   String          # description of rotation event
+  session_id           String          # session / epoch identifier
+
+  # Observed latency statistics
+  latency_min_ms_obs   f32
+  latency_max_ms_obs   f32
+  latency_mean_ms_obs  f32
+
+  # Failures and anomalies
+  failure_count        u32
+  failure_reasons      list String     # human-readable cause summaries
+
+  # Governance notes
+  governance_relevant  bool
+  read_only_to_actuators bool
+
+  # Timestamp for this audit record
+  recorded_utc         String
+end
+
+-------------------------------------------------------------------------------
+4. Cryptography invariants
+-------------------------------------------------------------------------------
+
+# 4.1 Forbid blacklisted primitives on all channels
+#
+# Any CommsChannelProfile must explicitly state that no blacklisted
+# primitive is in use. This is enforced by requiring forbidden_primitives
+# to be an empty list, and by enumerating what is disallowed at ontology
+# level.
+
+invariant phaos.NoBlacklistedPrimitivesOnChannels
+  forall c in phaos.CommsChannelProfile.v1
+    # By construction, any non-empty forbidden_primitives list indicates
+    # a violation; valid channels must therefore have an empty list.
+    c.forbidden_primitives.length == 0
+end
+
+# 4.2 PQC scheme class whitelist
+#
+# Only known PQC classes enumerated in phaos.PQCSchemeClass.v1 are permitted.
+# This is already enforced by the enum, but we attach an invariant that
+# governance-relevant channels must use classes aligned with NIST PQC.
+
+invariant phaos.GovernanceChannelsUseWhitelistedPQC
+  forall c in phaos.CommsChannelProfile.v1
+    c.governance_relevant == true
+    implies
+      (
+        c.pqc_class == phaos.PQCSchemeClass.v1.KyberKEM
+        or c.pqc_class == phaos.PQCSchemeClass.v1.DilithiumSignature
+        or c.pqc_class == phaos.PQCSchemeClass.v1.FalconSignature
+        or c.pqc_class == phaos.PQCSchemeClass.v1.SphincsPlusSignature
+        or c.pqc_class == phaos.PQCSchemeClass.v1.ClassicMcEliece
+        or c.pqc_class == phaos.PQCSchemeClass.v1.BIKE
+        or c.pqc_class == phaos.PQCSchemeClass.v1.HQC
+        or c.pqc_class == phaos.PQCSchemeClass.v1.OtherNistPqc
+      )
+end
+
+-------------------------------------------------------------------------------
+5. Non-actuation and read-only channel invariants
+-------------------------------------------------------------------------------
+
+# 5.1 Governance-relevant channels are read-only to actuators
+#
+# Any channel marked governance_relevant must be read-only with respect
+# to actuators, and must not carry actuation commands.
+
+invariant phaos.GovernanceChannelsReadOnlyToActuators
+  forall c in phaos.CommsChannelProfile.v1
+    c.governance_relevant == true
+    implies
+      c.read_only_to_actuators == true
+end
+
+# 5.2 Allowed message types exclude actuation commands
+#
+# All channels in this repo are non-actuating; message types are limited
+# to governance decisions, telemetry, evidence, audit events, and configuration.
+
+invariant phaos.NoActuationMessagesOnRepoChannels
+  forall c in phaos.CommsChannelProfile.v1,
+         t in c.allowed_message_types
+
+    # Only whitelisted non-actuating message types are allowed.
+    (
+      t == phaos.MessageType.v1.GovernanceDecision
+      or t == phaos.MessageType.v1.Telemetry
+      or t == phaos.MessageType.v1.EvidenceBundle
+      or t == phaos.MessageType.v1.AuditEvent
+      or t == phaos.MessageType.v1.Configuration
+    )
+    and c.nonactuating_repo_channel == true
+end
+
+# 5.3 Governance comms separated from actuator stacks
+#
+# Conceptual invariant: channels described in this shard must not be
+# used as direct actuator control paths. Actual actuator control must
+# belong to separately governed stacks, outside this repo.
+
+invariant phaos.CommsSeparatedFromActuators
+  forall c in phaos.CommsChannelProfile.v1
+
+    # If a channel is part of this repo, it is non-actuating by design.
+    c.nonactuating_repo_channel == true
+end
+
+-------------------------------------------------------------------------------
+6. Latency and audit invariants
+-------------------------------------------------------------------------------
+
+# 6.1 Observed latency stays within declared bounds (for governance channels)
+#
+# For governance-relevant channels, observed latency must remain within
+# declared min/max bounds, or audit records must reflect violations.
+
+invariant phaos.GovernanceLatencyWithinBoundsOrAudited
+  forall c in phaos.CommsChannelProfile.v1,
+         a in phaos.CommsAuditRecord.v1
+
+    c.channel_id == a.channel_id
+    and c.governance_relevant == true
+
+    implies
+
+      (
+        a.latency_min_ms_obs >= c.latency_min_ms
+        and a.latency_max_ms_obs <= c.latency_max_ms
+      )
+      or a.failure_count > 0
+end
+
+# 6.2 Audit record consistency with governance flags
+
+invariant phaos.AuditGovernanceFlagConsistency
+  forall c in phaos.CommsChannelProfile.v1,
+         a in phaos.CommsAuditRecord.v1
+
+    c.channel_id == a.channel_id
+    implies
+      a.governance_relevant == c.governance_relevant
+      and a.read_only_to_actuators == c.read_only_to_actuators
+end
+
+end
