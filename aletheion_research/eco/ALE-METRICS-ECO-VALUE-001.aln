@@ -1,0 +1,54 @@
+aln
+aln.schema ALE-METRICS-ECO-VALUE-001
+
+meta.role MetricSchema
+meta.domain EcoRestoration
+meta.engine Prometheus-Praxis
+meta.scope Land, MarineCoastal
+meta.version 0.1.0
+meta.status active
+meta.jurisdiction GLOBAL, EU
+
+type MetricId string
+type TaskId string
+type TxId string
+
+type Bounded01 float
+constraint Bounded01_min 0.0
+constraint Bounded01_max 1.0
+
+-- Global RoH ceiling (already present in ecosafety envelopes; mirrored here).
+invariant.global_roh_ceiling 0.30
+
+record KerComponents
+  field.k Bounded01         -- Knowledge yield (K)
+  field.e Bounded01         -- Eco impact (E)
+  field.r Bounded01         -- Risk-of-harm component (H)
+endrecord
+
+record EcoValueWeights
+  field.alpha float         -- α, weight for E
+  field.beta float          -- β, weight for H (cost term, must be positive)
+  field.gamma float         -- γ, weight for K
+  invariant.beta_nonnegative beta 0.0
+  invariant.beta_ge_alpha beta alpha
+  invariant.beta_ge_gamma beta gamma
+endrecord
+
+record EcoValueSnapshot
+  field.eco_value_id string
+  field.subject_kind string   -- "TASK" | "MARINE_TX"
+  field.subject_ref string    -- TaskId or TxId
+  field.ker KerComponents
+  field.weights EcoValueWeights
+  field.eco_value float
+  invariant.roh_within_global_ceiling ker.r global_roh_ceiling
+  invariant.eco_value_formula eco_value (weights.alpha * ker.e) - (weights.beta * ker.r) + (weights.gamma * ker.k)
+endrecord
+
+-- Linkage to other ALN schemas for context.
+ref.ker_metric_schema ALE-METRICS-KER-001.aln
+ref.restoration_task_schema ALE-ERM-RESTORATION-TASK-001.aln
+ref.marine_tx_schema ALE-TRUST-MARINE-RESTORATION-TX-001.aln
+
+end
