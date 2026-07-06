@@ -1,0 +1,199 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+
+\title{Prometheus-Praxis Core Definition}
+\author{Prometheus-Praxis Governance Spine}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This document defines the core objects of Prometheus-Praxis as a neurorights-safe, non-rollback adaptive implementation engine. It specifies the canonical ALN core shard, execution-plan schema, decision-log schema, monotone safety invariant, and owner-binding record, all designed to be implemented as Rust 2024 and ALN contracts under Veritas-Chain and KER/RoH/Tsafe/Lyapunov governance.[file:81][file:2]
+\end{abstract}
+
+\section{Overview}
+
+Prometheus-Praxis is the adaptive execution engine for the Synoptic Network, translating human and policy goals into constrained, verifiable task graphs that operate under strict non-rollback, neurorights, and ecosafety envelopes.[file:81][file:2]
+The core of this engine is captured in five objects:
+
+\begin{enumerate}[nosep]
+  \item \textbf{PrometheusPraxis.Core.v1.aln} -- canonical definition of the engine.
+  \item \textbf{PrometheusPraxis.ExecutionPlan.schema} -- formal task-graph schema.
+  \item \textbf{PrometheusPraxis.DecisionLog.schema} -- append-only governance log.
+  \item \textbf{PrometheusPraxis.MonotoneSafety.invariant} -- forward-only safety proof.
+  \item \textbf{PrometheusPraxis.OwnerBinding} -- sovereignty and DID binding.[file:81][file:2]
+\end{enumerate}
+
+\section{PrometheusPraxis.Core.v1.aln}
+
+\subsection{Purpose}
+
+PrometheusPraxis.Core.v1.aln is the canonical ALN shard describing Prometheus-Praxis as an adaptive implementation engine.[file:81]
+It binds inputs (goals, policies), outputs (task graphs), and invariants (neurorights, non-rollback, RoH ceilings) to concrete governance artifacts.[file:2]
+
+\subsection{Core Fields}
+
+\begin{itemize}[nosep]
+  \item \textbf{Title and binding}:
+    \begin{itemize}[nosep]
+      \item \texttt{aln.title = "Prometheus-Praxis Core Execution Engine v1"}.[file:2]
+      \item \texttt{binding.bostromaddress = bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7} (primary owner).[file:2]
+      \item \texttt{binding.hostdid} referencing the Organichain / Cybercore host DID.[file:2]
+    \end{itemize}
+  \item \textbf{Inputs (goals, policies)}:
+    \begin{itemize}[nosep]
+      \item \texttt{field.intent\_text} for raw natural-language goals routed from the Semantic Intent Translator.[file:2]
+      \item \texttt{field.intent\_semantic} for structured TaskKind, domain, lane, and jurisdiction.[file:2]
+      \item \texttt{field.policy\_envelopes[]} referencing KER, RoH, Tsafe, Lyapunov, neurorights, equality, and treaty ALN shards.[file:81][file:2]
+    \end{itemize}
+  \item \textbf{Outputs (task graphs)}:
+    \begin{itemize}[nosep]
+      \item \texttt{field.execution\_plan\_ref} pointing to \texttt{PrometheusPraxis.ExecutionPlan.schema}.[file:2]
+      \item \texttt{field.plan\_version} (semantic version for evolution tracking).[file:2]
+      \item \texttt{field.guard\_profile} listing guard stacks applied (KER, RoH, Tsafe, Lyapunov, treaty, neurorights).[file:81][file:2]
+    \end{itemize}
+  \item \textbf{Invariants}:
+    \begin{itemize}[nosep]
+      \item \texttt{invariant.rohglobalceiling = 0.30} as a non-negotiable risk-of-harm ceiling.[file:81][file:23]
+      \item \texttt{invariant.monotone\_ota = true} requiring forward-only capability evolution.[file:81]
+      \item \texttt{invariant.neurorights.nonrollback = true} forbidding weakening neurorights envelopes.[file:2][file:81]
+      \item \texttt{invariant.nonactuation\_fields} listing prohibited actuation fields (e.g., torque, current, stimpattern, autopilot).[file:2]
+    \end{itemize}
+\end{itemize}
+
+\section{PrometheusPraxis.ExecutionPlan.schema}
+
+\subsection{Purpose}
+
+PrometheusPraxis.ExecutionPlan.schema defines the structure of task graphs executed by Prometheus-Praxis.[file:81][file:2]
+It ensures that every plan carries domain, jurisdiction, KER targets, envelopes, and dependencies, and can be mirrored exactly in Rust structs.[file:2]
+
+\subsection{Plan-Level Schema}
+
+\begin{itemize}[nosep]
+  \item ALN object: \texttt{prometheuspraxis.execution\_plan.v1.aln}.[file:2]
+  \item Fields:
+    \begin{itemize}[nosep]
+      \item \texttt{plan\_id} (globally unique identifier).
+      \item \texttt{domain} (e.g., EcoRestoration, CityOperations, MacroHealth, SmartCityUpgrade, HealthcareProcedure).[file:81][file:2]
+      \item \texttt{jurisdiction\_ref} (binding to legal and regulatory context).[file:2]
+      \item \texttt{action\_lane} (Research, Pilot, Production) aligned with lane-specific KER envelopes.[file:2]
+      \item \texttt{ker\_targets} (bounded K, E, R scalars or bands).[file:81]
+      \item \texttt{roh\_targets} (maximum allowed RoH deltas per lane).[file:81]
+      \item \texttt{envelopes[]} (references to KER, RoH, Tsafe, Lyapunov, neurorights, equality, and treaties).[file:81][file:2]
+      \item \texttt{dependencies[]} forming a DAG of upstream plans or tasks.[file:2]
+    \end{itemize}
+\end{itemize}
+
+\subsection{Task Node Schema}
+
+\begin{itemize}[nosep]
+  \item ALN object: \texttt{prometheuspraxis.task.schema.v1.aln}.[file:2]
+  \item Fields:
+    \begin{itemize}[nosep]
+      \item \texttt{task\_id} (unique within plan).
+      \item \texttt{kind} (TaskKind enum mirrored in Rust).[file:2]
+      \item \texttt{ecotarget} (normalized eco-impact target).
+      \item \texttt{roh\_target} (maximum allowed RoH change).
+      \item \texttt{neurorights\_env} (reference to neurorights envelope).[file:2]
+      \item \texttt{equality\_env} (reference to equality/payment access envelope).[file:2]
+    \end{itemize}
+\end{itemize}
+
+\section{PrometheusPraxis.DecisionLog.schema}
+
+\subsection{Purpose}
+
+PrometheusPraxis.DecisionLog.schema defines the append-only governance log for all plan and commit decisions.[file:2][file:81]
+It captures KER, RoH, Tsafe, Lyapunov, reasons, and DID signatures for Veritas-Chain anchoring and audit.[file:2]
+
+\subsection{Log Entry Schema}
+
+\begin{itemize}[nosep]
+  \item ALN shard: \texttt{qpudatashards/PrometheusPraxisDecision.v1.aln}.[file:2]
+  \item Fields:
+    \begin{itemize}[nosep]
+      \item \texttt{decision\_id} (hex or UUID).
+      \item \texttt{task\_id}, \texttt{plan\_id} (links into ExecutionPlan).[file:2]
+      \item \texttt{domain}, \texttt{lane} (for governance analytics).[file:2]
+      \item \texttt{decision\_enum} (\texttt{Allow | Derate | Stop}) matching \texttt{GovernanceDecision}.[file:2]
+      \item \texttt{ker\_vector} summarizing K/E/R at decision time.[file:81][file:2]
+      \item \texttt{roh\_scalar} (risk-of-harm at decision time).[file:81]
+      \item \texttt{lyapunov\_vcurrent}, \texttt{lyapunov\_vnext}, \texttt{lyapunov\_epsilon} (stability evidence).[file:82]
+      \item \texttt{tsafe\_corridor\_id}, \texttt{aln\_envelope\_id} (active safety envelopes).[file:23][file:81]
+      \item \texttt{hextrace} (canonical hash of decision context).[file:2]
+      \item \texttt{reasons} (human-readable justification).
+      \item \texttt{timestamp\_utc}.
+      \item \texttt{did\_signature} binding the decision to a DID.[file:2]
+    \end{itemize}
+\end{itemize}
+
+\section{PrometheusPraxis.MonotoneSafety.invariant}
+
+\subsection{Purpose}
+
+PrometheusPraxis.MonotoneSafety.invariant encodes the forward-only evolution requirement for all upgrades.[file:81][file:2]
+It ensures that global goodness increases, disparity decreases, and risk-of-harm never rises when envelopes or firmware are updated.[file:81]
+
+\subsection{Invariant Definition}
+
+\begin{itemize}[nosep]
+  \item ALN shard: \texttt{praxis.monotone\_safety.invariant.v1.aln}.[file:81]
+  \item Inequalities:
+    \begin{itemize}[nosep]
+      \item \( G_{\text{new}} \geq G_{\text{old}} \) (global goodness or benefit).[file:81]
+      \item \( D_{\text{new}} \leq D_{\text{old}} \) (disparity or degradation).[file:81]
+      \item \( R_{\text{new}} \leq R_{\text{old}} \) (risk-of-harm scalar).[file:81]
+    \end{itemize}
+  \item Concrete bindings:
+    \begin{itemize}[nosep]
+      \item \( G \) as a KER-weighted goodness scalar.
+      \item \( D \) as equity or disparity metrics from equality and collective feed shards.[file:2]
+      \item \( R \) as RoH ceilings and local domain limits.[file:81]
+      \item Envelope constraints: new RoH ceiling must satisfy \( \mathrm{RoH}_{\text{new}} \leq \mathrm{RoH}_{\text{old}} \); new Tsafe bands must be subsets of old bands.[file:81]
+      \item Lyapunov envelopes must preserve non-increasing residual bounds.[file:82]
+    \end{itemize}
+\end{itemize}
+
+\section{PrometheusPraxis.OwnerBinding}
+
+\subsection{Purpose}
+
+PrometheusPraxis.OwnerBinding asserts sovereignty over all Prometheus-Praxis artifacts, tying them to specific Bostrom addresses and DIDs.[file:2]
+It prevents silent authority capture or re-binding of core governance shards.[file:2][file:81]
+
+\subsection{Binding Schema}
+
+\begin{itemize}[nosep]
+  \item ALN shard: \texttt{praxis.owner\_binding.v1.aln}.[file:2]
+  \item Fields:
+    \begin{itemize}[nosep]
+      \item \texttt{owner.primary\_bostrom = bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7}.[file:2]
+      \item \texttt{owner.alternate\_bostrom} for secondary safe pathways.[file:2]
+      \item \texttt{owner.safe\_alternates[]} for compatible external anchors.[file:2]
+      \item \texttt{binding.crate\_paths[]} enumerating all governed crates (e.g., \texttt{crates/prometheuspraxis/**}, \texttt{crates/prometheuspraxissemantics/**}, observability crates).[file:2][file:82]
+      \item \texttt{binding.neurorights\_envelope} identifying the canonical neurorights shard.[file:2]
+      \item \texttt{binding.treaty\_modules[]} for FPIC, equality, and transhuman-rights gates.[file:2]
+    \end{itemize}
+\end{itemize}
+
+\section{Integration Notes}
+
+Together, these five objects define Prometheus-Praxis as:
+
+\begin{itemize}[nosep]
+  \item An adaptive engine whose core logic is expressed as ALN shards and Rust guards.[file:2][file:81]
+  \item A system with explicit schemas for plans and decisions, enabling full auditability and non-rollback proofs.[file:81]
+  \item A forward-only evolution framework enforced by monotone safety invariants and Kani-verifiable properties.[file:2][file:23]
+  \item A sovereignty-preserving architecture bound to specific Bostrom and DID identities.[file:2]
+\end{itemize}
+
+Future work should instantiate these shards and their Rust mirrors, wire them to Veritas-Chain, and attach Kani harnesses that prove the stated invariants.[file:2][file:23][file:81]
+
+\end{document}
