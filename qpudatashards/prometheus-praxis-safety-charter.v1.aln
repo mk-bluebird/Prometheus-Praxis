@@ -1,0 +1,187 @@
+aln
+title Prometheus-Praxis Safety Commitment Charter v1
+version 1.0.0
+
+aln.migration   ALN.MIGRATION.CYBERCOREAUTHORITY.v1
+binding.hostdid did:aln:organic-host
+binding.bostromaddress bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+
+-------------------------------------------------------------------------------
+1. Core enums and IDs
+-------------------------------------------------------------------------------
+
+enum safety.CommitmentKind.v1
+  NonActuatingKernel
+  ProofOfResearchPSAT
+  RegressionEmergencyLogging
+  TelemetryVsActuationSeparation
+  StandardsAlignment
+end
+
+enum safety.StandardRef.v1
+  IEEE_P7007_PSAT
+  ISO_42001_AIMS
+  NeurorightsEnvelope
+  NonWeaponizationContract
+end
+
+record safety.SafetyCommitmentProfile.v1
+  id                    Uuid
+  owner_bostrom         String     # primary DID / Bostrom address
+  repo_root             String     # e.g. "github.com/mk-bluebird/eco_restoration_shard"
+  description           String
+  commitments           list safety.CommitmentKind.v1
+  standards             list safety.StandardRef.v1
+  created_utc           String
+end
+
+-------------------------------------------------------------------------------
+2. Non‑actuating governance kernel commitment
+-------------------------------------------------------------------------------
+
+record safety.NonActuatingKernelCommitment.v1
+  id                    Uuid
+  profile_id            Uuid       # safety.SafetyCommitmentProfile.v1.id
+
+  kernel_crates         list String  # e.g. ["prometheuspraxis", "prometheuspraxis-semantics"]
+  nonactuating_flag     bool         # must be true
+  roh_ceiling_global    f32          # expected 0.30
+  lanes                 list String  # e.g. ["RESEARCH", "PILOT", "PRODUCTION"]
+
+  # ALN envelopes and invariants this kernel enforces
+  ker_envelope_ref      String       # praxis.ker.envelope.v1.aln
+  roh_envelope_ref      String       # ecosafety.roh.envelope.v1.aln
+  tsafe_envelope_ref    optional String
+  lyapunov_envelope_ref optional String
+  neurorights_envelope_ref optional String
+  treaty_envelope_ref   optional String
+end
+
+-------------------------------------------------------------------------------
+3. ProofOfResearch + PSAT before scaling pilots
+-------------------------------------------------------------------------------
+
+record safety.ProofOfResearchPSATCommitment.v1
+  id                    Uuid
+  profile_id            Uuid
+
+  techne_shard_ref      String       # e.g. "prometheus-praxis-techne-incubator.v1.aln"
+  proofofresearch_shard_ref String   # e.g. "proof-of-research.autonomy-bands.v1.aln"
+  psat_ontology_ref     String       # "ieee-p7007-ontology.v1.aln"
+
+  # Hard RoH ceiling for pilots and production
+  roh_ceiling_global    f32          # must be <= 0.30
+
+  # Flags indicating mandatory gating before lane upgrade
+  require_proofofresearch_for_production bool
+  require_psat_for_production            bool
+  require_kani_verified_invariants       bool
+end
+
+-------------------------------------------------------------------------------
+4. Regression logging and emergency governance review
+-------------------------------------------------------------------------------
+
+record safety.RegressionLoggingCommitment.v1
+  id                    Uuid
+  profile_id            Uuid
+
+  techne_shard_ref      String       # same Technē-Incubator shard
+  veritas_chain_ref     String       # Veritas-Chain name / ID
+  janus_veritas_ref     String       # Janus-Veritas proof system name
+
+  # Requirement flags
+  require_emergency_aln_record bool
+  require_governance_review    bool
+
+  # Human-readable explanation
+  policy_note          String
+end
+
+-------------------------------------------------------------------------------
+5. Telemetry/advice vs actuation separation
+-------------------------------------------------------------------------------
+
+record safety.TelemetrySeparationCommitment.v1
+  id                    Uuid
+  profile_id            Uuid
+
+  telemetry_crates      list String   # non-actuating Rust crates
+  actuation_interfaces  list String   # external stacks, not part of this repo
+
+  # Nonactuation guarantees for this repo
+  nonactuating_repo     bool          # must be true
+  forbidden_io_families list String   # e.g. ["HW_IO", "ACTUATOR_API", "DIRECT_SCADA_WRITE"]
+end
+
+-------------------------------------------------------------------------------
+6. Standards alignment and responsibilities
+-------------------------------------------------------------------------------
+
+record safety.StandardsAlignmentCommitment.v1
+  id                    Uuid
+  profile_id            Uuid
+
+  # Standards explicitly targeted
+  ieee_p7007_enabled    bool
+  iso_42001_enabled     bool
+  neurorights_enabled   bool
+  nonweaponization_enabled bool
+
+  # Cargo / metadata bindings
+  cargo_ker_metadata_ref   String   # workspace.metadata.ker
+  cargo_aichat_metadata_ref String  # workspace.metadata.aichat
+  cargo_nonactuating_registry_ref String  # workspace.metadata.nonactuatingworkloads
+
+  # Responsibility note for adopters
+  adopter_responsibility_note String
+end
+
+-------------------------------------------------------------------------------
+7. Global invariants
+-------------------------------------------------------------------------------
+
+# 7.1 Non‑actuating governance kernels are mandatory
+
+invariant safety.NonActuatingKernelMandatory
+  forall c in safety.NonActuatingKernelCommitment.v1
+    c.nonactuating_flag == true
+    and c.roh_ceiling_global <= 0.30
+end
+
+# 7.2 ProofOfResearch + PSAT enforced for production
+
+invariant safety.ProofOfResearchPSATMandatory
+  forall c in safety.ProofOfResearchPSATCommitment.v1
+    c.roh_ceiling_global <= 0.30
+    and c.require_proofofresearch_for_production == true
+    and c.require_psat_for_production == true
+    and c.require_kani_verified_invariants == true
+end
+
+# 7.3 Regression logging: no silent safety regressions
+
+invariant safety.NoSilentSafetyRegressions
+  forall c in safety.RegressionLoggingCommitment.v1
+    c.require_emergency_aln_record == true
+    and c.require_governance_review == true
+end
+
+# 7.4 Telemetry vs actuation separation
+
+invariant safety.TelemetryRepoNonActuating
+  forall c in safety.TelemetrySeparationCommitment.v1
+    c.nonactuating_repo == true
+end
+
+# 7.5 Standards alignment declared
+
+invariant safety.StandardsAlignmentDeclared
+  forall c in safety.StandardsAlignmentCommitment.v1
+    c.ieee_p7007_enabled == true
+    and c.iso_42001_enabled == true
+    and c.neurorights_enabled == true
+    and c.nonweaponization_enabled == true
+end
+
+end
