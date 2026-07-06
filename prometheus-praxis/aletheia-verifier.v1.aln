@@ -1,0 +1,196 @@
+aln
+title Prometheus-Praxis Aletheia-Verifier v1
+version 1.0.0
+
+aln.migration ALN.MIGRATION.CYBERCOREAUTHORITY.v1
+binding.hostdid did:aln:organic-host
+binding.bostromaddress bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+
+-------------------------------------------------------------------------------
+1. Core enums: source type, decision type, integrity class
+-------------------------------------------------------------------------------
+
+enum aletheia.SourceType.v1
+  SensorStream
+  Dataset
+  PolicyDocument
+  HumanTestimony
+  AIChatEvidence
+end
+
+enum aletheia.DecisionType.v1
+  GovernanceDecision    # Allow / Derate / Stop
+  SemanticPlanApproval
+  RiskReclassification
+end
+
+enum aletheia.IntegrityClass.v1
+  FullyCertified
+  PartiallyCertified
+  Uncertified
+end
+
+-------------------------------------------------------------------------------
+2. VeritasAnchor.v1 (truth & provenance anchor)
+-------------------------------------------------------------------------------
+
+record aletheia.VeritasAnchor.v1
+  id                        Uuid
+
+  # Binding to decision-level objects
+  decision_id               String       # e.g. GovernanceDecision ID or plan ID
+  decision_type             aletheia.DecisionType.v1
+
+  provenance_record_id      String       # ProvenanceRecord / QpuDataShardDescriptor id
+
+  # Ontos-Veritas source set
+  ontos_source_ids          list[String] # Ontos-Veritas certified source IDs
+  source_types              list[aletheia.SourceType.v1]
+
+  # Hex-traceable commitment (canonical hash)
+  content_hash_hex          String       # canonical hash over decision + provenance
+  schema_version            String       # canonical serialization schema id
+
+  # Timestamps
+  created_utc               String
+  jurisdiction              String       # e.g. policy.jurisdiction.us-az-phoenix.v1
+
+  integrity_class           aletheia.IntegrityClass.v1
+end
+
+-------------------------------------------------------------------------------
+3. JanusCheckResult.v1 (dual integrity/factual checker)
+-------------------------------------------------------------------------------
+
+record aletheia.JanusCheckResult.v1
+  id                        Uuid
+
+  veritas_anchor_id         Uuid         # aletheia.VeritasAnchor.v1.id
+
+  integrity_ok              bool         # ALN authority, hash, schema correctness
+  factual_ok                bool         # data consistency vs Ontos-Veritas sources
+
+  reasons                   list[String] # explanations for any failure
+
+  # Latency metrics (NIST AI RMF monitoring/measurement)
+  latency_ms_total          i64          # end-to-end verification latency
+  latency_ms_integrity      i64          # integrity sub-path
+  latency_ms_factual        i64          # factual sub-path
+
+  created_utc               String
+end
+
+-------------------------------------------------------------------------------
+4. GovernanceDecision binding (typed view)
+-------------------------------------------------------------------------------
+
+record aletheia.GovernanceDecisionBinding.v1
+  id                        Uuid
+
+  # Link to governance kernel output (PraxisGovernanceKernel / Nomos-Enforcer)
+  policy_compliance_id      String       # nomos.PolicyComplianceResult or equivalent id
+  decision_id               String       # GovernanceDecision ID (Allow/Derate/Stop)
+  domain                    String       # domain label for audit (EcoRestoration, etc.)
+  lane                      String       # lane label (RESEARCH, GOV, EXPPROD)
+
+  veritas_anchor_id         Uuid         # aletheia.VeritasAnchor.v1.id
+  janus_check_result_id     Uuid         # aletheia.JanusCheckResult.v1.id
+
+  created_utc               String
+end
+
+-------------------------------------------------------------------------------
+5. Latency envelope configuration
+-------------------------------------------------------------------------------
+
+record aletheia.LatencyEnvelope.v1
+  id                        Uuid
+
+  # Maximum allowed total latency for verification (e.g. sub-second)
+  max_latency_ms_total      i64          # e.g. 500
+
+  # Optional sub-bounds for integrity/factual paths
+  max_latency_ms_integrity  i64          # e.g. 200
+  max_latency_ms_factual    i64          # e.g. 300
+end
+
+-------------------------------------------------------------------------------
+6. Invariants: every decision must be anchored and checked
+-------------------------------------------------------------------------------
+
+invariant aletheia.DecisionMustHaveVeritasAnchorAndJanusCheck
+  # Any GovernanceDecision binding must have a Veritas anchor and a Janus check.
+  forall g in aletheia.GovernanceDecisionBinding.v1
+    exists v in aletheia.VeritasAnchor.v1,
+           j in aletheia.JanusCheckResult.v1
+      g.veritas_anchor_id == v.id
+      and g.janus_check_result_id == j.id
+end
+
+-------------------------------------------------------------------------------
+7. Invariants: Veritas anchor source completeness
+-------------------------------------------------------------------------------
+
+invariant aletheia.VeritasAnchorMustHaveSources
+  # Veritas anchors must reference at least one Ontos-Veritas source.
+  forall v in aletheia.VeritasAnchor.v1
+    len(v.ontos_source_ids) > 0
+    and len(v.source_types) == len(v.ontos_source_ids)
+end
+
+invariant aletheia.VeritasAnchorHexAndSchemaNonEmpty
+  # Hash and schema version must be non-empty for traceability.
+  forall v in aletheia.VeritasAnchor.v1
+    v.content_hash_hex != ""
+    and v.schema_version != ""
+end
+
+-------------------------------------------------------------------------------
+8. Invariants: Janus checks tied to Veritas anchors
+-------------------------------------------------------------------------------
+
+invariant aletheia.JanusCheckMustReferenceExistingAnchor
+  # Every Janus check must reference an existing Veritas anchor.
+  forall j in aletheia.JanusCheckResult.v1
+    exists v in aletheia.VeritasAnchor.v1
+      j.veritas_anchor_id == v.id
+end
+
+-------------------------------------------------------------------------------
+9. Invariants: Latency ceilings (NIST AI RMF alignment)
+-------------------------------------------------------------------------------
+
+invariant aletheia.VerificationLatencyWithinEnvelope
+  # Janus verification latency must remain within configured envelope.
+  forall j in aletheia.JanusCheckResult.v1
+    exists e in aletheia.LatencyEnvelope.v1
+      j.latency_ms_total      <= e.max_latency_ms_total
+      and j.latency_ms_integrity <= e.max_latency_ms_integrity
+      and j.latency_ms_factual   <= e.max_latency_ms_factual
+end
+
+-------------------------------------------------------------------------------
+10. Invariants: Integrity and factual status for valid decisions
+-------------------------------------------------------------------------------
+
+invariant aletheia.ValidDecisionRequiresIntegrityAndFactualOk
+  # Any governance decision considered valid (Allow/Derate/Stop) must have
+  # integrity_ok and factual_ok both true in its Janus check.
+  forall g in aletheia.GovernanceDecisionBinding.v1
+    exists j in aletheia.JanusCheckResult.v1
+      g.janus_check_result_id == j.id
+      implies (j.integrity_ok == true and j.factual_ok == true)
+end
+
+-------------------------------------------------------------------------------
+11. Invariants: Integrity class constraints
+-------------------------------------------------------------------------------
+
+invariant aletheia.FullyCertifiedAnchorsOnlyForHighImpact
+  # For high-impact domains, anchors must be fully certified.
+  forall v in aletheia.VeritasAnchor.v1
+    (v.decision_type == aletheia.DecisionType.v1.GovernanceDecision)
+    implies v.integrity_class == aletheia.IntegrityClass.v1.FullyCertified
+end
+
+end
