@@ -120,6 +120,8 @@ members = [
     "crates/prometheus_praxis",
     "crates/prometheus_praxis_ai",
     "crates/prometheus_praxis_semantics",
+    "crates/prometheus_praxis_collective_feed",
+    "crates/prometheus_praxis_provenance",
 
     "crates/psychrisk_engine",
     "crates/restoration-radius",
