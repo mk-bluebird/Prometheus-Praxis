@@ -1,0 +1,21 @@
+# File: Eco-Fort/qpudatashards/particles/decision_log.aln
+# DirClass: PARTICLE
+# Schema: ecosafety.decision.log.v1
+
+SCHEMA: ecosafety.decision.log.v1
+ROLE: Governance / Audit
+LANE: PROD
+KER_BAND: [0.94, 0.91, 0.12] # High-K, High-E, Low-R
+LYAP_CHANNEL: governance
+
+FIELDS:
+  decisionid: UUID(PK)
+  taskid: UUID(FK)
+  allowed: BOOL
+  reasons: JSON(RoH_Compliance, Topology_Grade)
+  hextrace: SHA256(Payload_Hash)
+  timestamputc: DATETIME
+  kervector: F64_ARRAY_3(K, E, R)
+  janus_veritas_ref: URI(Ledger_Proof)
+  lyapunov_residual: F64(dV)
+  tsafe_margin: F64(T_sec)
