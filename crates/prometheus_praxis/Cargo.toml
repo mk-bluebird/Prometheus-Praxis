@@ -9,23 +9,61 @@ description = "Prometheus-Praxis adaptive implementation engine under Cybercore 
 repository = "https://github.com/mk-bluebird/eco_restoration_shard"
 
 [features]
+# Default runtime-safe features.
 default = ["metrics"]
+
+# Metrics layer; gates Prometheus integration only.
 metrics = ["dep:prometheus"]
 
+# Kani is not optional as a dependency; this feature is just a logical switch
+# to enable harnesses that are marked with `required-features = ["kani"]`.
+kani = []
+
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+# Sovereign stack baseline, pinned to required versions.
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
 thiserror = "1.0"
-prometheus = { version = "0.13", optional = true }
-once_cell = "1.19"
-rust_decimal = { version = "1.35", features = ["serde-with-str"] }
+
 chrono = { version = "0.4", features = ["serde"] }
+rust_decimal = { version = "1.36", features = ["serde"] }
+
+# Metrics (optional at runtime, but fully versioned).
+prometheus = { version = "0.13", optional = true }
+once_cell  = "1.19"
+
+# Internal stack crates; relative paths assume sibling crates under the mono-repo.
+transhuman-rights-core = { path = "../transhuman-rights-core" }
+bioscale-metrics        = { path = "../bioscale-metrics" }
+aln-runtime             = { path = "../aln-runtime" }
+veritas-chain-client    = { path = "../veritas-chain-client" }
+equality-payment-guard  = { path = "../equality-payment-guard" }
+aug-fingerprint-guard   = { path = "../aug-fingerprint-guard" }
+
+[dev-dependencies]
+# Kani is always present in dev-dependencies; not marked optional.
+kani = { version = "0.67.0" }
+
+# Test utilities mirror main dependency versions to avoid drift.
+serde_json   = { version = "1.0.120" }
+chrono       = { version = "0.4", features = ["serde"] }
+rust_decimal = { version = "1.36", features = ["serde"] }
+
+[lib]
+name = "prometheus_praxis"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[[test]]
+name = "praxiscore_contracts_kani"
+path = "tests/praxiscore_contracts_kani.rs"
+required-features = ["kani"]
 
 [lints.rust]
-unsafe_code = "forbid"
+unsafe_code  = "forbid"
 missing_docs = "warn"
 
 [lints.clippy]
-all = "warn"
+all      = "warn"
 pedantic = "warn"
-nursery = "warn"
+nursery  = "warn"
