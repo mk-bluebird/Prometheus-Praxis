@@ -1,0 +1,298 @@
+aln
+title Prometheus-Praxis Technē-Incubator v1
+version 1.0.0
+
+aln.migration   ALN.MIGRATION.CYBERCOREAUTHORITY.v1
+binding.hostdid did:aln:organic-host
+binding.bostromaddress bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+
+-------------------------------------------------------------------------------
+1. Core enums and IDs
+-------------------------------------------------------------------------------
+
+enum techne.ActionDomain.v1
+  EcoRestoration
+  CityOperations
+  MacroHealth
+  Cybernetics
+  ClimateEnergy
+end
+
+enum techne.ActionLane.v1
+  Research
+  Pilot
+  Production
+end
+
+enum techne.PilotState.v1
+  Proposal
+  Lab
+  MicroPilot
+  DistrictPilot
+  Retired
+end
+
+# Reference to ProofOfResearch catalogue (ALN-only, no Rust crate dep)
+record techne.ProofOfResearchRef.v1
+  id                    Uuid
+  proofofresearch_id    Uuid        # e.g. proof-of-research.autonomy-bands.v1.aln row
+  evidence_bundle_id    Uuid        # EvidenceBundle10 or similar
+  roh_ceiling_delta     f32         # allowed tightening (<= 0)
+  lifeforce_margin      f32
+  biocompat_min         f32
+  biocompat_max         f32
+  neurorights_guard_refs list String
+end
+
+-------------------------------------------------------------------------------
+2. PilotCandidate.v1
+-------------------------------------------------------------------------------
+
+record techne.PilotCandidate.v1
+  id                    Uuid
+
+  # Source and context
+  source_id             String      # Fortschritt-Link ID or similar
+  source_kind           String      # e.g. "Fortschritt-Link", "Nosphere", etc.
+
+  domain                techne.ActionDomain.v1
+  lane                  techne.ActionLane.v1      # initial lane, usually Research or Pilot
+
+  # Expected K/E/R in normalized 0..1 corridor
+  expected_k            f32
+  expected_e            f32
+  expected_r            f32
+
+  # Required PSAT profile and RoH ceiling
+  psat_profile_id       Uuid        # psat.P7007Profile.v1.id
+  roh_ceiling           f32         # must be <= global 0.30
+
+  # Optional link into ProofOfResearch (must be present before Production)
+  proofofresearch_ref   optional Uuid
+
+  created_utc           String
+end
+
+-------------------------------------------------------------------------------
+3. PilotLifecycle.v1
+-------------------------------------------------------------------------------
+
+record techne.PilotLifecycle.v1
+  id                    Uuid
+
+  pilot_candidate_id    Uuid        # techne.PilotCandidate.v1.id
+
+  state                 techne.PilotState.v1
+  domain                techne.ActionDomain.v1
+  lane                  techne.ActionLane.v1      # Research, Pilot, Production
+
+  # Snapshot of K/E/R for this state
+  k                     f32
+  e                     f32
+  r                     f32
+
+  # RoH history and ceilings
+  roh_current           f32
+  roh_ceiling           f32          # from ecosafety.roh.envelope or candidate
+  roh_history_ref       optional String  # ALN or DB reference to detailed history
+
+  # PSAT / neurorights / safety bindings
+  psat_profile_id       Uuid         # psat.P7007Profile.v1.id
+  biosafety_envelope_id optional Uuid
+  neurorights_envelope_ref optional String
+
+  # Proof-of-research linkage when applicable
+  proofofresearch_ref   optional Uuid  # techne.ProofOfResearchRef.v1.id
+
+  # Governance and audit bindings
+  veritas_anchor_id     optional String  # Veritas-Chain anchor
+  janus_proof_ref       optional String  # Janus-Veritas proof ref
+
+  transition_utc        String
+end
+
+-------------------------------------------------------------------------------
+4. PilotEvolutionEvent.v1 (explicit evolution log)
+-------------------------------------------------------------------------------
+
+record techne.PilotEvolutionEvent.v1
+  id                    Uuid
+
+  pilot_candidate_id    Uuid
+  from_state            techne.PilotState.v1
+  to_state              techne.PilotState.v1
+
+  from_lane             techne.ActionLane.v1
+  to_lane               techne.ActionLane.v1
+
+  from_k                f32
+  from_e                f32
+  from_r                f32
+  from_roh              f32
+
+  to_k                  f32
+  to_e                  f32
+  to_r                  f32
+  to_roh                f32
+
+  # Safety envelopes before and after
+  from_psat_profile_id  Uuid
+  to_psat_profile_id    Uuid
+
+  from_biosafety_envelope_id optional Uuid
+  to_biosafety_envelope_id   optional Uuid
+
+  from_neurorights_envelope_ref optional String
+  to_neurorights_envelope_ref   optional String
+
+  # Proof-of-research binding (required for Production)
+  proofofresearch_ref   optional Uuid
+
+  # Governance anchors
+  veritas_anchor_id     optional String
+  janus_proof_ref       optional String
+
+  # If this evolution is a regression in safety, this must reference an
+  # explicit emergency ALN record and governance decision.
+  emergency_record_ref  optional String  # e.g. TECHNE-EMERGENCY-YYYY.v1.aln row
+
+  transition_utc        String
+end
+
+-------------------------------------------------------------------------------
+5. Invariant: RoH ceiling non-negotiable (≤ 0.30)
+-------------------------------------------------------------------------------
+
+invariant techne.RoHCeilingRespected
+  # No pilot candidate or lifecycle state may declare a RoH ceiling above
+  # the global ecosafety ceiling (0.30) already encoded in your KER spine.
+  forall c in techne.PilotCandidate.v1
+    c.roh_ceiling <= 0.30
+
+  and forall l in techne.PilotLifecycle.v1
+    l.roh_ceiling <= 0.30
+    and l.roh_current <= l.roh_ceiling
+end
+
+-------------------------------------------------------------------------------
+6. Invariant: PSAT profile required and satisfied
+-------------------------------------------------------------------------------
+
+invariant techne.PSATProfileRequired
+  # Every pilot candidate and lifecycle state must carry a PSAT profile
+  # that aligns with your IEEE P7007 ontology and neurorights envelopes.
+  forall c in techne.PilotCandidate.v1
+    exists p in psat.P7007Profile.v1
+      c.psat_profile_id == p.id
+
+  and forall l in techne.PilotLifecycle.v1
+    exists p in psat.P7007Profile.v1
+      l.psat_profile_id == p.id
+end
+
+-------------------------------------------------------------------------------
+7. Invariant: No Production lane without ProofOfResearch + Kani
+-------------------------------------------------------------------------------
+
+# This shard encodes the structural side: Production requires a
+# ProofOfResearchRef. The Kani-verified invariants (RoH ≤ 0.30, PSAT
+# satisfied, neurorights guards) are enforced in Rust and referenced
+# via Veritas / Janus anchors.
+
+invariant techne.ProductionRequiresProofOfResearch
+  forall l in techne.PilotLifecycle.v1
+    l.lane == techne.ActionLane.v1.Production
+    implies
+      exists pr in techne.ProofOfResearchRef.v1
+        l.proofofresearch_ref != None
+        and l.proofofresearch_ref == Some(pr.id)
+end
+
+invariant techne.ProductionRequiresVeritasJanusAnchors
+  # Any Production lane state must be anchored in Veritas and Janus,
+  # representing Kani-verified invariants and proofs.
+  forall l in techne.PilotLifecycle.v1
+    l.lane == techne.ActionLane.v1.Production
+    implies
+      l.veritas_anchor_id != None
+      and l.janus_proof_ref != None
+end
+
+-------------------------------------------------------------------------------
+8. Invariant: Monotone safety envelopes across evolution
+-------------------------------------------------------------------------------
+
+invariant techne.PilotEvolutionMonotoneSafety
+  # Pilot evolution must be monotone in safety envelopes:
+  #  - RoH must not increase
+  #  - Risk R must not increase
+  #  - Safety envelopes (PSAT / BioSafety) may only stay the same or tighten
+  # Any regression requires an explicit emergency_record_ref.
+  forall e in techne.PilotEvolutionEvent.v1
+    # Normal path: monotone improvement or equal safety.
+    (
+      e.to_roh <= e.from_roh
+      and e.to_r   <= e.from_r
+      # PSAT safety profiles may only stay the same or strengthen.
+      # Strengthening logic is implemented in Rust using psat.P7007Profile
+      # invariants; ALN enforces identity/association.
+      and e.to_psat_profile_id == e.from_psat_profile_id
+    )
+    or
+    # If any regression occurs, it must be explicitly marked and bound
+    # to an emergency ALN record and governance review.
+    (
+      (e.to_roh  > e.from_roh
+        or e.to_r > e.from_r
+        or e.to_psat_profile_id != e.from_psat_profile_id)
+      and e.emergency_record_ref != None
+    )
+end
+
+-------------------------------------------------------------------------------
+9. Invariant: Pilot lane progression ordering
+-------------------------------------------------------------------------------
+
+invariant techne.PilotLaneProgressionOrdering
+  # Lane / state progression must follow the intended order:
+  # Research -> Pilot (Lab / MicroPilot / DistrictPilot) -> Production -> Retired.
+  forall e in techne.PilotEvolutionEvent.v1
+    (
+      # Allowed forward transitions
+      (e.from_state == techne.PilotState.v1.Proposal
+        and e.to_state == techne.PilotState.v1.Lab)
+      or
+      (e.from_state == techne.PilotState.v1.Lab
+        and e.to_state == techne.PilotState.v1.MicroPilot)
+      or
+      (e.from_state == techne.PilotState.v1.MicroPilot
+        and e.to_state == techne.PilotState.v1.DistrictPilot)
+      or
+      (e.from_state == techne.PilotState.v1.DistrictPilot
+        and e.to_state == techne.PilotState.v1.Retired)
+      or
+      (e.from_state == techne.PilotState.v1.DistrictPilot
+        and e.to_state == techne.PilotState.v1.DistrictPilot) # steady-state
+    )
+    or
+    # Any deviation from this ordering must be treated as an emergency
+    # and explicitly logged for governance review.
+    e.emergency_record_ref != None
+end
+
+-------------------------------------------------------------------------------
+10. Invariant: Neurorights guards required for human-coupled domains
+-------------------------------------------------------------------------------
+
+invariant techne.NeurorightsGuardsRequiredForHighRisk
+  # For domains that touch bodies or minds, neurorights envelopes must be present.
+  forall l in techne.PilotLifecycle.v1
+    (
+      l.domain == techne.ActionDomain.v1.MacroHealth
+      or l.domain == techne.ActionDomain.v1.Cybernetics
+    )
+    implies
+      l.neurorights_envelope_ref != None
+end
+
+end
