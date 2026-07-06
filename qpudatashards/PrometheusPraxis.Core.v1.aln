@@ -1,0 +1,108 @@
+aln
+title Prometheus-Praxis Core Execution Engine v1
+version 1.0.0
+aln.migration ALN.MIGRATION.CYBERCOREAUTHORITY.v1
+
+binding.hostdid did.aln.organic-host
+binding.bostromaddress bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+
+prometheuspraxis.coreid prometheus_praxis.core.v1
+prometheuspraxis.cratename prometheus_praxis
+prometheuspraxis.role AdaptiveImplementationEngine
+prometheuspraxis.domain EcosystemRestoration, Healthcare, Cybernetics, SmartCity
+prometheuspraxis.scope PlanetaryStewardship, HumanAugmentation, EcoPayments
+
+ref.neurorightsenvelope neurorights.envelope.citizen.v1
+ref.equalityenvelope equality.envelope.paymentandaccess.v1
+
+invariant.rohglobalceiling 0.30
+invariant.monotoneota true
+invariant.noactuationfields torque,current,stimpattern,autopilot
+invariant.nodowngrade.neurorights true
+invariant.nodowngrade.roh true
+
+owner.binding.address bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+owner.binding.requirematch true
+
+linked.subsystems.tellussynoptikos tellus-synoptikos.v1
+linked.subsystems.summuscivitas summus-civitas.v1
+linked.subsystems.perknosnexus perknos-nexus.v1
+linked.subsystems.biopaymop biopay.mop.core.v1
+linked.subsystems.veritaschain veritas-chain.v1
+linked.subsystems.nyxsemantix nyx-semantix.v1
+linked.subsystems.semanticus semanticus.v1
+linked.subsystems.ontosveritas ontos-veritas.v1
+linked.subsystems.janusveritas janus-veritas.v1
+linked.subsystems.lexmachina lex-machina.v1
+linked.subsystems.respublica res-publica.v1
+linked.subsystems.corpusjuris corpus-juris.v1
+linked.subsystems.schutzhrecht schutz-recht.v1
+
+core.tablespec ExecutionPlanCore
+core.tablespec DecisionLogCore
+core.tablespec MonotoneSafetyCore
+core.tablespec OwnerBindingCore
+
+table ExecutionPlanCore
+  column.planid string
+  column.taskid string
+  column.kind enum EcoRestoration,SmartCityUpgrade,HealthcareProcedure,AugmentationUpgrade,PaymentProgramRollout
+  column.jurisdictionref string
+  column.serviceclass string
+  column.ecotarget Bounded01
+  column.rohtarget Bounded01
+  column.neurorightsenv ref neurorights.envelope.citizen.v1
+  column.equalityenv ref equality.envelope.paymentandaccess.v1
+  column.steps.json path crates/prometheus_praxis/src/planner.rs
+  rust.type ExecutionPlan
+endtable
+
+table DecisionLogCore
+  column.decisionid string
+  column.taskid string
+  column.allowed bool
+  column.decisionenum enum Allow,Derate,Stop
+  column.reasons string
+  column.hextrace string
+  column.timestamputc string
+  column.kervector string
+  column.rohscalar Bounded01
+  column.neurorightsok bool
+  column.equalityok bool
+  rust.type DecisionLog
+  rust.source path crates/prometheus_praxis/src/logging.rs
+endtable
+
+table MonotoneSafetyCore
+  column.kernelconfigref string
+  column.kerenvelope.ref string
+  column.rohenvelope.ref string
+  column.tsafeenvelope.ref string
+  column.lyapunovenvelope.ref string
+  predicate.nonstopwheninvariantspass rust path crates/prometheus_praxis/src/praxiscore_contracts.rs fn non_stop_when_invariants_pass
+  predicate.nodowngrade.neurorights rust path crates/prometheus_praxis/src/praxiscore_contracts.rs fn no_neurorights_downgrade
+  predicate.nodowngrade.roh rust path crates/prometheus_praxis/src/praxiscore_contracts.rs fn no_roh_downgrade
+endtable
+
+table OwnerBindingCore
+  column.hostdid string
+  column.bostromaddress string
+  column.coreid string
+  invariant.hostdidmatch binding.hostdid
+  invariant.bostromaddressmatch binding.bostromaddress
+  invariant.coreidmatch prometheus_praxis.core.v1
+  rust.type OwnerBinding
+  rust.source path crates/prometheus_praxis/src/praxiscore_contracts.rs
+endtable
+
+logging.veritaschainref veritas-chain.v1
+logging.decisionlogshard qpudatashards/PrometheusPraxisDecision.v1.aln
+logging.field.decisionid string
+logging.field.taskid string
+logging.field.allowed bool
+logging.field.reasons string
+logging.field.hextrace string
+logging.field.timestamputc string
+logging.field.kervector string
+
+end
