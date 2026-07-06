@@ -119,6 +119,7 @@ members = [
     # prometheus-praxis crates (canonical dirs)
     "crates/prometheus_praxis",
     "crates/prometheus_praxis_ai",
+    "crates/prometheus_praxis_semantics",
 
     "crates/psychrisk_engine",
     "crates/restoration-radius",
