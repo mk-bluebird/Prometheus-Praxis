@@ -1,0 +1,122 @@
+aln
+aln.schema ALE-ERM-RESTORATION-SCHEMAS-001
+
+meta.role SchemaBundle
+meta.domain EcoRestoration
+meta.engine Prometheus-Praxis
+meta.scope NovaTerra, Tellus-Synoptikos, Gaia-Sentinel, Boden-Wesen, Erde-Sync, BioticTreaty
+meta.version 0.1.0
+meta.status active
+meta.jurisdiction GLOBAL, PHOENIX
+
+type ScenarioId string
+type TileId string
+type BirthSignId string
+type CorridorId string
+type TreatyId string
+type SpeciesId string
+type GaiaSnapshotId string
+type BodenSnapshotId string
+
+enum ActionKind PLANTING SOILTREATMENT WATERREROUTE HABITATRESTORE MONITORING
+enum CorridorType SOIL WATERCHEM HABITAT HEATBUDGET
+enum ConstraintKind HARD SOFT_HIGH_PENALTY
+enum AutopauseReason NONE MOISTURE HEAT_DROUGHT FLOOD FIRE COMBINED
+
+type Bounded01 float
+constraint Bounded01_min 0.0
+constraint Bounded01_max 1.0
+
+-- 6. RestorationTask.schema
+table RestorationTask
+  column.restoration_task_id string
+  column.scenario_id ScenarioId
+  column.tile_id TileId
+  column.birthsign_id BirthSignId
+  column.corridor_id CorridorId
+  column.biotictreaty_id TreatyId
+  column.action_kind ActionKind
+  column.species_mix list SpeciesId
+  column.area_m2 float
+  column.time_window_start string -- ISO-8601 UTC
+  column.time_window_end string   -- ISO-8601 UTC
+  column.k_score Bounded01
+  column.e_score Bounded01
+  column.r_score Bounded01
+  column.gaia_snapshot_ref GaiaSnapshotId
+  column.boden_snapshot_ref BodenSnapshotId
+  invariant.roh_ceiling_global 0.30
+  invariant.r_score_leq_roh_ceiling r_score roh_ceiling_global
+  forbidden.fields torque,current,stimpattern,autopilot
+  rust.type RestorationTask
+  rust.source path crates/prometheus_praxis/src/ecorestoration/restoration_task.rs
+endtable
+
+-- 7. CorridorEnvelope.schema
+table CorridorEnvelope
+  column.corridor_id CorridorId
+  column.corridor_type CorridorType
+  column.region_id string
+  column.soil_moisture_min Bounded01
+  column.soil_moisture_max Bounded01
+  column.soil_ph_min float
+  column.soil_ph_max float
+  column.salinity_min float
+  column.salinity_max float
+  column.nutrient_min float
+  column.nutrient_max float
+  column.water_table_min float
+  column.water_table_max float
+  column.contamination_index_max Bounded01
+  column.habitat_continuity_min Bounded01
+  column.biodiversity_floor Bounded01
+  column.roh_ceiling_local Bounded01
+  column.constraint_kind ConstraintKind
+  column.treaty_ids list TreatyId
+  invariant.roh_ceiling_local_leq_global roh_ceiling_local roh_ceiling_global
+  rust.type CorridorEnvelope
+  rust.source path crates/prometheus_praxis/src/ecorestoration/corridor_envelope.rs
+endtable
+
+-- 8. GaiaSentinelSnapshot.schema
+table GaiaSentinelSnapshot
+  column.snapshot_id GaiaSnapshotId
+  column.tile_id TileId
+  column.timestamp_utc string
+  column.soil_moisture_idx Bounded01
+  column.drought_idx Bounded01
+  column.heat_budget_idx Bounded01
+  column.flood_risk_idx Bounded01
+  column.fire_risk_idx Bounded01
+  column.moisture_below_floor bool
+  column.heat_budget_over_limit bool
+  column.drought_above_threshold bool
+  column.flood_risk_high bool
+  column.fire_risk_high bool
+  column.corridor_violation_ids list CorridorId
+  column.autopause_reason AutopauseReason
+  rust.type GaiaSentinelSnapshot
+  rust.source path crates/prometheus_praxis/src/ecorestoration/gaia_snapshot.rs
+endtable
+
+-- 9. GaiaCorridorThresholds.policy
+table GaiaCorridorThresholds
+  column.policy_id string
+  column.jurisdiction string
+  column.soil_moisture_pause_threshold Bounded01
+  column.soil_moisture_days_below_for_pause int
+  column.heat_budget_pause_threshold Bounded01
+  column.drought_idx_pause_threshold Bounded01
+  column.flood_risk_pause_threshold Bounded01
+  column.fire_risk_pause_threshold Bounded01
+  column.max_consecutive_moisture_breach_days int
+  column.max_consecutive_heat_drought_breach_days int
+  column.max_consecutive_flood_breach_events int
+  column.max_consecutive_fire_breach_events int
+  column.preflight_rule_id string
+  column.target_workflow_ids list string
+  rust.type GaiaCorridorThresholds
+  rust.source path crates/prometheus_praxis/src/ecorestoration/gaia_thresholds.rs
+endtable
+
+end
