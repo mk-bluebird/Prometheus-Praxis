@@ -1,0 +1,286 @@
+aln
+title Prometheus-Praxis Hygeia-Orchestrator v1
+version 1.0.0
+
+aln.migration ALN.MIGRATION.CYBERCOREAUTHORITY.v1
+binding.hostdid did:aln:organic-host
+binding.bostromaddress bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+
+-------------------------------------------------------------------------------
+1. Core enums: domains, device types, lanes, status
+-------------------------------------------------------------------------------
+
+enum hygeia.ClinicalDomain.v1
+  MacroHealth
+  NeuroRehab
+  SensoryRestoration
+  PainManagement
+  NanoDetox
+  ImmuneModulation
+end
+
+enum hygeia.DeviceType.v1
+  RetinalBCI
+  CorticalImplant
+  PeripheralNerveBCI
+  SpinalInterface
+  DeepBrainStimLike
+  NanoswarmInfusion
+  WearableNeuroband
+  NonInvasiveEEG
+end
+
+enum hygeia.SessionLane.v1
+  RESEARCH
+  CLINICAL_PILOT
+  CLINICAL_PRODUCTION
+end
+
+enum hygeia.ProcedureStatus.v1
+  Draft
+  Approved
+  Scheduled
+  Executing
+  Completed
+  Suspended
+end
+
+-------------------------------------------------------------------------------
+2. Clinical Session Envelope (BioSafety + neurorights)
+-------------------------------------------------------------------------------
+
+record hygeia.ClinicalSessionEnvelope.v1
+  id                          Uuid
+
+  domain                      hygeia.ClinicalDomain.v1
+  lane                        hygeia.SessionLane.v1
+
+  biosafety_envelope_id       Uuid          # BioSafetyEnvelopeV1.id
+  psat_profile_id             Uuid          # psat.P7007Profile.v1.id
+
+  roh_ceiling                 f32           # <= 0.30
+  lifeforce_floor             f32           # e.g. >= 0.12
+  biocompatibility_min        f32
+  biocompatibility_max        f32
+
+  pain_band_min               f32           # normalized 0..1
+  pain_band_max               f32
+  fear_band_min               f32
+  fear_band_max               f32
+
+  neurorights_envelope_ref    String        # e.g. neurorights.envelope.citizen.v1
+  perkunos_context_id         Uuid          # PerkunosNexusContext.id
+
+  created_utc                 String
+end
+
+-------------------------------------------------------------------------------
+3. Hygeia Procedure Plan
+-------------------------------------------------------------------------------
+
+record hygeia.HygeiaProcedurePlan.v1
+  id                          Uuid
+
+  session_envelope_id         Uuid          # ClinicalSessionEnvelope.v1.id
+  domain                      hygeia.ClinicalDomain.v1
+  lane                        hygeia.SessionLane.v1
+
+  device_type                 hygeia.DeviceType.v1
+  device_model_id             String        # vendor/model ref
+
+  diagnostics_steps_json      String        # structured, non-actuating description
+  nanoswarm_steps_json        String        # structured, non-actuating description
+  bci_assist_steps_json       String        # structured, non-actuating description
+
+  psat_profile_id             Uuid          # psat.P7007Profile.v1.id
+  consent_ledger_entry_id     String        # Cybernetic Consent Ledger entry
+  aug_fingerprint_id          String        # AugFingerprint id
+  capability_vector_before_id String        # CapabilityVector snapshot
+  capability_vector_after_id  String        # CapabilityVector snapshot
+
+  planned_start_utc           String
+  planned_end_utc             String
+
+  status                      hygeia.ProcedureStatus.v1
+  created_utc                 String
+end
+
+-------------------------------------------------------------------------------
+4. Device -> PSAT + BioSafety mapping (auto envelope selection)
+-------------------------------------------------------------------------------
+
+record hygeia.DeviceEnvelopeBinding.v1
+  id                          Uuid
+
+  device_type                 hygeia.DeviceType.v1
+  device_model_id             String        # optional refinement
+
+  # Recommended PSAT + BioSafety combo
+  psat_profile_id             Uuid          # psat.P7007Profile.v1.id
+  biosafety_envelope_id       Uuid          # BioSafetyEnvelopeV1.id
+
+  # Hard constraints
+  roh_ceiling                 f32           # <= 0.30
+  lifeforce_floor             f32
+  pain_band_min               f32
+  pain_band_max               f32
+  fear_band_min               f32
+  fear_band_max               f32
+end
+
+-------------------------------------------------------------------------------
+5. PSAT & neurorights alignment reuse from PSAT shard
+-------------------------------------------------------------------------------
+
+# We reference psat.P7007Profile.v1 invariants from ieee-p7007-ontology.v1.aln:
+# - PSATtopsychriskandneurorightsalignment
+# - PSATcollectivegovernanceforneurodata
+# This shard assumes those invariants are enforced globally for any
+# psat_profile_id used in high-intensity Perkunos contexts.
+# (No subliminal manipulation, no behavioral coercion, visible risk indicators.)
+
+-------------------------------------------------------------------------------
+6. Invariants: Clinical Session Envelope correctness
+-------------------------------------------------------------------------------
+
+invariant hygeia.SessionEnvelopeRohAndLifeforce
+  # Clinical session envelopes must respect global RoH and minimum lifeforce floors.
+  forall env in hygeia.ClinicalSessionEnvelope.v1
+    env.roh_ceiling <= 0.30
+    and env.lifeforce_floor >= 0.12
+end
+
+invariant hygeia.SessionEnvelopePainFearBands
+  # Pain/fear bands must be within 0..1 and internally consistent.
+  forall env in hygeia.ClinicalSessionEnvelope.v1
+    env.pain_band_min  >= 0.0
+    and env.pain_band_max <= 1.0
+    and env.pain_band_min <= env.pain_band_max
+    and env.fear_band_min  >= 0.0
+    and env.fear_band_max <= 1.0
+    and env.fear_band_min <= env.fear_band_max
+end
+
+-------------------------------------------------------------------------------
+7. Invariants: Device-PSAT-BioSafety mapping consistency
+-------------------------------------------------------------------------------
+
+invariant hygeia.DeviceEnvelopeBindingConsistency
+  # Device bindings must respect RoH ceiling and lifeforce floors.
+  forall b in hygeia.DeviceEnvelopeBinding.v1
+    b.roh_ceiling <= 0.30
+    and b.lifeforce_floor >= 0.12
+    and b.pain_band_min  >= 0.0
+    and b.pain_band_max <= 1.0
+    and b.pain_band_min <= b.pain_band_max
+    and b.fear_band_min  >= 0.0
+    and b.fear_band_max <= 1.0
+    and b.fear_band_min <= b.fear_band_max
+end
+
+invariant hygeia.ProcedureMustMatchDeviceBinding
+  # HygeiaProcedurePlan must use PSAT + BioSafety consistent with DeviceEnvelopeBinding.
+  forall p in hygeia.HygeiaProcedurePlan.v1
+    exists b in hygeia.DeviceEnvelopeBinding.v1
+      p.device_type == b.device_type
+      and (b.device_model_id == "" or p.device_model_id == b.device_model_id)
+      and p.psat_profile_id == b.psat_profile_id
+      and p.session_envelope_id == b.biosafety_envelope_id
+end
+
+-------------------------------------------------------------------------------
+8. Invariants: PSAT & psychrisk & neurorights alignment in procedures
+-------------------------------------------------------------------------------
+
+# We rely on PSATtopsychriskandneurorightsalignment:
+# forall p in psat.P7007Profile.v1
+#   p.safetyreq.rohglobalceiling <= 0.30
+#   and p.safetyreq.lifeforceglobalfloor >= 0.12
+#   and p.safetyreq.forbidsubliminalmanipulation == true
+#   and p.safetyreq.forbidbehavioralcoercion == true
+#   and p.transparencyreq.requireriskindicator == true
+#   and p.transparencyreq.requiremodeindicator == true
+
+# Hygeia-specific alignment: any procedure's psat_profile_id must be such a profile.
+
+invariant hygeia.ProcedureUsesHighIntegrityPsat
+  # Clinical procedures must use PSAT profiles already aligned to psychrisk & neurorights.
+  forall p in hygeia.HygeiaProcedurePlan.v1
+    p.psat_profile_id != 0U    # non-zero UUID as a structural guard
+end
+
+-------------------------------------------------------------------------------
+9. Invariants: Consent ledger & monotone capability evolution
+-------------------------------------------------------------------------------
+
+record hygeia.CapabilityEvolutionBinding.v1
+  id                          Uuid
+  procedure_id                Uuid        # HygeiaProcedurePlan.v1.id
+  consent_ledger_entry_id     String      # Cybernetic Consent Ledger entry
+  aug_fingerprint_id          String      # AugFingerprint id
+  capability_vector_before_id String
+  capability_vector_after_id  String
+end
+
+# Capability vectors and monotonicity are enforced in Rust/Kani by psychrisk / Perkunos,
+# but we assert the structural bindings here.
+
+invariant hygeia.ConsentAndCapabilityBindingRequired
+  # Any procedure must have a consent and capability evolution binding.
+  forall p in hygeia.HygeiaProcedurePlan.v1
+    exists cb in hygeia.CapabilityEvolutionBinding.v1
+      cb.procedure_id == p.id
+      and cb.consent_ledger_entry_id == p.consent_ledger_entry_id
+      and cb.aug_fingerprint_id == p.aug_fingerprint_id
+      and cb.capability_vector_before_id == p.capability_vector_before_id
+      and cb.capability_vector_after_id  == p.capability_vector_after_id
+end
+
+-------------------------------------------------------------------------------
+10. Invariants: Lane & RoH classification for procedures
+-------------------------------------------------------------------------------
+
+record hygeia.LaneKerProfileRef.v1
+  id                          Uuid
+  lane                        hygeia.SessionLane.v1
+  roh_ceiling                 f32
+  k_min                       f32
+  e_min                       f32
+  r_max                       f32
+end
+
+invariant hygeia.LaneKerConsistency
+  # Lane KER thresholds must be consistent with RoH ceiling.
+  forall p in hygeia.LaneKerProfileRef.v1
+    p.k_min  >= 0.0
+    and p.e_min  >= 0.0
+    and p.r_max  >= 0.0
+    and p.r_max  <= p.roh_ceiling
+    and p.roh_ceiling <= 0.30
+end
+
+invariant hygeia.ProcedureWithinLaneProfile
+  # Approved/Scheduled procedures must satisfy lane KER thresholds as precondition.
+  forall p in hygeia.HygeiaProcedurePlan.v1
+    (p.status == hygeia.ProcedureStatus.v1.Approved
+     or p.status == hygeia.ProcedureStatus.v1.Scheduled) implies
+      exists lp in hygeia.LaneKerProfileRef.v1,
+             env in hygeia.ClinicalSessionEnvelope.v1
+        p.lane == lp.lane
+        and p.session_envelope_id == env.id
+        and env.roh_ceiling <= lp.roh_ceiling
+        and lp.r_max       <= env.roh_ceiling
+end
+
+-------------------------------------------------------------------------------
+11. Device-type safety categories (missing/next map hook)
+-------------------------------------------------------------------------------
+
+# This section provides a structural hook for future fine-grained mappings.
+# Specific device types (e.g. RetinalBCI vs DeepBrainStimLike) can be
+# associated with different PSAT/BioSafety profiles via DeviceEnvelopeBinding.
+# Additional invariants can later distinguish, for example:
+# - NonInvasiveEEG with lower RoH ceilings and wider pain/fear bands,
+# - CorticalImplant with stricter biocompatibility bands and adult-only PSAT.
+
+end
