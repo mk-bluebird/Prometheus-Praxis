@@ -1,0 +1,216 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+
+\title{Prometheus-Praxis Design Principles}
+\author{Prometheus-Praxis / eco\_restoration\_shard}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This document codifies the core design principles of Prometheus-Praxis as concrete, enforceable requirements for eco\_restoration\_shard, Cybercore, and Augmented Citizen workflows. Each principle is intended to be implementable in Rust 2024 and ALN, with non-actuating governance kernels, verifiable invariants, and hash-anchored provenance.[file:81][file:2]
+\end{abstract}
+
+\section{Introduction}
+
+Prometheus-Praxis is the neurorights-safe adaptive execution engine that turns high-level planetary, healthcare, cybernetic, and civic goals into concrete, auditable actions under strict non-rollback, ecosafety, and sovereignty constraints.[file:81][file:2]
+This document enumerates the design principles that must govern all crates, ALN shards, and city-scale workflows attached to Prometheus-Praxis.[file:81]
+
+\section{Design Principle 1: Forward-Only Evolution}
+
+\subsection{Statement}
+
+\begin{quote}
+Design for forward-only evolution: Every upgrade must tighten safety and capability envelopes, never silently downgrade rights, KER scores, or neurorights without explicit, consented rollback proof.
+\end{quote}
+
+\subsection{Operational Requirements}
+
+\begin{itemize}[nosep]
+  \item All firmware, model, and corridor updates must satisfy monotonicity invariants for KER, capability envelopes, and ResponsibilityScalar per host.[file:81]
+  \item Any decrease in capability or rights requires an explicit rollback artifact, bound to a continuity proof and NonRollbackProvenanceAnchor on Veritas-Chain.[file:81]
+  \item PsychologicalContinuityGate and Schutz-Recht must veto downgrades that lack proven harm justification, opening formal appeals.[file:81][file:2]
+\end{itemize}
+
+\subsection{Implementation Hooks}
+
+\begin{itemize}[nosep]
+  \item ALN invariants: \texttt{invariant.capability\_new\_geq\_old}, \texttt{invariant.responsibility\_new\_geq\_old}, except when \texttt{rollback\_artifact\_ref} is present.[file:81]
+  \item Rust guards: post-plan checks over capability vectors and KER streams must reject any monotone violation for Production lanes.[file:81]
+\end{itemize}
+
+\section{Design Principle 2: Hard RoH, Tsafe, and Lyapunov Ceilings}
+
+\subsection{Statement}
+
+\begin{quote}
+Make RoH, Tsafe, and Lyapunov hard ceilings: Any action that would push Risk-of-Harm above its bound, leave Tsafe corridors, or increase Lyapunov residuals must be auto-blocked or derated, with decisions logged on Veritas-Chain.
+\end{quote}
+
+\subsection{Operational Requirements}
+
+\begin{itemize}[nosep]
+  \item Global RoH ceiling: \( \mathrm{RoH} \leq 0.30 \) for all actions, non-offsettable by high K or E.[file:81][file:23]
+  \item Tsafe corridor membership is mandatory; leaving safe bands or entering restricted zones must trigger Derate or Stop.[file:23]
+  \item Lyapunov residuals must satisfy \( V_{t+1}^{\mathrm{city}} \leq V_t^{\mathrm{city}} \) for guarded entities and city-scale aggregates.[file:82]
+  \item Every Derate/Stop decision and its metrics snapshot must be anchored via Veritas-Chain decision shards.[file:81][file:2]
+\end{itemize}
+
+\subsection{Implementation Hooks}
+
+\begin{itemize}[nosep]
+  \item ALN envelopes: \texttt{roh.envelope}, \texttt{tsafe.envelope}, and \texttt{lyapunov.envelope} define ceilings and polytopes.[file:81][file:82]
+  \item Rights Verification Object must enforce that violation of any envelope yields \texttt{GovernanceDecision::Stop}.[file:2]
+\end{itemize}
+
+\section{Design Principle 3: Governance as Code}
+
+\subsection{Statement}
+
+\begin{quote}
+Encode governance as code, not policy: Laws, contracts, neurorights, and treaties become ALN predicates and Rust guards (Themis, Pan-Ethos, Corpus Juris, Schutz-Recht) so every actuation is a provably checked, machine-verifiable decision.
+\end{quote}
+
+\subsection{Operational Requirements}
+
+\begin{itemize}[nosep]
+  \item Themis-Axiom and Pan-Ethos must be compiled into boolean predicates over ALN fields, evaluated for every action.[file:81][file:2]
+  \item Corpus Juris contracts must encode budgets, RoH ceilings, time windows, and audit obligations as executable constraints.[file:81][file:2]
+  \item Schutz-Recht must compute a rights-risk scalar \(Q\) and open appeals when \(Q \geq Q_{\mathrm{crit}}\).[file:81][file:2]
+\end{itemize}
+
+\subsection{Implementation Hooks}
+
+\begin{itemize}[nosep]
+  \item Rust governance kernel: \texttt{PraxisGovernanceKernel::validate\_action(ctx)} returns \texttt{Allow/Derate/Stop} based on invariants and rights gates.[file:2]
+  \item Kani harnesses must prove that any failed predicate forces \texttt{Stop}, independent of KER or public-good scalars.[file:2]
+\end{itemize}
+
+\section{Design Principle 4: Non-Rollback Provenance Everywhere}
+
+\subsection{Statement}
+
+\begin{quote}
+Enforce non-rollback provenance everywhere: Continuity proofs, capability streams, and consent artifacts (e.g., AugFingerprint HASHONLY) are hash-anchored and non-deletable, ensuring no hidden control panels, covert downgrades, or rights erasure.
+\end{quote}
+
+\subsection{Operational Requirements}
+
+\begin{itemize}[nosep]
+  \item All critical events must carry a \texttt{continuityproofhex} binding identity, SOIC credentials, KER pre/post, and RoH course windows.[file:81]
+  \item NonRollbackProvenanceAnchor rows on Veritas-Chain must forbid deletion and encode monotone capability streams.[file:81]
+  \item Consent artifacts such as AugFingerprint must operate in HASHONLY mode, with revocable states but immutable histories.[file:81]
+\end{itemize}
+
+\subsection{Implementation Hooks}
+
+\begin{itemize}[nosep]
+  \item SQLite/ALN schemas must disallow \texttt{DELETE} on consent and continuity tables; state changes are append-only.[file:81]
+  \item Blacklist-and-hidden-control shards must enumerate downgrade patterns and block them at policy load time.[file:81]
+\end{itemize}
+
+\section{Design Principle 5: Observability as Safety Organ}
+
+\subsection{Statement}
+
+\begin{quote}
+Treat observability as a safety organ: Prometheus gauges, counters, and histograms wired through a dedicated observability core crate must make every RoH, Tsafe, aliasing, and guard verdict visible in real time and analyzable post-hoc for evidence-backed evolution.
+\end{quote}
+
+\subsection{Operational Requirements}
+
+\begin{itemize}[nosep]
+  \item Gauges must expose real-time state for RoH, Tsafe distance, Lyapunov residuals, aliasing margins, and shear dose.[file:23][file:82]
+  \item Counters must track guard violations and corridor hard-stops per kind (RoH, Tsafe, Lyapunov, aliasing, neurorights).[file:23][file:82]
+  \item Histograms must capture distributions needed for corridor tuning and KER tightening.[file:23][file:82]
+  \item Observability core must be a lean, deterministic crate with shared registration and update APIs across nanoswarm and cyboquatic stacks.[file:23][file:82]
+\end{itemize}
+
+\subsection{Implementation Hooks}
+
+\begin{itemize}[nosep]
+  \item Crate: \texttt{crates/nanorobotics-observability-core} registering canonical metric families and \texttt{observe\_*} functions.[file:82]
+  \item ALN shard: \texttt{nanorobotics.obs.metrics.schema.v1.aln} mapping metrics to units, formulas, and governance fields.[file:82]
+\end{itemize}
+
+\section{Design Principle 6: Separation of Safety Logic and AI UX}
+
+\subsection{Statement}
+
+\begin{quote}
+Keep safety logic and AI UX strictly separated: Core Rust/ALN guard and observability crates stay non-actuating and deterministic, while AI-chat and dashboards consume read-only JSON snapshots and metrics via adapter layers under DID/consent gates.
+\end{quote}
+
+\subsection{Operational Requirements}
+
+\begin{itemize}[nosep]
+  \item Safety-critical crates must not embed AI, chat interfaces, or UI logic; they expose Prometheus metrics and structured snapshot APIs only.[file:23][file:2]
+  \item Snapshot APIs must be read-only, authenticated via DIDs, and consent-gated for hosts and citizens.[file:23][file:2]
+  \item AI-chat tools and dashboards must operate as external adapters consuming snapshots, without any ability to mutate core state.[file:23]
+\end{itemize}
+
+\subsection{Implementation Hooks}
+
+\begin{itemize}[nosep]
+  \item Structured JSON/ALN snapshot endpoint providing RoH, Tsafe, Lyapunov, guard verdicts, and corridor IDs per node.[file:23]
+  \item Adapter crates implementing clinician consoles, citizen explainers, and operator co-pilots over the snapshot API.[file:23]
+\end{itemize}
+
+\section{Design Principle 7: Eco-Restoration and Biodiverse Public Good}
+
+\subsection{Statement}
+
+\begin{quote}
+Prioritize eco-restoration and biodiverse public good: Eco-routing, cyboquatic missions, and city orchestration must maximize carbon-negative, low-waste impact without crossing biodiversity hard floors, using KER and Res Publica scalars to justify city-scale choices.
+\end{quote}
+
+\subsection{Operational Requirements}
+
+\begin{itemize}[nosep]
+  \item Eco-restoration corridors must encode hard biodiversity floors (e.g., BIODIVERSITY\_HARDFLOOR) and forbid monoculture optimizations.[file:81][file:65]
+  \item KER triads must reward actions with high eco-impact and low risk, subject to biodiversity and water treaties.[file:65]
+  \item Res Publica scalar \( PG = G - L \) must justify public-good decisions, without infringing non-derogable rights.[file:81]
+\end{itemize}
+
+\subsection{Implementation Hooks}
+
+\begin{itemize}[nosep]
+  \item ALN policies: \texttt{EnforceCarbonBiodiversityBalance} and BioticTreaty corridors binding eco-planner outputs.[file:81][file:65]
+  \item City orchestration maps that treat eco-restoration missions as first-class workloads under NIST AI RMF-aligned risk processes.[file:65]
+\end{itemize}
+
+\section{Design Principle 8: Sovereignty and Consent as Invariants}
+
+\subsection{Statement}
+
+\begin{quote}
+Honor sovereignty and consent as invariants: Every augmented or non-augmented citizen interaction flows through neurorights envelopes, Cybernetic Consent Ledgers, and appeal corridors, making participation revocable, non-punitive, and transparently governed.
+\end{quote}
+
+\subsection{Operational Requirements}
+
+\begin{itemize}[nosep]
+  \item All BCI and XR participation must pass through RealityOS, NeurorightsEnvelope, and Cybernetic Consent Ledger primitives.[file:65][file:2]
+  \item Consent must be explicit, revocable, and logged; revocation cannot downgrade rights or access to essential services.[file:81][file:2]
+  \item Appeals via Schutz-Recht and PsychologicalContinuityGate must be available for any perceived rights infringement or downgrade.[file:2]
+\end{itemize}
+
+\subsection{Implementation Hooks}
+
+\begin{itemize}[nosep]
+  \item ALN consent corridors binding DIDs, envelopes, scopes, and expiry, with non-rollback provenance.[file:81][file:2]
+  \item Rights Verification Object integrating neurorights predicates and consent states into its decision lattice.[file:2]
+\end{itemize}
+
+\section{Conclusion}
+
+These principles are binding constraints for all Prometheus-Praxis artifacts under \texttt{eco\_restoration\_shard}, Cybercore, and Augmented-Citizen stacks.
+Future Rust and ALN work must cite the relevant sections of this document and demonstrate compliance via Kani proofs, Veritas-Chain anchors, and Prometheus observability.[file:81][file:23][file:2]
+
+\end{document}
