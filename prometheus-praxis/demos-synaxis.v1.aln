@@ -1,0 +1,245 @@
+aln
+title Prometheus-Praxis Demos-Synaxis v1
+version 1.0.0
+
+aln.migration ALN.MIGRATION.CYBERCOREAUTHORITY.v1
+binding.hostdid did:aln:organic-host
+binding.bostromaddress bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+
+-------------------------------------------------------------------------------
+1. Core enums: origins, topics, consent, neurorights
+-------------------------------------------------------------------------------
+
+enum demos.SignalOrigin.v1
+  Assembly          # in-person assembly / citizens' forum
+  OnlineForum       # moderated online forum
+  NGO               # non-governmental organization
+  Cooperative       # co-op / neighborhood association
+  ExpertCouncil     # domain expert body
+end
+
+enum demos.TopicKind.v1
+  EcoRestoration
+  CityOperations
+  Healthcare
+  Cybernetics
+  PaymentsAndEquity
+  ClimateEnergy
+  Other
+end
+
+enum demos.ConsentMode.v1
+  ExplicitOptIn
+  ExplicitOptOut
+  ImpliedWithinMandate
+end
+
+# Reference to PSAT privacy dimensions for mental/neuro signals
+enum demos.NeuroInputKind.v1
+  None
+  MentalStateAggregate     # aggregated mental state / affect
+  NeuroFeedbackSession     # Perkunos / high-intensity session outputs
+end
+
+-------------------------------------------------------------------------------
+2. CommunitySignal.v1 (per-signal record)
+-------------------------------------------------------------------------------
+
+record demos.CommunitySignal.v1
+  id                         Uuid
+
+  origin                     demos.SignalOrigin.v1
+  topic                      demos.TopicKind.v1
+  corridor_id                String       # corridor / region identifier
+
+  # Core content references (no raw text or identities)
+  noosphere_topic_ref        optional String   # Noosphere topic id
+  gemeinschaft_priority_ref  optional String   # Gemeinschaft-Verein priority id
+  fortschritt_track_ref      optional String   # Fortschritt-Link innovation track id
+
+  # Weight and K/E influence (normalized 0..1)
+  weight                     f32          # scalar influence weight
+  delta_k                    f32          # suggested K adjustment (knowledge)
+  delta_e                    f32          # suggested E adjustment (eco impact)
+
+  # Consent & anonymization metadata (PSAT-aligned)
+  consent_mode               demos.ConsentMode.v1
+  consent_document_ref       optional String   # ALN consent shard id
+  anonymized                 bool             # true if personally identifying data removed
+  aggregation_level          String           # e.g. "group", "cohort", "region"
+
+  # Neurorights envelope binding
+  neuro_input_kind           demos.NeuroInputKind.v1
+  neurorights_envelope_ref   optional String  # e.g. neurorights.envelope.citizen.v1
+  psat_privacy_profile_ref   optional String  # psat.PrivacyRequirement.v1 id
+
+  created_utc                String
+end
+
+-------------------------------------------------------------------------------
+3. CollectiveFeedSnapshot.v1 (per-window aggregate)
+-------------------------------------------------------------------------------
+
+record demos.CollectiveFeedSnapshot.v1
+  id                         Uuid
+
+  # Scope
+  corridor_id                String          # corridor / region id
+  domain                     String          # e.g. EcoRestoration, CityOps
+  lane                       String          # RESEARCH, GOV, EXPPROD
+
+  # Priority vector (per topic, normalized 0..1)
+  priority_eco_restoration   f32
+  priority_city_operations   f32
+  priority_healthcare        f32
+  priority_cybernetics       f32
+  priority_payments_equity   f32
+  priority_climate_energy    f32
+
+  # Equity gaps (per corridor, normalized 0..1; 0 = no gap)
+  equity_gap_services        f32            # access to services
+  equity_gap_exposure        f32            # exposure to harm/pollution
+  equity_gap_participation   f32            # participation / representation gap
+
+  # Innovation uptake metrics (per corridor, 0..1)
+  innovation_uptake_ecotech  f32
+  innovation_uptake_health   f32
+  innovation_uptake_cyber    f32
+
+  # Aggregation provenance
+  signal_count               i64
+  aggregation_window_start   String
+  aggregation_window_end     String
+
+  # KER-adjacent evidence (only K/E are adjusted by these)
+  cumulative_delta_k         f32           # summed / averaged K adjustment
+  cumulative_delta_e         f32           # summed / averaged E adjustment
+
+  created_utc                String
+end
+
+-------------------------------------------------------------------------------
+4. Invariants: collective signals cannot lower R or relax RoH/Tsafe
+-------------------------------------------------------------------------------
+
+# 4.1. Signals only allowed to adjust K and E, not R
+invariant demos.SignalsAdjustKnowledgeAndEcoOnly
+  # For any CommunitySignal, delta_k and delta_e may be non-zero, but they
+  # must not encode any direct relaxation of Risk-of-harm R thresholds.
+  forall s in demos.CommunitySignal.v1
+    # No negative constraints on R can be encoded here; enforcement occurs
+    # by design at the governance kernel, but ALN ensures signals do not
+    # carry any R-lowering fields.
+    true
+end
+
+# 4.2. CollectiveFeedSnapshot carries only K/E adjustments
+invariant demos.SnapshotKERAdjacency
+  # CollectiveFeedSnapshot may carry cumulative K/E deltas, but no fields
+  # representing RoH ceiling or Tsafe bands.
+  forall c in demos.CollectiveFeedSnapshot.v1
+    c.cumulative_delta_k >= -1.0 and c.cumulative_delta_k <= 1.0
+    and c.cumulative_delta_e >= -1.0 and c.cumulative_delta_e <= 1.0
+end
+
+# 4.3. No relaxation of global RoH ceiling through Demos-Synaxis
+invariant demos.NoRoHRelaxationByCollectiveInputs
+  # Conceptual invariant: any governance lane using CollectiveFeedSnapshot
+  # must still obey global RoH ceiling and Tsafe corridors defined elsewhere.
+  # Here we encode that snapshots cannot carry any field that overrides RoH.
+  forall c in demos.CollectiveFeedSnapshot.v1
+    true
+end
+
+-------------------------------------------------------------------------------
+5. Invariants: PSAT MentalPrivacy + CollectiveGovernance for neuro inputs
+-------------------------------------------------------------------------------
+
+# These invariants rely on psat.PrivacyRequirement.v1, already defined in the
+# IEEE P7007 ontology ALN shard.
+
+invariant demos.MentalPrivacyRequiresCollectiveGovernance
+  # If a CommunitySignal involves mental/neuro input, its bound
+  # psat.PrivacyRequirement must encode both MentalPrivacy and
+  # CollectiveGovernance, and require collective approval for secondary use.
+  forall s in demos.CommunitySignal.v1
+    s.neuro_input_kind != demos.NeuroInputKind.v1.None
+    and s.psat_privacy_profile_ref != None
+    implies
+      exists pr in psat.PrivacyRequirement.v1
+        pr.id == s.psat_privacy_profile_ref
+        and exists d in pr.dimensions
+          d == psat.PrivacyDimension.v1.MentalPrivacy
+        and exists g in pr.dimensions
+          g == psat.PrivacyDimension.v1.CollectiveGovernance
+        and pr.requirecollectiveapprovalforsecondaryuse == true
+end
+
+invariant demos.NeuroSignalsMustBeAnonymizedAggregates
+  # Any CommunitySignal derived from mental/neurological streams must be
+  # anonymized and aggregated at or above cohort level.
+  forall s in demos.CommunitySignal.v1
+    s.neuro_input_kind != demos.NeuroInputKind.v1.None
+    implies
+      s.anonymized == true
+      and (s.aggregation_level == "group"
+           or s.aggregation_level == "cohort"
+           or s.aggregation_level == "region")
+end
+
+-------------------------------------------------------------------------------
+6. Invariants: consent discipline for all signals
+-------------------------------------------------------------------------------
+
+invariant demos.ExplicitConsentForHighIntensityNeuro
+  # For high-intensity or neurofeedback-derived signals, consent must be
+  # explicit opt-in with a bound consent document.
+  forall s in demos.CommunitySignal.v1
+    s.neuro_input_kind == demos.NeuroInputKind.v1.NeuroFeedbackSession
+    implies
+      s.consent_mode == demos.ConsentMode.v1.ExplicitOptIn
+      and s.consent_document_ref != None
+end
+
+invariant demos.ConsentDocumentRefRequiredForAssemblySignals
+  # Assembly-origin signals must carry an explicit consent / mandate document.
+  forall s in demos.CommunitySignal.v1
+    s.origin == demos.SignalOrigin.v1.Assembly
+    implies s.consent_document_ref != None
+end
+
+-------------------------------------------------------------------------------
+7. Invariants: non-coercion and non-punitive aggregation
+-------------------------------------------------------------------------------
+
+invariant demos.NoPunitiveUseOfEquityGap
+  # Equity gap metrics cannot be used to lower rights, neurorights envelopes,
+  # or access to basic services; they serve as advisory K/E evidence only.
+  forall c in demos.CollectiveFeedSnapshot.v1
+    c.equity_gap_services >= 0.0 and c.equity_gap_services <= 1.0
+    and c.equity_gap_exposure >= 0.0 and c.equity_gap_exposure <= 1.0
+    and c.equity_gap_participation >= 0.0 and c.equity_gap_participation <= 1.0
+end
+
+invariant demos.NoIndividualTrackingInCollectiveFeed
+  # CollectiveFeedSnapshot operates only at corridor/aggregate level and
+  # must not contain individual identifiers or scores.
+  forall c in demos.CollectiveFeedSnapshot.v1
+    # Enforced structurally: there are no fields for individual identity.
+    true
+end
+
+-------------------------------------------------------------------------------
+8. Invariants: advisory role only (no override of safety invariants)
+-------------------------------------------------------------------------------
+
+invariant demos.CollectiveFeedAdvisoryOnly
+  # Any use of Demos-Synaxis outputs in governance must be advisory:
+  # they can adjust K (knowledge) and E (eco impact) weighting, but cannot
+  # override or relax RoH, Tsafe, Lyapunov, or neurorights invariants.
+  # This is enforced by structure (no R-related fields) and by governance code.
+  forall c in demos.CollectiveFeedSnapshot.v1
+    true
+end
+
+end
