@@ -46,6 +46,7 @@ members = [
     "crates/cyboquatic_index",
     "crates/cyboquatic_lane_replay",
     "crates/cyboquatic_progress/20260705_crate",
+    "crates/cyboquatic-qpudatashard",
     "crates/cyboquatic_spine",
     "crates/cyboquationmark_workload",
     "crates/datalake_core",
