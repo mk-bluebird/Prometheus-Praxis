@@ -1,4 +1,5 @@
 // Filename: crates/cyboquatic-ecosafety/src/lib.rs
+// destination: github.com/mk-bluebird/Prometheus-Praxis
 
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
@@ -15,32 +16,44 @@
 //! Cyboquatic nodes, aligned with the 2026 rx/Vt/KER grammar used across
 //! Phoenix MAR basins, FOG routing workloads, and biodegradable substrates.
 //!
-//! # Ecosafety invariants
+//! - All risk planes are normalized to [0, 1] as `RiskCoord` values, with
+//!   corridor-based normalization defined in ALN specifications.
+//! - The Lyapunov residual V_t = sum_j w_j r_j^2 is used as the scalar
+//!   ecosafety channel, and control is only admissible when the residual is
+//!   non-increasing outside a small safe interior.
+//! - KER windows track knowledge-factor `K`, eco-impact `E`, and risk-of-harm
+//!   `R` over rolling horizons, with deployability gates enforced via
+//!   `ker_deployable()`.
 //!
-//! - All risk planes are normalized to [0, 1] as `RiskCoord` values,
-//!   with corridor-based normalization defined in ALN specs.
-//! - The Lyapunov residual V_t = sum_j w_j r_j^2 is used as the
-//!   scalar ecosafety channel, and control is only admissible when
-//!   the residual is non-increasing outside a small safe interior.
-//! - KER windows track knowledge-factor `K`, eco-impact `E`, and
-//!   risk-of-harm `R` over rolling horizons, with deployability gates
-//!   enforced via `ker_deployable()`.
-//!
-//! # Corridor linkage
-//!
-//! This crate is wired directly to ALN specifications such as
-//! `CyboquaticEcosafetyEnvelopePhoenix2026v1`, which define the
-//! corridor bands and schema columns for PFAS, CEC, SAT, surcharge,
-//! biodiversity, Vt, lane, KER, evidencehex, and Bostrom DIDs.
-//!
-//! The ALN specification is embedded so that Rust types and grammar
-//! co-evolve with the authoritative protocol.
+//! This crate also provides privacy-preserving aggregation of ecosafety
+//! statistics across multiple node operators using additive sharing and
+//! optional differential privacy. All outputs are advisory and non-actuating.
+
+/// Privacy-preserving aggregation primitives for ecosafety risk.
+pub mod privacy;
+
+pub use crate::privacy::{
+    AggregatedShares,
+    DpConfig,
+    DpGlobalRiskStats,
+    GlobalRiskStats,
+    LaplaceSampler,
+    LocalRiskStats,
+    RiskShare,
+    apply_dp_to_global_stats,
+    make_risk_shares,
+    reconstruct_global_stats,
+};
+
+// Corridor linkage and ALN binding.
+// The ALN specification is embedded so that Rust types and grammar
+// co-evolve with the authoritative protocol.
 
 /// Embedded ALN specification for the ecosafety envelope.
 ///
 /// This string must match the contents of
 /// `qpudatashards/policies/CyboquaticEcosafetyEnvelopePhoenix2026v1.aln`
-/// in the `ecorestoration_shard` repository.
+/// in the Prometheus-Praxis repository.
 pub const ECOSAFETY_ALN_SPEC: &str =
     include_str!("../../qpudatashards/policies/CyboquaticEcosafetyEnvelopePhoenix2026v1.aln");
 
@@ -82,21 +95,35 @@ pub use frame::{CompositeFrame, Frame, FrameContext, FrameError};
 
 // Windowing and status history.
 pub use window::{
-    EcosafetyStatus, EcosafetyStatusHistory, EcosafetyTrend, WindowManager,
+    EcosafetyStatus,
+    EcosafetyStatusHistory,
+    EcosafetyTrend,
+    WindowManager,
 };
 
 // Lyapunov regime diagnostics.
-pub use lyapunov_regime::{LyapunovStabilityDiagnostics, LyapunovStabilityFrame, VtHistory};
+pub use lyapunov_regime::{
+    LyapunovStabilityDiagnostics,
+    LyapunovStabilityFrame,
+    VtHistory,
+};
 
 // Risk-space primitives and KER window representation.
 pub use risk::{
-    KERWindow, LyapunovResidual, LyapunovWeights, RiskCoord, RiskVector,
+    KERWindow,
+    LyapunovResidual,
+    LyapunovWeights,
+    RiskCoord,
+    RiskVector,
 };
 
 // Covariance-based ecosafety frame.
 pub use covariance::{
-    CovarianceOutput, CovarianceSample, EcosafetyCovarianceConfig,
-    EcosafetyCovarianceFrame as CoreCovarianceFrame, LyapunovDistance,
+    CovarianceOutput,
+    CovarianceSample,
+    EcosafetyCovarianceConfig,
+    EcosafetyCovarianceFrame as CoreCovarianceFrame,
+    LyapunovDistance,
 };
 
 // Integrity frame for adversarial or malformed inputs.
@@ -104,8 +131,12 @@ pub use integrity::{IntegrityCheckFrame, IntegrityDiagnostics};
 
 // ALN-bound schema and shard update validation.
 pub use aln_schema::{
-    parse_ecosafety_envelope_schema, validate_update as validate_shard_update,
-    ShardField, ShardFieldKind, ShardSchema as AlnShardSchema, ShardUpdate,
+    parse_ecosafety_envelope_schema,
+    validate_update as validate_shard_update,
+    ShardField,
+    ShardFieldKind,
+    ShardSchema as AlnShardSchema,
+    ShardUpdate,
     ShardValidationError,
 };
 
@@ -118,20 +149,27 @@ pub use provenance::{Provenance, ProvenanceStep};
 pub use provenancedetail::ProvenanceDetail;
 pub use provenancerecord::EcosafetyProvenanceRecord;
 pub use provenanceexport::{
-    pipeline_output_to_provenance_records, provenance_record_to_csv_row,
+    pipeline_output_to_provenance_records,
+    provenance_record_to_csv_row,
 };
 
 // Governance checker that tags shard updates with sovereignty/consent hints.
 pub use governance_checker::{GovernanceChecker, GovernanceTag};
 
 // High-level three-stage pipeline (Integrity → Covariance → Biodiversity) with provenance.
-pub use pipeline3::{buildecosafetypipeline3, EcosafetyPipeline3, EcosafetyPipelineOutput};
+pub use pipeline3::{
+    buildecosafetypipeline3,
+    EcosafetyPipeline3,
+    EcosafetyPipelineOutput,
+};
 
-// Schemabound ecosystem types mirroring ALN SQL records.
+// Schema-bound ecosystem types mirroring ALN SQL records.
 pub use types::{CyboNodeEcosafetyEnvelope, NodeRiskSample};
 
 // Biodiversity mesocosm diagnostics.
 pub use biodiversity_mesocosm::{
-    BiodiversityIntegrityDiagnostics, BiodiversityIntegrityFrame, MesocosmRiskFrame,
+    BiodiversityIntegrityDiagnostics,
+    BiodiversityIntegrityFrame,
+    MesocosmRiskFrame,
     MesocosmShardRow,
 };
