@@ -5,17 +5,20 @@
 
 //! Cyboquatic core recognition and indexing crate.
 //!
-//! This crate is explicitly **non-actuating**: it provides data structures and
-//! pure functions for:
+//! This crate is explicitly non-actuating. It provides:
 //! - Per-node eco/energy recognition (`CyboquaticNodeSample` → `CyboquaticEcoPlot`).
 //! - Restoration surfaces and carbon-negative flags for frames and orchestration.
-//! - Region-level aggregations suitable for GeoJSON heatmaps.
-//! - Synthetic Phoenix `NodeRiskSample` generation and ESPD-style ecosafety scoring.
+//! - Region-level aggregations and GeoJSON emitters for overlays.
+//! - Synthetic Phoenix `NodeRiskSample` and ESPD-style ecosafety scoring.
+//! - A `FrameRegistry` driven by `Frames.toml` to enable or disable diagnostics.
+//! - An optional `metrics` feature exporting Prometheus-style diagnostics.
 //!
-//! Any controller or actuator using these outputs MUST still pass through ALN
-//! `safesteprule` and `deploydecisionkernel` gates in higher layers.[file:32]
+//! Any controller or actuator using these outputs must still pass through ALN
+//! `safesteprule` and `deploydecisionkernel` gates in higher layers.
 
 mod cyboquatic_index;
+mod frame_registry;
+mod metrics;
 
 pub use crate::cyboquatic_index::{
     aggregate_by_region,
@@ -38,3 +41,6 @@ pub use crate::cyboquatic_index::{
     E_FACTOR,
     R_FACTOR,
 };
+
+pub use crate::frame_registry::{FrameKind, FrameRegistry};
+pub use crate::metrics::{export_last_metrics, record_metrics_snapshot, MetricsSnapshot};
