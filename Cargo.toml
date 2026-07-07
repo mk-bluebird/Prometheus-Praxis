@@ -138,6 +138,7 @@ members = [
     "crates/cyboquatic_progress/20260705_crate",
     "crates/school_zone_mapper",
     "crates/tailwind_fsm",
+    "crates/air_globe_ceim",
 ]
 
 resolver = "2"
