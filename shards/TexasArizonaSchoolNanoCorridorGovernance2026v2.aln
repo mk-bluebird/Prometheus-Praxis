@@ -1,0 +1,278 @@
+META TexasArizonaSchoolNanoCorridorGovernance2026v2
+  shardkind      QPUDATASHARD
+  primaryplane   biology
+  region         Texas-Arizona
+  schemaref      EcoNetSchemaShard2026v2.aln
+  shardversion   2026v2
+  preferredrole  KERNELINPUT
+  issued_utc     2026-07-06T19:30:00Z
+  signing_did    bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+ENDMETA
+
+RECORD SchoolNanoCorridorRow
+  region_id              text
+  region_name            text
+  state                  text
+  county                 text
+  district               text
+  campus_id              text
+  campus_name            text
+  lat                    float
+  lon                    float
+  twindow_start_utc      text
+  twindow_end_utc        text
+
+  context_screwworm_zone text      # NONE,WATCH,INFESTED
+  context_livestock_density text   # LOW,MEDIUM,HIGH
+  context_vec_index       float    # normalized 0–1 parasite pressure
+
+  school_enrollment       int
+  school_level            text      # ELEMENTARY,SECONDARY,MIXED
+  has_ag_program          bool
+  water_source_type       text      # WELL,MUNICIPAL,OTHER
+  hvac_type               text      # CENTRAL-HVAC,PACKAGED-ROOFTOP,OTHER
+
+  parasite_indicator_type text      # FECAL_INDICATOR_ECOLI,HELMINTH_PREVALENCE,NONE
+  parasite_indicator_value float
+  parasite_indicator_unit text      # MPN_100ML,FRACTION,N_A
+
+  nano_mode               text      # NONE,EXTERNAL_FILTER,SURFACE_COATING,EXTERNAL_DIAGNOSTIC
+  nano_parasite_coverage_frac float # 0–1 fraction of relevant surfaces/flows covered
+  nano_neuro_binding_score float    # 0–1 proxy; must remain near 0
+  nano_material_half_life_days float
+  nano_carbon_kg_co2e_year float
+  nano_uncertainty_index   float    # rsigma_raw-style scalar before normalization
+
+  r_parasite              float     # 0–1 normalized parasite risk
+  r_nano_benefit_gap      float     # 0–1 gap between nano benefit and baseline
+  r_neuro                 float     # 0–1 normalized neuro risk
+  r_persistence           float     # 0–1 normalized environmental persistence
+  r_carbon                float     # 0–1 normalized carbon footprint
+  r_sigma                 float     # 0–1 normalized uncertainty
+
+  r_regulatory            float     # 0–1 normalized regulatory risk
+  r_consent               float     # 0–1 normalized community consent/trust risk
+  r_longterm              float     # 0–1 normalized long-horizon pediatric risk
+
+  vt                      float     # Lyapunov residual for this time window
+  ker_k                   float
+  ker_e                   float
+  ker_r                   float
+
+  kerdeployable           bool      # final gate from Rust ecosafety engine
+
+  deployment_stage        text      # STAGE0_SIM,STAGE1_ADULT,STAGE2_INFRA,STAGE3_SCHOOL_PILOT,STAGE4_NORMALIZED
+  lane                    text      # EXP,PILOT,PROD
+
+  corridor_neuro          text      # e.g. NEURO_TIGHT
+  corridor_persistence    text      # e.g. PERSIST_BIODEG_FAST
+  corridor_carbon         text      # e.g. CARBON_NET_NEGATIVE
+  corridor_uncertainty    text      # e.g. UNCERTAINTY_LOW
+
+  regulatory_basis_id     text      # links to EVIDENCE shard: TSCA/EPA/FDA/state analysis
+  consent_artifact_id     text      # links to EVIDENCE shard: parental consent & engagement
+  monitoring_protocol_id  text      # links to EVIDENCE shard: pediatric monitoring protocol
+
+  evidence_hex            text      # hex hash of primary evidence bundle
+  signing_hex             text      # hex signature tied to Bostrom/ALN identity
+ENDRECORD
+
+SECTION rows SchoolNanoCorridorRow
+  TX-ZAVALA-001-ZONE-01,
+  "Zavala Screwworm Buffer 2026",
+  "TX",
+  "Zavala",
+  "Zavala ISD",
+  "TX-ZAVALA-001",
+  "Zavala Elementary",
+  28.883,
+  -99.760,
+  "2026-06-01T00:00:00Z",
+  "2026-06-30T23:59:59Z",
+
+  "INFESTED",
+  "HIGH",
+  0.75,
+
+  520,
+  "ELEMENTARY",
+  true,
+  "WELL",
+  "PACKAGED-ROOFTOP",
+
+  "FECAL_INDICATOR_ECOLI",
+  420.0,
+  "MPN_100ML",
+
+  "EXTERNAL_FILTER",
+  0.95,
+  0.00,
+  30.0,
+  -500.0,
+  0.30,
+
+  0.70,
+  0.05,
+  0.00,
+  0.08,
+  0.00,
+  0.12,
+
+  0.05,         # r_regulatory: EPA/TSCA & state aligned, minor paperwork lag
+  0.15,         # r_consent: strong but not universal parental engagement
+  0.25,         # r_longterm: monitoring plan exists, data just beginning
+
+  0.30,         # vt
+  0.93,         # ker_k
+  0.91,         # ker_e
+  0.12,         # ker_r
+
+  false,        # kerdeployable: governance planes not yet low enough
+
+  "STAGE2_INFRA",
+  "PILOT",
+
+  "NEURO_TIGHT",
+  "PERSIST_BIODEG_FAST",
+  "CARBON_NET_NEGATIVE",
+  "UNCERTAINTY_MED",
+
+  "REG-TX-NANO-2026-0001",
+  "CONSENT-ZAVALA-2026-001",
+  "MONITOR-ZAVALA-NEUROCOG-2026-001",
+
+  "3f7c2a9b5e8d1046c2b7e9f1a4d6803c",
+  "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+
+  AZ-MARICOPA-001-ZONE-01,
+  "Phoenix Central Prep 2026",
+  "AZ",
+  "Maricopa",
+  "Phoenix Union",
+  "AZ-MARICOPA-001",
+  "Phoenix Central High",
+  33.472,
+  -112.089,
+  "2026-06-01T00:00:00Z",
+  "2026-06-30T23:59:59Z",
+
+  "WATCH",
+  "MEDIUM",
+  0.40,
+
+  1800,
+  "SECONDARY",
+  false,
+  "MUNICIPAL",
+  "CENTRAL-HVAC",
+
+  "HELMINTH_PREVALENCE",
+  0.08,
+  "FRACTION",
+
+  "SURFACE_COATING",
+  0.80,
+  0.00,
+  10.0,
+  -200.0,
+  0.25,
+
+  0.40,
+  0.20,
+  0.00,
+  0.03,
+  0.00,
+  0.08,
+
+  0.10,         # r_regulatory: additional state review in progress
+  0.30,         # r_consent: partial buy-in, active concerns logged
+  0.35,         # r_longterm: protocol drafted, not yet fully enrolled
+
+  0.26,
+  0.94,
+  0.92,
+  0.11,
+
+  false,
+
+  "STAGE2_INFRA",
+  "PILOT",
+
+  "NEURO_TIGHT",
+  "PERSIST_BIODEG_FAST",
+  "CARBON_NET_NEGATIVE",
+  "UNCERTAINTY_MED",
+
+  "REG-AZ-NANO-2026-0003",
+  "CONSENT-PHOENIX-2026-014",
+  "MONITOR-AZ-MARICOPA-2026-005",
+
+  "8f7e6d5c4b3a2910a1b2c3d4e5f67890",
+  "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+
+  TX-KENDALL-001-ZONE-01,
+  "Comfort ISD Screwworm Monitor",
+  "TX",
+  "Kendall",
+  "Comfort ISD",
+  "TX-KENDALL-001",
+  "Comfort High",
+  29.966,
+  -98.905,
+  "2026-06-01T00:00:00Z",
+  "2026-06-30T23:59:59Z",
+
+  "NONE",
+  "MEDIUM",
+  0.25,
+
+  620,
+  "SECONDARY",
+  true,
+  "MUNICIPAL",
+  "CENTRAL-HVAC",
+
+  "NONE",
+  0.00,
+  "N_A",
+
+  "NONE",
+  0.00,
+  0.00,
+  0.00,
+  0.00,
+  1.00,
+
+  0.25,
+  1.00,
+  0.00,
+  0.00,
+  0.00,
+  0.25,
+
+  0.02,         # r_regulatory: no nano, fully compliant baseline
+  0.05,         # r_consent: strong trust around conventional programs
+  0.10,         # r_longterm: baseline health monitoring in place
+
+  1.09,
+  0.85,
+  0.90,
+  0.10,
+
+  false,
+
+  "STAGE0_SIM",
+  "EXP",
+
+  "NEURO_TIGHT",
+  "PERSIST_BIODEG_FAST",
+  "CARBON_HIGH",
+  "UNCERTAINTY_LOW",
+
+  "REG-TX-BASELINE-2026-0007",
+  "CONSENT-COMFORT-2026-BASE",
+  "MONITOR-TX-KENDALL-BASE-2026",
+
+  "4a3b2c1d9e8f7g6h0f1e2d3c4b5a6978",
+  "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+ENDSECTION
