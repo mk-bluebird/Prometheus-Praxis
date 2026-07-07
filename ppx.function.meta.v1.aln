@@ -1,0 +1,61 @@
+aln ppx.function.meta.v1
+
+record PpxFunctionMetaV1
+    string id
+    string name
+    list<string> domains
+    list<string> corridors
+    list<string> capitals
+    uint32 nodecount
+    bool actuating
+    bool ecosafetyrequired
+    string policytag
+endrecord
+
+record PpxFunctionGateBindingV1
+    string function_id
+    string gate_id
+    string relation   -- e.g., "REQUIRES_GATE"
+endrecord
+
+instance ecoindex_blastradius_list_v1 of PpxFunctionMetaV1
+    id           "ecoindex.blastradius.list.v1"
+    name         "ecoindex.blastradius.list.v1"
+    domains      ["water", "thermal", "biotic"]
+    corridors    ["*"]
+    capitals     ["water", "thermal", "biotic", "neurobiome", "somatic"]
+    nodecount    1024
+    actuating    false
+    ecosafetyrequired true
+    policytag    "DATA_DIAGNOSTIC_MULTI_DOMAIN"
+endinstance
+
+instance ecosafety_node_recent_v1 of PpxFunctionMetaV1
+    id           "ecosafety.node.recent.v1"
+    name         "ecosafety.node.recent.v1"
+    domains      ["water"]
+    corridors    ["local"]
+    capitals     ["water"]
+    nodecount    1
+    actuating    false
+    ecosafetyrequired false
+    policytag    "DATA_DIAGNOSTIC_LOCAL"
+endinstance
+
+instance ecosafety_governance_gate_v1 of PpxFunctionMetaV1
+    id           "ecosafety.governance.gate.v1"
+    name         "ecosafety.governance.gate.v1"
+    domains      ["governance"]
+    corridors    ["*"]
+    capitals     []
+    nodecount    0
+    actuating    false
+    ecosafetyrequired false
+    policytag    "GATE"
+endinstance
+
+instance ecoindex_blastradius_list_gate_binding of PpxFunctionGateBindingV1
+    function_id  "ecoindex.blastradius.list.v1"
+    gate_id      "ecosafety.governance.gate.v1"
+    relation     "REQUIRES_GATE"
+endinstance
