@@ -1,3 +1,5 @@
+nanoscript qpudatashards/policies/CyboquaticEcosafetyProvenancePhoenix2026v1.aln
+
 schema CyboquaticEcosafetyProvenancePhoenix2026v1
   title "Provenance for Cyboquatic ecosafety envelopes (Phoenix)"
   description "Per-envelope provenance chain for ecosafety diagnostic frames."
