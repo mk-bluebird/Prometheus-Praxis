@@ -1,0 +1,26 @@
+# filename: cyboquatic-core/Cargo.toml
+# destination: github.com/mk-bluebird/Prometheus-Praxis
+
+[package]
+name = "cyboquatic-core"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
+csv = "1.3.0"
+
+[lib]
+name = "cyboquatic_core"
+path = "src/cyboquatic_index.rs"
+
+[[example]]
+name = "cyboquatic_region_geojson"
+path = "examples/cyboquatic_region_geojson.rs"
+
+[[example]]
+name = "phoenix_synthetic_risk_samples"
+path = "examples/phoenix_synthetic_risk_samples.rs"
