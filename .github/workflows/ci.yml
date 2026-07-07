@@ -1,0 +1,33 @@
+# filename: .github/workflows/ci.yml
+# destination: github.com/mk-bluebird/Prometheus-Praxis
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test-all-features:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-hack and cargo-deny
+        run: |
+          cargo install cargo-hack
+          cargo install cargo-deny
+      - name: Test all feature combinations with cargo-hack
+        run: |
+          cargo hack test --each-feature --exclude-features android,wasm --workspace
+      - name: Test workspace with important feature sets
+        run: |
+          cargo test --workspace --all-features
+          cargo test --workspace --features "full-cov"
+          cargo test --workspace --features "sqlite-storage"
+          cargo test --workspace --features "metrics"
+          cargo test --workspace --features "android"
+          cargo test --workspace --features "wasm"
+      - name: Audit dependencies with cargo-deny
+        run: |
+          cargo deny check
