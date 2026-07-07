@@ -1,0 +1,36 @@
+# File: crates/cain_air_node/Cargo.toml
+# License: MIT OR Apache-2.0
+# Rust edition: 2024
+# rust-version = "1.85"
+
+[package]
+name = "cain_air_node"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+authors = ["mk-bluebird <bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7>"]
+description = "CAIN air node mass-balance and ecosafety kernels for concurrent PM2.5 and NO2 capture in biochar-fiber media while irrigating plants."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+readme = "README.md"
+
+[lib]
+name = "cain_air_node"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+# No_std compatible; std feature can be enabled by workspace if needed.
+# No external runtime dependencies required for core mass-balance and ecosafety kernels. [file:50][file:51]
+
+[dev-dependencies]
+# Standard test framework is built into Rust; no additional dev-deps required. [file:51]
+
+[package.metadata.kani]
+# Kani verifier must be present and non-optional as per ecosafety constraints. [file:51]
+version = "0.67"
+enable = true
