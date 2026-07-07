@@ -33,6 +33,7 @@ members = [
     "crates/blastradius",
     "crates/bostrom-cli",
     "crates/bostrom-signer",
+    "crates/cain_placement_opt",
     "crates/cargo-blast-radius",
     "crates/city-pass",
     "crates/community-governance",
