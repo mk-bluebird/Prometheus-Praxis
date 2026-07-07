@@ -45,4 +45,8 @@ CREATE TABLE IF NOT EXISTS qpudatashard_water_quality (
 CREATE INDEX IF NOT EXISTS idx_qpudatashard_wq_node_window
   ON qpudatashard_water_quality (nodeid, windowendts);
 
+-- Secondary index for time-range scans across multiple nodes
+CREATE INDEX IF NOT EXISTS idx_qpudatashard_wq_window_end
+  ON qpudatashard_water_quality (windowendts);
+
 COMMIT;
