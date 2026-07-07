@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS blast_radius_index (
 );
 
 CREATE INDEX IF NOT EXISTS idx_blast_radius_vault
-  ON blast_radius_index (vault_nodeid);
+  ON blast_radius_index (vault_nodeid, breach_scenario_id);
 
 CREATE INDEX IF NOT EXISTS idx_blast_radius_reach
   ON blast_radius_index (reach_id);
