@@ -50,6 +50,7 @@ members = [
     "crates/datalake_core",
     "crates/definition_registry_checker",
     "crates/disaster-scenarios",
+    "crates/deployment_accountability_core",
     "crates/eco-chat-ffi",
     "crates/eco-governance-spine",
     "crates/eco-guard_spine",
