@@ -152,20 +152,24 @@ impl Frame<Option<BiodiversityInput>, Option<EcosafetyPipelineOutput>> for Biodi
 }
 
 /// Concrete three-stage composite type.
-pub type EcosafetyPipeline3 =
+///
+/// I = EcosafetyInputWindow
+/// M1 = (IntegrityOutput, Provenance)
+/// M2 = Option<BiodiversityInput>
+/// O = Option<EcosafetyPipelineOutput>
+pub type EcosafetyPipeline3 = CompositeFrame<
+    IntegrityStage,
     CompositeFrame<
-        IntegrityStage,
-        CompositeFrame<
-            CovarianceStage,
-            BiodiversityStage,
-            (IntegrityOutput, Provenance),
-            Option<BiodiversityInput>,
-            Option<EcosafetyPipelineOutput>,
-        >,
-        EcosafetyInputWindow,
+        CovarianceStage,
+        BiodiversityStage,
         (IntegrityOutput, Provenance),
+        Option<BiodiversityInput>,
         Option<EcosafetyPipelineOutput>,
-    >;
+    >,
+    EcosafetyInputWindow,
+    (IntegrityOutput, Provenance),
+    Option<EcosafetyPipelineOutput>,
+>;
 
 /// Helper constructor for the 3-stage pipeline.
 pub fn build_ecosafety_pipeline3(cfg: EcosafetyConfig, r_biodiv_warn: f32) -> EcosafetyPipeline3 {
