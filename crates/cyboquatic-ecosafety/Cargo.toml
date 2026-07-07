@@ -22,6 +22,8 @@ name = "migration_runner"
 path = "src/bin/migration_runner.rs"
 
 [features]
+privacy = []
+
 # Default: pure diagnostic core with no optional backends.
 default = []
 
