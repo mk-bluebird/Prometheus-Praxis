@@ -19,6 +19,7 @@ path = "src/lib.rs"
 [[bin]]
 name = "restorationindextool"
 path = "src/bin/restorationindextool.rs"
+required-feature = []
 
 [features]
 default = ["sqlite"]
