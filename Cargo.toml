@@ -62,6 +62,7 @@ members = [
     "crates/eco_restoration_index",
     "crates/eco_restoration_shard",
     "crates/eco_restoration_shard_config",
+    "crates/eco_restoration_shard_core",
     "crates/ecocybo_planner",
     "crates/econet-governance-summary",
     "crates/econet-index",
