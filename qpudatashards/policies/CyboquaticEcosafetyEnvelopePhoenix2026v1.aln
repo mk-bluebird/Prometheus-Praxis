@@ -1,0 +1,55 @@
+nanoscript qpudatashards/policies/CyboquaticEcosafetyEnvelopePhoenix2026v1.aln
+
+schema CyboquaticEcosafetyEnvelopePhoenix2026v1
+  title "Cyboquatic ecosafety envelope metrics and gating for Phoenix nodes"
+  description "Mahalanobis-like ecosafety distance and covariance quality for Cyboquatic nodes, used as non-actuating governance predicates."
+  version "2026v1"
+  category "POLICY"
+
+particle CyboNodeEcosafetyEnvelopeV1
+  role "QPUDATASHARD"
+  version "2026v1"
+  description "Per-node ecosafety envelope metrics derived from risk-coordinate covariance over a rolling window."
+
+  # Identity and time window
+  field nodeid           string   # matches nodeid in hydro-eco shards
+  field region           string   # e.g., 'Phoenix-AZ'
+  field medium           string   # 'canal','wetland','river','reservoir'
+  field window_start_utc datetime
+  field window_end_utc   datetime
+
+  # Risk coordinate subset used for covariance (for transparency)
+  field r_pfas_mean          float64
+  field r_cec_mean           float64
+  field r_trap_fish_mean     float64
+  field r_trap_amphib_mean   float64
+  field r_sat_mean           float64
+  field r_surcharge_mean     float64
+  field r_biodiv_mean        float64
+
+  # Ecosafety covariance metrics
+  field samples_used             uint32    # number of samples in window
+  field cov_condition_number     float32   # condition number of covariance estimate
+  field cov_regularized          bool      # true if fallback regularization applied
+
+  # Ecosafety distance (Mahalanobis-like, unitless)
+  # This is the distance between the latest risk vector and the window mean
+  field ecosafety_distance       float32   # sqrt( (x - mu)^T Sigma^-1 (x - mu) )
+  field ecosafety_distance_sq    float32   # squared distance for cheap comparisons
+
+  # Thresholds and governance view (can be region- or node-specific)
+  field d_warn_threshold         float32   # advisory threshold
+  field d_max_threshold          float32   # hard gating threshold
+  field ecosafety_status         string    # 'GREEN','WARN','RED','UNDEFINED'
+
+  # Link to Lyapunov residual and lanes for auditability
+  field vt_at_window_end         float32
+  field lane                     string    # 'EXP','PROD','QUAR'
+  field kerdeployable            bool
+
+  # Provenance and KER for this envelope record
+  field evidencehex              string    # hex stamp linking to calibration/proof bundle
+  field kfactor                  float32   # Knowledge score for this envelope config
+  field efactor                  float32   # Eco-impact score
+  field rfactor                  float32   # Risk-of-harm score
+  field signingdid               string    # DID of signer (e.g., Bostrom DID)
