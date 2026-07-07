@@ -1,4 +1,4 @@
-//! Three‑stage ecosafety pipeline:
+//! Three-stage ecosafety pipeline:
 //! IntegrityCheckFrame → EcosafetyCovarianceFrame → BiodiversityFrame
 //!
 //! The final output is an envelope plus a provenance chain describing
@@ -10,6 +10,7 @@ use crate::ecosafety_covariance_frame::{EcosafetyCovarianceFrame, EcosafetyInput
 use crate::frame::{CompositeFrame, Frame};
 use crate::integrity_frame::{IntegrityCheckFrame, IntegrityOutput};
 use crate::provenance::{Provenance, ProvenanceStep};
+use crate::provenance_detail::ProvenanceDetail;
 use crate::types::CyboNodeEcosafetyEnvelope;
 
 /// Final output: envelope plus provenance chain.
@@ -20,12 +21,10 @@ pub struct EcosafetyPipelineOutput {
 }
 
 impl EcosafetyPipelineOutput {
-    /// Envelope accessor.
     pub fn envelope(&self) -> &CyboNodeEcosafetyEnvelope {
         &self.envelope
     }
 
-    /// Provenance accessor.
     pub fn provenance(&self) -> &Provenance {
         &self.provenance
     }
@@ -35,29 +34,30 @@ impl EcosafetyPipelineOutput {
 #[derive(Clone, Debug)]
 pub struct IntegrityStage {
     inner: IntegrityCheckFrame,
+    cfg: EcosafetyConfig,
 }
 
 impl IntegrityStage {
     pub fn new(cfg: EcosafetyConfig) -> Self {
         Self {
-            inner: IntegrityCheckFrame::new(cfg),
+            inner: IntegrityCheckFrame::new(cfg.clone()),
+            cfg,
         }
     }
 }
 
 impl Frame<EcosafetyInputWindow, (IntegrityOutput, Provenance)> for IntegrityStage {
     fn evaluate(&self, input: &EcosafetyInputWindow) -> (IntegrityOutput, Provenance) {
+        let samples = input.samples();
         let out = self.inner.evaluate(input);
 
         let mut provenance = Provenance::new();
-        let detail = match &out {
-            Some(_) => "integrity_ok",
-            None => "integrity_rejected",
+        let detail = ProvenanceDetail::Integrity {
+            min_samples: self.cfg.min_samples,
+            samples_present: samples.len(),
+            accepted: out.is_some(),
         };
-        provenance.push(ProvenanceStep::new(
-            "IntegrityCheckFrame",
-            detail.to_string(),
-        ));
+        provenance.push(ProvenanceStep::new("IntegrityCheckFrame", &detail));
 
         (out, provenance)
     }
@@ -84,10 +84,13 @@ impl Frame<(IntegrityOutput, Provenance), Option<BiodiversityInput>> for Covaria
         let window = match integrity_out {
             Some(w) => w,
             None => {
-                provenance.push(ProvenanceStep::new(
-                    "EcosafetyCovarianceFrame",
-                    "skipped_due_to_integrity".to_string(),
-                ));
+                let detail = ProvenanceDetail::Covariance {
+                    ecosafety_status: "SKIPPED".to_string(),
+                    ecosafety_distance: 0.0,
+                    samples_used: 0,
+                    cov_condition_number: f32::INFINITY,
+                };
+                provenance.push(ProvenanceStep::new("EcosafetyCovarianceFrame", &detail));
                 return None;
             }
         };
@@ -95,23 +98,23 @@ impl Frame<(IntegrityOutput, Provenance), Option<BiodiversityInput>> for Covaria
         let envelope_opt = self.inner.evaluate(&window);
         match envelope_opt {
             Some(env) => {
-                let detail = format!(
-                    "status={}, d={:.4}, samples_used={}",
-                    env.ecosafety_status(),
-                    env.ecosafety_distance(),
-                    env.samples_used()
-                );
-                provenance.push(ProvenanceStep::new(
-                    "EcosafetyCovarianceFrame",
-                    detail,
-                ));
+                let detail = ProvenanceDetail::Covariance {
+                    ecosafety_status: env.ecosafety_status().to_string(),
+                    ecosafety_distance: env.ecosafety_distance(),
+                    samples_used: env.samples_used(),
+                    cov_condition_number: env.cov_condition_number(),
+                };
+                provenance.push(ProvenanceStep::new("EcosafetyCovarianceFrame", &detail));
                 Some(BiodiversityInput::new(env, provenance))
             }
             None => {
-                provenance.push(ProvenanceStep::new(
-                    "EcosafetyCovarianceFrame",
-                    "no_envelope".to_string(),
-                ));
+                let detail = ProvenanceDetail::Covariance {
+                    ecosafety_status: "NO_ENVELOPE".to_string(),
+                    ecosafety_distance: 0.0,
+                    samples_used: 0,
+                    cov_condition_number: f32::INFINITY,
+                };
+                provenance.push(ProvenanceStep::new("EcosafetyCovarianceFrame", &detail));
                 None
             }
         }
@@ -148,22 +151,23 @@ impl Frame<Option<BiodiversityInput>, Option<EcosafetyPipelineOutput>> for Biodi
     }
 }
 
-/// Concrete three‑stage composite type.
-///
-/// I = EcosafetyInputWindow  
-/// M1 = (IntegrityOutput, Provenance)  
-/// M2 = Option<BiodiversityInput>  
-/// O = Option<EcosafetyPipelineOutput>
+/// Concrete three-stage composite type.
 pub type EcosafetyPipeline3 =
     CompositeFrame<
         IntegrityStage,
-        CompositeFrame<CovarianceStage, BiodiversityStage, (IntegrityOutput, Provenance), Option<BiodiversityInput>, Option<EcosafetyPipelineOutput>>,
+        CompositeFrame<
+            CovarianceStage,
+            BiodiversityStage,
+            (IntegrityOutput, Provenance),
+            Option<BiodiversityInput>,
+            Option<EcosafetyPipelineOutput>,
+        >,
         EcosafetyInputWindow,
         (IntegrityOutput, Provenance),
         Option<EcosafetyPipelineOutput>,
     >;
 
-/// Helper constructor for the 3‑stage pipeline.
+/// Helper constructor for the 3-stage pipeline.
 pub fn build_ecosafety_pipeline3(cfg: EcosafetyConfig, r_biodiv_warn: f32) -> EcosafetyPipeline3 {
     let stage1 = IntegrityStage::new(cfg.clone());
     let stage2 = CovarianceStage::new(cfg);
