@@ -8,7 +8,8 @@ use core::fmt;
 /// Scalar for ecosafety math.
 pub type Scalar = f64;
 
-/// Minimal per-operator ecosafety statistics that can be shared in masked form.
+/// Minimal per-node ecosafety statistics that operators are allowed to share
+/// in masked form.
 #[derive(Debug, Clone)]
 pub struct LocalRiskStats {
     pub sample_count: u64,
@@ -26,50 +27,6 @@ impl LocalRiskStats {
     }
 }
 
-/// Configuration for differential-privacy over ecosafety statistics.
-#[derive(Debug, Clone)]
-pub struct DpConfig {
-    pub epsilon: Scalar,
-    pub delta: Scalar,
-    pub max_risk: Scalar,
-}
-
-/// Interface for Laplace noise generation; caller supplies the RNG.
-pub trait LaplaceSampler {
-    fn sample_laplace(&mut self, scale: Scalar) -> Scalar;
-}
-
-/// Differential-privacy protected global statistics.
-#[derive(Debug, Clone)]
-pub struct DpGlobalRiskStats {
-    pub sample_count: u64,
-    pub mean_risk_dp: Scalar,
-    pub variance_risk_dp: Scalar,
-}
-
-pub fn apply_dp_to_global_stats<S: LaplaceSampler>(
-    base: &GlobalRiskStats,
-    cfg: &DpConfig,
-    sampler: &mut S,
-) -> DpGlobalRiskStats {
-    let n = base.sample_count.max(1) as Scalar;
-
-    let sensitivity_mean = cfg.max_risk / n;
-    let scale_mean = sensitivity_mean / cfg.epsilon.max(1e-9);
-
-    let sensitivity_var = cfg.max_risk * cfg.max_risk / n;
-    let scale_var = sensitivity_var / cfg.epsilon.max(1e-9);
-
-    let mean_dp = base.mean_risk + sampler.sample_laplace(scale_mean);
-    let var_dp = (base.variance_risk + sampler.sample_laplace(scale_var)).max(0.0);
-
-    DpGlobalRiskStats {
-        sample_count: base.sample_count,
-        mean_risk_dp: mean_dp,
-        variance_risk_dp: var_dp,
-    }
-}
-
 /// A single additive share of a local statistics triple.
 #[derive(Debug, Clone, Copy)]
 pub struct RiskShare {
@@ -78,7 +35,10 @@ pub struct RiskShare {
     pub sum_risk_sq_share: Scalar,
 }
 
-/// Generate additive shares for a single operator.
+/// Deterministic share generator for a single operator.
+///
+/// The caller must provide `parties - 1` random tuples; the final share is
+/// computed so that the sum of all shares equals the original stats.
 pub fn make_risk_shares(
     local: &LocalRiskStats,
     parties: usize,
@@ -118,6 +78,8 @@ pub fn make_risk_shares(
 }
 
 /// Aggregated shares at a single aggregator.
+///
+/// Each aggregator receives exactly one share per operator.
 #[derive(Debug, Clone, Default)]
 pub struct AggregatedShares {
     pub sample_count_sum: i128,
@@ -133,7 +95,8 @@ impl AggregatedShares {
     }
 }
 
-/// Final aggregated, non-private statistics reconstructed after combining all aggregators.
+/// Final aggregated, non-private statistics reconstructed after all aggregators
+/// combine their local AggregatedShares.
 #[derive(Debug, Clone)]
 pub struct GlobalRiskStats {
     pub sample_count: u64,
@@ -151,6 +114,7 @@ impl fmt::Display for GlobalRiskStats {
     }
 }
 
+/// Combine summed shares from all aggregators into final global stats.
 pub fn reconstruct_global_stats(total: &AggregatedShares) -> Option<GlobalRiskStats> {
     if total.sample_count_sum <= 0 {
         return None;
@@ -165,4 +129,55 @@ pub fn reconstruct_global_stats(total: &AggregatedShares) -> Option<GlobalRiskSt
         mean_risk: mean,
         variance_risk: var,
     })
+}
+
+/// Differential-privacy configuration for ecosafety statistics.
+#[derive(Debug, Clone)]
+pub struct DpConfig {
+    pub epsilon: Scalar,
+    pub delta: Scalar,
+    pub max_risk: Scalar,
+}
+
+/// Laplace noise generator interface.
+///
+/// The caller must supply a concrete sampler; this keeps the crate
+/// independent of any specific RNG implementation.
+pub trait LaplaceSampler {
+    fn sample_laplace(&mut self, scale: Scalar) -> Scalar;
+}
+
+/// DP-protected global statistics.
+#[derive(Debug, Clone)]
+pub struct DpGlobalRiskStats {
+    pub sample_count: u64,
+    pub mean_risk_dp: Scalar,
+    pub variance_risk_dp: Scalar,
+}
+
+/// Apply differential privacy to global risk statistics.
+///
+/// This function leaves actuation decisions to higher governance layers;
+/// it only produces DP-protected aggregates for reporting and overlays.
+pub fn apply_dp_to_global_stats<S: LaplaceSampler>(
+    base: &GlobalRiskStats,
+    cfg: &DpConfig,
+    sampler: &mut S,
+) -> DpGlobalRiskStats {
+    let n = base.sample_count.max(1) as Scalar;
+
+    let sensitivity_mean = cfg.max_risk / n;
+    let scale_mean = sensitivity_mean / cfg.epsilon.max(1e-9);
+
+    let sensitivity_var = cfg.max_risk * cfg.max_risk / n;
+    let scale_var = sensitivity_var / cfg.epsilon.max(1e-9);
+
+    let mean_dp = base.mean_risk + sampler.sample_laplace(scale_mean);
+    let var_dp = (base.variance_risk + sampler.sample_laplace(scale_var)).max(0.0);
+
+    DpGlobalRiskStats {
+        sample_count: base.sample_count,
+        mean_risk_dp: mean_dp,
+        variance_risk_dp: var_dp,
+    }
 }
