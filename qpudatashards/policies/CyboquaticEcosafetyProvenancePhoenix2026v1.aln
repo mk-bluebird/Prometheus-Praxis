@@ -1,0 +1,21 @@
+schema CyboquaticEcosafetyProvenancePhoenix2026v1
+  title "Provenance for Cyboquatic ecosafety envelopes (Phoenix)"
+  description "Per-envelope provenance chain for ecosafety diagnostic frames."
+  version "2026v1"
+  category "POLICY"
+
+particle CyboNodeEcosafetyProvenanceV1
+  role "QPUDATASHARD"
+  version "2026v1"
+  description "Audit trail of diagnostic frames that produced an ecosafety envelope."
+
+  field nodeid           string
+  field region           string
+  field window_start_utc datetime
+  field window_end_utc   datetime
+
+  field step_index       uint32      # 0..N-1 in order of execution
+  field frame_name       string      # e.g. 'IntegrityCheckFrame'
+  field detail           string      # human-readable details
+  field evidencehex      string      # link to envelope evidencehex
+  field signingdid       string      # DID responsible for this provenance submission
