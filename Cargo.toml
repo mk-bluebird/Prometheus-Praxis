@@ -17,6 +17,7 @@ members = [
 
     # ecorestorationshard sub-crates
     "ecorestorationshard/eco_restoration_shard_core",
+    "crates/cyboquatic-core",
 
     # C++ / mixed crates (Rust-compatible build roots if present)
     "cpp/EcoNetCentralAZ",
