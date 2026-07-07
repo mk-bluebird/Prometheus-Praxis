@@ -1,0 +1,68 @@
+alnversion 1.0
+schema Design.authorship.v1
+
+TITLE Design authorship particle binding a design kernel to Bostrom DID, KER triad, corridor footprint, invariants, and Kani proof hashes.
+
+particlefields
+  field designkernelid        string   required
+  field designversion         string   required
+  field designauthorid        string   required  // Bostrom DID, e.g. bostrom18sd2...
+  field domain                enum     required  // cyboquatic, cybocinder, biopack
+
+  field ker_K                 float    required  // Knowledge-factor
+  field ker_E                 float    required  // Eco-impact
+  field ker_R                 float    required  // Risk-of-harm
+
+  field ncorridors            integer  required  // number of corridor rows touched
+  field nverifiedinvariants   integer  required  // discrete invariants proved (Rust+Kani)
+
+  field kani_proof_hashes     array    required  // list of hex strings, one per Kani proof
+  field repo_path             string   required  // mono-repo crate path, e.g. crates/tailwind_fsm
+  field commit_hash           string   required  // git SHA for the verified revision
+  field ecosafety_core_dep    string   required  // version of ecosafety core, e.g. ecosafety-core-v2.0.0
+  field evidencehex           string   required  // hex stamp binding DID, repo, commit, proofs
+endparticlefields
+
+domainenum
+  value cyboquatic
+  value cybocinder
+  value biopack
+enddomainenum
+
+constraints
+  constraint KER_bounds
+    ker_K >= 0.80
+    ker_K <= 1.00
+    ker_E >= 0.80
+    ker_E <= 1.00
+    ker_R >= 0.00
+    ker_R <= 0.50
+  endconstraint
+
+  constraint Author_DID_format
+    designauthorid prefix "bostrom"
+    designauthorid length >= 10
+  endconstraint
+
+  constraint KaniProofs_nonempty
+    len(kani_proof_hashes) >= 1
+  endconstraint
+
+  constraint Corridors_nonnegative
+    ncorridors >= 0
+  endconstraint
+
+  constraint Invariants_nonnegative
+    nverifiedinvariants >= 0
+  endconstraint
+endconstraints
+
+validationhooks
+  hook RustKaniCrateValidation
+    lang rust
+    crate ecosafety-design-authorship
+    fn validate_design_authorship_particle
+  endhook
+endvalidationhooks
+
+endtext
