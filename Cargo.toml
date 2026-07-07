@@ -137,6 +137,7 @@ members = [
     "crates/zoning-shards",
     "crates/cyboquatic_progress/20260705_crate",
     "crates/school_zone_mapper",
+    "crates/tailwind_fsm",
 ]
 
 resolver = "2"
