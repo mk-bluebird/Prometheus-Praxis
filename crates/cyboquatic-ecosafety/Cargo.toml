@@ -1,0 +1,19 @@
+[package]
+name = "cyboquatic-ecosafety"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "KER-aware ecosafety core for Cyboquatic nodes in Phoenix, 2026"
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+
+[dependencies]
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = "1.0.120"
+
+[features]
+default = []
+
+[lib]
+name = "cyboquatic_ecosafety"
+path = "src/lib.rs"
