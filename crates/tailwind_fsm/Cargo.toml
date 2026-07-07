@@ -1,0 +1,12 @@
+// Filename: crates/tailwind_fsm/Cargo.toml
+[package]
+name = "tailwind_fsm"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+
+[dependencies]
+serde = { version = "1.0.203", features = ["derive"] }
+
+[dev-dependencies]
+kani = "0.67.0"
