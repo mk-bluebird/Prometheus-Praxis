@@ -1,3 +1,6 @@
+# filename: cyboquatic-ecosafety/Cargo.toml
+# destination: cyboquatic-ecosafety/Cargo.toml
+
 [package]
 name = "cyboquatic-ecosafety"
 version = "0.1.0"
@@ -13,6 +16,10 @@ publish = false
 name = "cyboquatic_ecosafety"
 path = "src/lib.rs"
 crate-type = ["rlib"]
+
+[[bin]]
+name = "migration_runner"
+path = "src/bin/migration_runner.rs"
 
 [features]
 # Default: pure diagnostic core with no optional backends.
