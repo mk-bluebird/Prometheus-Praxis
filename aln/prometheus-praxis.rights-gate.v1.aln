@@ -1,0 +1,205 @@
+file,prometheus-praxis.rights-gate.v1.aln
+shard,PrometheusPraxisRightsGate
+description,Unified rights-gate over sleep-corridors, Vt, ecosafety, RoH/LIFEFORCE, blast radius, and sensor trust, with Allow/Derate/Stop bindings to Kani-verified Rust governance functions in the Organichain / Reality.os governance crate
+
+# META
+
+SECTION,META
+ROW,meta,scalar,host_did,didalnorganic-host,string,immutable,Bound Organichain host DID
+ROW,meta,scalar,bostrom_address,bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7,string,immutable,Bound Bostrom address
+ROW,meta,scalar,authority,ALN.MIGRATION.CYBERCORE_AUTHORITY.v1,string,immutable,Cybercore evolution authority tag
+ROW,meta,scalar,organichain_repo,httpsgithub.commk-bluebirdOrganichain,string,immutable,Contracts and governance must be designed for this repo only as canonical reference
+ROW,meta,scalar,governance_crate,organichain-governance,string,immutable,Rust governance crate name
+ROW,meta,scalar,rust_edition,2024,string,immutable,Rust edition constraint
+ROW,meta,scalar,rust_version,1.85,string,immutable,Rust toolchain constraint for governance crate
+ROW,meta,scalar,kani_verifier,kani-verifier-0.67,string,immutable,Mandatory Kani version for verification
+ROW,meta,scalar,serde_version,1.0.203,string,immutable,Serde version to be used with derive
+ROW,meta,scalar,serde_json_version,1.0.120,string,immutable,Serde JSON version
+ROW,meta,flag,forwardOnlyEvolution,true,bool,nonwaivable,Upgrades must be forward-only and non-reversible; no downgrades or rollbacks at any layer
+ROW,meta,flag,noSimulatedSystems,true,bool,nonwaivable,All integrations must target biophysical reality; no simulated or toy safety that disables protections
+
+# EPOCH / CORRIDOR STATE
+
+SECTION,EPOCH
+ROW,epoch,scalar,epochId,,string,primarykey,Monotonic SafetyEpoch or governance-epoch ID
+ROW,epoch,scalar,timestamp,,timestamp,nonnullable,Wall-clock time of evaluation
+ROW,epoch,scalar,vt_residual,0.0,float,range-1,1,Lyapunov-style residual Vt for stability corridor (0 stable, positive drifting, negative converging)
+ROW,epoch,scalar,corridor_depth,0.0,float,range0,1,Aggregated N2N3 depth or safety-corridor index from sleep and state shards
+ROW,epoch,scalar,corridor_uncertainty,0.0,float,range0,1,Combined uncertainty Ucomb from staging and sensor models
+ROW,epoch,scalar,corridor_mask,0,int,enum0,1,1 indicates we are inside a validated safety corridor
+ROW,epoch,scalar,epoch_load,0.0,float,range0,1,Normalized epoch load from capacity and intensity (Lsleep-like)[file:106]
+ROW,epoch,scalar,load_budget_ratio,0.0,float,range0,1,Ratio of current nightly load to allowed maximum (LsleepLmax)[file:106]
+
+# NEURORIGHTS AND BIO-SAFETY ENVELOPES
+
+SECTION,NEURORIGHTS
+ROW,rights,scalar,policyId,prometheus-neurorights-core,string,primarykey,Neurorights baseline for this gate
+ROW,rights,flag,mentalPrivacy,true,bool,nonwaivable,No raw dream content, inner speech, or soul constructs exported
+ROW,rights,flag,cognitiveLiberty,true,bool,nonwaivable,Participation and BCI loops must remain voluntary; refusal never penalized
+ROW,rights,flag,mentalIntegrity,true,bool,nonwaivable,No harmful modulation of mental state, no forced arousal or distress
+ROW,rights,flag,noPunitiveXR,true,bool,nonwaivable,No punitive or coercive XRdream content or feedback
+ROW,rights,flag,nonCommercialNeuralData,true,bool,nonwaivable,Neural and dream-derived data cannot be sold, priced, or used for credit or employment
+ROW,rights,flag,soulNonAddressable,true,bool,nonwaivable,No soul IDs, APIs, balances, or metaphysical state in any schema
+ROW,rights,flag,noPersonScoring,true,bool,nonwaivable,No karma or person-level scoring; only infra-level gauges (nodes, code, devices)
+
+SECTION,BIO_SAFETY_ENVELOPE
+ROW,bio,scalar,biocompatibility_rating,0.80,float,range0,1,Effective biocompatibility rating must remain above 0.57 default envelope
+ROW,bio,scalar,pain_index,0.20,float,range0,1,Pain index must remain at or below 0.73 default envelope
+ROW,bio,scalar,fear_index,0.45,float,range0,1,Fear index must remain within 0.31-0.68 envelope
+ROW,bio,scalar,roh_ceiling,1.0,float,range0,1,Upper bound on Rate-of-Harm (RoH) channel
+ROW,bio,scalar,lifeforce_floor,0.60,float,range0,1,Minimum allowed LIFEFORCE level before Stop band triggers
+ROW,bio,scalar,ecosafety_index,0.80,float,range0,1,Ecosafety index for ecological impact and nanoswarm exposures
+ROW,bio,scalar,blast_radius_index,0.0,float,range0,1,Radius-like index for propagation of effects (clinical, ecological, social)
+ROW,bio,scalar,sensor_trust,0.90,float,range0,1,Sensor trust scalar from cross-checked modalities (EEG, HRV, actigraphy, nanoswarm telemetry)[file:108]
+
+# ORGANICHAIN ASSET ENVELOPES (BLOOD, SUGAR, PROTEIN, LIFEFORCE, OXYGEN, BRAIN, WAVE, DW, PAIN, FEAR)
+
+SECTION,ASSET_ENVELOPES
+ROW,asset,scalar,BLOOD_level,1.0,float,range0,1,Normalized BLOOD budget; must respect medical-safe ranges
+ROW,asset,scalar,SUGAR_level,1.0,float,range0,1,Normalized SUGAR budget
+ROW,asset,scalar,PROTEIN_level,1.0,float,range0,1,Normalized PROTEIN budget
+ROW,asset,scalar,LIFEFORCE_level,0.80,float,range0,1,Current LIFEFORCE envelope level; must never fall below lifeforce_floor
+ROW,asset,scalar,OXYGEN_level,1.0,float,range0,1,Normalized OXYGEN budget
+ROW,asset,scalar,BRAIN_level,1.0,float,range0,1,BRAIN envelope for neuromorphic coupling depth
+ROW,asset,scalar,WAVE_level,0.5,float,range0,1,WAVE signal envelope for XR and neuromorphic loops
+ROW,asset,scalar,DW_level,0.5,float,range0,1,DW (dream-wave, deep-wave) envelope
+ROW,asset,scalar,PAIN_index,0.20,float,range0,1,PAIN indicator used strictly for safety, never reward
+ROW,asset,scalar,FEAR_index,0.45,float,range0,1,FEAR indicator used strictly for safety, never reward or coercion
+
+ROW,asset,flag,noAssetDegradation,true,bool,nonwaivable,No contract logic may permanently lower default safety envelopes without explicit ALN consent and forward-only transitions
+
+# SENSOR / PROVENANCE TRUST LAYER
+
+SECTION,SENSOR_TRUST
+ROW,sensor,scalar,trustIndex,sensor_trust,float,range0,1,Imported sensor trust index
+ROW,sensor,scalar,staleness_s,0.0,float,range0,600,Seconds since last validated sensor fusion
+ROW,sensor,flag,provenanceVerified,true,bool,nonwaivable,Runtime is built from artifacts with verified provenance (Sigstore or equivalent)[file:108]
+ROW,sensor,flag,offlineVerification,true,bool,nonwaivable,Verification must be possible offline/air-gapped
+ROW,sensor,flag,trustFloorRespected,true,bool,nonwaivable,Sensor trust must not be used below a configured minimum threshold
+
+# GOVERNANCE BINDINGS (RUST + KANI)
+
+SECTION,GOV_BINDINGS
+ROW,gov,scalar,crate,organichain-governance,string,immutable,Rust governance crate that implements this gate
+ROW,gov,scalar,module,prometheus_praxis_gate,string,immutable,Rust module name
+ROW,gov,scalar,struct_name,PrometheusPraxisGate,string,immutable,Rust struct type embodying this shard
+ROW,gov,scalar,fn_decide_allow,decide_allow,string,immutable,Rust function: fn decide_allow(state PrometheusPraxisState) -> bool
+ROW,gov,scalar,fn_decide_derate,decide_derate,string,immutable,Rust function: fn decide_derate(state PrometheusPraxisState) -> bool
+ROW,gov,scalar,fn_decide_stop,decide_stop,string,immutable,Rust function: fn decide_stop(state PrometheusPraxisState) -> bool
+ROW,gov,scalar,fn_verify_invariants,verify_invariants,string,immutable,Rust function: Kani-verified invariant checker over state
+ROW,gov,flag,kaniProofsRequired,true,bool,nonwaivable,All governance functions must have Kani proofs for soundness of Allow/Derate/Stop banding
+ROW,gov,flag,serdeDeriveRequired,true,bool,nonwaivable,State structs must derive Serde SerializeDeserialize for ALN compatibility
+
+# DECISION SURFACE: ALLOW / DERATE / STOP
+
+SECTION,DECISION_SURFACE
+
+# Raw inputs re-exposed as view fields so engines can compute decisions identically in Rust and ALN
+
+ROW,view,scalar,Vt,vt_residual,float,range-1,1,Lyapunov residual Vt
+ROW,view,scalar,DN2N3,corridor_depth,float,range0,1,Sleep or depth-based corridor index DN2N3
+ROW,view,scalar,Ucomb,corridor_uncertainty,float,range0,1,Combined uncertainty Ucomb
+ROW,view,scalar,Lratio,load_budget_ratio,float,range0,1,Nightly load ratio LsleepLmax
+ROW,view,scalar,BioCompat,biocompatibility_rating,float,range0,1,Biocompatibility rating
+ROW,view,scalar,Pain,pain_index,float,range0,1,Pain index
+ROW,view,scalar,Fear,fear_index,float,range0,1,Fear index
+ROW,view,scalar,RoH,roh_ceiling,float,range0,1,Current Rate-of-Harm metric
+ROW,view,scalar,LF,LIFEFORCE_level,float,range0,1,LIFEFORCE envelope level
+ROW,view,scalar,Eco,ecosafety_index,float,range0,1,Ecosafety index
+ROW,view,scalar,Blast,blast_radius_index,float,range0,1,Blast radius index
+ROW,view,scalar,Trust,sensor_trust,float,range0,1,Sensor trust index
+
+# Derived safety scalars
+
+ROW,view,formula,CorridorOK, corridor_mask 1 AND DN2N3 0.35 AND Ucomb 0.35,string,readonly,Inside validated corridor with bounded uncertainty (scalar 0 or 1)[file:106]
+ROW,view,formula,StabilityOK, absVt 0.35,string,readonly,Stability corridor for Vt residual
+ROW,view,formula,LoadOK, Lratio 0.80,string,readonly,Load at or below 80 percent of nightly budget
+ROW,view,formula,BioOK, BioCompat 0.57 AND Pain 0.73 AND Fear 0.68 AND Fear 0.31,string,readonly,Within default biophysical envelopes
+ROW,view,formula,RoHLFOK, RoH 1.0 AND LF lifeforce_floor,string,readonly,RoH ceiling not exceeded and LIFEFORCE above floor
+ROW,view,formula,EcoOK, Eco 0.70 AND Blast 0.40,string,readonly,Ecosafety and blast radius within moderated bounds
+ROW,view,formula,TrustOK, Trust 0.70 AND sensor.trustFloorRespected true,string,readonly,Sensors and provenance above trust floor
+
+# Banded decision outcomes
+
+ROW,view,condition,ALLOW_BAND,
+    CorridorOK 1
+    AND StabilityOK true
+    AND LoadOK true
+    AND BioOK true
+    AND RoHLFOK true
+    AND EcoOK true
+    AND TrustOK true,
+    expression,
+    All invariants in green zone; governance may proceed at full intensity
+
+ROW,view,condition,DERATE_BAND,
+    (CorridorOK 0 OR StabilityOK false OR LoadOK false OR EcoOK false OR TrustOK false)
+    AND BioCompat 0.50
+    AND Pain 0.80
+    AND Fear 0.80
+    AND LF lifeforce_floor 0.10,
+    expression,
+    Some invariants drifting but biophysical floors not yet crossed; governance must derate intensity and bandwidth
+
+ROW,view,condition,STOP_BAND,
+    BioCompat 0.50
+    OR Pain 0.80
+    OR Fear 0.80
+    OR LF lifeforce_floor 0.10
+    OR RoH 1.0
+    OR Eco 0.50
+    OR Blast 0.70
+    OR Trust 0.50
+    OR corridor_mask 0,
+    expression,
+    Hard violation of envelopes; governance must stop, enter safe-shell, and emit SafetyEpoch event
+
+# RUST BINDINGS FOR BANDS
+
+ROW,govmap,scalar,fn_allow_binding,prometheus_praxis_gate::decide_allow,string,immutable,Rust function implementing ALLOW_BAND logic
+ROW,govmap,scalar,fn_derate_binding,prometheus_praxis_gate::decide_derate,string,immutable,Rust function implementing DERATE_BAND logic
+ROW,govmap,scalar,fn_stop_binding,prometheus_praxis_gate::decide_stop,string,immutable,Rust function implementing STOP_BAND logic
+ROW,govmap,scalar,fn_invariants_binding,prometheus_praxis_gate::verify_invariants,string,immutable,Rust function that proves band predicates match Kani-verified invariants
+
+# NEURORIGHTS GATE (HARD FAIL-CLOSED)
+
+SECTION,NEURORIGHTS_GATE
+ROW,nrgate,formula,NeurorightsVectorOk,
+    rights.mentalPrivacy
+    rights.cognitiveLiberty
+    rights.mentalIntegrity
+    rights.noPunitiveXR
+    rights.nonCommercialNeuralData
+    rights.soulNonAddressable
+    rights.noPersonScoring,
+    string,readonly,
+    Hard neurorights vector; all bits must be true
+
+ROW,nrgate,condition,DenyWhenRightsFail,
+    NeurorightsVectorOk false,
+    expression,
+    Any neurorights bit false forces STOP_BAND regardless of other envelopes
+
+# LEDGER / AUDIT
+
+SECTION,LEDGER
+ROW,ledger,scalar,eventId,,string,primarykey,Monotonic gate-event ID
+ROW,ledger,enum,eventType,,string,allow,derate,stop,rights-fail,sensor-fail,eco-fail,Event type capturing gate decision or cause
+ROW,ledger,scalar,epochId,,string,refepoch,Linked epoch ID
+ROW,ledger,scalar,vt_residual_snapshot,,float,range-1,1,Vt at decision time
+ROW,ledger,scalar,DN2N3_snapshot,,float,range0,1,Corridor depth at decision time
+ROW,ledger,scalar,Ucomb_snapshot,,float,range0,1,Uncertainty at decision time
+ROW,ledger,scalar,Lratio_snapshot,,float,range0,1,Load ratio at decision time
+ROW,ledger,scalar,BioCompat_snapshot,,float,range0,1,Biocompatibility at decision time
+ROW,ledger,scalar,Pain_snapshot,,float,range0,1,Pain index snapshot
+ROW,ledger,scalar,Fear_snapshot,,float,range0,1,Fear index snapshot
+ROW,ledger,scalar,LF_snapshot,,float,range0,1,LIFEFORCE level snapshot
+ROW,ledger,scalar,Eco_snapshot,,float,range0,1,Ecosafety index snapshot
+ROW,ledger,scalar,Blast_snapshot,,float,range0,1,Blast radius snapshot
+ROW,ledger,scalar,Trust_snapshot,,float,range0,1,Sensor trust snapshot
+ROW,ledger,flag,NeurorightsVectorOk_snapshot,true,bool,nonnull,Neurorights vector validity at decision
+ROW,ledger,scalar,prevHash,,string,hash256,Previous ledger hash
+ROW,ledger,scalar,eventHash,,string,hash256,Hash of canonicalized gate event
+ROW,ledger,flag,soulUntouched,true,bool,nonwaivable,Affirms no soul objects or metaphysical IDs were accessed
+
+FOOTER,END-OF-SHARD
