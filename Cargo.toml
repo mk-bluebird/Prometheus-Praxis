@@ -127,6 +127,7 @@ members = [
     "crates/vocab_guard",
     "crates/water_telemetry_ingest",
     "crates/zoning-shards",
+    "crates/cain_air_node",
 ]
 
 resolver = "2"
