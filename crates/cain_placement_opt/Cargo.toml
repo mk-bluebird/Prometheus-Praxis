@@ -1,0 +1,20 @@
+# ecorestoration_shard/crates/cain_placement_opt/Cargo.toml
+[package]
+name = "cain_placement_opt"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "Binary integer programming kernel for CAIN placement under eco-impact and heat-equity objectives."
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+
+[lib]
+name = "cain_placement_opt"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[dependencies]
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
+thiserror = "1.0.57"
+good_lp = "1.7.0"         # MILP/BIP modelling (pure Rust wrapper)
