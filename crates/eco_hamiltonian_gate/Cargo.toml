@@ -1,0 +1,13 @@
+// Filename: crates/eco_hamiltonian_gate/Cargo.toml
+[package]
+name = "eco_hamiltonian_gate"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+
+[dependencies]
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
+
+[dev-dependencies]
+kani = "0.67.0"
