@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Cyboquatic ALN Dashboard (Offline)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- All assets are local; no CDN -->
+  <script src="./sql-wasm.js"></script>
+  <script src="./chart.umd.js"></script>
+  <!-- If using chartjs-plugin-annotation locally, include it as well -->
+  <script src="./chartjs-plugin-annotation.min.js"></script>
+
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 1rem;
+      background: #050608;
+      color: #f5f7ff;
+    }
+    h1, h2 {
+      margin: 0.5rem 0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+      gap: 1.2rem;
+      margin-top: 1rem;
+    }
+    .panel {
+      background: #10121a;
+      border-radius: 10px;
+      padding: 0.75rem 0.75rem 1rem;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.04);
+    }
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+    .panel-header span {
+      font-size: 0.8rem;
+      color: #a0a4c0;
+    }
+    canvas {
+      width: 100% !important;
+      height: 260px !important;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.8rem;
+      align-items: center;
+    }
+    .controls label {
+      font-size: 0.82rem;
+      color: #c0c4e0;
+    }
+    .controls input {
+      background: #050608;
+      border-radius: 6px;
+      border: 1px solid #363b5a;
+      padding: 0.25rem 0.4rem;
+      color: #f5f7ff;
+      font-size: 0.85rem;
+      min-width: 60px;
+    }
+    .controls button {
+      border: 0;
+      border-radius: 6px;
+      background: #3648ff;
+      color: #f5f7ff;
+      padding: 0.3rem 0.7rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    .controls button:hover {
+      background: #4b5dff;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.75rem;
+      border-radius: 999px;
+      padding: 0.1rem 0.5rem;
+      background: rgba(54,72,255,0.16);
+      color: #c9ceff;
+    }
+    .badge-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: #45ffb0;
+    }
+    .status-line {
+      font-size: 0.75rem;
+      margin-top: 0.3rem;
+      color: #a0a4c0;
+    }
+    .status-line strong {
+      color: #ffc857;
+    }
+    .status-line span.violation {
+      color: #ff6a6a;
+    }
+    .heatmap-legend {
+      margin-top: 0.4rem;
+      font-size: 0.72rem;
+      color: #a0a4c0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Cyboquatic ALN Research Console (Offline)</h1>
+  <div class="controls">
+    <label>
+      Node ID:
+      <input type="text" id="nodeIdInput" value="PHX-CYBOFILT-01" />
+    </label>
+    <label>
+      Max Cycles:
+      <input type="number" id="maxCyclesInput" value="120" min="1" />
+    </label>
+    <label>
+      LIFEFORCE Floor:
+      <input type="number" step="0.01" id="lifeforceFloorInput" value="0.5" />
+    </label>
+    <label>
+      Rmat Max:
+      <input type="number" step="0.01" id="rmatMaxInput" value="0.8" />
+    </label>
+    <button id="reloadBtn">Reload Node</button>
+    <span class="badge">
+      <span class="badge-dot"></span>
+      offline / local‑only
+    </span>
+  </div>
+  <div id="status" class="status-line">Waiting for qpudatashard.db…</div>
+
+  <div class="grid">
+    <div class="panel">
+      <div class="panel-header">
+        <h2>Microplastic Load & Risk</h2>
+        <span>M_next & Rmat per cycle</span>
+      </div>
+      <canvas id="microChart"></canvas>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <h2>LIFEFORCE Corridor</h2>
+        <span>LIFEFORCE_next vs floor</span>
+      </div>
+      <canvas id="lifeforceChart"></canvas>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <h2>Lyapunov Residual Planes</h2>
+        <span>w · r² per plane</span>
+      </div>
+      <canvas id="lyapunovChart"></canvas>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <h2>Corridor Risk Heatmap</h2>
+        <span>cycle × risk coordinate</span>
+      </div>
+      <canvas id="heatmapChart"></canvas>
+      <div class="heatmap-legend">
+        0 = green, 1 = red, &gt; 1 = black (VIOLATION).
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <h2>KER Radar</h2>
+        <span>Deployability over time</span>
+      </div>
+      <canvas id="kerChart"></canvas>
+    </div>
+  </div>
+
+  <script>
+    // ---------------------------------------------------------------------
+    // 1. sqlite + ALN query utilities (read‑only)
+    // ---------------------------------------------------------------------
+    let SQL = null;
+    let cyboDb = null;
+
+    function getNodeHistory(db, nodeId, maxCycles) {
+      const stmt = db.prepare(
+        "SELECT * FROM qpudatashard WHERE node_id = :nodeId ORDER BY cycle_index LIMIT :maxC"
+      );
+      stmt.bind({ ":nodeId": nodeId, ":maxC": maxCycles });
+      const rows = [];
+      while (stmt.step()) {
+        rows.push(stmt.getAsObject());
+      }
+      stmt.free();
+      return rows;
+    }
+
+    function getLatestCycle(db, nodeId) {
+      const stmt = db.prepare(
+        "SELECT * FROM qpudatashard WHERE node_id = :nodeId ORDER BY cycle_index DESC LIMIT 1"
+      );
+      stmt.bind({ ":nodeId": nodeId });
+      let latest = null;
+      if (stmt.step()) {
+        latest = stmt.getAsObject();
+      }
+      stmt.free();
+      return latest;
+    }
+
+    function computeLyapunovResidual(riskVector, weights) {
+      let V = 0;
+      for (const key in weights) {
+        const r = Number(riskVector[key]);
+        if (!Number.isNaN(r)) {
+          V += weights[key] * r * r;
+        }
+      }
+      return V;
+    }
+
+    function checkInvariants(prevState, nextState) {
+      const issues = [];
+      if (nextState.Vt > prevState.Vt + 1e-9) {
+        issues.push(
+          "Safestep violated: Vt increased from " +
+          prevState.Vt.toFixed(4) + " to " +
+          nextState.Vt.toFixed(4)
+        );
+      }
+      if (nextState.LIFEFORCE < nextState.LIFEFORCE_floor) {
+        issues.push(
+          "LIFEFORCE below floor: " +
+          nextState.LIFEFORCE.toFixed(4) + " < " +
+          nextState.LIFEFORCE_floor.toFixed(4)
+        );
+      }
+      const corridors = [
+        "Rmat",
+        "r_heat_local",
+        "r_surcharge_head",
+        "r_pathogen_conc",
+        "r_cec_conc"
+      ];
+      for (const key of corridors) {
+        const v = Number(nextState[key]);
+        if (v > 1.0) {
+          issues.push(
+            "Corridor " + key +
+            " exceeded hard bound: " +
+            v.toFixed(4) + " > 1.0"
+          );
+        }
+      }
+      return issues;
+    }
+
+    class CyboquaticNode {
+      constructor(nodeId, db) {
+        this.nodeId = nodeId;
+        this.db = db;
+      }
+
+      history(maxCycles) {
+        return getNodeHistory(this.db, this.nodeId, maxCycles);
+      }
+
+      latest() {
+        return getLatestCycle(this.db, this.nodeId);
+      }
+
+      riskVector(cycleIndex) {
+        const stmt = this.db.prepare(
+          "SELECT Rmat, r_heat_local, r_surcharge_head, r_pathogen_conc, r_cec_conc FROM qpudatashard WHERE node_id = :nid AND cycle_index = :cyc"
+        );
+        stmt.bind({ ":nid": this.nodeId, ":cyc": cycleIndex });
+        let obj = null;
+        if (stmt.step()) {
+          obj = stmt.getAsObject();
+        }
+        stmt.free();
+        return obj;
+      }
+
+      lifeforceRow(cycleIndex) {
+        const stmt = this.db.prepare(
+          "SELECT LIFEFORCE_next, LIFEFORCE_floor FROM qpudatashard WHERE node_id = :nid AND cycle_index = :cyc"
+        );
+        stmt.bind({ ":nid": this.nodeId, ":cyc": cycleIndex });
+        let obj = null;
+        if (stmt.step()) {
+          obj = stmt.getAsObject();
+        }
+        stmt.free();
+        return obj;
+      }
+
+      checkTransition(cyclePrev, cycleNext, weights, lifeforceFloorOverride) {
+        const riskPrev = this.riskVector(cyclePrev);
+        const riskNext = this.riskVector(cycleNext);
+        if (!riskPrev || !riskNext) {
+          return ["Missing cycle data for transition " + cyclePrev + " → " + cycleNext];
+        }
+        const prevVt = computeLyapunovResidual(riskPrev, weights);
+        const nextVt = computeLyapunovResidual(riskNext, weights);
+        const lfPrev = this.lifeforceRow(cyclePrev);
+        const lfNext = this.lifeforceRow(cycleNext);
+        if (!lfPrev || !lfNext) {
+          return ["Missing LIFEFORCE rows for transition " + cyclePrev + " → " + cycleNext];
+        }
+        const prevState = {
+          Vt: prevVt,
+          LIFEFORCE: Number(lfPrev.LIFEFORCE_next)
+        };
+        const floor = lifeforceFloorOverride != null
+          ? Number(lifeforceFloorOverride)
+          : Number(lfNext.LIFEFORCE_floor);
+        const nextState = {
+          Vt: nextVt,
+          LIFEFORCE: Number(lfNext.LIFEFORCE_next),
+          LIFEFORCE_floor: floor,
+          ...riskNext
+        };
+        return checkInvariants(prevState, nextState);
+      }
+    }
+
+    window.CyboquaticQuery = {
+      getNode: function (nodeId) {
+        if (!cyboDb) {
+          throw new Error("Database not initialized");
+        }
+        return new CyboquaticNode(nodeId, cyboDb);
+      },
+      computeResidual: computeLyapunovResidual,
+      checkInvariants: checkInvariants
+    };
+
+    // ---------------------------------------------------------------------
+    // 2. Chart helpers (Chart.js 4+, all local)
+    // ---------------------------------------------------------------------
+    let microChart = null;
+    let lifeforceChart = null;
+    let lyapunovChart = null;
+    let heatmapChart = null;
+    let kerChart = null;
+
+    function destroyIfExists(chart) {
+      if (chart) {
+        chart.destroy();
+      }
+    }
+
+    function buildMicroChart(ctx, history, rmatMax, mRef) {
+      const labels = history.map(r => r.cycle_index);
+      const M = history.map(r => Number(r.M_next));
+      const R = history.map(r => Number(r.Rmat));
+
+      destroyIfExists(microChart);
+      microChart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels,
+          datasets: [
+            {
+              label: "M_next (g)",
+              data: M,
+              yAxisID: "y-mass",
+              borderColor: "#45b7ff",
+              backgroundColor: "rgba(69,183,255,0.15)",
+              tension: 0.2,
+              pointRadius: 2
+            },
+            {
+              label: "Rmat",
+              data: R,
+              yAxisID: "y-risk",
+              borderColor: "#ff6a6a",
+              backgroundColor: "rgba(255,106,106,0.18)",
+              tension: 0.2,
+              pointRadius: 2
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            "y-mass": {
+              type: "linear",
+              position: "left",
+              title: {
+                display: true,
+                text: "Mass (g)"
+              },
+              grid: {
+                color: "rgba(120,130,180,0.25)"
+              }
+            },
+            "y-risk": {
+              type: "linear",
+              position: "right",
+              min: 0,
+              max: Math.max(1, rmatMax),
+              title: {
+                display: true,
+                text: "Rmat"
+              },
+              grid: {
+                drawOnChartArea: false
+              }
+            },
+            x: {
+              title: {
+                display: true,
+                text: "Cycle"
+              },
+              grid: {
+                color: "rgba(120,130,180,0.18)"
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              labels: {
+                color: "#f5f7ff"
+              }
+            },
+            annotation: {
+              annotations: {
+                Mref: {
+                  type: "line",
+                  yMin: mRef,
+                  yMax: mRef,
+                  yScaleID: "y-mass",
+                  borderColor: "#ffc857",
+                  borderWidth: 1.5,
+                  borderDash: [6, 4],
+                  label: {
+                    display: true,
+                    content: "M_ref",
+                    color: "#050608",
+                    backgroundColor: "#ffc857",
+                    position: "start"
+                  }
+                },
+                Rmax: {
+                  type: "line",
+                  yMin: rmatMax,
+                  yMax: rmatMax,
+                  yScaleID: "y-risk",
+                  borderColor: "#ff6a6a",
+                  borderWidth: 1.5,
+                  borderDash: [6, 4],
+                  label: {
+                    display: true,
+                    content: "Rmat_max",
+                    color: "#050608",
+                    backgroundColor: "#ff6a6a",
+                    position: "end"
+                  }
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function buildLifeforceChart(ctx, history, lifeforceFloor) {
+      const labels = history.map(r => r.cycle_index);
+      const L = history.map(r => Number(r.LIFEFORCE_next));
+
+      destroyIfExists(lifeforceChart);
+      lifeforceChart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels,
+          datasets: [
+            {
+              label: "LIFEFORCE_next",
+              data: L,
+              borderColor: "#45ffb0",
+              backgroundColor: "rgba(69,255,176,0.16)",
+              tension: 0.18,
+              pointRadius: 2,
+              fill: {
+                target: {
+                  value: lifeforceFloor
+                },
+                above: "rgba(69,255,176,0.16)",
+                below: "rgba(255,106,106,0.18)"
+              }
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              title: {
+                display: true,
+                text: "LIFEFORCE"
+              },
+              grid: {
+                color: "rgba(120,130,180,0.22)"
+              }
+            },
+            x: {
+              title: {
+                display: true,
+                text: "Cycle"
+              },
+              grid: {
+                color: "rgba(120,130,180,0.18)"
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              labels: {
+                color: "#f5f7ff"
+              }
+            },
+            annotation: {
+              annotations: {
+                floor: {
+                  type: "line",
+                  yMin: lifeforceFloor,
+                  yMax: lifeforceFloor,
+                  borderColor: "#ffc857",
+                  borderDash: [5, 4],
+                  borderWidth: 1.5,
+                  label: {
+                    display: true,
+                    content: "LIFEFORCE_floor",
+                    color: "#050608",
+                    backgroundColor: "#ffc857"
+                  }
+                },
+                derateZone: {
+                  type: "box",
+                  yMin: 0,
+                  yMax: lifeforceFloor,
+                  backgroundColor: "rgba(255,106,106,0.10)",
+                  borderWidth: 0
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function buildLyapunovChart(ctx, history, weights) {
+      const labels = history.map(r => r.cycle_index);
+      const baseNames = [
+        "Rmat",
+        "r_heat_local",
+        "r_surcharge_head",
+        "r_pathogen_conc",
+        "r_cec_conc"
+      ];
+      const colors = {
+        Rmat: "rgba(255,106,106,0.82)",
+        r_heat_local: "rgba(255,184,77,0.86)",
+        r_surcharge_head: "rgba(96,154,255,0.86)",
+        r_pathogen_conc: "rgba(129,242,156,0.86)",
+        r_cec_conc: "rgba(201,148,255,0.86)"
+      };
+
+      const datasets = baseNames.map(name => {
+        const data = history.map(r => {
+          const v = Number(r[name]);
+          const w = weights[name] || 0;
+          return w * v * v;
+        });
+        return {
+          label: name + " plane",
+          data,
+          fill: true,
+          borderColor: colors[name],
+          backgroundColor: colors[name].replace("0.86", "0.30"),
+          tension: 0.15,
+          pointRadius: 0
+        };
+      });
+
+      destroyIfExists(lyapunovChart);
+      lyapunovChart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels,
+          datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              stacked: true,
+              title: {
+                display: true,
+                text: "Residual Contribution to V_t"
+              },
+              grid: {
+                color: "rgba(120,130,180,0.25)"
+              }
+            },
+            x: {
+              stacked: true,
+              title: {
+                display: true,
+                text: "Cycle"
+              },
+              grid: {
+                color: "rgba(120,130,180,0.18)"
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              labels: {
+                color: "#f5f7ff"
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function buildHeatmapChart(ctx, history) {
+      const coords = [
+        "r_heat_local",
+        "r_surcharge_head",
+        "Rmat",
+        "r_pathogen_conc",
+        "r_cec_conc"
+      ];
+      const labelsX = coords;
+      const labelsY = history.map(r => r.cycle_index);
+
+      const dataPoints = [];
+      history.forEach((row, rowIndex) => {
+        coords.forEach((key, colIndex) => {
+          const value = Number(row[key]);
+          dataPoints.push({
+            x: colIndex,
+            y: rowIndex,
+            v: value
+          });
+        });
+      });
+
+      function valueToColor(v) {
+        if (Number.isNaN(v)) {
+          return "rgba(80,80,80,0.6)";
+        }
+        if (v > 1) {
+          return "#000000";
+        }
+        const clamped = Math.max(0, Math.min(1, v));
+        const r = Math.round(60 + clamped * 160);
+        const g = Math.round(200 - clamped * 160);
+        const b = 90;
+        return "rgba(" + r + "," + g + "," + b + ",0.95)";
+      }
+
+      destroyIfExists(heatmapChart);
+      heatmapChart = new Chart(ctx, {
+        type: "matrix",
+        data: {
+          datasets: [
+            {
+              label: "Corridor Risk",
+              data: dataPoints,
+              width: function (ctx) {
+                const a = ctx.chart.chartArea;
+                if (!a) {
+                  return 0;
+                }
+                return (a.right - a.left) / labelsX.length;
+              },
+              height: function (ctx) {
+                const a = ctx.chart.chartArea;
+                if (!a) {
+                  return 0;
+                }
+                return (a.bottom - a.top) / labelsY.length;
+              },
+              backgroundColor: function (ctx) {
+                const v = ctx.raw.v;
+                return valueToColor(v);
+              },
+              borderWidth: 0.5,
+              borderColor: "rgba(0,0,0,0.4)"
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              type: "category",
+              labels: labelsX,
+              offset: true,
+              grid: {
+                display: false
+              },
+              title: {
+                display: true,
+                text: "Risk Coordinate"
+              },
+              ticks: {
+                color: "#f5f7ff"
+              }
+            },
+            y: {
+              type: "category",
+              labels: labelsY,
+              offset: true,
+              grid: {
+                display: false
+              },
+              reverse: true,
+              title: {
+                display: true,
+                text: "Cycle"
+              },
+              ticks: {
+                color: "#f5f7ff",
+                maxTicksLimit: 10
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              callbacks: {
+                title: function (items) {
+                  const item = items[0];
+                  const cIndex = item.raw.y;
+                  const cycleLabel = labelsY[cIndex];
+                  const coordLabel = labelsX[item.raw.x];
+                  return "Cycle " + cycleLabel + " – " + coordLabel;
+                },
+                label: function (item) {
+                  return "Value: " + item.raw.v.toFixed(3);
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function buildKerRadarChart(ctx, history) {
+      const labels = history.map(r => r.cycle_index);
+      const K = history.map(r => Number(r.K) || 0);
+      const E = history.map(r => Number(r.E) || 0);
+      const R = history.map(r => Number(r.R) || 0);
+
+      destroyIfExists(kerChart);
+      kerChart = new Chart(ctx, {
+        type: "radar",
+        data: {
+          labels,
+          datasets: [
+            {
+              label: "K (Knowledge)",
+              data: K,
+              borderColor: "#45b7ff",
+              backgroundColor: "rgba(69,183,255,0.18)",
+              pointRadius: 1.5
+            },
+            {
+              label: "E (Efficiency)",
+              data: E,
+              borderColor: "#ffc857",
+              backgroundColor: "rgba(255,200,87,0.15)",
+              pointRadius: 1.5
+            },
+            {
+              label: "R (Resilience)",
+              data: R,
+              borderColor: "#45ffb0",
+              backgroundColor: "rgba(69,255,176,0.16)",
+              pointRadius: 1.5
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            r: {
+              min: 0,
+              max: 1,
+              ticks: {
+                stepSize: 0.2,
+                color: "#d0d3ff"
+              },
+              grid: {
+                color: "rgba(120,130,180,0.35)"
+              },
+              angleLines: {
+                color: "rgba(120,130,180,0.35)"
+              },
+              pointLabels: {
+                color: "#f5f7ff",
+                font: {
+                  size: 10
+                }
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              labels: {
+                color: "#f5f7ff"
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // ---------------------------------------------------------------------
+    // 3. Main load / refresh flow (sovereign, offline)
+    // ---------------------------------------------------------------------
+    async function initDb() {
+      if (!SQL) {
+        SQL = await initSqlJs({
+          locateFile: function (file) {
+            return "./sql-wasm.wasm";
+          }
+        });
+      }
+      if (!cyboDb) {
+        const resp = await fetch("./qpudatashard.db");
+        const buf = await resp.arrayBuffer();
+        cyboDb = new SQL.Database(new Uint8Array(buf));
+      }
+    }
+
+    async function refreshDashboard() {
+      const statusEl = document.getElementById("status");
+      const nodeId = document.getElementById("nodeIdInput").value.trim();
+      const maxCycles = Number(document.getElementById("maxCyclesInput").value) || 100;
+      const lifeforceFloor = Number(document.getElementById("lifeforceFloorInput").value) || 0.5;
+      const rmatMax = Number(document.getElementById("rmatMaxInput").value) || 0.8;
+
+      statusEl.textContent = "Loading node " + nodeId + "…";
+      statusEl.classList.remove("violation");
+
+      try {
+        await initDb();
+        const node = window.CyboquaticQuery.getNode(nodeId);
+        const history = node.history(maxCycles);
+        if (!history.length) {
+          statusEl.innerHTML = "<span class=\"violation\">No cycles found for node " +
+            nodeId + ".</span>";
+          return;
+        }
+
+        const latest = node.latest();
+        const weights = {
+          Rmat: 1.5,
+          r_heat_local: 0.8,
+          r_surcharge_head: 1.0,
+          r_pathogen_conc: 1.2,
+          r_cec_conc: 1.3
+        };
+
+        let invariantIssues = [];
+        for (let i = 1; i < history.length; i++) {
+          const cPrev = history[i - 1].cycle_index;
+          const cNext = history[i].cycle_index;
+          const issues = node.checkTransition(cPrev, cNext, weights, lifeforceFloor);
+          if (issues.length) {
+            invariantIssues.push("Cycle " + cPrev + " → " + cNext + ": " + issues.join("; "));
+          }
+        }
+
+        const hasViolations = invariantIssues.length > 0;
+        if (hasViolations) {
+          statusEl.innerHTML =
+            "<span class=\"violation\">INVARIANT WARNINGS (" +
+            invariantIssues.length +
+            " transitions). First: " +
+            invariantIssues[0] +
+            "</span>";
+          statusEl.classList.add("violation");
+        } else {
+          statusEl.textContent =
+            "Safestep / LIFEFORCE / corridor respected for " +
+            history.length +
+            " cycles. Latest cycle: " +
+            latest.cycle_index;
+        }
+
+        const mRef = history.reduce(
+          (max, r) => Math.max(max, Number(r.M_next) || 0),
+          0
+        ) * 0.6;
+
+        buildMicroChart(
+          document.getElementById("microChart").getContext("2d"),
+          history,
+          rmatMax,
+          mRef
+        );
+        buildLifeforceChart(
+          document.getElementById("lifeforceChart").getContext("2d"),
+          history,
+          lifeforceFloor
+        );
+        buildLyapunovChart(
+          document.getElementById("lyapunovChart").getContext("2d"),
+          history,
+          weights
+        );
+        buildHeatmapChart(
+          document.getElementById("heatmapChart").getContext("2d"),
+          history
+        );
+        buildKerRadarChart(
+          document.getElementById("kerChart").getContext("2d"),
+          history
+        );
+      } catch (err) {
+        console.error(err);
+        statusEl.innerHTML =
+          "<span class=\"violation\">Error loading dashboard: " +
+          (err && err.message ? err.message : String(err)) +
+          "</span>";
+      }
+    }
+
+    document.getElementById("reloadBtn").addEventListener("click", function () {
+      refreshDashboard();
+    });
+
+    window.addEventListener("load", function () {
+      refreshDashboard();
+    });
+  </script>
+</body>
+</html>
