@@ -1,0 +1,113 @@
+name: CI cyboquatic-ecosafety
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust 1.85.0
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.85.0
+          components: clippy, rustfmt
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build workspace
+        run: |
+          cargo build --workspace --all-targets
+
+      - name: Run tests (all features)
+        run: |
+          cargo test --workspace --all-features
+
+      - name: Clippy (deny warnings and unsafe patterns)
+        run: |
+          cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+      - name: Format check
+        run: |
+          cargo fmt --all -- --check
+
+  security-audit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust 1.85.0
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.85.0
+
+      - name: Install cargo-audit and cargo-deny
+        run: |
+          cargo install cargo-audit --locked
+          cargo install cargo-deny --locked
+
+      - name: Run cargo-audit
+        run: |
+          cargo audit
+
+      - name: Run cargo-deny (bans and licenses)
+        run: |
+          cargo deny check bans
+          cargo deny check licenses
+          cargo deny check advisories
+
+  geiger-nonunsafe-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust 1.85.0
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.85.0
+
+      - name: Install cargo-geiger
+        run: |
+          cargo install cargo-geiger --locked
+
+      - name: Scan for unsafe code in cyboquatic-ecosafety
+        run: |
+          cargo geiger --all-features --include-tests --manifest-path crates/cyboquatic-ecosafety/Cargo.toml
+
+  feature-matrix:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust 1.85.0
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.85.0
+
+      - name: Install cargo-hack
+        run: |
+          cargo install cargo-hack --locked
+
+      - name: Test cyboquatic-ecosafety feature matrix
+        run: |
+          cd crates/cyboquatic-ecosafety
+          cargo hack test --each-feature --features full-cov,sqlite-storage,metrics,android,wasm
