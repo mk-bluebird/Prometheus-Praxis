@@ -25,6 +25,7 @@ members = [
     "crates/adaptive-corridors",
     "crates/ai_chat_hashonly_normalizer",
     "crates/air_globe_ceim",
+    "crates/aln_qpudatashard_parser",
     "crates/bioscale-fairness-validator",
     "crates/bioscale_evolution_cli",
     "crates/blacklist_filter",
