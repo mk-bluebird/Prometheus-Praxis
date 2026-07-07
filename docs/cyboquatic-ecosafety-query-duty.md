@@ -389,27 +389,27 @@ All responses are safe for browser‑side visualization and reasoning; actuation
 
 ```mermaid
 flowchart LR
-  subgraph Browser["AI Browser (Comet + Javasphere)"]
-    A[User / Agent Intent] --> B[CyboquaticEcosafetyQueryDuty]
+  subgraph Browser["AI Browser - Comet + Javasphere"]
+    A[User or Agent Intent] --> B[CyboquaticEcosafetyQueryDuty]
   end
 
   subgraph Bridge["Javasphere Transport Layer"]
-    B --> C[JSON Request\n(MCP / HTTP Client)]
+    B --> C[JSON Request - MCP or HTTP Client]
   end
 
   subgraph Gateway["Rust Gateway Daemon"]
     C --> D[Request Router]
-    D --> E[ALN Shard Schema & Frames\n(Cyboquatic crates)]
-    D --> F[SQLite Ecosafety DB]
+    D --> E[ALN Shard Schema and Frames - Cyboquatic crates]
+    D --> F[SQLite Ecosafety Database]
   end
 
   E --> F
   F --> D
   D --> C
 
-  C --> G[JSON Response\n(Status / Frames)]
+  C --> G[JSON Response - Status and Frames]
   G --> B
-  B --> H[Visualizations,\nAI Reasoning,\nNon‑actuating Decisions]
+  B --> H[Visualizations, AI Reasoning, Non-actuating Decisions]
 
   classDef browser fill:#1f2933,stroke:#cbd2d9,color:#f9fafb;
   classDef bridge fill:#102a43,stroke:#cbd2d9,color:#f9fafb;
