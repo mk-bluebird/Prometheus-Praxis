@@ -1,0 +1,43 @@
+alnversion 1.0
+schema Deployment.accountability.v1
+
+TITLE Deployment accountability particle linking node, operator, stakeholder, corridor instance, runtime KER triad, and kerdeployable flag under frozen ecosafety grammar.
+
+particlefields
+  field nodeid              string  required
+  field operatorid          string  required   // operator DID or account
+  field stakeholderid       string  required   // community / school / utility DID
+  field corridorinstanceid  string  required   // specific ecosafety.corridors.v2 instance
+  field runtime_ker_k       float   required
+  field runtime_ker_e       float   required
+  field runtime_ker_r       float   required
+  field kerdeployable       bool    required   // true only if all runtime risks <= gold
+  field evidencehex         string  required   // hex stamp for particle content
+endparticlefields
+
+constraints
+  constraint KER_bounds
+    runtime_ker_k >= 0.80
+    runtime_ker_k <= 1.00
+    runtime_ker_e >= 0.80
+    runtime_ker_e <= 1.00
+    runtime_ker_r >= 0.00
+    runtime_ker_r <= 0.50
+  endconstraint
+
+  constraint Deployable_implies_KER
+    kerdeployable == true => runtime_ker_k >= 0.90
+    kerdeployable == true => runtime_ker_e >= 0.90
+    kerdeployable == true => runtime_ker_r <= 0.13
+  endconstraint
+endconstraints
+
+validationhooks
+  hook RustDeploymentAccountabilityValidation
+    lang rust
+    crate deployment_accountability_core
+    fn validate_deployment_particle
+  endhook
+endvalidationhooks
+
+endtext
