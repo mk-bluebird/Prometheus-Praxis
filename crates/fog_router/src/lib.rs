@@ -205,6 +205,228 @@ impl<'lua> FogLuaSandbox<'lua> {
     }
 }
 
+/// State for one canal reach used in ThermalPlumeAuditFrame and ResidualUpdateFrame.
+#[derive(Copy, Clone)]
+pub struct CanalState {
+    pub q_m3_s: f64,
+    pub t_c: f64,
+    pub h_m: f64,
+    pub theta_mm: f64,
+}
+
+/// Observation vector combining satellite ET and canal telemetry.
+#[derive(Copy, Clone)]
+pub struct CanalObs {
+    pub et_mm_day: f64,
+    pub q_m3_s: f64,
+    pub t_c: f64,
+}
+
+/// Risk coordinates derived from state for Lyapunov residual.
+#[derive(Copy, Clone)]
+pub struct CanalRiskCoords {
+    pub r_thermal: f64,
+    pub r_hydraulic: f64,
+    pub r_recharge: f64,
+}
+
+/// Lyapunov weights for canal residual.
+#[derive(Copy, Clone)]
+pub struct LyapunovWeights {
+    pub w_thermal: f64,
+    pub w_hydraulic: f64,
+    pub w_recharge: f64,
+}
+
+/// Ensemble member for EnKF.
+#[derive(Copy, Clone)]
+pub struct EnsembleMember {
+    pub state: CanalState,
+}
+
+fn clamp01(x: f64) -> f64 {
+    if x < 0.0 {
+        0.0
+    } else if x > 1.0 {
+        1.0
+    } else {
+        x
+    }
+}
+
+/// Map physical state to risk coordinates using corridor bands.
+pub fn state_to_risk(
+    state: &CanalState,
+    t_gold_c: f64,
+    t_hard_c: f64,
+    hlr_gold: f64,
+    hlr_hard: f64,
+    recharge_gold: f64,
+    recharge_hard: f64,
+) -> CanalRiskCoords {
+    let r_thermal = if state.t_c <= t_gold_c {
+        0.0
+    } else if state.t_c >= t_hard_c {
+        1.0
+    } else {
+        clamp01((state.t_c - t_gold_c) / (t_hard_c - t_gold_c))
+    };
+
+    let r_hydraulic = if state.h_m <= hlr_gold {
+        0.0
+    } else if state.h_m >= hlr_hard {
+        1.0
+    } else {
+        clamp01((state.h_m - hlr_gold) / (hlr_hard - hlr_gold))
+    };
+
+    let r_recharge = if state.theta_mm <= recharge_gold {
+        0.0
+    } else if state.theta_mm >= recharge_hard {
+        1.0
+    } else {
+        clamp01((state.theta_mm - recharge_gold) / (recharge_hard - recharge_gold))
+    };
+
+    CanalRiskCoords {
+        r_thermal,
+        r_hydraulic,
+        r_recharge,
+    }
+}
+
+/// Compute Lyapunov residual V_t for canal reach.
+pub fn compute_vt(risk: &CanalRiskCoords, w: &LyapunovWeights) -> f64 {
+    let v = w.w_thermal * risk.r_thermal * risk.r_thermal
+        + w.w_hydraulic * risk.r_hydraulic * risk.r_hydraulic
+        + w.w_recharge * risk.r_recharge * risk.r_recharge;
+    if v < 0.0 {
+        0.0
+    } else {
+        v
+    }
+}
+
+/// Simple forecast model f(x_k) for one time step.
+/// This should be calibrated against HydraulicDecayFrame and ThermalPlumeAuditFrame.
+pub fn forecast_state(
+    prev: &CanalState,
+    dq_ops_m3_s: f64,
+    dq_loss_m3_s: f64,
+    dt_s: f64,
+    solar_heat_w_m2: f64,
+    exchange_coeff_w_m2_c: f64,
+) -> CanalState {
+    let q_next = (prev.q_m3_s + dq_ops_m3_s - dq_loss_m3_s).max(0.0);
+
+    let rho_cp: f64 = 4.18e6;
+    let depth_m: f64 = 2.0;
+    let area_m2: f64 = depth_m;
+    let heat_net = solar_heat_w_m2 * area_m2 - exchange_coeff_w_m2_c * (prev.t_c - 25.0);
+    let denom = rho_cp * depth_m * q_next.max(0.1);
+    let d_t = (heat_net * dt_s) / denom;
+    let t_next = prev.t_c + d_t;
+
+    let h_next = prev.h_m;
+    let theta_next = prev.theta_mm;
+
+    CanalState {
+        q_m3_s: q_next,
+        t_c: t_next,
+        h_m: h_next,
+        theta_mm: theta_next,
+    }
+}
+
+/// Observation operator h(x): predicted ET and canal telemetry.
+pub fn observe_state(state: &CanalState) -> CanalObs {
+    let et_mm_day = (state.theta_mm * 0.05 + (state.t_c - 15.0) * 0.2).max(0.0);
+    CanalObs {
+        et_mm_day,
+        q_m3_s: state.q_m3_s,
+        t_c: state.t_c,
+    }
+}
+
+/// EnKF update for a single reach (scalar-gain approximation, non-actuating).
+pub fn enkf_update(
+    ensemble: &mut [EnsembleMember],
+    obs: CanalObs,
+    prev_vt: f64,
+    weights: &LyapunovWeights,
+    corridors: (f64, f64, f64, f64, f64, f64),
+    max_delta_vt: f64,
+) {
+    let n = ensemble.len() as f64;
+    if n <= 1.0 {
+        return;
+    }
+
+    let mut mean_et = 0.0;
+    let mut mean_q = 0.0;
+    let mut mean_t = 0.0;
+
+    let mut pred_obs: heapless::Vec<CanalObs, 32> = heapless::Vec::new();
+
+    for m in ensemble.iter_mut() {
+        let forecast = forecast_state(&m.state, 0.0, 0.0, 900.0, 200.0, 40.0);
+        m.state = forecast;
+        let o = observe_state(&forecast);
+        pred_obs.push(o).ok();
+        mean_et += o.et_mm_day;
+        mean_q += o.q_m3_s;
+        mean_t += o.t_c;
+    }
+
+    mean_et /= n;
+    mean_q /= n;
+    mean_t /= n;
+
+    let mut var_et = 0.0;
+    let mut var_q = 0.0;
+    let mut var_t = 0.0;
+
+    for o in pred_obs.iter() {
+        var_et += (o.et_mm_day - mean_et).powi(2);
+        var_q += (o.q_m3_s - mean_q).powi(2);
+        var_t += (o.t_c - mean_t).powi(2);
+    }
+
+    var_et /= n - 1.0;
+    var_q /= n - 1.0;
+    var_t /= n - 1.0;
+
+    let r_et: f64 = 1.0;
+    let r_q: f64 = 0.1;
+    let r_t: f64 = 0.5;
+
+    let k_et = var_et / (var_et + r_et);
+    let k_q = var_q / (var_q + r_q);
+    let k_t = var_t / (var_t + r_t);
+
+    let (t_gold, t_hard, hlr_gold, hlr_hard, rech_gold, rech_hard) = corridors;
+
+    for (idx, m) in ensemble.iter_mut().enumerate() {
+        let o_pred = pred_obs[idx];
+        let de = obs.et_mm_day - o_pred.et_mm_day;
+        let dq = obs.q_m3_s - o_pred.q_m3_s;
+        let dt = obs.t_c - o_pred.t_c;
+
+        let mut updated = m.state;
+        updated.theta_mm += k_et * de;
+        updated.q_m3_s += k_q * dq;
+        updated.t_c += k_t * dt;
+
+        let risk =
+            state_to_risk(&updated, t_gold, t_hard, hlr_gold, hlr_hard, rech_gold, rech_hard);
+        let vt_new = compute_vt(&risk, weights);
+
+        if vt_new <= prev_vt + max_delta_vt {
+            m.state = updated;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -330,9 +552,7 @@ mod tests {
             end
         "#;
 
-        let decision = sandbox
-            .eval_predicate(lua_src, shard)
-            .expect("decision");
+        let decision = sandbox.eval_predicate(lua_src, shard).expect("decision");
         assert_eq!(decision, FogRoutingDecision::NeedsDesiccation);
     }
 
@@ -359,9 +579,66 @@ mod tests {
             end
         "#;
 
-        let decision = sandbox
-            .eval_predicate(lua_src, shard)
-            .expect("decision");
+        let decision = sandbox.eval_predicate(lua_src, shard).expect("decision");
         assert_eq!(decision, FogRoutingDecision::Block);
+    }
+
+    #[test]
+    fn test_enkf_nonexpansive_vt() {
+        let mut ensemble = [EnsembleMember {
+            state: CanalState {
+                q_m3_s: 5.0,
+                t_c: 25.0,
+                h_m: 2.0,
+                theta_mm: 50.0,
+            },
+        }; 8];
+
+        let obs = CanalObs {
+            et_mm_day: 6.0,
+            q_m3_s: 5.5,
+            t_c: 26.0,
+        };
+
+        let weights = LyapunovWeights {
+            w_thermal: 0.5,
+            w_hydraulic: 0.3,
+            w_recharge: 0.2,
+        };
+
+        let corridors = (24.0, 30.0, 1.5, 3.0, 40.0, 80.0);
+
+        let risk_prev = state_to_risk(
+            &ensemble[0].state,
+            corridors.0,
+            corridors.1,
+            corridors.2,
+            corridors.3,
+            corridors.4,
+            corridors.5,
+        );
+        let vt_prev = compute_vt(&risk_prev, &weights);
+
+        enkf_update(
+            &mut ensemble,
+            obs,
+            vt_prev,
+            &weights,
+            corridors,
+            0.01,
+        );
+
+        let risk_new = state_to_risk(
+            &ensemble[0].state,
+            corridors.0,
+            corridors.1,
+            corridors.2,
+            corridors.3,
+            corridors.4,
+            corridors.5,
+        );
+        let vt_new = compute_vt(&risk_new, &weights);
+
+        assert!(vt_new <= vt_prev + 0.01 + 1e-6);
     }
 }
