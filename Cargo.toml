@@ -4,12 +4,24 @@
 
 [workspace]
 members = [
-    # Root eco_restoration_shard crate (code in ecorestorationshard/)
-    "ecorestorationshard",
+    # Root eco_restoration_shard crate
+    "eco_restoration_shard",
+    "eco_restoration_shard/T08_sensor_health",
+    "eco_restoration_shard/T10_pricing",
+    "eco_restoration_shard/kerresidual",
 
-    # Crates under `crates/` (matching actual directory names per repo listing)
-    "crates/adaptive-corridors",
+    # eco_wealth standalone crate
+    "eco_wealth",
+
+    # ecorestorationshard sub-crates
+    "ecorestorationshard/eco_restoration_shard_core",
+
+    # cpp crates
+    "cpp/EcoNetCentralAZ",
+
+    # Crates under `crates/` (alphabetically sorted)
     "crates/ai_chat_hashonly_normalizer",
+    "crates/air_globe_ceim",
     "crates/bioscale-fairness-validator",
     "crates/bioscale_evolution_cli",
     "crates/blacklist_filter",
@@ -20,95 +32,40 @@ members = [
     "crates/cargo-blast-radius",
     "crates/city-pass",
     "crates/community-governance",
-    "crates/constellation-logic-auto",
+    "crates/consent-kernel",
     "crates/cross-constellation-index",
-    "crates/cyboquatic_blastradius_spine",
-
-    # Prometheus-Praxis and related crates (canonical dirs)
-    "crates/prometheus_praxis",
-    "crates/prometheus_praxis_ai",
-    "crates/prometheus_praxis_semantics",
-    "crates/prometheus_praxis_collective_feed",
-    "crates/prometheus_praxis_provenance",
-
-    # Crates with src/ subdirs under `crates/`
-    "crates/cyboquatic-ecosafety-core",
     "crates/cyboquatic_benchmark_tool",
+    "crates/cyboquatic_blastradius_spine",
     "crates/cyboquatic_index",
-    "crates/cyboquatic_lane_replay",
+    "crates/cyboquatic_progress/20260705_crate",
     "crates/cyboquatic_spine",
-
-    "crates/datalake_core",
+    "crates/cyboquationmark_workload",
     "crates/definition_registry_checker",
     "crates/disaster-scenarios",
     "crates/eco-chat-ffi",
-
-    # eco-governance-spine/src -> crate root under crates/eco-governance-spine
-    "crates/eco-governance-spine",
-
     "crates/eco-ledger-particles",
     "crates/eco-pricing",
     "crates/eco-restoration-governance",
     "crates/eco-wealth-portfolio",
-
-    # eco_guard_spine/src -> crates/eco_guard_spine
-    "crates/eco_guard_spine",
-
-    # eco_r_axis_verifier/src -> crates/eco_r_axis_verifier
-    "crates/eco_r_axis_verifier",
-
+    "crates/eco_hamiltonian_gate",
     "crates/eco_restoration_index",
-    "crates/eco_restoration_shard",
     "crates/eco_restoration_shard_config",
-
-    # eco_zk_aggregate/src -> crates/eco_zk_aggregate
-    "crates/eco_zk_aggregate",
-
     "crates/ecocybo_planner",
     "crates/econet-governance-summary",
-
-    # econet-hardware/lua is not a Rust crate; omitted from workspace.members.
-
     "crates/econet-index-loader",
-
-    # econet-index/src -> crates/econet-index
-    "crates/econet-index",
-
-    # econet_blastradius_spine/src -> crates/econet_blastradius_spine
     "crates/econet_blastradius_spine",
-
-    # econet_ceim_phoenixwater/src -> crates/econet_ceim_phoenixwater
-    "crates/econet_ceim_phoenixwater",
-
-    # econet_ecowealth/src -> crates/econet_ecowealth
-    "crates/econet_ecowealth",
-
     "crates/econet_governance_guard",
     "crates/econet_governance_spine",
-    "crates/econet_ker",
     "crates/econet_overlay",
     "crates/ecoper-joule",
     "crates/ecoresponseshard",
-
-    # Crate providing the cdylib / rlib spine
     "crates/ecorestorationshard",
-
-    # ecosafety-core/src -> crates/ecosafety-core
-    "crates/ecosafety-core",
-
-    # ecosafety_sqlite_index/src -> crates/ecosafety_sqlite_index
-    "crates/ecosafety_sqlite_index",
-
+    "crates/ecosafety-nanoswarm-urban-core",
     "crates/education-prompts",
     "crates/energy-metrics",
     "crates/ersilogger",
-
-    # federated-ker/src -> crates/federated-ker
-    "crates/federated-ker",
-
     "crates/governance-guard",
     "crates/host-sovereignty-envelope",
-    "crates/hydraulics-kernels",
     "crates/hydrology-constraints",
     "crates/ker-score-lab",
     "crates/kerdeployable",
@@ -117,28 +74,26 @@ members = [
     "crates/lane-governance",
     "crates/large-particle-registry",
     "crates/link_compensator",
-    "crates/neuromorphic-risk",
+    "crates/nanoswarm-consent-kernel",
     "crates/offroad",
     "crates/plane-weights",
     "crates/ppx_continuity_kernel",
     "crates/ppx_continuity_mcp",
     "crates/ppx_minimal_identity_kernel",
-
+    "crates/prometheus_praxis",
+    "crates/prometheus_praxis_collective_feed",
+    "crates/prometheus_praxis_provenance",
+    "crates/prometheus_praxis_semantics",
     "crates/psychrisk_engine",
     "crates/restoration-radius",
-
-    # round-trip-verify/tests -> root crate dir crates/round-trip-verify
-    "crates/round-trip-verify",
-
+    "crates/school_zone_mapper",
     "crates/sensor-health",
     "crates/sensor-telemetry",
+    "crates/tailwind_fsm",
+    "crates/titan-metrics-core",
     "crates/topology-risk",
     "crates/vocab_guard",
-    "crates/zoning-shards",
-    "crates/cyboquatic_progress/20260705_crate",
-    "crates/school_zone_mapper",
-    "crates/tailwind_fsm",
-    "crates/air_globe_ceim",
+    "crates/water_telemetry_ingest",
 ]
 
 resolver = "2"
