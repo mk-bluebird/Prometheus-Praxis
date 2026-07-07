@@ -135,6 +135,7 @@ members = [
     "crates/topology-risk",
     "crates/vocab_guard",
     "crates/zoning-shards",
+    "crates/cyboquatic_progress/20260705_crate",
 ]
 
 resolver = "2"
