@@ -3,22 +3,18 @@
 [package]
 name        = "blastradius"
 version     = "0.1.0"
-edition     = "2021"
+edition     = "2024"
+rust-version = "1.85"
 license     = "MIT OR Apache-2.0"
 description = "Non-actuating blastradius and neighbouring-zone assets for EcoNet / Eco restoration shard."
 publish     = false
 
 [dependencies]
-serde     = { version = "1.0.197", features = ["derive"] }
+serde     = { version = "1.0.203", features = ["derive"] }
 uuid      = { version = "1", features = ["v4", "serde"] }
 aln_core  = "0.1"
 ecospine  = "0.1"
 thiserror = "1.0.57"
-
-[lints.rust]
-unsafe_code = "forbid"
-
-[lints.clippy]
 
 [lib]
 name       = "blastradius"
@@ -28,3 +24,8 @@ crate-type = ["rlib"]
 [[bin]]
 name = "blastradius_cli"
 path = "src/main.rs"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
