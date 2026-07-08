@@ -1,0 +1,26 @@
+# crates/cyboquatic-ecosafety-core/Cargo.toml
+
+[package]
+name = "cyboquatic-ecosafety-core"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "Core ecosafety frames, pipelines, and provenance math for cyboquatic nodes in the Prometheus-Praxis ecosystem."
+repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
+readme = "README.md"
+keywords = ["ecosafety", "cyboquatic", "ker", "biodiversity", "provenance"]
+categories = ["science", "algorithms", "data-structures"]
+
+[lib]
+name = "cyboquatic_ecosafety_core"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[dependencies]
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
+time = { version = "0.3", features = ["formatting", "parsing", "serde"] }
+uuid = { version = "1.10", features = ["v4", "serde"] }
+thiserror = "1.0"
+aln_core = "0.1"
