@@ -1,0 +1,18 @@
+# filename: crates/alncore_macros/Cargo.toml
+# destination: github.com/mk-bluebird/Prometheus-Praxis
+
+[package]
+name = "alncore_macros"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+
+[lib]
+proc-macro = true
+path = "src/lib.rs"
+
+[dependencies]
+proc-macro2 = "1.0.79"
+quote = "1.0.37"
+syn = { version = "2.0.60", features = ["full"] }
