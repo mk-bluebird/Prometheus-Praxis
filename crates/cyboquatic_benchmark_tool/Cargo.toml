@@ -1,10 +1,25 @@
-# Filename: crates/cyboquatic_benchmark_tool/Cargo.toml
-# Destination: crates/cyboquatic_benchmark_tool/Cargo.toml
+# crates/cyboquatic_benchmark_tool/Cargo.toml
 
 [package]
 name = "cyboquatic_benchmark_tool"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "Benchmarking tool for cyboquatic ecosafety kernels and governance spine in the Prometheus-Praxis workspace."
+repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
+readme = "README.md"
+keywords = ["cyboquatic", "benchmark", "ecosafety", "governance"]
+categories = ["science", "command-line-utilities"]
+
+[lib]
+name = "cyboquatic_benchmark_tool"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[[bin]]
+name = "cyboquatic-benchmark-tool"
+path = "src/main.rs"
 
 [dependencies]
 econet_governance_spine = { path = "../econet_governance_spine" }
