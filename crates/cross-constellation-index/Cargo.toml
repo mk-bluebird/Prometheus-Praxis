@@ -9,7 +9,7 @@ rust-version = "1.85"
 authors = ["EcoNet Constellation"]
 license = "MIT OR Apache-2.0"
 description = "Shared cross-constellation index and wiring tools for EcoNet repositories (EcoNet, DataLake, Eco-Fort, Cyboquatic, etc.)."
-repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
 readme = "README.md"
 
 [lib]
