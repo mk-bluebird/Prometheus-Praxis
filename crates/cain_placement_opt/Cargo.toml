@@ -6,7 +6,7 @@ edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
 description = "Binary integer programming kernel for CAIN placement under eco-impact and heat-equity objectives."
-repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
 
 [lib]
 name = "cain_placement_opt"
