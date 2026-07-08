@@ -1,0 +1,34 @@
+# Cyboquatic DAO Deployment ALN
+docid CYBO-DAO-DEPLOY-001
+schemaname ALN-DAO
+versiontag 2026v1
+category GOVERNANCE
+region AZ-PHX
+roleband EXPPROD
+ownerdid bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+evidencehex 0xcybo789
+signinghex 0xdao012
+
+record SafeStepRule2026v1
+  ruleid cybo-governance-step
+  description Cyboquatic governance safety step
+  epsilon 0.08
+  lyapchannel dao-governance
+endrecord
+
+record DeployDecisionKernel2026v1
+  kernelid cybo-exp-kernel
+  description Experimental lane kernel
+  k_min 0.6
+  e_min 0.55
+  r_max 0.4
+  lane_scope EXPPROD
+endrecord
+
+record OverridePolicy2026v1
+  policyid emergency-override-001
+  description Emergency derate policy
+  allow_tighten_only true
+  allow_emergency_derate true
+  forbid_safety_loosen true
+endrecord
