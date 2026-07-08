@@ -5,7 +5,7 @@ edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
 description = "Sovereign eco-data consent state machine for Prometheus-Praxis, bound to primary Bostrom address with Kani-verified invariants."
-repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
 authors = ["Prometheus-Praxis <maintainers@eco-restoration-shard.local>"]
 
 [lib]
