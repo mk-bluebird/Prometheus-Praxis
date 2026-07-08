@@ -130,6 +130,7 @@ members = [
     "crates/water_telemetry_ingest",
     "crates/zoning-shards",
     "crates/cain_air_node",
+    "crates/alncore",
 ]
 
 resolver = "2"
