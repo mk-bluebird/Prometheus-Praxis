@@ -1,0 +1,6 @@
+"#","Concept","Existing spine objects it uses","Hard safety predicate it enforces"
+"1","Corridor‑validated ALN startup","alncore, vshardker, vlaneadmissibility, corridor bands 75ad93d5-9a4a-404d-a28b-850fd11718bc.md+1","No Lyapunov‑safe corridor ⇒ node rejected (Stop)"
+"2","Non‑negotiable blast‑radius stop kernel","blastradiusobject, vshardblast, Lua CI blast checks 75ad93d5-9a4a-404d-a28b-850fd11718bc.md+2","Blast radius beyond corridor ⇒ physical cutoff"
+"3","Kani‑verified EU NRR Lyapunov guard","Praxis KER/Lyapunov harnesses, plane/coord grammar, Kani 75ad93d5-9a4a-404d-a28b-850fd11718bc.md+1","Turbidity > 50 NTU on seagrass ⇒ mandatory Stop"
+"4","EcoValue‑tuned deployment capital","CyboquaticEcoPlot, ecowealth profiles, KER windows eco.txt+1","Capital gates tighten as harm underestimated / E overstated"
+"5","Nanoswarm‑driven fog routing","Ingest trust, FOG router windows, vshardblast, blast_radius_kernel eco.txt+2","Swarm hull must stay within RoH/isopleth and blast bounds"

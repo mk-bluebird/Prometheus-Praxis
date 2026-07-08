@@ -1,0 +1,4 @@
+"Layer","Input signal","Predicate / invariant","Output"
+"Praxis governance kernel","K, E, R, RoH, maxcarbonradius, maxenergyradius 75ad93d5-9a4a-404d-a28b-850fd11718bc.md+1","K,E above minima; R, RoH below ceilings; blast within corridor bands 7c29567c-46db-40ea-a92b-69ea3f2bd52c.md","Allow / Derate / Stop"
+"Stop kernel (nonact.)","blast_radius_kernel scalar, Praxis verdict","blast_radius_kernel ≤ margin AND verdict ≠ Stop","Pass / block navigation"
+"Hardware relay","Stop → block","Any Stop → open contactor; no software override","Physical cutoff of thrusters"
