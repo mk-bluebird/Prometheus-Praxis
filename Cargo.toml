@@ -131,6 +131,7 @@ members = [
     "crates/zoning-shards",
     "crates/cain_air_node",
     "crates/alncore",
+    "crates/alncore_macros",
 ]
 
 resolver = "2"
