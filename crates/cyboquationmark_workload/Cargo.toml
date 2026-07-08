@@ -1,8 +1,19 @@
 [package]
-name = "cyboquationmark_workload"
+name = "cyboquatic_workload"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "Cyboquatic workload modeling and serialization primitives for Prometheus-Praxis."
+repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
+readme = "README.md"
+keywords = ["cyboquatic", "workload", "ecosafety"]
+categories = ["science", "data-structures"]
+
+[lib]
+name = "cyboquatic_workload"
+path = "src/lib.rs"
+crate-type = ["rlib"]
 
 [dependencies]
 serde = { version = "1.0.203", features = ["derive"] }
