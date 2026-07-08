@@ -9,7 +9,7 @@ rust-version = "1.85"
 description = "Non-actuating blast-radius lambda kernel for eco_restoration_shard. Computes segment-level lambda = k/v with eco weights."
 license = "MIT OR Apache-2.0"
 authors = ["Prometheus-Praxis"]
-repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
 
 [lib]
 name = "blast_radius_kernel"
