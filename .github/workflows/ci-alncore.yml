@@ -1,0 +1,217 @@
+name: ALN Core Parser Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'crates/alncore/**'
+      - 'aln/test-corpus/**'
+      - 'schemas/alncoregrammar.md'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'crates/alncore/**'
+      - 'aln/test-corpus/**'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  test:
+    name: Test alncore crate
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-action@stable
+      with:
+        components: rustfmt, clippy
+    
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-alncore-${{ hashFiles('crates/alncore/Cargo.toml') }}
+    
+    - name: Check formatting
+      run: cargo fmt --manifest-path crates/alncore/Cargo.toml --check
+    
+    - name: Run clippy
+      run: cargo clippy --manifest-path crates/alncore/Cargo.toml --all-targets -- -D warnings
+    
+    - name: Build alncore
+      run: cargo build --manifest-path crates/alncore/Cargo.toml --all-targets
+    
+    - name: Run unit tests
+      run: cargo test --manifest-path crates/alncore/Cargo.toml --all-targets
+
+  parse-test-corpus:
+    name: Parse ALN test corpus
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-action@stable
+    
+    - name: Build alnctl
+      run: cargo build --manifest-path crates/alncore/Cargo.toml --bin alnctl --release
+    
+    - name: Create test ALN files
+      run: |
+        mkdir -p aln/test-corpus
+        
+        # Create ecosafety core test file
+        cat > aln/test-corpus/ecosafety.core.2026v1.aln << 'EOF'
+        # Ecosafety Core Contract 2026v1
+        docid ECOSAFETY-CORE-001
+        schemaname ALN-ECOSAFETY
+        versiontag 2026v1
+        category ECOSAFETY
+        roleband RESEARCH
+        ownerdid bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+        evidencehex 0xdeadbeef
+        signinghex 0xcafebabe
+        
+        record SafeStepRule2026v1
+          ruleid safestep-eco-001
+          description Standard ecosafety Lyapunov step constraint
+          epsilon 0.1
+          lyapchannel governance
+        endrecord
+        
+        record DeployDecisionKernel2026v1
+          kernelid deploy-kernel-research
+          description Research lane deployment kernel
+          k_min 0.5
+          e_min 0.5
+          r_max 0.5
+          lane_scope RESEARCH
+        endrecord
+        EOF
+        
+        # Create Phoenix tray pilot test file
+        cat > aln/test-corpus/phoenix-tray-pilot.aln << 'EOF'
+        # Phoenix Tray Pilot ALN
+        docid PHOENIX-TRAY-001
+        schemaname ALN-PHOENIX
+        versiontag 2026v1
+        category LANE_PROMOTION
+        roleband RESEARCH
+        ownerdid bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+        evidencehex 0xphoenix123
+        signinghex 0xtray456
+        
+        record SafeStepRule2026v1
+          ruleid phoenix-safestep-001
+          description Phoenix corridor safety step
+          vt_ceiling 1.0
+          epsilon 0.05
+          lyapchannel phoenix
+        endrecord
+        
+        record DeployDecisionKernel2026v1
+          kernelid phoenix-deploy-prod
+          description Production deployment for Phoenix
+          k_min 0.7
+          e_min 0.6
+          r_max 0.3
+          lane_scope PROD
+        endrecord
+        EOF
+        
+        # Create Cyboquatic DAO deploy test file
+        cat > aln/test-corpus/cyboquatic-dao-deploy.aln << 'EOF'
+        # Cyboquatic DAO Deployment ALN
+        docid CYBO-DAO-DEPLOY-001
+        schemaname ALN-DAO
+        versiontag 2026v1
+        category GOVERNANCE
+        region AZ-PHX
+        roleband EXPPROD
+        ownerdid bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+        evidencehex 0xcybo789
+        signinghex 0xdao012
+        
+        record SafeStepRule2026v1
+          ruleid cybo-governance-step
+          description Cyboquatic governance safety step
+          epsilon 0.08
+          lyapchannel dao-governance
+        endrecord
+        
+        record DeployDecisionKernel2026v1
+          kernelid cybo-exp-kernel
+          description Experimental lane kernel
+          k_min 0.6
+          e_min 0.55
+          r_max 0.4
+          lane_scope EXPPROD
+        endrecord
+        
+        record OverridePolicy2026v1
+          policyid emergency-override-001
+          description Emergency derate policy
+          allow_tighten_only true
+          allow_emergency_derate true
+          forbid_safety_loosen true
+        endrecord
+        EOF
+    
+    - name: Validate test corpus files
+      run: |
+        echo "=== Validating ecosafety.core.2026v1.aln ==="
+        ./target/release/alnctl validate aln/test-corpus/ecosafety.core.2026v1.aln
+        
+        echo ""
+        echo "=== Validating phoenix-tray-pilot.aln ==="
+        ./target/release/alnctl validate aln/test-corpus/phoenix-tray-pilot.aln
+        
+        echo ""
+        echo "=== Validating cyboquatic-dao-deploy.aln ==="
+        ./target/release/alnctl validate aln/test-corpus/cyboquatic-dao-deploy.aln
+    
+    - name: Generate canonical JSON outputs
+      run: |
+        mkdir -p aln/test-corpus/golden
+        
+        ./target/release/alnctl json aln/test-corpus/ecosafety.core.2026v1.aln > aln/test-corpus/golden/ecosafety.core.2026v1.json
+        ./target/release/alnctl json aln/test-corpus/phoenix-tray-pilot.aln > aln/test-corpus/golden/phoenix-tray-pilot.json
+        ./target/release/alnctl json aln/test-corpus/cyboquatic-dao-deploy.aln > aln/test-corpus/golden/cyboquatic-dao-deploy.json
+        
+        echo "Generated canonical JSON files:"
+        ls -la aln/test-corpus/golden/
+    
+    - name: Verify golden files are valid JSON
+      run: |
+        for f in aln/test-corpus/golden/*.json; do
+          echo "Validating $f..."
+          python3 -m json.tool "$f" > /dev/null || exit 1
+        done
+        echo "All golden files are valid JSON"
+
+  cross-parser-check:
+    name: Cross-parser equivalence check (placeholder)
+    runs-on: ubuntu-latest
+    needs: parse-test-corpus
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Note on cross-parser testing
+      run: |
+        echo "Cross-parser equivalence testing is configured."
+        echo "To add C and JS parser comparisons:"
+        echo "1. Implement parsers in c_kernel/ and appropriate JS directory"
+        echo "2. Add steps to compare their JSON output against aln/test-corpus/golden/"
+        echo "3. Use diff or jq to verify equivalence"
+        echo ""
+        echo "Current status: Rust parser is the reference implementation."

@@ -1,4 +1,38 @@
 ```
-# Database related
-*.sql
+# Dependencies
+target/
+**/target/
+
+# Compiled files
+**/*.rs.bk
+**/*.lock.bk
+
+# Logs and temp files
+*.log
+*.tmp
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# MyPy cache
+.mypy_cache/
+.pytest_cache/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
 ```
