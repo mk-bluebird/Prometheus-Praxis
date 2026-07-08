@@ -1,13 +1,25 @@
+# crates/city-pass/Cargo.toml
+
 [package]
 name = "city-pass"
 version = "0.1.0"
 edition = "2024"
-license = "Apache-2.0"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
 description = "Sovereign, offline-capable transit pass crate for Phoenix metro"
+repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
+categories = ["authentication", "embedded", "no-std"]
+keywords = ["phoenix", "transit", "sovereign", "offline"]
+readme = "README.md"
+
+[lib]
+name = "city_pass"
+path = "src/lib.rs"
+crate-type = ["rlib"]
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
 time = { version = "0.3", features = ["formatting", "parsing"] }
 uuid = { version = "1.10", features = ["serde", "v4"] }
 thiserror = "1.0"
