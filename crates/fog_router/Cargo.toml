@@ -1,14 +1,64 @@
 # Filename: crates/fog_router/Cargo.toml
+
 [package]
 name = "fog_router"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "FOG routing gateway and guard integration for eco_restoration_shard"
+repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
+
+[lib]
+# Main library entry; src/lib.rs is the default path.
+name = "fog_router"
+path = "src/lib.rs"
+crate-type = ["rlib"]
 
 [dependencies]
+# Async runtime for any gateway/MCP/HTTP handling.
 tokio = { version = "1.38.0", features = ["rt-multi-thread", "macros"] }
+
+# Serialization for JSON request/response envelopes.
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = { version = "1.0.120" }
 
+# Gateway logging and error handling (optional but recommended).
+log = "0.4.21"
+anyhow = "1.0.86"
+
+# Local ecosafety core crate (path relative to workspace root).
+# Adjust the path if your mono-repo layout differs.
+cyboquatic-ecosafety = { path = "../cyboquatic-ecosafety" }
+
+# Local FOG router guard crate that wraps safestep/decide_route.
+fog-router-guard = { path = "../fog-router-guard" }
+
+# Cross-constellation index / governance crate, if present.
+# If this crate has a different name, update accordingly.
+cross-constellation-index = { path = "../cross-constellation-index", optional = true }
+
 [dev-dependencies]
+# Kani should be available for proof harnesses; it is non-optional in the sense
+# that all Kani code is compiled under cfg(kani), but Kani must be present.
 kani = "0.67.0"
+
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
+
+[features]
+# Default feature set for production builds.
+default = ["runtime"]
+
+# Runtime feature enables tokio integration and any gateway loop code.
+runtime = []
+
+# Enable cross-constellation workflows when the cross-constellation-index crate
+# is present and configured.
+cross-constellation = ["cross-constellation-index"]
+
+[workspace]
+# This section ensures fog_router is a workspace crate when built standalone.
+# If you already have a top-level workspace Cargo.toml, this can be omitted,
+# but including it here is harmless for local builds.
+members = []
