@@ -1,6 +1,3 @@
-// Filename: crates/cyboquatic-ecosafety/src/lib.rs
-// Destination: github.com/mk-bluebird/Prometheus-Praxis
-
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 #![deny(clippy::unwrap_used)]
@@ -75,38 +72,10 @@ mod fog_guard;
 /// Embedded ALN specification for the ecosafety envelope.
 ///
 /// This string must match the contents of
-/// `qpudatashards/particles/CyboquaticEcosafetyEnvelopePhoenix2026v1.aln`
+/// `specs/CyboquaticEcosafetyEnvelopePhoenix2026v1.aln`
 /// in the Prometheus-Praxis repository.
 pub const ECOSAFETY_ALN_SPEC: &str =
-    include_str!("../../qpudatashards/particles/CyboquaticEcosafetyEnvelopePhoenix2026v1.aln");
-
-/// Construct a `FogGuardInput` from a `CyboNodeEcosafetyEnvelope` and an explicit
-/// `corridor_present` flag.
-///
-/// This function is the canonical wiring between ecosafety envelopes and the
-/// FOG guard; all routing and sewer actuation gates should pass through it.
-pub fn fog_guard_input_from_envelope(
-    envelope: &CyboNodeEcosafetyEnvelope,
-    corridor_present: bool,
-) -> FogGuardInput {
-    let ker = envelope.ker();
-    let risk = envelope.risk();
-    let residual = envelope.residual();
-
-    let k = RiskCoord::new_clamped(ker.k());
-    let e = RiskCoord::new_clamped(ker.e());
-    let r = RiskCoord::new_clamped(ker.r());
-
-    FogGuardInput {
-        risk,
-        residual,
-        corridor_present,
-        safestep_ok: ker.kerdeployable(),
-        k,
-        e,
-        r,
-    }
-}
+    include_str!("../specs/CyboquaticEcosafetyEnvelopePhoenix2026v1.aln");
 
 /// Configuration types for ecosafety frames.
 pub mod config_reexport {
@@ -211,3 +180,114 @@ pub use fog_guard::{
     FogGuardKerThresholds,
     FogGuardVerdict,
 };
+
+/// Construct a `FogGuardInput` from a `CyboNodeEcosafetyEnvelope` and an explicit
+/// `corridor_present` flag.
+///
+/// This function is the canonical wiring between ecosafety envelopes and the
+/// FOG guard; all routing and sewer actuation gates should pass through it.
+pub fn fog_guard_input_from_envelope(
+    envelope: &CyboNodeEcosafetyEnvelope,
+    corridor_present: bool,
+) -> FogGuardInput {
+    let ker = envelope.ker();
+    let risk = envelope.risk();
+    let residual = envelope.residual();
+
+    let k = RiskCoord::new_clamped(ker.k());
+    let e = RiskCoord::new_clamped(ker.e());
+    let r = RiskCoord::new_clamped(ker.r());
+
+    FogGuardInput {
+        risk,
+        residual,
+        corridor_present,
+        safestep_ok: ker.kerdeployable(),
+        k,
+        e,
+        r,
+    }
+}
+
+/// Evaluate a safestep verdict for a `CyboNodeEcosafetyEnvelope`.
+///
+/// Callers supply:
+/// - `envelope`: the current ecosafety state for the node,
+/// - `corridor_present`: whether a valid corridor exists for this step,
+/// - `cfg`: optional guard configuration; if `None`, defaults are used.
+///
+/// This helper is the single entry point that FOG routers and sewer planners
+/// should call before proposing any actuation.
+pub fn safestep(
+    envelope: &CyboNodeEcosafetyEnvelope,
+    corridor_present: bool,
+    cfg: Option<FogGuardConfig>,
+) -> FogGuardVerdict {
+    let guard_cfg = cfg.unwrap_or_else(FogGuardConfig::default);
+    let guard = FogGuard::new(guard_cfg);
+    let input = fog_guard_input_from_envelope(envelope, corridor_present);
+    guard.evaluate(&input)
+}
+
+/// Non-actuating smoke test for the `safestep` helper.
+///
+/// This function is intended for use in unit tests or diagnostics to verify
+/// that the default guard configuration accepts a clearly safe envelope and
+/// rejects one that violates KER and RoH constraints.
+///
+/// It does not touch any hardware or external IO.
+pub fn safestep_smoke_test() {
+    let risk = RiskVector {
+        rcec: RiskCoord::new_clamped(0.0),
+        rsat: RiskCoord::new_clamped(0.0),
+        rsurcharge: RiskCoord::new_clamped(0.0),
+        rbiodiv: RiskCoord::new_clamped(0.0),
+        rvt: RiskCoord::new_clamped(0.0),
+        rgovernance: RiskCoord::new_clamped(0.0),
+    };
+
+    let weights = LyapunovWeights::equal();
+    let prev_residual = LyapunovResidual { value: 0.0 };
+    let mut ker = KERWindow::new();
+    ker.update(prev_residual, prev_residual, risk);
+
+    let envelope = CyboNodeEcosafetyEnvelope::new(
+        crate::types::CyboLane::Production,
+        risk,
+        weights,
+        prev_residual,
+        ker,
+        "0x00".to_string(),
+        "did:bostrom:test".to_string(),
+    );
+
+    let verdict_ok = safestep(&envelope, true, None);
+    assert!(matches!(verdict_ok, FogGuardVerdict::Allow));
+
+    let mut ker_bad = KERWindow::new();
+    ker_bad.update(
+        prev_residual,
+        prev_residual,
+        RiskVector {
+            rcec: RiskCoord::new_clamped(0.9),
+            rsat: RiskCoord::new_clamped(0.9),
+            rsurcharge: RiskCoord::new_clamped(0.9),
+            rbiodiv: RiskCoord::new_clamped(0.9),
+            rvt: RiskCoord::new_clamped(0.9),
+            rgovernance: RiskCoord::new_clamped(0.9),
+        },
+    );
+
+    let bad_envelope = CyboNodeEcosafetyEnvelope::new(
+        crate::types::CyboLane::Production,
+        risk,
+        weights,
+        prev_residual,
+        ker_bad,
+        "0x00".to_string(),
+        "did:bostrom:test".to_string(),
+    );
+
+    let verdict_bad = safestep(&bad_envelope, true, None);
+    assert!(matches!(verdict_bad, FogGuardVerdict::Stop));
+}
