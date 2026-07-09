@@ -1,0 +1,59 @@
+flowchart TD
+
+subgraph B[AI Browser / Comet]
+  B1[CometBrowserTransport\n(toolDefinitions)]
+  B2[MCPBoundaryGuard\n(JSON Schema + SafetyEnvelopeGuard)]
+  B3[MCPRoutePlannerGate\n(EcoPlanner pre-gate mirror)]
+end
+
+subgraph G[ppx_continuity_mcp Gateway]
+  G1[MCP Request Router\n(match toolId)]
+  G2[SafetyEnvelopeValidator\n(neurorights_safety)]
+  G3[EcoPlanner Gate\n(organichain_eco_planner)]
+end
+
+subgraph H[MCP Tool Handlers\nRust, non-actuating]
+  H1[handle_fog_guard_route]
+  H2[handle_tile_space_probe]
+  H3[handle_eco_lane_planner]
+  H4[handle_fog_tile_bridge]
+  H5[handle_nanoroute_probe]
+  H6[handle_ker_window_update]
+  H7[handle_ecowealth_snapshot]
+  H8[handle_roh_guard_probe]
+end
+
+subgraph E[Downstream Eco / Actuation Layer]
+  E1[FogGuard / safestep\n(FOG & tile-space guards)]
+  E2[Actuation Corridors\n(FPGA / fieldbus)]
+end
+
+%% Browser side
+B1 -->|tool call JSON| B2
+B2 -->|structurally valid\n+ host envelope Allow| B3
+B2 -->|invalid or unsafe| B1
+
+B3 -->|allowed + routenanoswarmenergy| G1
+B3 -->|missing_data| B1
+
+%% Gateway boundary
+G1 -->|deserialize request| G2
+G2 -->|Allow| G3
+G2 -->|Derate/Stop| G1
+
+G3 -->|EcoPlanner::check_route OK\nmonotone & corridors present| H1
+G3 -->|MissingCorridor\nMissingEnergy\nNonMonotone| G1
+
+%% Handlers
+H1 -->|FogGuardVerdict / Reject| E1
+H2 -->|diagnostic only| E1
+H3 -->|eco-plan output| E1
+H4 -->|bridge plan| E1
+H5 -->|nano diagnostics| E1
+H6 -->|KER window update| E1
+H7 -->|eco-wealth snapshot| E1
+H8 -->|RoH guard probe| E1
+
+%% Actuation envelope (conceptual)
+E1 -->|AllowRoute / BlockRoute| E2
+E2 -->|final hardware gate\nRoH, FPIC, corridor bands| E2
