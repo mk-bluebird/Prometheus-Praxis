@@ -1,0 +1,51 @@
+flowchart TD
+
+subgraph C["Comet / AI Browser"]
+  U["AI Agent<br/>(Perkūnos-Nexus host)"]
+  S["AiChatSessionDuty"]
+  B["MCPBoundaryGuard<br/>(JSON Schema + SafetyEnvelopeGuard)"]
+end
+
+subgraph M["ppx_continuity_mcp Gateway"]
+  R["MCP Router"]
+  E["EcoPlannerSessionState<br/>(per-session cache)"]
+  P["EcoPlanner<br/>(routenanoswarmenergy)"]
+  N["PsychRiskBandEval<br/>(cybercore-psychrisk)"]
+end
+
+subgraph G["Eco Restoration Core"]
+  K["KerWindowManager<br/>(ALN-bound KER window)"]
+  SE["SafetyEnvelopeValidator<br/>(neurorights_safety)"]
+end
+
+subgraph ERR["Error Channel"]
+  ER["EcoRestorationError<br/>(kind + PsychRiskBandInfo)"]
+end
+
+%% AI chat session lifecycle
+U -->|"create_session DID"| S
+S -->|"MCP tool: create_session"| B
+B -->|"valid + safe envelope"| R
+R -->|"issue DID challenge<br/>+ create SessionRecord"| S
+
+%% AI chat query loop
+U -->|"tool call JSON<br/>with session_id"| S
+S -->|"MCP tool: domain_call"| B
+B -->|"validated request"| R
+R -->|"load session + EcoPlannerSessionState"| E
+E -->|"last routenanoswarmenergy<br/>hint"| P
+P -->|"fresh decision + m_eco"| E
+
+%% Safety / KER / psych risk gates
+R -->|"build host envelope"| SE
+SE -->|"Allow / Derate / Stop"| R
+R -->|"query KerWindow"| K
+K -->|"KER window view"| R
+R -->|"psych metrics"| N
+N -->|"band + downgrade hint"| ER
+
+%% Error / response propagation
+R -->|"success payload"| S
+R -->|"Err(EcoRestorationError)"| ER
+ER -->|"kind, message,<br/>psych_risk_band,<br/>suggested_mission_downgrade"| S
+S -->|"structured result<br/>(payload or error with bands)"| U
