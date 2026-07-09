@@ -1,0 +1,32 @@
+# Filename: aln/biodegradation-microresidue-link.v1.aln
+# Governance shard linking OECD biodegradation scores to r_micro corridors.
+
+meta,plane_id,rmicro,,
+meta,description,"Microresidue risk from biodegradation tests",,
+meta,owner_did,"bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7",,
+
+# Corridor bands for rmicro (safe/gold/hard based on biodegradation fraction B in ISO 14851/14855 tests).
+# B is mean percentage of biodegradation at test horizon T_h, corrected for blanks and reference.
+# rmicro = 1 - g(B), where g(B) is a monotone map from [0,100] to [0,1].
+
+# Safe: high biodegradation (OECD ready or inherently biodegradable).
+ROW,plane_corridor,rmicro_safe_min,scalar,rmicro_safe_min,0.0,float,range0,1
+ROW,plane_corridor,rmicro_safe_max,scalar,rmicro_safe_max,0.2,float,range0,1
+
+# Gold: intermediate biodegradation, some persistence.
+ROW,plane_corridor,rmicro_gold_min,scalar,rmicro_gold_min,0.2,float,range0,1
+ROW,plane_corridor,rmicro_gold_max,scalar,rmicro_gold_max,0.6,float,range0,1
+
+# Hard: low biodegradation, microresidue risk high.
+ROW,plane_corridor,rmicro_hard_min,scalar,rmicro_hard_min,0.6,float,range0,1
+ROW,plane_corridor,rmicro_hard_max,scalar,rmicro_hard_max,1.0,float,range0,1
+
+# Mapping parameters: piecewise-linear g(B) with test variability margin.
+# B_safe_high ~ 70% (ISO ready biodegradation threshold); B_hard_low ~ 20%.
+ROW,biodegradation_map,B_safe_high,scalar,B_safe_high,70.0,float,range0,100
+ROW,biodegradation_map,B_hard_low,scalar,B_hard_low,20.0,float,range0,100
+ROW,biodegradation_map,B_sigma_max,scalar,B_sigma_max,10.0,float,range0,100
+
+# QSAR fingerprint profile binding; model_id refers to a pre-trained QSAR model.
+ROW,qsar_profile,model_id,scalar,model_id,"QSAR_MICRO_PERSISTENCE_V1",string,,
+ROW,qsar_profile,fingerprint_type,scalar,fingerprint_type,"ECFP4",string,,
