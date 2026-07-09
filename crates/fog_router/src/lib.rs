@@ -4,6 +4,7 @@
 // rust-version = "1.85"
 
 #![cfg_attr(not(test), no_std)]
+#![forbid(unsafe_code)]
 
 extern crate alloc;
 
@@ -15,8 +16,20 @@ use mlua::{Function, Lua, Result as LuaResult, Table, Value};
 use rusqlite::{params, Connection, Result as SqlResult};
 use serde::{Deserialize, Serialize};
 
+use cyboquatic_ecosafety::{
+    CyboLane,
+    CyboNodeEcosafetyEnvelope,
+    KERWindow,
+    LyapunovResidual,
+    LyapunovWeights,
+    RiskCoord,
+    RiskVector,
+    FogGuardConfig,
+    FogGuardVerdict,
+    safestep,
+};
+
 /// Minimal qpudatashard view for routing decisions.
-/// This struct mirrors the Lyapunov and predicate context exposed by ecosafety shards.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct QpuDataShard {
     pub node_id: String,
@@ -28,8 +41,52 @@ pub struct QpuDataShard {
     pub lyapunov_ok: bool,
 }
 
-/// Shared risk coordinates as stored in the memory-mapped SQLite DB.
-/// These must match the schema used by the hydraulic and ecosafety spine.
+/// High-level route decision for a FOG node window.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum FogRouteDecision {
+    AllowRoute,
+    BlockRoute,
+}
+
+/// Minimal snapshot of FOG node state needed for ecosafety routing.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct FogNodeSnapshot {
+    pub lane: CyboLane,
+    pub risk: RiskVector,
+    pub ker_window: KERWindow,
+    pub prev_residual: LyapunovResidual,
+    pub evidencehex: String,
+    pub did: String,
+    pub corridor_present: bool,
+}
+
+fn envelope_from_snapshot(snapshot: &FogNodeSnapshot) -> CyboNodeEcosafetyEnvelope {
+    let weights = LyapunovWeights::equal();
+    CyboNodeEcosafetyEnvelope::new(
+        snapshot.lane,
+        snapshot.risk,
+        weights,
+        snapshot.prev_residual,
+        snapshot.ker_window,
+        snapshot.evidencehex.clone(),
+        snapshot.did.clone(),
+    )
+}
+
+/// Safestep-based routing decision for a FOG node snapshot.
+pub fn decide_route(
+    snapshot: &FogNodeSnapshot,
+    cfg: Option<FogGuardConfig>,
+) -> FogRouteDecision {
+    let envelope = envelope_from_snapshot(snapshot);
+    let verdict = safestep(&envelope, snapshot.corridor_present, cfg);
+    match verdict {
+        FogGuardVerdict::Allow => FogRouteDecision::AllowRoute,
+        FogGuardVerdict::Stop => FogRouteDecision::BlockRoute,
+    }
+}
+
+/// Shared risk coordinates stored in SQLite.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RiskCoords {
     pub timestamp_utc: String,
@@ -44,7 +101,7 @@ pub struct RiskCoords {
     pub rsigma: f32,
 }
 
-/// Tree-of-Life weights aligned to governance ALN via build.rs in the full system.
+/// Tree-of-Life weights aligned to governance ALN.
 #[derive(Debug, Clone, Copy)]
 pub struct RiskWeights {
     pub whydraulic: f32,
@@ -85,7 +142,6 @@ pub fn lyapunov_residual(coords: &RiskCoords, weights: RiskWeights) -> f32 {
     v
 }
 
-/// Routing decision verdict.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum RoutingVerdict {
     Allow,
@@ -93,7 +149,6 @@ pub enum RoutingVerdict {
     Deny,
 }
 
-/// Routing decision record for logging and diagnostics.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoutingDecision {
     pub timestamp_utc: String,
@@ -105,8 +160,12 @@ pub struct RoutingDecision {
     pub evidence_hex: String,
 }
 
-/// Hex-stamp builder for routing decisions.
-pub fn build_evidence_hex(node_id: &str, timestamp_utc: &str, previous_v: f32, current_v: f32) -> String {
+pub fn build_evidence_hex(
+    node_id: &str,
+    timestamp_utc: &str,
+    previous_v: f32,
+    current_v: f32,
+) -> String {
     use core::fmt::Write;
     let mut s = String::new();
     let payload = format!("{node_id}|{timestamp_utc}|{previous_v:.6}|{current_v:.6}");
@@ -116,19 +175,15 @@ pub fn build_evidence_hex(node_id: &str, timestamp_utc: &str, previous_v: f32, c
     s
 }
 
-/// Hysteresis configuration: only re-evaluate routing if |V_t - V_{t-1}| exceeds delta_v_min.
 #[derive(Debug, Clone, Copy)]
 pub struct HysteresisConfig {
     pub delta_v_min: f32,
 }
 
-/// Core Lyapunov guard: returns true iff V_{t+1} <= V_t.
 pub fn lyapunov_ok(previous_v: f32, current_v: f32) -> bool {
     current_v <= previous_v
 }
 
-/// Evaluate a routing decision for a given node, previous and current coordinates,
-/// with hysteresis and diagnostic-only mode.
 pub fn evaluate_routing_decision(
     node_id: &str,
     previous: &RiskCoords,
@@ -166,7 +221,6 @@ pub fn evaluate_routing_decision(
     }
 }
 
-/// Log a routing decision into a SQLite table `fog_routing_decisions`.
 pub fn log_routing_decision(conn: &Connection, decision: &RoutingDecision) -> SqlResult<()> {
     conn.execute(
         "INSERT INTO fog_routing_decisions (
@@ -191,7 +245,6 @@ pub fn log_routing_decision(conn: &Connection, decision: &RoutingDecision) -> Sq
     Ok(())
 }
 
-/// Workload descriptor for FOG routing and ecosafety checks.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WorkloadDescriptor {
     pub workload_id: String,
@@ -199,7 +252,6 @@ pub struct WorkloadDescriptor {
     pub media_class: String,
 }
 
-/// Router decision for FOG routing layer.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum RouterDecision {
     Accept {
@@ -215,8 +267,6 @@ pub enum RouterDecision {
     },
 }
 
-/// Pure predicate bundle for ecosafety routing.
-/// All fields must be true, and the Lyapunov residual must be non-increasing.
 fn all_predicates_hold(shard: &QpuDataShard) -> bool {
     shard.tailwind_valid
         && shard.biosurface_ok
@@ -225,7 +275,6 @@ fn all_predicates_hold(shard: &QpuDataShard) -> bool {
         && shard.vt_next_est <= shard.vt_prev
 }
 
-/// Core routing evaluation: enforce ecosafety predicates and decide Accept/Reroute/Reject.
 pub fn evaluate_workload(
     shard: &QpuDataShard,
     _workload: &WorkloadDescriptor,
@@ -260,7 +309,6 @@ pub fn evaluate_workload(
     }
 }
 
-/// FOG routing predicate test result from Lua.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum FogRoutingDecision {
     RouteOk,
@@ -268,7 +316,6 @@ pub enum FogRoutingDecision {
     Block,
 }
 
-/// Immutable view of a FOG shard row for Lua inspection.
 #[derive(Debug, Copy, Clone)]
 pub struct FogShardView {
     pub node_id: &'static str,
@@ -278,7 +325,6 @@ pub struct FogShardView {
     pub r_hydraulics: f32,
 }
 
-/// Sandboxed Lua engine for evaluating FOG routing predicates on live shard dumps.
 pub struct FogLuaSandbox<'lua> {
     lua: Lua,
     _marker: PhantomData<&'lua ()>,
@@ -321,14 +367,6 @@ impl<'lua> FogLuaSandbox<'lua> {
         })
     }
 
-    /// Evaluate a routing predicate Lua snippet against a single shard view.
-    ///
-    /// The Lua source must define:
-    ///
-    ///     function decide(shard)
-    ///       -- shard.node_id, shard.medium, shard.r_fog, shard.r_energy, shard.r_hydraulics
-    ///       -- return "route_ok", "needs_desiccation", or "block"
-    ///     end
     pub fn eval_predicate(
         &self,
         lua_source: &str,
@@ -371,7 +409,6 @@ impl<'lua> FogLuaSandbox<'lua> {
     }
 }
 
-/// State for one canal reach used in thermal and hydraulic audits.
 #[derive(Copy, Clone)]
 pub struct CanalState {
     pub q_m3_s: f64,
@@ -380,7 +417,6 @@ pub struct CanalState {
     pub theta_mm: f64,
 }
 
-/// Observation vector combining satellite ET and canal telemetry.
 #[derive(Copy, Clone)]
 pub struct CanalObs {
     pub et_mm_day: f64,
@@ -388,7 +424,6 @@ pub struct CanalObs {
     pub t_c: f64,
 }
 
-/// Risk coordinates derived from state for Lyapunov residual.
 #[derive(Copy, Clone)]
 pub struct CanalRiskCoords {
     pub r_thermal: f64,
@@ -396,15 +431,13 @@ pub struct CanalRiskCoords {
     pub r_recharge: f64,
 }
 
-/// Lyapunov weights for canal residual.
 #[derive(Copy, Clone)]
-pub struct LyapunovWeights {
+pub struct CanalLyapunovWeights {
     pub w_thermal: f64,
     pub w_hydraulic: f64,
     pub w_recharge: f64,
 }
 
-/// Ensemble member for EnKF.
 #[derive(Copy, Clone)]
 pub struct EnsembleMember {
     pub state: CanalState,
@@ -420,7 +453,6 @@ fn clamp01(x: f64) -> f64 {
     }
 }
 
-/// Map physical state to risk coordinates using corridor bands.
 pub fn state_to_risk(
     state: &CanalState,
     t_gold_c: f64,
@@ -461,8 +493,7 @@ pub fn state_to_risk(
     }
 }
 
-/// Compute Lyapunov residual V_t for canal reach.
-pub fn compute_vt(risk: &CanalRiskCoords, w: &LyapunovWeights) -> f64 {
+pub fn compute_vt(risk: &CanalRiskCoords, w: &CanalLyapunovWeights) -> f64 {
     let v = w.w_thermal * risk.r_thermal * risk.r_thermal
         + w.w_hydraulic * risk.r_hydraulic * risk.r_hydraulic
         + w.w_recharge * risk.r_recharge * risk.r_recharge;
@@ -473,7 +504,6 @@ pub fn compute_vt(risk: &CanalRiskCoords, w: &LyapunovWeights) -> f64 {
     }
 }
 
-/// Simple forecast model f(x_k) for one time step.
 pub fn forecast_state(
     prev: &CanalState,
     dq_ops_m3_s: f64,
@@ -503,7 +533,6 @@ pub fn forecast_state(
     }
 }
 
-/// Observation operator h(x): predicted ET and canal telemetry.
 pub fn observe_state(state: &CanalState) -> CanalObs {
     let et_mm_day = (state.theta_mm * 0.05 + (state.t_c - 15.0) * 0.2).max(0.0);
     CanalObs {
@@ -513,12 +542,11 @@ pub fn observe_state(state: &CanalState) -> CanalObs {
     }
 }
 
-/// EnKF update for a single reach (scalar-gain approximation, non-actuating).
 pub fn enkf_update(
     ensemble: &mut [EnsembleMember],
     obs: CanalObs,
     prev_vt: f64,
-    weights: &LyapunovWeights,
+    weights: &CanalLyapunovWeights,
     corridors: (f64, f64, f64, f64, f64, f64),
     max_delta_vt: f64,
 ) {
@@ -765,7 +793,7 @@ mod tests {
             t_c: 26.0,
         };
 
-        let weights = LyapunovWeights {
+        let weights = CanalLyapunovWeights {
             w_thermal: 0.5,
             w_hydraulic: 0.3,
             w_recharge: 0.2,
