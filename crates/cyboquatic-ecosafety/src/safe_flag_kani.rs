@@ -1,7 +1,7 @@
-//! Kani harness for SAFE_FLAG monotone behavior on the Rust side.
+//! Kani proof harness for SAFE_FLAG monotone behavior.
 //!
-//! Proves that, under the SafeFlagModel, SAFE_FLAG never transitions
-//! from Low back to High without a reset. [file:23][file:41]
+//! This harness proves that under the SafeFlagModel, once SAFE_FLAG
+//! drops to Low, it never returns to High without an external reset.
 
 #![cfg(kani)]
 #![forbid(unsafe_code)]
@@ -10,15 +10,10 @@ use kani::any;
 use crate::safe_flag::{SafeFlagModel, SafeFlagState};
 
 #[kani::proof]
-fn safe_flag_monotone() {
-    // Start from a fresh SAFE_FLAG in High state.
+fn safe_flag_monotone_low_absorbing() {
     let mut model = SafeFlagModel::new();
 
-    // Apply a bounded sequence of governance verdicts, each indicating
-    // whether the ecosafety kernel considered the system safe.
-    //
-    // For Kani, we model 3 steps; this is sufficient given the simple
-    // state machine and can be extended if needed. [file:23][file:41]
+    // Model a small sequence of ecosafety verdicts.
     let v1: bool = any();
     let v2: bool = any();
     let v3: bool = any();
@@ -32,9 +27,7 @@ fn safe_flag_monotone() {
     model.apply_verdict(v3);
     let s3 = model.state();
 
-    // Monotonicity: once Low, always Low.
-    //
-    // If at any step SAFE_FLAG is Low, all subsequent states must be Low.
+    // Absorbing Low: once Low, always Low.
     if s1 == SafeFlagState::Low {
         assert!(s2 == SafeFlagState::Low);
         assert!(s3 == SafeFlagState::Low);
@@ -44,7 +37,7 @@ fn safe_flag_monotone() {
         assert!(s3 == SafeFlagState::Low);
     }
 
-    // Additional coverage: SAFE_FLAG may remain High if all verdicts are safe.
+    // Coverage: it is possible to stay High if all verdicts are safe.
     kani::cover!(
         s1 == SafeFlagState::High &&
         s2 == SafeFlagState::High &&
