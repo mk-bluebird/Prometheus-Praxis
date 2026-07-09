@@ -49,6 +49,29 @@ pub use crate::privacy::{
     reconstruct_global_stats,
 };
 
+mod config;
+mod ker;
+mod frame;
+mod window;
+mod lyapunov_regime;
+mod risk;
+mod covariance;
+mod integrity;
+mod aln_schema;
+mod shard_schema;
+mod shard_update_validator;
+mod provenance;
+mod provenancedetail;
+mod provenancerecord;
+mod provenanceexport;
+mod governance_checker;
+mod ecosafetycovarianceframe;
+mod biodiversity_mesocosm;
+mod pipeline3;
+mod types;
+mod node;
+mod fog_guard;
+
 /// Embedded ALN specification for the ecosafety envelope.
 ///
 /// This string must match the contents of
@@ -57,68 +80,38 @@ pub use crate::privacy::{
 pub const ECOSAFETY_ALN_SPEC: &str =
     include_str!("../../qpudatashards/particles/CyboquaticEcosafetyEnvelopePhoenix2026v1.aln");
 
+/// Construct a `FogGuardInput` from a `CyboNodeEcosafetyEnvelope` and an explicit
+/// `corridor_present` flag.
+///
+/// This function is the canonical wiring between ecosafety envelopes and the
+/// FOG guard; all routing and sewer actuation gates should pass through it.
+pub fn fog_guard_input_from_envelope(
+    envelope: &CyboNodeEcosafetyEnvelope,
+    corridor_present: bool,
+) -> FogGuardInput {
+    let ker = envelope.ker();
+    let risk = envelope.risk();
+    let residual = envelope.residual();
+
+    let k = RiskCoord::new_clamped(ker.k());
+    let e = RiskCoord::new_clamped(ker.e());
+    let r = RiskCoord::new_clamped(ker.r());
+
+    FogGuardInput {
+        risk,
+        residual,
+        corridor_present,
+        safestep_ok: ker.kerdeployable(),
+        k,
+        e,
+        r,
+    }
+}
+
 /// Configuration types for ecosafety frames.
-pub mod config;
-
-/// KER factor and deployability calculations.
-pub mod ker;
-
-/// Core frame and pipeline primitives.
-pub mod frame;
-
-/// Windowing and ecosafety status history.
-pub mod window;
-
-/// Lyapunov regime diagnostics for V_t histories.
-pub mod lyapunov_regime;
-
-/// Risk-space primitives and KER window representation.
-pub mod risk;
-
-/// Covariance-based ecosafety diagnostics.
-pub mod covariance;
-
-/// Integrity frame for adversarial or malformed inputs.
-pub mod integrity;
-
-/// ALN-bound schema and shard parsing.
-pub mod aln_schema;
-
-/// SQL/ALN shard schema model.
-pub mod shard_schema;
-
-/// Shard update validator for ecosafety shards.
-pub mod shard_update_validator;
-
-/// Provenance tracking primitives.
-pub mod provenance;
-
-/// Detailed provenance payloads.
-pub mod provenancedetail;
-
-/// Ecosafety provenance records.
-pub mod provenancerecord;
-
-/// Provenance export helpers.
-pub mod provenanceexport;
-
-/// Governance checker that tags shard updates with sovereignty/consent hints.
-pub mod governance_checker;
-
-/// Covariance-based ecosafety frame implementation.
-pub mod ecosafetycovarianceframe;
-
-/// Biodiversity and mesocosm diagnostics.
-pub mod biodiversity_mesocosm;
-
-/// High-level ecosafety pipeline (Integrity → Covariance → Biodiversity) with provenance.
-pub mod pipeline3;
-
-/// Schema-bound ecosystem types mirroring ALN SQL records.
-pub mod types;
-
-/// Common configuration types for ecosafety frames.
-pub use config::EcosafetyConfig;
+pub mod config_reexport {
+    pub use crate::config::EcosafetyConfig;
+}
 
 /// Dynamic KER calculator based on covariance condition number and ecosafety distance.
 pub use ker::KerFactors;
@@ -207,4 +200,14 @@ pub use biodiversity_mesocosm::{
     BiodiversityIntegrityFrame,
     MesocosmRiskFrame,
     MesocosmShardRow,
+};
+
+/// FOG guard primitives.
+pub use fog_guard::{
+    FogGuard,
+    FogGuardBands,
+    FogGuardConfig,
+    FogGuardInput,
+    FogGuardKerThresholds,
+    FogGuardVerdict,
 };
