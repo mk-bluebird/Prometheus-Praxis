@@ -1,43 +1,53 @@
-//! SAFE_FLAG wrapper for iCE40 governance FPGA.
+//! SAFE_FLAG governance signal model for iCE40 Lyapunov kernel.
 //!
-//! This module provides a minimal Rust-side representation of the
-//! SAFE_FLAG signal, suitable for Kani proofs. Real hardware access
-//! is abstracted behind trait-based interfaces to keep this non-actuating.
-//! [file:23][file:41]
+//! This module provides a minimal, purely logical representation of the
+//! SAFE_FLAG signal used to gate actuation in hardware. It is non-actuating
+//! and suitable for Kani proofs and production ecosafety kernels.
 
 #![forbid(unsafe_code)]
 
+/// Logical state of SAFE_FLAG as seen by the Rust ecosafety kernel.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SafeFlagState {
-    /// Hardware indicates safe corridor (actuation permitted).
+    /// Ecosafety kernel considers the system safe (actuation permissible).
     High,
-    /// Hardware indicates unsafe state (STOP asserted).
+    /// Ecosafety kernel considers the system unsafe (STOP asserted).
     Low,
 }
 
-/// Pure, in-memory model of SAFE_FLAG evolution.
-/// This is what Kani reasons over; hardware mappings are tested
-/// separately with integration tests on the iCE40 board.
-/// [file:23][file:41]
+/// Pure state machine model for SAFE_FLAG evolution.
+///
+/// Invariants:
+/// - High -> High and High -> Low transitions are allowed.
+/// - Low -> Low transitions are allowed.
+/// - Low -> High transitions are disallowed without an external reset
+///   (reset is not modeled here).
 #[derive(Clone, Debug)]
 pub struct SafeFlagModel {
     state: SafeFlagState,
 }
 
 impl SafeFlagModel {
-    /// Create a new SAFE_FLAG model, starting from High (safe).
+    /// Initialize SAFE_FLAG in the safe (High) state.
     pub fn new() -> Self {
-        Self { state: SafeFlagState::High }
+        Self {
+            state: SafeFlagState::High,
+        }
     }
 
-    /// Apply a governance verdict from the ecosafety kernel.
+    /// Initialize SAFE_FLAG from an explicit state.
     ///
-    /// - If verdict is `true` (safe), SAFE_FLAG stays in its current state.
-    /// - If verdict is `false` (unsafe), SAFE_FLAG becomes Low and
-    ///   stays Low thereafter.
+    /// This allows integration tests and harnesses to start directly
+    /// from Low when modeling post-fault behavior.
+    pub fn from_state(state: SafeFlagState) -> Self {
+        Self { state }
+    }
+
+    /// Apply a new ecosafety verdict.
     ///
-    /// This enforces monotone behavior: High -> Low is allowed; Low -> High
-    /// is disallowed without an external reset not modeled here. [file:23]
+    /// `verdict_safe` is the result of the internal ecosafety kernel
+    /// (Lyapunov + KER + corridor checks). When false, SAFE_FLAG drops
+    /// to Low and remains there.
     pub fn apply_verdict(&mut self, verdict_safe: bool) {
         match (self.state, verdict_safe) {
             (SafeFlagState::High, false) => {
@@ -52,7 +62,21 @@ impl SafeFlagModel {
         }
     }
 
+    /// Current SAFE_FLAG state.
     pub fn state(&self) -> SafeFlagState {
         self.state
+    }
+
+    /// Whether SAFE_FLAG currently permits actuation.
+    ///
+    /// This is a convenience wrapper for consumers that only need a
+    /// boolean gate.
+    pub fn is_high(&self) -> bool {
+        matches!(self.state, SafeFlagState::High)
+    }
+
+    /// Whether SAFE_FLAG currently asserts STOP.
+    pub fn is_low(&self) -> bool {
+        matches!(self.state, SafeFlagState::Low)
     }
 }
