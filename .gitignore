@@ -1,38 +1,33 @@
 ```
-# Dependencies
-target/
-**/target/
+# Browser-specific build artifacts
+*.js.map
+*.min.js
+*.bundle.js
 
-# Compiled files
-**/*.rs.bk
-**/*.lock.bk
+# Dependencies
+node_modules/
+
+# Editors
+.vscode/
+.idea/
 
 # Logs and temp files
 *.log
 *.tmp
+*.swp
 
 # Environment
 .env
 .env.local
 *.env.*
 
-# Editors
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Coverage
+# Coverage and test reports
 coverage/
 htmlcov/
-.coverage
+*.coverage
 
-# MyPy cache
-.mypy_cache/
-.pytest_cache/
-
-# Distribution / packaging
+# Build outputs
 dist/
 build/
-*.egg-info/
+target/
 ```
