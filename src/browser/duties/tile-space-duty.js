@@ -1,8 +1,10 @@
-// FILE: src/browser/duties/tile-space-duty.js
+// src/browser/duties/tile-space-duty.js
 // ROLE: Virtual tile graph and safe transitioning/querying for eco-restoration objects.
 // NOTE: Non-actuating: purely data-space, no device control.
 
 "use strict";
+
+import EcoStationRegistryDuty from "./eco-station-registry.js";
 
 /**
  * @typedef {Object} TileCoord
@@ -12,15 +14,14 @@
 
 /**
  * @typedef {Object} VirtualTile
- * @property {string} id                - Stable tile identifier (matches TileId in ALN/Rust).
- * @property {TileCoord} coord          - Logical coordinate in the virtual grid.
- * @property {string[]} corridorIds     - CorridorEnvelope IDs applying to this tile.
- * @property {string[]} neighborIds     - Adjacent tiles by id.
+ * @property {string} id
+ * @property {TileCoord} coord
+ * @property {string[]} corridorIds
+ * @property {string[]} neighborIds
  */
 
 /**
  * @typedef {Object} RestorationTask
- * Mirrors ALE-ERM-RESTORATION-TASK-001.aln (simplified for JS).
  * @property {string} restoration_task_id
  * @property {string} scenario_id
  * @property {string} tile_id
@@ -32,18 +33,17 @@
  * @property {number} area_m2
  * @property {string} time_window_start
  * @property {string} time_window_end
- * @property {number} k_score           - 0..1
- * @property {number} e_score           - 0..1
- * @property {number} r_score           - 0..1  (RoH component, must respect ceilings)
+ * @property {number} k_score
+ * @property {number} e_score
+ * @property {number} r_score
  * @property {string} gaia_snapshot_ref
  * @property {string} boden_snapshot_ref
  */
 
 /**
  * @typedef {Object} CorridorEnvelope
- * Mirrors ALE-GOV-CORRIDOR-CONSTRAINTS-001.aln (simplified for JS).
  * @property {string} corridor_id
- * @property {string} corridor_type     - "SOIL" | "WATERCHEM" | "HABITAT" | "HEATBUDGET"
+ * @property {string} corridor_type
  * @property {string} region_id
  * @property {number} soil_moisture_min
  * @property {number} soil_moisture_max
@@ -59,13 +59,12 @@
  * @property {number} habitat_continuity_min
  * @property {number} biodiversity_floor
  * @property {number} roh_ceiling_local
- * @property {string} constraint_kind   - "HARD" | "SOFT_HIGH_PENALTY"
+ * @property {string} constraint_kind
  * @property {string[]} treaty_ids
  */
 
 /**
  * @typedef {Object} GaiaSentinelSnapshot
- * Mirrors ALE-GOV-GAIA-SNAPSHOT-001.aln (simplified for JS).
  * @property {string} snapshot_id
  * @property {string} tile_id
  * @property {string} timestamp_utc
@@ -80,12 +79,11 @@
  * @property {boolean} flood_risk_high
  * @property {boolean} fire_risk_high
  * @property {string[]} corridor_violation_ids
- * @property {string} autopause_reason  - "NONE" | "MOISTURE" | "HEAT_DROUGHT" | "FLOOD" | "FIRE" | "COMBINED"
+ * @property {string} autopause_reason
  */
 
 /**
  * @typedef {Object} GaiaCorridorThresholds
- * Mirrors ALE-GOV-GAIA-THRESHOLDS-001.aln (simplified for JS).
  * @property {string} policy_id
  * @property {string} jurisdiction
  * @property {number} soil_moisture_pause_threshold
@@ -104,9 +102,8 @@
 
 /**
  * In-memory index of eco objects keyed by tile.
- * This keeps querying cheap and avoids unsafe cross-object coupling.
  */
-class TileObjectIndex {
+export class LocalTileObjectIndex {
   constructor() {
     /** @type {Map<string, RestorationTask[]>} */
     this.tasksByTile = new Map();
@@ -118,18 +115,10 @@ class TileObjectIndex {
     this.gaiaThresholds = null;
   }
 
-  /**
-   * Attach thresholds (usually from ALN/Rust; here just a JS mirror).
-   * @param {GaiaCorridorThresholds} thresholds
-   */
   setGaiaThresholds(thresholds) {
     this.gaiaThresholds = { ...thresholds };
   }
 
-  /**
-   * Index tasks by tile.
-   * @param {RestorationTask[]} tasks
-   */
   addTasks(tasks) {
     for (const t of tasks) {
       if (!this.tasksByTile.has(t.tile_id)) {
@@ -139,19 +128,13 @@ class TileObjectIndex {
     }
   }
 
-  /**
-   * Index corridors by tile via explicit tile binding.
-   * @param {string} tileId
-   * @param {CorridorEnvelope[]} corridors
-   */
   addCorridorsForTile(tileId, corridors) {
-    this.corridorsByTile.set(tileId, corridors.map(c => ({ ...c })));
+    this.corridorsByTile.set(
+      tileId,
+      corridors.map(c => ({ ...c }))
+    );
   }
 
-  /**
-   * Index Gaia snapshots by tile.
-   * @param {GaiaSentinelSnapshot[]} snapshots
-   */
   addGaiaSnapshots(snapshots) {
     for (const s of snapshots) {
       if (!this.gaiaByTile.has(s.tile_id)) {
@@ -161,33 +144,17 @@ class TileObjectIndex {
     }
   }
 
-  /**
-   * Query tasks on a given tile, optionally filtered by action_kind.
-   * @param {string} tileId
-   * @param {string | null} actionKind
-   * @returns {RestorationTask[]}
-   */
   getTasks(tileId, actionKind = null) {
     const tasks = this.tasksByTile.get(tileId) || [];
     if (!actionKind) return tasks.slice();
     return tasks.filter(t => t.action_kind === actionKind);
   }
 
-  /**
-   * Fetch corridors bound to a tile.
-   * @param {string} tileId
-   * @returns {CorridorEnvelope[]}
-   */
   getCorridors(tileId) {
     const corridors = this.corridorsByTile.get(tileId) || [];
     return corridors.slice();
   }
 
-  /**
-   * Get latest Gaia snapshot for a tile (by timestamp).
-   * @param {string} tileId
-   * @returns {GaiaSentinelSnapshot | null}
-   */
   getLatestGaiaSnapshot(tileId) {
     const snaps = this.gaiaByTile.get(tileId) || [];
     if (snaps.length === 0) return null;
@@ -196,18 +163,6 @@ class TileObjectIndex {
     );
   }
 
-  /**
-   * High-level eco safety summary for a tile.
-   * Combines corridors, latest Gaia, and task RoH to support visualization/query.
-   * @param {string} tileId
-   * @returns {{
-   *   tileId: string,
-   *   corridors: CorridorEnvelope[],
-   *   latestGaia: GaiaSentinelSnapshot | null,
-   *   tasks: RestorationTask[],
-   *   maxTaskRoH: number | null
-   * }}
-   */
   summarizeTile(tileId) {
     const tasks = this.getTasks(tileId, null);
     const corridors = this.getCorridors(tileId);
@@ -215,7 +170,10 @@ class TileObjectIndex {
     const maxTaskRoH =
       tasks.length === 0
         ? null
-        : tasks.reduce((max, t) => (t.r_score > max ? t.r_score : max), 0);
+        : tasks.reduce(
+            (max, t) => (t.r_score > max ? t.r_score : max),
+            0
+          );
 
     return {
       tileId,
@@ -228,13 +186,12 @@ class TileObjectIndex {
 }
 
 /**
- * TileSpaceDuty: manages virtual tiles and safe transitions between them,
- * while exposing queryable views of eco objects for the current tile and neighbors.
+ * LocalTileSpaceGraph: manages virtual tiles and safe transitions between them.
  */
-class TileSpaceDuty {
+export class LocalTileSpaceGraph {
   /**
    * @param {VirtualTile[]} tiles
-   * @param {TileObjectIndex} index
+   * @param {LocalTileObjectIndex} index
    * @param {string} initialTileId
    */
   constructor(tiles, index, initialTileId) {
@@ -249,41 +206,29 @@ class TileSpaceDuty {
       });
     }
 
-    /** @type {TileObjectIndex} */
     this.index = index;
 
     if (!this.tiles.has(initialTileId)) {
-      throw new Error(`Initial tile ${initialTileId} does not exist in TileSpaceDuty.`);
+      throw new Error(
+        `Initial tile ${initialTileId} does not exist in LocalTileSpaceGraph.`
+      );
     }
 
-    /** @type {string} */
     this.activeTileId = initialTileId;
   }
 
-  /**
-   * Get currently active tile.
-   * @returns {VirtualTile}
-   */
   getActiveTile() {
     const tile = this.tiles.get(this.activeTileId);
-    if (!tile) throw new Error("Active tile missing from graph.");
+    if (!tile) {
+      throw new Error("Active tile missing from graph.");
+    }
     return tile;
   }
 
-  /**
-   * List neighbor tile IDs for the active tile.
-   * @returns {string[]}
-   */
   getActiveNeighbors() {
     return this.getActiveTile().neighborIds.slice();
   }
 
-  /**
-   * Attempt to transition to a neighbor tile.
-   * Only neighbor tiles are allowed, preventing arbitrary jumps.
-   * @param {string} targetTileId
-   * @returns {VirtualTile}
-   */
   transitionToNeighbor(targetTileId) {
     const active = this.getActiveTile();
     if (!active.neighborIds.includes(targetTileId)) {
@@ -298,50 +243,88 @@ class TileSpaceDuty {
     return this.getActiveTile();
   }
 
-  /**
-   * Query summarized eco-state for the active tile.
-   * @returns {ReturnType<TileObjectIndex["summarizeTile"]>}
-   */
   summarizeActiveTile() {
     return this.index.summarizeTile(this.activeTileId);
   }
 
-  /**
-   * Query summarized eco-state for neighbors of the active tile.
-   * @returns {Array<ReturnType<TileObjectIndex["summarizeTile"]>>}
-   */
   summarizeNeighborTiles() {
     const neighborIds = this.getActiveNeighbors();
     return neighborIds.map(id => this.index.summarizeTile(id));
   }
 
-  /**
-   * Get all tasks for the active tile, with optional filter by action_kind.
-   * @param {string | null} actionKind
-   * @returns {RestorationTask[]}
-   */
   getActiveTileTasks(actionKind = null) {
     return this.index.getTasks(this.activeTileId, actionKind);
   }
 
-  /**
-   * Get latest Gaia snapshot for the active tile.
-   * @returns {GaiaSentinelSnapshot | null}
-   */
   getActiveTileLatestGaia() {
     return this.index.getLatestGaiaSnapshot(this.activeTileId);
   }
 
-  /**
-   * Get corridor envelopes bound to the active tile.
-   * @returns {CorridorEnvelope[]}
-   */
   getActiveTileCorridors() {
     return this.index.getCorridors(this.activeTileId);
   }
 }
 
-module.exports = {
-  TileObjectIndex,
-  TileSpaceDuty,
-};
+/**
+ * TileObjectIndex: facade for tile-centric objects over MCP (imagery, envelopes, eco-stations).
+ * Uses EcoPlanner-aware EcoStationRegistryDuty for eco-station queries.
+ */
+export class TileObjectIndex {
+  /**
+   * @param {(request:any) => Promise<any>} transport
+   */
+  constructor(transport) {
+    this.transport = transport;
+    this.ecoStationRegistry = new EcoStationRegistryDuty(transport);
+  }
+
+  /**
+   * Fetch eco-station info for a tile, gated by EcoPlanner routing.
+   */
+  async ecoStationByTile(options) {
+    return this.ecoStationRegistry.ecoStationByTile(options);
+  }
+}
+
+/**
+ * TileSpaceDuty: primary browser-duty entry point for AI agents.
+ * Combines MCP-backed TileObjectIndex with optional LocalTileSpaceGraph.
+ */
+export class TileSpaceDuty {
+  /**
+   * @param {(request:any) => Promise<any>} transport
+   * @param {LocalTileSpaceGraph | null} localGraph
+   */
+  constructor(transport, localGraph = null) {
+    this.transport = transport;
+    this.index = new TileObjectIndex(transport);
+    this.localGraph = localGraph;
+  }
+
+  async getEcoStationForTile(options) {
+    return this.index.ecoStationByTile(options);
+  }
+
+  /**
+   * Optional helpers that surface local graph state when present.
+   */
+
+  getActiveTileSummary() {
+    if (!this.localGraph) return null;
+    return this.localGraph.summarizeActiveTile();
+  }
+
+  getNeighborTileSummaries() {
+    if (!this.localGraph) return [];
+    return this.localGraph.summarizeNeighborTiles();
+  }
+
+  stepToNeighbor(targetTileId) {
+    if (!this.localGraph) {
+      throw new Error("LocalTileSpaceGraph not configured for TileSpaceDuty.");
+    }
+    return this.localGraph.transitionToNeighbor(targetTileId);
+  }
+}
+
+export default TileSpaceDuty;
