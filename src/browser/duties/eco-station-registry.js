@@ -1,5 +1,7 @@
 // src/browser/duties/eco-station-registry.js
 
+"use strict";
+
 import { EcoStation } from "./eco-station-schema.js";
 
 /**
@@ -73,7 +75,7 @@ export class EcoStationRegistry {
    * @returns {Object[]}
    */
   queryByRadius(lat, lon, radiusKm) {
-    const R = 6371; // Earth radius in km
+    const R = 6371;
     const toRad = (deg) => (deg * Math.PI) / 180;
 
     const results = [];
@@ -98,7 +100,6 @@ export class EcoStationRegistry {
       }
     }
 
-    // Closest first
     results.sort((a, b) => a.distanceKm - b.distanceKm);
     return results;
   }
@@ -115,3 +116,100 @@ export function createEcoStationRegistry(geojson) {
   registry.loadFromGeoJSON(geojson);
   return registry;
 }
+
+/**
+ * Request type for EcoPlanner-gated eco-station queries.
+ */
+export class EcoStationRegistryRequest {
+  constructor(options) {
+    this.tileId = options.tileId;
+    this.constellationId = options.constellationId ?? "Phoenix";
+    this.missionClass = options.missionClass ?? "cyboquatic-cleanup";
+    this.familyId =
+      options.familyId ?? "CyboquaticEcosafetyEnvelopePhoenix2026v1";
+  }
+
+  build() {
+    if (!this.tileId) {
+      throw new Error("EcoStationRegistryRequest requires tileId");
+    }
+    return {
+      type: "EcoStationRegistryRequest",
+      tileId: this.tileId,
+      constellationId: this.constellationId,
+      missionClass: this.missionClass,
+      familyId: this.familyId,
+    };
+  }
+}
+
+/**
+ * Eco-station registry duty that filters station health through EcoPlanner.
+ * Non-actuating: delegates routing semantics to a Rust MCP backend.
+ */
+export class EcoStationRegistryDuty {
+  /**
+   * @param {(request:any) => Promise<any>} transport
+   */
+  constructor(transport) {
+    this.transport = transport;
+  }
+
+  /**
+   * Compute an EcoPlanner route and return station health only when mission is Accept.
+   *
+   * @param {Object} options
+   * @returns {Promise<Object>}
+   */
+  async ecoStationByTile(options) {
+    const req = new EcoStationRegistryRequest(options).build();
+
+    const ecoPlannerResponse = await this.transport({
+      type: "EcoPlannerRouteNanoswarmEnergyRequest",
+      tileId: req.tileId,
+      constellationId: req.constellationId,
+      missionClass: req.missionClass,
+      familyId: req.familyId,
+    });
+
+    const { decision, m_eco, routeId, lane, diagnostics } =
+      ecoPlannerResponse ?? {};
+
+    if (decision !== "Accept") {
+      return {
+        tileId: req.tileId,
+        constellationId: req.constellationId,
+        missionClass: req.missionClass,
+        allowed: false,
+        reason: diagnostics?.reason ?? "route_not_accepted",
+        m_eco,
+        routeId,
+        lane,
+        station: null,
+      };
+    }
+
+    const stationResponse = await this.transport({
+      type: "EcoStationHealthByTileRequest",
+      tileId: req.tileId,
+      constellationId: req.constellationId,
+      routeId,
+      lane,
+      familyId: req.familyId,
+    });
+
+    return {
+      tileId: req.tileId,
+      constellationId: req.constellationId,
+      missionClass: req.missionClass,
+      allowed: true,
+      m_eco,
+      routeId,
+      lane,
+      station: stationResponse?.station ?? null,
+      diagnostics,
+    };
+  }
+}
+
+export default EcoStationRegistryDuty;
