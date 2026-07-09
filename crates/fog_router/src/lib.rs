@@ -5,8 +5,14 @@
 
 #![cfg_attr(not(test), no_std)]
 
+extern crate alloc;
+
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 use core::marker::PhantomData;
+
 use mlua::{Function, Lua, Result as LuaResult, Table, Value};
+use rusqlite::{params, Connection, Result as SqlResult};
 use serde::{Deserialize, Serialize};
 
 /// Minimal qpudatashard view for routing decisions.
@@ -20,6 +26,169 @@ pub struct QpuDataShard {
     pub biosurface_ok: bool,
     pub hydraulic_ok: bool,
     pub lyapunov_ok: bool,
+}
+
+/// Shared risk coordinates as stored in the memory-mapped SQLite DB.
+/// These must match the schema used by the hydraulic and ecosafety spine.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RiskCoords {
+    pub timestamp_utc: String,
+    pub rhydraulic: f32,
+    pub renergy: f32,
+    pub rbio: f32,
+    pub rtox: f32,
+    pub rmicro: f32,
+    pub rmaterials: f32,
+    pub rcarbon: f32,
+    pub rcalib: f32,
+    pub rsigma: f32,
+}
+
+/// Tree-of-Life weights aligned to governance ALN via build.rs in the full system.
+#[derive(Debug, Clone, Copy)]
+pub struct RiskWeights {
+    pub whydraulic: f32,
+    pub wenergy: f32,
+    pub wbio: f32,
+    pub wtox: f32,
+    pub wmicro: f32,
+    pub wmaterials: f32,
+    pub wcarbon: f32,
+    pub wcalib: f32,
+    pub wsigma: f32,
+}
+
+pub const TREE_OF_LIFE_WEIGHTS_PHX_V1: RiskWeights = RiskWeights {
+    whydraulic: 1.0,
+    wenergy: 0.8,
+    wbio: 1.5,
+    wtox: 1.5,
+    wmicro: 1.2,
+    wmaterials: 1.0,
+    wcarbon: 1.0,
+    wcalib: 0.6,
+    wsigma: 0.6,
+};
+
+/// Lyapunov residual V_t = sum_j w_j r_j^2.
+pub fn lyapunov_residual(coords: &RiskCoords, weights: RiskWeights) -> f32 {
+    let mut v = 0.0_f32;
+    v += weights.whydraulic * coords.rhydraulic * coords.rhydraulic;
+    v += weights.wenergy * coords.renergy * coords.renergy;
+    v += weights.wbio * coords.rbio * coords.rbio;
+    v += weights.wtox * coords.rtox * coords.rtox;
+    v += weights.wmicro * coords.rmicro * coords.rmicro;
+    v += weights.wmaterials * coords.rmaterials * coords.rmaterials;
+    v += weights.wcarbon * coords.rcarbon * coords.rcarbon;
+    v += weights.wcalib * coords.rcalib * coords.rcalib;
+    v += weights.wsigma * coords.rsigma * coords.rsigma;
+    v
+}
+
+/// Routing decision verdict.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum RoutingVerdict {
+    Allow,
+    SuggestOnly,
+    Deny,
+}
+
+/// Routing decision record for logging and diagnostics.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoutingDecision {
+    pub timestamp_utc: String,
+    pub node_id: String,
+    pub previous_v: f32,
+    pub current_v: f32,
+    pub verdict: RoutingVerdict,
+    pub diagnostic_only: bool,
+    pub evidence_hex: String,
+}
+
+/// Hex-stamp builder for routing decisions.
+pub fn build_evidence_hex(node_id: &str, timestamp_utc: &str, previous_v: f32, current_v: f32) -> String {
+    use core::fmt::Write;
+    let mut s = String::new();
+    let payload = format!("{node_id}|{timestamp_utc}|{previous_v:.6}|{current_v:.6}");
+    for b in payload.as_bytes() {
+        write!(&mut s, "{:02x}", b).expect("hex write should not fail");
+    }
+    s
+}
+
+/// Hysteresis configuration: only re-evaluate routing if |V_t - V_{t-1}| exceeds delta_v_min.
+#[derive(Debug, Clone, Copy)]
+pub struct HysteresisConfig {
+    pub delta_v_min: f32,
+}
+
+/// Core Lyapunov guard: returns true iff V_{t+1} <= V_t.
+pub fn lyapunov_ok(previous_v: f32, current_v: f32) -> bool {
+    current_v <= previous_v
+}
+
+/// Evaluate a routing decision for a given node, previous and current coordinates,
+/// with hysteresis and diagnostic-only mode.
+pub fn evaluate_routing_decision(
+    node_id: &str,
+    previous: &RiskCoords,
+    current: &RiskCoords,
+    weights: RiskWeights,
+    hyst: HysteresisConfig,
+    diagnostic_only: bool,
+) -> RoutingDecision {
+    let previous_v = lyapunov_residual(previous, weights);
+    let current_v = lyapunov_residual(current, weights);
+
+    let delta_v = (current_v - previous_v).abs();
+    let verdict = if delta_v < hyst.delta_v_min {
+        RoutingVerdict::SuggestOnly
+    } else if lyapunov_ok(previous_v, current_v) {
+        if diagnostic_only {
+            RoutingVerdict::SuggestOnly
+        } else {
+            RoutingVerdict::Allow
+        }
+    } else {
+        RoutingVerdict::Deny
+    };
+
+    let evidence_hex = build_evidence_hex(node_id, &current.timestamp_utc, previous_v, current_v);
+
+    RoutingDecision {
+        timestamp_utc: current.timestamp_utc.clone(),
+        node_id: node_id.to_owned(),
+        previous_v,
+        current_v,
+        verdict,
+        diagnostic_only,
+        evidence_hex,
+    }
+}
+
+/// Log a routing decision into a SQLite table `fog_routing_decisions`.
+pub fn log_routing_decision(conn: &Connection, decision: &RoutingDecision) -> SqlResult<()> {
+    conn.execute(
+        "INSERT INTO fog_routing_decisions (
+            timestamp_utc,
+            node_id,
+            previous_v,
+            current_v,
+            verdict,
+            diagnostic_only,
+            evidence_hex
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![
+            decision.timestamp_utc,
+            decision.node_id,
+            decision.previous_v,
+            decision.current_v,
+            format!("{:?}", decision.verdict),
+            if decision.diagnostic_only { 1_i64 } else { 0_i64 },
+            decision.evidence_hex
+        ],
+    )?;
+    Ok(())
 }
 
 /// Workload descriptor for FOG routing and ecosafety checks.
@@ -47,7 +216,7 @@ pub enum RouterDecision {
 }
 
 /// Pure predicate bundle for ecosafety routing.
-/// All fields are required to be true, and the Lyapunov residual must be non-increasing.
+/// All fields must be true, and the Lyapunov residual must be non-increasing.
 fn all_predicates_hold(shard: &QpuDataShard) -> bool {
     shard.tailwind_valid
         && shard.biosurface_ok
@@ -92,7 +261,6 @@ pub fn evaluate_workload(
 }
 
 /// FOG routing predicate test result from Lua.
-/// Scripts may classify shards as `route_ok`, `needs_desiccation`, or `block`.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum FogRoutingDecision {
     RouteOk,
@@ -110,15 +278,13 @@ pub struct FogShardView {
     pub r_hydraulics: f32,
 }
 
-/// Sandboxed Lua engine for evaluating FOG routing predicates on live shard dumps
-/// without recompiling Rust or allowing state mutation.
+/// Sandboxed Lua engine for evaluating FOG routing predicates on live shard dumps.
 pub struct FogLuaSandbox<'lua> {
     lua: Lua,
     _marker: PhantomData<&'lua ()>,
 }
 
 impl<'lua> FogLuaSandbox<'lua> {
-    /// Create a new sandboxed Lua environment with a restricted API.
     pub fn new() -> LuaResult<FogLuaSandbox<'lua>> {
         let lua = Lua::new();
 
@@ -205,7 +371,7 @@ impl<'lua> FogLuaSandbox<'lua> {
     }
 }
 
-/// State for one canal reach used in ThermalPlumeAuditFrame and ResidualUpdateFrame.
+/// State for one canal reach used in thermal and hydraulic audits.
 #[derive(Copy, Clone)]
 pub struct CanalState {
     pub q_m3_s: f64,
@@ -308,7 +474,6 @@ pub fn compute_vt(risk: &CanalRiskCoords, w: &LyapunovWeights) -> f64 {
 }
 
 /// Simple forecast model f(x_k) for one time step.
-/// This should be calibrated against HydraulicDecayFrame and ThermalPlumeAuditFrame.
 pub fn forecast_state(
     prev: &CanalState,
     dq_ops_m3_s: f64,
@@ -366,13 +531,13 @@ pub fn enkf_update(
     let mut mean_q = 0.0;
     let mut mean_t = 0.0;
 
-    let mut pred_obs: heapless::Vec<CanalObs, 32> = heapless::Vec::new();
+    let mut pred_obs: Vec<CanalObs> = Vec::new();
 
     for m in ensemble.iter_mut() {
         let forecast = forecast_state(&m.state, 0.0, 0.0, 900.0, 200.0, 40.0);
         m.state = forecast;
         let o = observe_state(&forecast);
-        pred_obs.push(o).ok();
+        pred_obs.push(o);
         mean_et += o.et_mm_day;
         mean_q += o.q_m3_s;
         mean_t += o.t_c;
@@ -410,12 +575,12 @@ pub fn enkf_update(
         let o_pred = pred_obs[idx];
         let de = obs.et_mm_day - o_pred.et_mm_day;
         let dq = obs.q_m3_s - o_pred.q_m3_s;
-        let dt = obs.t_c - o_pred.t_c;
+        let dt_obs = obs.t_c - o_pred.t_c;
 
         let mut updated = m.state;
         updated.theta_mm += k_et * de;
         updated.q_m3_s += k_q * dq;
-        updated.t_c += k_t * dt;
+        updated.t_c += k_t * dt_obs;
 
         let risk =
             state_to_risk(&updated, t_gold, t_hard, hlr_gold, hlr_hard, rech_gold, rech_hard);
