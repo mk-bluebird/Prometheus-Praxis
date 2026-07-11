@@ -1,0 +1,53 @@
+%% filename: diagrams/bee-nanoswarm-safety-flow.mmd
+%% destination: github.com/mk-bluebird/Prometheus-Praxis
+
+flowchart LR
+  %% Ledger and governance backbone
+  defLedger["defLedger<br>BeeCorridorLedger<br>SQLite/Rust"]
+  defRust["defRustCore<br>beecorridor-ledger crate"]
+  defGov["defGovRules<br>kerdeployable, safestep,<br>BeeRestorationCredits"]
+  defKani["defKaniProofs<br>Kani harnesses & records"]
+  defTLA["defTLAPlus<br>Global invariants model"]
+
+  %% Telemetry ingestion with attestation
+  instDevice["instDevice<br>Smart hive / edge TEE"]
+  instALN["instALNParticle<br>eco.beecorridor.telemetry.v1.aln"]
+  polAttest["polAttestationCheck<br>ALN signature + TEE quote"]
+  envIngest["envIngest<br>Telemetry ingestion service"]
+
+  %% JS query and CLI layer
+  defJSClient["defJSClient<br>BeeCorridorLedgerClient"]
+  defJSSafety["defJSSafety<br>NanoswarmSafetyQuery"]
+  defDuty["defDuty<br>BeeNanoswarmSafetyDuty"]
+  envCLI["envCLI<br>bee-corridor-safety-cli"]
+
+  %% AI-chat / dashboards
+  instAgent["instAgent<br>AI-chat / MCP client"]
+  instDashboard["instDashboard<br>Governance / CI dashboard"]
+
+  %% Ledger core wiring
+  defRust --> defLedger
+  defGov --> defRust
+  defKani --> defGov
+  defTLA --> defGov
+
+  %% Telemetry path
+  instDevice --> instALN
+  instALN --> polAttest
+  polAttest --> envIngest
+  envIngest --> defLedger
+
+  %% JS client uses ledger-backed API (read-only)
+  defLedger --> defJSClient
+  defJSClient --> defJSSafety
+  defJSSafety --> defDuty
+
+  %% CLI and agents consuming duty
+  defDuty --> envCLI
+  defDuty --> instAgent
+  envCLI --> instDashboard
+  instAgent --> instDashboard
+
+  %% Safety decision flow for nanoswarm
+  defJSSafety --> polNanoswarm["polNanoswarmDecision<br>assessNanoswarmSafety"]
+  polNanoswarm --> instAgent
