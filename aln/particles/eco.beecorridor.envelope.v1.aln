@@ -1,0 +1,38 @@
+aln particle eco.beecorridor.envelope.v1
+
+field corridor_id text
+field region_id text
+field species_agent_id text          # binds into Synthexis SpeciesAgent[file:92]
+field evidence_bundle_hex hex
+field version u32
+
+field floral_area_connected_m2 f32
+field nesting_site_density_per_ha f32
+field pesticide_free_buffer_radius_m f32
+
+field flight_density_per_min_m2 f32
+field foraging_success_rate f32
+field shannon_diversity_index f32
+
+field emf_intensity_hive_height_vpm f32
+field noise_level_db_a f32
+field light_spill_lux f32
+field temperature_min_c f32
+field temperature_max_c f32
+
+field roh_ceiling f32
+field ker_required bool
+field lane text
+
+# Invariants: bind to EvidenceBundle and forbid corridor widening
+rule evidence_linked when e eco.beecorridor.envelope.v1 then require e.evidence_bundle_hex !
+rule no_widening_when_upgrading
+    when old eco.beecorridor.envelope.v1, new eco.beecorridor.envelope.v1
+    then forbid condition new.floral_area_connected_m2 < old.floral_area_connected_m2
+    forbid condition new.nesting_site_density_per_ha < old.nesting_site_density_per_ha
+    forbid condition new.pesticide_free_buffer_radius_m < old.pesticide_free_buffer_radius_m
+    forbid condition new.emf_intensity_hive_height_vpm > old.emf_intensity_hive_height_vpm
+    forbid condition new.noise_level_db_a > old.noise_level_db_a
+    forbid condition new.light_spill_lux > old.light_spill_lux
+    forbid condition new.temperature_min_c < old.temperature_min_c
+    forbid condition new.temperature_max_c > old.temperature_max_c
