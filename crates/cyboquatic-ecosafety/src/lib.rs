@@ -1,3 +1,5 @@
+// Filename: crates/cyboquatic-ecosafety-core/src/lib.rs
+
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 #![deny(clippy::unwrap_used)]
@@ -237,7 +239,7 @@ pub fn safestep(
 ///
 /// It does not touch any hardware or external IO.
 pub fn safestep_smoke_test() {
-    let risk = RiskVector {
+    let risk_safe = RiskVector {
         rcec: RiskCoord::new_clamped(0.0),
         rsat: RiskCoord::new_clamped(0.0),
         rsurcharge: RiskCoord::new_clamped(0.0),
@@ -248,39 +250,38 @@ pub fn safestep_smoke_test() {
 
     let weights = LyapunovWeights::equal();
     let prev_residual = LyapunovResidual { value: 0.0 };
-    let mut ker = KERWindow::new();
-    ker.update(prev_residual, prev_residual, risk);
 
-    let envelope = CyboNodeEcosafetyEnvelope::new(
+    let mut ker_ok = KERWindow::new();
+    ker_ok.update(prev_residual, prev_residual, risk_safe);
+
+    let envelope_ok = CyboNodeEcosafetyEnvelope::new(
         crate::types::CyboLane::Production,
-        risk,
+        risk_safe,
         weights,
         prev_residual,
-        ker,
+        ker_ok,
         "0x00".to_string(),
         "did:bostrom:test".to_string(),
     );
 
-    let verdict_ok = safestep(&envelope, true, None);
+    let verdict_ok = safestep(&envelope_ok, true, None);
     assert!(matches!(verdict_ok, FogGuardVerdict::Allow));
 
-    let mut ker_bad = KERWindow::new();
-    ker_bad.update(
-        prev_residual,
-        prev_residual,
-        RiskVector {
-            rcec: RiskCoord::new_clamped(0.9),
-            rsat: RiskCoord::new_clamped(0.9),
-            rsurcharge: RiskCoord::new_clamped(0.9),
-            rbiodiv: RiskCoord::new_clamped(0.9),
-            rvt: RiskCoord::new_clamped(0.9),
-            rgovernance: RiskCoord::new_clamped(0.9),
-        },
-    );
+    let risk_bad = RiskVector {
+        rcec: RiskCoord::new_clamped(0.9),
+        rsat: RiskCoord::new_clamped(0.9),
+        rsurcharge: RiskCoord::new_clamped(0.9),
+        rbiodiv: RiskCoord::new_clamped(0.9),
+        rvt: RiskCoord::new_clamped(0.9),
+        rgovernance: RiskCoord::new_clamped(0.9),
+    };
 
-    let bad_envelope = CyboNodeEcosafetyEnvelope::new(
+    let mut ker_bad = KERWindow::new();
+    ker_bad.update(prev_residual, prev_residual, risk_bad);
+
+    let envelope_bad = CyboNodeEcosafetyEnvelope::new(
         crate::types::CyboLane::Production,
-        risk,
+        risk_bad,
         weights,
         prev_residual,
         ker_bad,
@@ -288,6 +289,6 @@ pub fn safestep_smoke_test() {
         "did:bostrom:test".to_string(),
     );
 
-    let verdict_bad = safestep(&bad_envelope, true, None);
+    let verdict_bad = safestep(&envelope_bad, true, None);
     assert!(matches!(verdict_bad, FogGuardVerdict::Stop));
 }
