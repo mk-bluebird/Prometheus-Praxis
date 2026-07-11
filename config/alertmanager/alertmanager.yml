@@ -1,0 +1,21 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: "default"
+  group_by: ["alertname", "node_id"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 3h
+
+receivers:
+  - name: "default"
+    email_configs:
+      - to: "ops@example.org"
+        from: "alerts@example.org"
+        smarthost: "smtp.example.org:587"
+        auth_username: "alerts@example.org"
+        auth_identity: "alerts@example.org"
+        auth_password: "change_me"
+
+templates: []
