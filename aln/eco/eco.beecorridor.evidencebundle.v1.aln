@@ -1,0 +1,66 @@
+aln particle eco.beecorridor.evidencebundle.v1
+
+# Bundle identity and species linkage
+field bundle_hex hex
+field species_agent_id text
+
+# Thresholds for safe exposure and habitat structure
+field emf_safe_max_vpm f32
+field noise_safe_max_db_a f32
+field light_safe_max_lux f32
+field temp_min_c f32
+field temp_max_c f32
+
+field floral_min_density_per_m2 f32
+field floral_connected_min_m2 f32
+field neonic_drift_max_ug_per_m2 f32
+field nesting_min_density_per_ha f32
+
+# Evidence sources (minimum two independent sources per axis)
+field source_emf_1 text
+field source_emf_2 text
+field source_noise_1 text
+field source_noise_2 text
+field source_light_1 text
+field source_light_2 text
+field source_flora_1 text
+field source_flora_2 text
+field source_pesticide_1 text
+field source_pesticide_2 text
+field source_nesting_1 text
+field source_nesting_2 text
+
+# -------------------------
+# Evidence completeness, non-negotiability
+# -------------------------
+
+# Require that each critical axis has at least two independent sources.
+rule evidence_emf_complete
+  when b eco.beecorridor.evidencebundle.v1
+  then require b.source_emf_1 !
+  require b.source_emf_2 !
+
+rule evidence_noise_complete
+  when b eco.beecorridor.evidencebundle.v1
+  then require b.source_noise_1 !
+  require b.source_noise_2 !
+
+rule evidence_light_complete
+  when b eco.beecorridor.evidencebundle.v1
+  then require b.source_light_1 !
+  require b.source_light_2 !
+
+rule evidence_flora_complete
+  when b eco.beecorridor.evidencebundle.v1
+  then require b.source_flora_1 !
+  require b.source_flora_2 !
+
+rule evidence_pesticide_complete
+  when b eco.beecorridor.evidencebundle.v1
+  then require b.source_pesticide_1 !
+  require b.source_pesticide_2 !
+
+rule evidence_nesting_complete
+  when b eco.beecorridor.evidencebundle.v1
+  then require b.source_nesting_1 !
+  require b.source_nesting_2 !
