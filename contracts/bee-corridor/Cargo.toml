@@ -1,0 +1,40 @@
+# filename: contracts/bee-corridor/Cargo.toml
+# destination: mk-bluebird/Prometheus-Praxis/contracts/bee-corridor/Cargo.toml
+
+[package]
+name = "bee-corridor"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "CosmWasm contract enforcing bee corridor envelopes and Sunflower placement rules."
+repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
+homepage = "https://github.com/mk-bluebird/Prometheus-Praxis"
+keywords = ["cosmwasm", "bee", "corridor", "ecosafety"]
+categories = ["wasm", "science", "environment"]
+
+[lib]
+name = "bee_corridor"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+cosmwasm-std = { version = "1.5.0", default-features = false, features = ["stargate"] }
+cw2 = { version = "1.1.2", default-features = false }
+cw-storage-plus = { version = "1.2.0", default-features = false }
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
+
+# Local dependency on the eco-net-bee crate for BeeCorridorProvider, BeeEnvelope, etc.
+eco-net-bee = { path = "../../crates/eco-net-bee", version = "0.1.0" }
+
+[dev-dependencies]
+cosmwasm-schema = { version = "1.5.0", default-features = false }
+
+[profile.release]
+# Recommended settings for CosmWasm contracts.
+opt-level = "z"
+lto = true
+codegen-units = 1
+debug = false
+panic = "abort"
+incremental = false
