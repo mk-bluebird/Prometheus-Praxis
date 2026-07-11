@@ -135,6 +135,7 @@ members = [
     "crates/alncore",
     "crates/alncore_macros",
     "crates/cyboquatic_progress/20260709_crate",
+    "crates/cyboquatic-ecosafety-turbine-wl01",
 ]
 
 resolver = "2"
