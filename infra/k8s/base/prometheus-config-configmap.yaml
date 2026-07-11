@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: prometheus-praxis
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 30s
+      scrape_timeout: 10s
+
+      external_labels:
+        environment: "prod"
+        stack: "prometheus-praxis"
+
+    rule_files:
+      - /etc/prometheus/rules/*.yml
+
+    scrape_configs:
+      - job_name: "prometheus"
+        static_configs:
+          - targets:
+              - "prometheus:9090"
+
+      - job_name: "node-exporter"
+        static_configs:
+          - targets: []
+
+  eco_ker_rules.yml: |
+    groups:
+      - name: eco_ker_rules
+        interval: 30s
+        rules:
+          - record: econet:vt:sum
+            expr: sum by (node_id) (econet_vt)
+          - record: econet:ker:kavg
+            expr: avg by (node_id) (econet_k)
+          - record: econet:ker:eavg
+            expr: avg by (node_id) (econet_e)
+          - record: econet:ker:rmax
+            expr: max by (node_id) (econet_r)
+
+  eco_alerts.yml: |
+    groups:
+      - name: eco_alerts
+        interval: 30s
+        rules:
+          - alert: EconetHighLyapunovResidual
+            expr: econet:vt:sum > 0.13
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "High Lyapunov residual for ecosafety node"
+              description: "Node {{ $labels.node_id }} has Vt {{ $value }} above 0.13."
+          - alert: EconetHighRiskCoordinate
+            expr: econet:ker:rmax > 0.13
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High risk coordinate R for ecosafety node"
+              description: "Node {{ $labels.node_id }} has Rmax {{ $value }} above 0.13."
+          - alert: MonitoringStackScrapeFailures
+            expr: rate(prometheus_target_scrapes_failed_total[5m]) > 0
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Prometheus scrape failures detected"
+              description: "Scrape failures over the last 5 minutes indicate monitoring coverage issues."
+          - alert: TsdbHighBlockCount
+            expr: prometheus_tsdb_head_chunks > 5000000
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High TSDB head chunk count"
+              description: "Prometheus TSDB head chunks exceeded 5M. Consider sharding or retention changes."
