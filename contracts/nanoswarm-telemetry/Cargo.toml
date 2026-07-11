@@ -1,0 +1,37 @@
+# filename: contracts/nanoswarm-telemetry/Cargo.toml
+# destination: mk-bluebird/Prometheus-Praxis/contracts/nanoswarm-telemetry/Cargo.toml
+
+[package]
+name = "nanoswarm-telemetry"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "CosmWasm contract ingesting nanoswarm EMF and flower density telemetry for bee corridors."
+repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
+homepage = "https://github.com/mk-bluebird/Prometheus-Praxis"
+keywords = ["cosmwasm", "telemetry", "bee", "ecosafety"]
+categories = ["wasm", "science", "environment"]
+
+[lib]
+name = "nanoswarm_telemetry"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+cosmwasm-std = { version = "1.5.0", default-features = false, features = ["stargate"] }
+cw2 = { version = "1.1.2", default-features = false }
+cw-storage-plus = { version = "1.2.0", default-features = false }
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
+
+[dev-dependencies]
+cosmwasm-schema = { version = "1.5.0", default-features = false }
+
+[profile.release]
+# Recommended settings for CosmWasm contracts.
+opt-level = "z"
+lto = true
+codegen-units = 1
+debug = false
+panic = "abort"
+incremental = false
