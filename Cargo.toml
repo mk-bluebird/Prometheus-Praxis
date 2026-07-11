@@ -134,6 +134,7 @@ members = [
     "crates/cain_air_node",
     "crates/alncore",
     "crates/alncore_macros",
+    "crates/cyboquatic_progress/20260709_crate",
 ]
 
 resolver = "2"
