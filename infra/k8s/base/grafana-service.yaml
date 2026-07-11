@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: eco-grafana
+  namespace: prometheus-praxis
+  labels:
+    app: eco-grafana
+spec:
+  type: ClusterIP
+  selector:
+    app: eco-grafana
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
