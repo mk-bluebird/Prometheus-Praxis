@@ -18,6 +18,8 @@ members = [
     # ecorestorationshard sub-crates
     "ecorestorationshard/eco_restoration_shard_core",
     "crates/cyboquatic-core",
+    "contracts/bee-corridor",
+    "contracts/nanoswarm-telemetry",
 
     # C++ / mixed crates (Rust-compatible build roots if present)
     "cpp/EcoNetCentralAZ",
