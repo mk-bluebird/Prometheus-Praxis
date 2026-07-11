@@ -1,4 +1,4 @@
-eco_restoration_shard/
+Prometheus-Praxis/
 ├─ Cargo.toml
 ├─ Cargo.lock
 ├─ README.md
