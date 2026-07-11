@@ -1,0 +1,15 @@
+groups:
+  - name: eco_ker_rules
+    interval: 30s
+    rules:
+      - record: econet:vt:sum
+        expr: sum by (node_id) (econet_vt)
+
+      - record: econet:ker:kavg
+        expr: avg by (node_id) (econet_k)
+
+      - record: econet:ker:eavg
+        expr: avg by (node_id) (econet_e)
+
+      - record: econet:ker:rmax
+        expr: max by (node_id) (econet_r)
