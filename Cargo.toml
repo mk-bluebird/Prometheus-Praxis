@@ -139,6 +139,7 @@ members = [
     "crates/cyboquatic-ecosafety-hydroturbine",
     "crates/eco-bee-corridor-envelope",
     "crates/beecorridor-ledger",
+    "crates/eco-net-bee",
 ]
 
 resolver = "2"
