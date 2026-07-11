@@ -326,11 +326,10 @@ pub fn record_drainage_sample(
 }
 
 /// Kani proof harness: ensure normalization clamps risk coordinates to [0,1] and ΔVt is computed consistently.
-/// This harness is non-actuating and checks a small subset of inputs. [web:22][web:25]
+/// This harness is non-actuating and checks a small subset of inputs.
 #[cfg(kani)]
 mod verification {
     use super::*;
-    use kani::prelude::*;
 
     #[kani::proof]
     fn risk_clamping_and_residual_stability() {

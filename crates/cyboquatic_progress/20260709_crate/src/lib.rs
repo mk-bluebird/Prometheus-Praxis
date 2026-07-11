@@ -370,7 +370,6 @@ pub fn record_workload_sample(
 #[cfg(kani)]
 mod verification {
     use super::*;
-    use kani::prelude::*;
 
     /// Kani harness: check that normalization clamps risk coordinates to [0,1],
     /// residuals are non-negative, and R stays in [0,1] for admissible inputs.

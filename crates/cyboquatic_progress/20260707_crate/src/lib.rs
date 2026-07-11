@@ -15,7 +15,6 @@
 
 use chrono::{DateTime, Utc};
 use hex::ToHex;
-use log::info;
 use rusqlite::{params, Connection, OpenFlags};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -293,10 +292,6 @@ pub fn insert_today_progress(
     )?;
 
     let id = conn.last_insert_rowid();
-    info!(
-        "Inserted daily_progress row id={} for date {} domain {}",
-        id, date_str, domain
-    );
     Ok(id)
 }
 
@@ -311,10 +306,6 @@ pub fn compute_and_record_today(
     cec_index: f32,
     prior_pointer: &str,
 ) -> Result<(DrainageDecayIndicator, i64), ProgressError> {
-    env_logger::Builder::from_default_env()
-        .format_timestamp_secs()
-        .init();
-
     let indicator = DrainageDecayIndicator::compute(
         segment_id,
         "Phoenix-AZ",
