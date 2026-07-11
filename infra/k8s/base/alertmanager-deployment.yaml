@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager-core
+  namespace: prometheus-praxis
+  labels:
+    app: alertmanager-core
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alertmanager-core
+  template:
+    metadata:
+      labels:
+        app: alertmanager-core
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        fsGroup: 65534
+      containers:
+        - name: alertmanager
+          image: prom/alertmanager:v0.27.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--config.file=/etc/alertmanager/alertmanager.yml"
+            - "--storage.path=/alertmanager"
+          ports:
+            - name: http
+              containerPort: 9093
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          volumeMounts:
+            - name: config
+              mountPath: /etc/alertmanager
+            - name: data
+              mountPath: /alertmanager
+      volumes:
+        - name: config
+          configMap:
+            name: alertmanager-config
+            items:
+              - key: alertmanager.yml
+                path: alertmanager.yml
+        - name: data
+          emptyDir: {}
