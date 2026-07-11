@@ -1,0 +1,39 @@
+groups:
+  - name: eco_alerts
+    interval: 30s
+    rules:
+      - alert: EconetHighLyapunovResidual
+        expr: econet:vt:sum > 0.13
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High Lyapunov residual for ecosafety node"
+          description: "Node {{ $labels.node_id }} has Vt {{ $value }} above 0.13."
+
+      - alert: EconetHighRiskCoordinate
+        expr: econet:ker:rmax > 0.13
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High risk coordinate R for ecosafety node"
+          description: "Node {{ $labels.node_id }} has Rmax {{ $value }} above 0.13."
+
+      - alert: MonitoringStackScrapeFailures
+        expr: rate(prometheus_target_scrapes_failed_total[5m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus scrape failures detected"
+          description: "Scrape failures over the last 5 minutes indicate monitoring coverage issues."
+
+      - alert: TsdbHighBlockCount
+        expr: prometheus_tsdb_head_chunks > 5000000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High TSDB head chunk count"
+          description: "Prometheus TSDB head chunks exceeded 5M. Consider sharding or retention changes."
