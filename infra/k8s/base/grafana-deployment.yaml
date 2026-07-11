@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eco-grafana
+  namespace: prometheus-praxis
+  labels:
+    app: eco-grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eco-grafana
+  template:
+    metadata:
+      labels:
+        app: eco-grafana
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 472
+        fsGroup: 472
+      containers:
+        - name: grafana
+          image: grafana/grafana:11.0.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: GF_SECURITY_ADMIN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-admin-secret
+                  key: admin-user
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-admin-secret
+                  key: admin-password
+          ports:
+            - name: http
+              containerPort: 3000
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          volumeMounts:
+            - name: config
+              mountPath: /etc/grafana/grafana.ini
+              subPath: grafana.ini
+            - name: provisioning
+              mountPath: /etc/grafana/provisioning
+      volumes:
+        - name: config
+          configMap:
+            name: grafana-config
+            items:
+              - key: grafana.ini
+                path: grafana.ini
+        - name: provisioning
+          configMap:
+            name: grafana-config
+            items:
+              - key: datasource.yml
+                path: datasources/datasource.yml
+              - key: dashboard.yml
+                path: dashboards/dashboard.yml
+              - key: econet_ker_dashboard.json
+                path: dashboards/econet_ker_dashboard.json
