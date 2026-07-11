@@ -1,0 +1,31 @@
+aln particle eco.sunflower.beecorridor.ledger.v1
+
+field node_id text
+field corridor_id text
+field policy_id text
+field timestamp_utc_s i64
+field eco_bee_impact_prev f32
+field eco_bee_impact_new f32
+field emf_intensity_hive_height_vpm f32
+field noise_level_db_a f32
+field light_spill_lux f32
+
+# -------------------------
+# Monotone EcoBeeImpactScore
+# -------------------------
+
+rule eco_bee_impact_monotone
+  when e eco.sunflower.beecorridor.ledger.v1
+  then forbid condition e.eco_bee_impact_new < e.eco_bee_impact_prev
+
+# -------------------------
+# Ledger respects envelope ceilings
+# -------------------------
+
+rule ledger_respects_envelope
+  when e eco.sunflower.beecorridor.ledger.v1,
+       env eco.beecorridor.envelope.v1
+  then require e.corridor_id == env.corridor_id
+  require e.emf_intensity_hive_height_vpm <= env.emf_intensity_hive_height_vpm
+  require e.noise_level_db_a              <= env.noise_level_db_a
+  require e.light_spill_lux               <= env.light_spill_lux
