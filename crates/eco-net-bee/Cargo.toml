@@ -1,0 +1,28 @@
+# filename: crates/eco-net-bee/Cargo.toml
+# destination: mk-bluebird/Prometheus-Praxis/crates/eco-net-bee/Cargo.toml
+
+[package]
+name = "eco-net-bee"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "Bee corridor governance primitives for EcoNet / EcoFort, including BeeCorridorProvider traits and non-actuating placement validation."
+repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
+homepage = "https://github.com/mk-bluebird/Prometheus-Praxis"
+keywords = ["econet", "bee", "corridor", "ecosafety"]
+categories = ["science", "environment", "rust-patterns"]
+
+[lib]
+name = "eco_net_bee"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[dependencies]
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
+
+[features]
+default = []
+# Optional feature to enable experimental backends or integrations in the future.
+experimental-backend = []
