@@ -1,0 +1,27 @@
+# eco_restoration_shard/crates/cyboquatic_progress/20260711_crate/Cargo.toml
+
+[package]
+name = "cyboquatic_progress_20260711"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "Cyboquatic workload model with energy requirements and ΔVt for eco-restoration machinery (daily shard 2026-07-11)."
+
+[dependencies]
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
+kani-verifier = { version = "0.67.0" }
+
+[features]
+default = ["verify"]
+verify = []
+
+[lib]
+name = "cyboquatic_progress_20260711"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[[bin]]
+name = "daily_cyboquatic_20260711"
+path = "src/main.rs"
