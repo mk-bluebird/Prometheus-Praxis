@@ -26,7 +26,6 @@ pub fn compute_always_improve_score(
         + W_V * violation_latency_improvement
 }
 
-/// Check that a sequence of windows satisfies the ALN monotonicity criteria.
 pub fn windows_satisfy_monotonicity(windows: &[WindowMetrics]) -> bool {
     for pair in windows.windows(2) {
         let prev = &pair[0];
@@ -36,4 +35,12 @@ pub fn windows_satisfy_monotonicity(windows: &[WindowMetrics]) -> bool {
         }
     }
     true
+}
+
+pub fn last_window_satisfies_minimum_trend(windows: &[WindowMetrics]) -> bool {
+    if let Some(last) = windows.last() {
+        last.always_improve_score >= 0.0
+    } else {
+        false
+    }
 }
