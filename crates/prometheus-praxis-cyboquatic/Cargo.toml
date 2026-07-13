@@ -1,0 +1,47 @@
+[package]
+name = "prometheus-praxis-cyboquatic"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+authors = ["mk-bluebird <host@organichain.local>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+description = "Cyboquatic index computation and eco-labour anchored governance for Prometheus-Praxis."
+keywords = ["organichain", "cyboquatic", "eco-labour", "index"]
+categories = ["science", "simulation"]
+
+[lib]
+name = "prometheus_praxis_cyboquatic"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[dependencies]
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = "1.0.120"
+thiserror = "1.0"
+
+# Depends on the Lyapunov guard crate for KerSnapshot and shared envelopes.
+prometheus-praxis-lyapunov-guard = { path = "../prometheus-praxis-lyapunov-guard" }
+
+[dev-dependencies]
+kani-verifier = "0.67"
+
+[features]
+default = []
+
+[package.metadata.organichain]
+hostdid = "didalnorganic-host"
+bostromaddress = "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+alnauthority = "ALN.MIGRATION.CYBERCOREAUTHORITY.v1"
+alnshard = "cyboquatic-index.v1.aln"
+role = "CyboquaticIndexKernel"
+
+[profile.dev]
+opt-level = 1
+debug = true
+
+[profile.release]
+opt-level = 3
+debug = false
+lto = "thin"
+codegen-units = 1
