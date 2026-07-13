@@ -118,6 +118,7 @@ members = [
     "crates/prometheus_praxis",
     "crates/prometheus_praxis_ai",
     "crates/prometheus_praxis_collective_feed",
+    "crates/prometheus-praxis-cyboquatic",
     "crates/prometheus-praxis-lyapunov-guard",
     "crates/prometheus_praxis_provenance",
     "crates/prometheus_praxis_semantics",
