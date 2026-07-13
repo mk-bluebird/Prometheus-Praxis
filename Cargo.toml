@@ -13,6 +13,7 @@ members = [
     "eco_restoration_shard/kerresidual",
     "crates/agent-registry",
     "crates/cyboquatic-runner",
+    "crates/always-improve-core",
 
     # eco_wealth standalone crate
     "eco_wealth",
