@@ -11,6 +11,7 @@ members = [
     "eco_restoration_shard/T08_sensor_health",
     "eco_restoration_shard/T10_pricing",
     "eco_restoration_shard/kerresidual",
+    "crates/agent-registry",
 
     # eco_wealth standalone crate
     "eco_wealth",
