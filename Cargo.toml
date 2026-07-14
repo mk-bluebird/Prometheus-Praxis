@@ -14,6 +14,7 @@ members = [
     "crates/agent-registry",
     "crates/cyboquatic-runner",
     "crates/always-improve-core",
+    "crates/ker_triad",
 
     # eco_wealth standalone crate
     "eco_wealth",
