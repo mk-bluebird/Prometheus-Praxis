@@ -1,0 +1,25 @@
+# crates/ker_triad/Cargo.toml
+
+[package]
+name = "ker_triad"
+version = "0.3.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+rust_decimal = "1.36"
+serde = { version = "1.0.203", features = ["derive"] }
+rand = "0.8"
+statrs = "0.16"
+
+prometheuspraxisker = { path = "../prometheuspraxisker" }
+
+[dev-dependencies]
+serde_json = { version = "1.0.120" }
+
+[package.metadata.kani]
+# Kani is mandatory in this workspace.
+version = "0.67"
+enable = true
+harnesses = ["ess_ks_dominance_harness"]
