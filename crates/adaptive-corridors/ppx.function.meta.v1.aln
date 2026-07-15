@@ -1,0 +1,87 @@
+// crates/adaptive-corridors/ppx.function.meta.v1.aln
+// Function catalog entry for CAP Phoenix Hflow diagnostic tool.
+
+function-def ALE-ERM-WATER-HFLOW-CAP-PHX-DIAG-001 {
+  name            "water.hflow_guard_cap_phx.diagnostic.v1"
+  version         "1.0.0"
+  crate-path      "eco_restoration_shard"
+  module-path     "water::hflow_guard_cap_phx"
+  rust-symbol     "evaluate_cap_hflow"
+
+  domain          "water"
+  corridor-kind   "URBAN_FLOOD"
+  corridor-id     "PHX_CAP_URBAN_FLOOD_V1"
+
+  actuationallowed false        // diagnostic-only; never drives hardware
+  ecosafetyrequired false       // safe read; no pre-governance gate
+  blast-radius     "local"      // single corridor, single window
+
+  input-schema-json {
+    type "object"
+    properties {
+      corridor_id { type "string" }
+      telemetry   {
+        type "object"
+        properties {
+          velocity_mps         { type "number" }
+          turbulence_index     { type "number" }
+          shear_index          { type "number" }
+          shutter_open_frac    { type "number" }
+          shutter_rate_per_min { type "number" }
+          mobility_index       { type "number" }
+          geom_stability_index { type "number" }
+        }
+        required [ "velocity_mps",
+                   "turbulence_index",
+                   "shear_index",
+                   "shutter_open_frac",
+                   "shutter_rate_per_min",
+                   "mobility_index",
+                   "geom_stability_index" ]
+      }
+      prob_summary {
+        type "object"
+        properties {
+          mean                  { type "number" }
+          var                   { type "number" }
+          tail_prob_over_ceiling{ type "number" }
+        }
+        required [ "mean", "var", "tail_prob_over_ceiling" ]
+      }
+    }
+    required [ "corridor_id", "telemetry", "prob_summary" ]
+  }
+
+  output-schema-json {
+    type "object"
+    properties {
+      corridor_id            { type "string" }
+      lane                   { type "string"  enum [ "Allow", "Derate", "Stop" ] }
+      hflow_scalar           { type "number" }
+      hflow_op               { type "number" }
+      r_vel                  { type "number" }
+      r_mob                  { type "number" }
+      r_geo                  { type "number" }
+      tail_prob_over_ceiling { type "number" }
+      reasons {
+        type "array"
+        items { type "string" }
+      }
+      safety_vector {
+        type "object"
+        properties {
+          roh_ceiling        { type "number" }   // 0.30
+          soft_band_start    { type "number" }   // 0.24
+          hard_ceiling       { type "number" }   // 0.30
+          max_exceed_prob    { type "number" }   // 0.01
+          beta               { type "number" }   // 2.0
+        }
+        required [ "roh_ceiling", "soft_band_start", "hard_ceiling",
+                   "max_exceed_prob", "beta" ]
+      }
+    }
+    required [ "corridor_id", "lane", "hflow_scalar", "hflow_op",
+               "r_vel", "r_mob", "r_geo", "tail_prob_over_ceiling",
+               "reasons", "safety_vector" ]
+  }
+}
