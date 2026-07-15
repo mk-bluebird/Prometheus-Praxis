@@ -93,7 +93,3 @@ These harnesses keep the Rust decision logic provably aligned with the ALN predi
 - No actuation or mission routing; this crate does not schedule nanoswarms, cyboquatic flows, or city controllers.[file:21]  
 - No direct policy or treaty enforcement; higher-level treaty and governance crates (e.g. `prometheuspraxis`, `prometheuspraxistreatygates`) consume this kernel but enforce legal/ethical gates elsewhere.[file:21]  
 - No raw neural or psychometric data storage; only scalar continuity metrics and aggregates are used, consistent with HASHONLY and privacy-first patterns described in your continuity and neurorights documents.[file:21]  
-
----
-
-If you’d like, the next step can be: a small Kani test file under `crates/ppx_continuity_kernel/tests/continuity_governance_kernel_kani.rs` that proves the ALN decision rules hold for all normalized inputs, using only pure scalar reasoning.
