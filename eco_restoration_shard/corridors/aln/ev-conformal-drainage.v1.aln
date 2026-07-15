@@ -1,0 +1,28 @@
+aln
+TITLE ev-conformal-drainage.v1.aln
+VERSION 1.0.0
+AUTHORITY ALN.MIGRATION.CYBERCOREAUTHORITY.v1
+NAMESPACE EcoRestorationShard
+
+STRUCTS
+ROW EvSignalIntegritySummary struct
+  residual_mean float64
+  residual_std float64
+  roh_noise_band float64
+  telemetry_gap_fraction float64
+ROW ConformalConfig struct
+  alpha float64
+  aln_floor float64
+ENDSTRUCTS
+
+INVARIANTS
+ROW FLOOR_GUARD apply_preemptive_brake(lower_bound, aln_floor) == true WHEN lower_bound < aln_floor
+ROW ROH_NOISE_BAND roh_noise_band <= 0.30
+ENDINVARIANTS
+
+BINDINGS
+ROW RUSTMODULE eco_restoration_shard/crates/drainage_decay/src/ev_conformal.rs
+ROW FUNCTIONS conformal_lower_bound, apply_preemptive_brake
+ROW PROOFMETHOD KANI
+ROW PROOFFILES eco_restoration_shard/crates/drainage_decay/tests/kani_ev_conformal.rs
+ENDBINDINGS
