@@ -46,6 +46,14 @@ pub struct DrainageStateSnapshot {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DecayKernelParams {
+    pub k_bod_per_day: f64,
+    pub k_tss_per_day: f64,
+    pub theta: f64,
+    pub ref_temp_c: f64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DrainageDutyDecision {
     pub corridorid: String,
     pub prob_hit_bod: f64,
@@ -55,10 +63,25 @@ pub struct DrainageDutyDecision {
     pub reasons: Vec<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct DecayKernelParams {
-    pub k_bod_per_hour: f64,
-    pub k_tss_per_hour: f64,
+pub fn decay_to_horizon(
+    state: &DrainageStateSnapshot,
+    params: &DecayKernelParams,
+    dt_hours: f64,
+) -> (f64, f64) {
+    let dt_hours = dt_hours.max(0.0);
+
+    let temp_factor = temperature_factor(params.theta, params.ref_temp_c, state.temperature_c);
+
+    let k_bod_per_hour = params.k_bod_per_day * 24.0 * temp_factor;
+    let k_tss_per_hour = params.k_tss_per_day * 24.0 * temp_factor;
+
+    let bod_next = first_order_decay(state.bod_mg_per_l, k_bod_per_hour, dt_hours);
+    let tss_next = first_order_decay(state.tss_mg_per_l, k_tss_per_hour, dt_hours);
+
+    let bod_clamped = bod_next.max(0.0);
+    let tss_clamped = tss_next.max(0.0);
+
+    (bod_clamped, tss_clamped)
 }
 
 pub fn evaluate_duty_window(
@@ -128,10 +151,17 @@ fn decay_to_horizon(
     dt_hours: f64,
 ) -> (f64, f64) {
     let dt = dt_hours.max(0.0);
-    let bod_next = first_order_decay(state.bod_mg_per_l, params.k_bod_per_hour, dt);
-    let tss_next = first_order_decay(state.tss_mg_per_l, params.k_tss_per_hour, dt);
+    let temp_factor = temperature_factor(params.theta, params.ref_temp_c, state.temperature_c);
+
+    let k_bod_per_hour = params.k_bod_per_day * 24.0 * temp_factor;
+    let k_tss_per_hour = params.k_tss_per_day * 24.0 * temp_factor;
+
+    let bod_next = first_order_decay(state.bod_mg_per_l, k_bod_per_hour, dt);
+    let tss_next = first_order_decay(state.tss_mg_per_l, k_tss_per_hour, dt);
+
     let bod_clamped = bod_next.max(0.0);
     let tss_clamped = tss_next.max(0.0);
+
     (bod_clamped, tss_clamped)
 }
 
@@ -140,10 +170,11 @@ fn first_order_decay(initial: f64, k_per_hour: f64, dt_hours: f64) -> f64 {
         return 0.0;
     }
     if k_per_hour <= 0.0 || dt_hours <= 0.0 {
-        return initial;
+        return initial.max(0.0);
     }
     let exponent = -k_per_hour * dt_hours;
-    initial * exponent.exp()
+    let factor = exponent.exp();
+    (initial * factor).max(0.0)
 }
 
 fn hitting_prob_ou(x0: f64, lveto: f64, lambda: f64, gamma: f64, t: f64) -> f64 {
@@ -153,11 +184,13 @@ fn hitting_prob_ou(x0: f64, lveto: f64, lambda: f64, gamma: f64, t: f64) -> f64 
     if t <= 0.0 || gamma <= 0.0 || lambda < 0.0 {
         return 0.0;
     }
+
     let drift = -lambda * (x0 - lveto) * t;
     let var = gamma * gamma * t;
     if var <= 0.0 {
         return 0.0;
     }
+
     let z = (lveto - (x0 + drift)).max(0.0) / var.sqrt();
     upper_tail_gaussian(z)
 }
@@ -166,4 +199,10 @@ fn upper_tail_gaussian(z: f64) -> f64 {
     let za = z.abs();
     let approx = 1.0 / (1.0 + za);
     approx.min(1.0).max(0.0)
+}
+
+fn temperature_factor(theta: f64, ref_temp_c: f64, current_temp_c: f64) -> f64 {
+    let delta = current_temp_c - ref_temp_c;
+    let ln_theta = if theta <= 0.0 { 0.0 } else { theta.ln() };
+    (ln_theta * (delta / 10.0)).exp()
 }
