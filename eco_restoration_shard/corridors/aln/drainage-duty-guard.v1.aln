@@ -1,0 +1,52 @@
+aln
+TITLE drainage-duty-guard.v1.aln
+VERSION 1.0.0
+AUTHORITY ALN.MIGRATION.CYBERCOREAUTHORITY.v1
+NAMESPACE EcoRestorationShard
+META
+  HOSTDID didalnorganic-host
+  PRIMARYBOSTROMADDRESS bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+  DOMAIN Water
+  SUBDOMAIN DrainageDecay
+ENDMETA
+
+EPOCH DRAINAGE_DUTY_GUARD
+
+GLOBALENVELOPES
+  ROHCEILINGGLOBAL 0.30
+  HFLOWHARDCEILING 0.30
+  PHIT_MAX 1e-12
+ENDGLOBALENVELOPES
+
+STRUCTS
+ROW DrainageRiskParams struct
+  lambda_bod float64
+  lambda_tss float64
+  gamma_bod float64
+  gamma_tss float64
+  lveto_bod float64
+  lveto_tss float64
+  monitoring_dt_hours float64
+ROW DrainageDutyDecision struct
+  corridorid string!
+  prob_hit_bod float64
+  prob_hit_tss float64
+  prob_hit_any float64
+  allowed bool
+  reasons string
+ENDSTRUCTS
+
+INVARIANTS
+ROW HITTING_PROBABILITY_BOUND prob_hit_any < PHIT_MAX
+ROW FLOOR_GUARD allowed == false WHEN bod_next < aln_floor_bod OR tss_next < aln_floor_tss
+ROW R_SCORE_BOUND r_score <= 0.25
+ENDINVARIANTS
+
+BINDINGS
+ROW RUSTMODULE ecore_restoration_shard/crates/drainage_decay/src/lifeforce_duty.rs
+ROW FUNCTIONS evaluate_duty_window
+ROW PROOFMETHOD KANI
+ROW PROOFFILES ecore_restoration_shard/crates/drainage_decay/tests/kani_duty_guard.rs
+ENDBINDINGS
+
+ENDS H A R D
