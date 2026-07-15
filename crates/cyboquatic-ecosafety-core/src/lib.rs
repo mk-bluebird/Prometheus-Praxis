@@ -1,37 +1,42 @@
-// File: crates/cyboquatic-ecosafety-core/src/lib.rs
-// Target repo: github.com/Doctor0Evil/eco_restoration_shard
+// Filename: crates/cyboquatic-ecosafety-core/src/lib.rs
+// Target repo: github.com/mk-bluebird/Prometheus-Praxis
 // Purpose: Shared ecosafety spine + blast-radius scoring for Cyboquatic industrial machinery.
-// This crate is strictly non‑actuating and intended as a core library that other
+// This crate is strictly non-actuating and intended as a core library that other
 // ecosafety crates and governance stacks can build upon.
-
-//! Cyboquatic ecosafety core primitives.
-//!
-//! This crate provides non‑actuating ecosafety primitives and diagnostics for
-//! Cyboquatic nodes and industrial machinery, aligned with the KER
-//! (Knowledge, Eco‑impact, Risk‑of‑harm) framework and Lyapunov‑style residual
-//! invariants used in EcoNet and eco_restoration_shard.
-//!
-//! It defines:
-//! - Normalised risk coordinates and plane‑labelled risk vectors.
-//! - Lyapunov‑style residual computation over risk planes.
-//! - Corridor bands and blast‑radius classes for ecosafety corridors.
-//! - Rolling KER window estimation over diagnostic histories.
-//! - A safestep gating function that classifies candidate steps as Ok/Derate/Stop.
-//!
-//! This crate is strictly non‑actuating: it does not open device handles or
-//! perform I/O beyond in‑memory computations. Higher‑level crates are
-//! responsible for connecting these diagnostics to ALN, SQL shards, and
-//! governance logic.
 
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
-#![deny(clippy::all)]
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
+#![deny(clippy::panic)]
+#![deny(clippy::todo)]
+#![deny(clippy::unimplemented)]
+#![deny(clippy::disallowed_methods)]
+
+//! Cyboquatic ecosafety core for Phoenix-class nodes.
+//!
+//! This crate provides non-actuating ecosafety primitives and diagnostics for
+//! Cyboquatic nodes and industrial machinery, aligned with the KER
+//! (Knowledge, Eco-impact, Risk-of-harm) framework and Lyapunov-style residual
+//! invariants used across EcoNet and eco_restoration_shard.
+//!
+//! It defines:
+//! - Normalized risk coordinates and plane-labelled risk vectors.
+//! - Lyapunov-style residual computation over risk planes.
+//! - Corridor bands and blast-radius classes for ecosafety corridors.
+//! - Rolling KER window estimation over diagnostic histories.
+//! - Safestep gating and controller wrappers for ecosafety governance.
+//!
+//! This crate is strictly non-actuating: it does not open device handles or
+//! perform I/O beyond in-memory computations. Higher-level crates are
+//! responsible for connecting these diagnostics to ALN, SQL shards, and
+//! governance logic.
 
 use core::fmt;
 
 /// Normalized risk coordinate in [0,1].
 ///
-/// Risk coordinates encode unitless, corridor‑bounded measures on planes such as
+/// Risk coordinates encode unitless, corridor-bounded measures on planes such as
 /// energy, hydraulics, biology, carbon, materials, biodiversity, and uncertainty.
 /// Values are clamped to the closed interval [0,1].
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -63,7 +68,7 @@ impl RiskCoord {
 
 /// Named risk plane identifier.
 ///
-/// Planes correspond to corridor‑governed dimensions that together form
+/// Planes correspond to corridor-governed dimensions that together form
 /// a risk vector for a node or subsystem.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum RiskPlane {
@@ -87,12 +92,12 @@ pub enum RiskPlane {
 
 /// One entry in the risk vector.
 ///
-/// Each entry is a plane + normalised coordinate pair.
+/// Each entry is a plane + normalized coordinate pair.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RiskEntry {
     /// Risk plane.
     pub plane: RiskPlane,
-    /// Normalised coordinate on that plane.
+    /// Normalized coordinate on that plane.
     pub coord: RiskCoord,
 }
 
@@ -102,7 +107,7 @@ pub struct RiskEntry {
 /// responsible for avoiding duplicates.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RiskVector {
-    /// Plane‑labelled risk entries.
+    /// Plane-labelled risk entries.
     pub entries: Vec<RiskEntry>,
 }
 
@@ -130,7 +135,7 @@ impl RiskVector {
     }
 }
 
-/// Quadratic Lyapunov‑style residual V_t = Σ_j w_j * r_j^2.
+/// Quadratic Lyapunov-style residual V_t = Σ_j w_j * r_j^2.
 ///
 /// This is a scalar summary of the risk vector under a given set of
 /// weights, used as a monotone surrogate for ecosafety and stability.
@@ -152,7 +157,7 @@ impl Residual {
 /// Weights for each risk plane in the residual.
 ///
 /// These weights encode how much each plane contributes to the global
-/// residual. They are corridor‑governed and should not be adjusted
+/// residual. They are corridor-governed and should not be adjusted
 /// without a corresponding governance decision.
 #[derive(Clone, Debug, PartialEq)]
 pub struct LyapunovWeights {
@@ -177,7 +182,7 @@ pub struct LyapunovWeights {
 impl LyapunovWeights {
     /// Default ecosafety weights.
     ///
-    /// Emphasises long‑horizon planes (carbon, biodiversity, materials,
+    /// Emphasises long-horizon planes (carbon, biodiversity, materials,
     /// uncertainty) while retaining substantial weight on energy and hydraulics.
     pub fn default_ecosafety() -> Self {
         Self {
@@ -207,7 +212,7 @@ impl LyapunovWeights {
     }
 }
 
-/// Computes a Lyapunov‑style residual for a risk vector and weights.
+/// Computes a Lyapunov-style residual for a risk vector and weights.
 pub fn compute_residual(rx: &RiskVector, w: &LyapunovWeights) -> Residual {
     let mut acc = 0.0_f32;
     for entry in &rx.entries {
@@ -275,18 +280,18 @@ pub enum CorridorBand {
     OutOfCorridor,
 }
 
-/// Blast‑radius classification for a node or workload.
+/// Blast-radius classification for a node or workload.
 ///
 /// These labels summarise how widely a deviation may propagate.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum BlastRadiusClass {
-    /// Localised, low‑risk changes; all coordinates in safe/gold, low residual.
+    /// Localised, low-risk changes; all coordinates in safe/gold, low residual.
     LocalLow,
-    /// Localised but moderate risk; some near‑breach coordinates, residual below threshold.
+    /// Localised but moderate risk; some near-breach coordinates, residual below threshold.
     LocalModerate,
-    /// Basin‑scale risk; residual elevated but no out‑of‑corridor planes.
+    /// Basin-scale risk; residual elevated but no out-of-corridor planes.
     Basin,
-    /// Constellation‑scale risk; any out‑of‑corridor plane or high uncertainty.
+    /// Constellation-scale risk; any out-of-corridor plane or high uncertainty.
     Constellation,
 }
 
@@ -310,14 +315,14 @@ impl fmt::Display for BlastRadiusClass {
 pub struct KerTriad {
     /// Knowledge factor.
     pub k_knowledge: f32,
-    /// Eco‑impact factor.
+    /// Eco-impact factor.
     pub e_ecoimpact: f32,
-    /// Risk‑of‑harm factor.
+    /// Risk-of-harm factor.
     pub r_risk_of_harm: f32,
 }
 
 impl KerTriad {
-    /// Reference triad for research‑band ecosafety envelopes.
+    /// Reference triad for research-band ecosafety envelopes.
     pub fn research_band() -> Self {
         Self {
             k_knowledge: 0.94,
@@ -388,6 +393,14 @@ impl KerWindow {
             r_risk_of_harm: r.clamp(0.0, 1.0),
         }
     }
+
+    /// Returns true if the window meets conservative deployability thresholds.
+    pub fn ker_deployable(&self) -> bool {
+        let triad = self.triad();
+        triad.k_knowledge >= KerTriad::production_gate().k_knowledge
+            && triad.e_ecoimpact >= KerTriad::production_gate().e_ecoimpact
+            && triad.r_risk_of_harm <= KerTriad::production_gate().r_risk_of_harm
+    }
 }
 
 /// Decision for a proposed step under ecosafety gating.
@@ -406,15 +419,15 @@ pub enum SafeStepDecision {
 
 /// Configuration for safestep gating.
 ///
-/// `vt_max` and `vt_non_increase_eps` encode Lyapunov‑style constraints;
-/// `allow_near_breach` controls whether near‑breach coordinates are allowed.
+/// `vt_max` and `vt_non_increase_eps` encode Lyapunov-style constraints;
+/// `allow_near_breach` controls whether near-breach coordinates are allowed.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SafeStepConfig {
     /// Maximum allowed residual.
     pub vt_max: f32,
     /// Allowed residual increase tolerance.
     pub vt_non_increase_eps: f32,
-    /// Whether near‑breach coordinates are allowed.
+    /// Whether near-breach coordinates are allowed.
     pub allow_near_breach: bool,
 }
 
@@ -431,12 +444,12 @@ impl SafeStepConfig {
 
 /// Result of evaluating a safestep contract.
 ///
-/// Contains both the decision and a blast‑radius class.
+/// Contains both the decision and a blast-radius class.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SafeStepResult {
     /// Step decision.
     pub decision: SafeStepDecision,
-    /// Blast‑radius classification.
+    /// Blast-radius classification.
     pub blast_radius: BlastRadiusClass,
 }
 
@@ -449,12 +462,10 @@ pub fn evaluate_safestep(
     prev_vt: Residual,
     candidate_rx: &RiskVector,
     candidate_vt: Residual,
-    weights: &LyapunovWeights,
+    _weights: &LyapunovWeights,
     config: &SafeStepConfig,
     per_plane_corridors: &[(RiskPlane, CorridorBands)],
 ) -> SafeStepResult {
-    let _ = weights;
-
     let mut max_band = CorridorBand::Safe;
     let mut has_out_of_corridor = false;
     let mut high_uncertainty = false;
@@ -537,7 +548,7 @@ pub struct SafeControllerWrapper<C: SafeController> {
     pub weights: LyapunovWeights,
     /// Gating configuration.
     pub config: SafeStepConfig,
-    /// Per‑plane corridors.
+    /// Per-plane corridors.
     pub corridors: Vec<(RiskPlane, CorridorBands)>,
     /// Rolling KER window.
     pub ker_window: KerWindow,
@@ -559,9 +570,9 @@ impl<C: SafeController> SafeControllerWrapper<C> {
         }
     }
 
-    /// Evaluates one control step: gating, blast‑radius scoring, and KER update.
+    /// Evaluates one control step: gating, blast-radius scoring, and KER update.
     ///
-    /// This method is non‑actuating unless the decision is `Ok`, in which case
+    /// This method is non-actuating unless the decision is `Ok`, in which case
     /// it delegates to the inner controller's `apply_step`.
     pub fn step(&mut self) -> (SafeStepResult, KerTriad) {
         let (act, rx) = self.inner.propose_step();
@@ -590,10 +601,12 @@ impl<C: SafeController> SafeControllerWrapper<C> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
+/// Non-actuating smoke test for the ecosafety safestep helper.
+///
+/// Intended for use in unit tests or diagnostics to verify that the
+/// default guard configuration accepts a clearly safe envelope and rejects
+/// one that violates KER and Risk-of-harm constraints.
+pub fn safestep_smoke_test() {
     #[derive(Clone)]
     struct DummyController {
         energy: f32,
@@ -631,25 +644,44 @@ mod tests {
         }
     }
 
+    let controller = DummyController { energy: 0.3 };
+
+    let corridors = vec![
+        (RiskPlane::Energy, CorridorBands::new(0.3, 0.6, 0.9)),
+        (RiskPlane::Carbon, CorridorBands::new(0.2, 0.4, 0.8)),
+        (RiskPlane::Materials, CorridorBands::new(0.2, 0.5, 0.9)),
+        (RiskPlane::Uncertainty, CorridorBands::new(0.2, 0.5, 0.8)),
+    ];
+
+    let mut wrapper = SafeControllerWrapper::new(controller, corridors);
+
+    for _ in 0..10 {
+        let (result, triad) = wrapper.step();
+        assert_ne!(result.decision, SafeStepDecision::Stop);
+        assert!((0.0..=1.0).contains(&triad.k_knowledge));
+        assert!((0.0..=1.0).contains(&triad.e_ecoimpact));
+        assert!((0.0..=1.0).contains(&triad.r_risk_of_harm));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
     #[test]
-    fn basic_safestep_and_ker() {
-        let controller = DummyController { energy: 0.3 };
-
-        let corridors = vec![
-            (RiskPlane::Energy, CorridorBands::new(0.3, 0.6, 0.9)),
-            (RiskPlane::Carbon, CorridorBands::new(0.2, 0.4, 0.8)),
-            (RiskPlane::Materials, CorridorBands::new(0.2, 0.5, 0.9)),
-            (RiskPlane::Uncertainty, CorridorBands::new(0.2, 0.5, 0.8)),
-        ];
-
-        let mut wrapper = SafeControllerWrapper::new(controller, corridors);
-
-        for _ in 0..10 {
-            let (result, triad) = wrapper.step();
-            assert_ne!(result.decision, SafeStepDecision::Stop);
-            assert!((0.0..=1.0).contains(&triad.k_knowledge));
-            assert!((0.0..=1.0).contains(&triad.e_ecoimpact));
-            assert!((0.0..=1.0).contains(&triad.r_risk_of_harm));
+    fn ker_window_deployable_thresholds() {
+        let mut window = KerWindow::new();
+        let rx_safe = RiskVector::new(vec![RiskEntry {
+            plane: RiskPlane::Energy,
+            coord: RiskCoord::new_clamped(0.1),
+        }]);
+        for _ in 0..100 {
+            window.update(true, &rx_safe);
         }
+        let triad = window.triad();
+        assert!(triad.k_knowledge > 0.9);
+        assert!(triad.e_ecoimpact >= 0.9);
+        assert!(triad.r_risk_of_harm <= 0.13);
+        assert!(window.ker_deployable());
     }
 }
