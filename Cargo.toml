@@ -15,6 +15,7 @@ members = [
     "crates/cyboquatic-runner",
     "crates/always-improve-core",
     "crates/ker_triad",
+    "crates/ker-intelligence-scheduler",
 
     # eco_wealth standalone crate
     "eco_wealth",
