@@ -1,6 +1,6 @@
-// filename: eco_restoration_shard/cyboquatic_progress/20260713/kotlin/CyboquaticWorkloadEnergyTelemetry.kt
-// domain: (d) Cyboquatic workload in Kotlin + SQL telemetry
-// purpose: Kotlin helper to emit workload samples into SQLite (via JDBC) or an Android-telemetry layer.
+// File: eco_restoration_shard/cyboquatic_progress/20260713/kotlin/CyboquaticWorkloadEnergyTelemetry.kt
+// Domain: (d) Cyboquatic workload in Kotlin + SQL telemetry.
+// Purpose: Kotlin helper to compute K,E,R metrics and emit workload samples into SQLite.
 
 package org.cyboquatic.progress
 
@@ -156,8 +156,10 @@ object CyboquaticWorkloadEnergyTelemetry {
         val yyyymmdd = "20260713"
         val domain = "workload_energy_dvt"
         val subtaskId = "PHX-CANAL-WL-2026-07-13"
-        val phoenixHex = "0x20260713PHX3345NWorkloadEnergyDeltaVtKotlin"
-        val priorPointer = "20260709/workload_energy_dvt_rust"
+        val phoenixHex = "0x5078585f574c5f32303236303731335f64445674"
+        val priorPointer = "eco_restoration_shard/cyboquatic_progress/20260709/workload_energy_dvt_rust"
+
+        val vtBeforeSafe = if (vtBefore < 0.0) 0.0 else vtBefore
 
         return WorkloadSampleRow(
             yyyymmdd,
@@ -171,7 +173,7 @@ object CyboquaticWorkloadEnergyTelemetry {
             hydraulicRisk,
             uncertaintyRisk,
             risk,
-            if (vtBefore < 0.0) 0.0 else vtBefore,
+            vtBeforeSafe,
             ker.vt,
             ker.deltaVt,
             ker.k,
@@ -188,7 +190,7 @@ object CyboquaticWorkloadEnergyTelemetry {
         DriverManager.getConnection(url).use { conn ->
             ensureSchema(conn)
             val sql = """
-                INSERT INTO daily_progress (
+                INSERT INTO workload_daily_progress (
                   yyyymmdd, domain, subtask_id,
                   node_id, sample_id, timestamp_utc,
                   energy_req_j, energy_surplus_j,
@@ -208,7 +210,7 @@ object CyboquaticWorkloadEnergyTelemetry {
                   ?, ?
                 );
             """.trimIndent()
-            conn.prepareStatement(sql).use { st ->
+            conn.prepareStatement(sql).use { st: PreparedStatement ->
                 var idx = 1
                 st.setString(idx++, row.yyyymmdd)
                 st.setString(idx++, row.domain)
@@ -247,34 +249,37 @@ object CyboquaticWorkloadEnergyTelemetry {
     private fun ensureSchema(conn: Connection) {
         val sql = """
             PRAGMA foreign_keys=ON;
-            CREATE TABLE IF NOT EXISTS daily_progress (
-              progress_id     INTEGER PRIMARY KEY AUTOINCREMENT,
-              yyyymmdd        TEXT NOT NULL,
-              domain          TEXT NOT NULL,
-              subtask_id      TEXT NOT NULL,
-              node_id         TEXT NOT NULL,
-              sample_id       TEXT NOT NULL,
-              timestamp_utc   TEXT NOT NULL,
-              energy_req_j    REAL NOT NULL,
-              energy_surplus_j REAL NOT NULL,
-              hydraulic_risk  REAL NOT NULL,
-              uncertainty_risk REAL NOT NULL,
-              renergy         REAL NOT NULL,
-              rhydraulic      REAL NOT NULL,
-              runcertainty    REAL NOT NULL,
-              vt_before       REAL NOT NULL,
-              vt_after        REAL NOT NULL,
-              delta_vt        REAL NOT NULL,
-              k_factor        REAL NOT NULL,
-              e_factor        REAL NOT NULL,
-              r_factor        REAL NOT NULL,
-              phoenix_hex     TEXT NOT NULL,
-              prior_pointer   TEXT NOT NULL
+            CREATE TABLE IF NOT EXISTS workload_daily_progress (
+              progress_id       INTEGER PRIMARY KEY AUTOINCREMENT,
+              yyyymmdd          TEXT    NOT NULL,
+              domain            TEXT    NOT NULL,
+              subtask_id        TEXT    NOT NULL,
+              node_id           TEXT    NOT NULL,
+              sample_id         TEXT    NOT NULL,
+              timestamp_utc     TEXT    NOT NULL,
+              energy_req_j      REAL    NOT NULL,
+              energy_surplus_j  REAL    NOT NULL,
+              hydraulic_risk    REAL    NOT NULL,
+              uncertainty_risk  REAL    NOT NULL,
+              renergy           REAL    NOT NULL,
+              rhydraulic        REAL    NOT NULL,
+              runcertainty      REAL    NOT NULL,
+              vt_before         REAL    NOT NULL,
+              vt_after          REAL    NOT NULL,
+              delta_vt          REAL    NOT NULL,
+              k_factor          REAL    NOT NULL,
+              e_factor          REAL    NOT NULL,
+              r_factor          REAL    NOT NULL,
+              phoenix_hex       TEXT    NOT NULL,
+              prior_pointer     TEXT    NOT NULL,
+              created_at        TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
             );
-            CREATE INDEX IF NOT EXISTS idx_daily_progress_date
-              ON daily_progress(yyyymmdd);
-            CREATE INDEX IF NOT EXISTS idx_daily_progress_node_time
-              ON daily_progress(node_id, timestamp_utc);
+            CREATE INDEX IF NOT EXISTS idx_workload_daily_date
+              ON workload_daily_progress(yyyymmdd);
+            CREATE INDEX IF NOT EXISTS idx_workload_daily_node_time
+              ON workload_daily_progress(node_id, timestamp_utc);
+            CREATE INDEX IF NOT EXISTS idx_workload_daily_domain_subtask
+              ON workload_daily_progress(domain, subtask_id);
         """.trimIndent()
         conn.createStatement().use { st ->
             st.executeUpdate(sql)
