@@ -1,6 +1,6 @@
 // filename: eco_restoration_shard/cyboquatic_progress/20260713/cpp/cyboquatic_workload_energyreq_dvt.cpp
 // domain: (d) Cyboquatic workload (energyreqJ, ΔVt) in C++
-// purpose: Non-actuating diagnostic helper to compute workload risk, Lyapunov residual,
+// purpose: Non-actuating diagnostic helper to compute workload risk, Lyapunov-style residual,
 //          and K,E,R scores, and log into cyboquatic_daily_progress.sqlite for Phoenix nodes.
 
 #include <cmath>
@@ -31,7 +31,6 @@ struct WorkloadRiskVector {
     }
 
     double residual() const {
-        // weights mirrored from 2026-07-09 Rust workload crate
         const double WENERGY = 0.8;
         const double WHYDRAULIC = 1.0;
         const double WUNCERTAINTY = 0.6;
@@ -94,7 +93,7 @@ static WorkloadRiskVector normalize_risk(double energy_req_j,
     v.renergy = renergy_raw;
     v.rhydraulic = hydraulic_risk;
     v.runcertainty = uncertainty_risk;
-    return v;
+    return v.clamped();
 }
 
 static void compute_ker(const WorkloadRiskVector &risk,
@@ -151,14 +150,18 @@ static WorkloadSample make_sample(const std::string &sample_id,
     s.hydraulic_risk = hydraulic_risk;
     s.uncertainty_risk = uncertainty_risk;
 
-    WorkloadRiskVector raw = normalize_risk(energy_req_j,
-                                            energy_surplus_j,
-                                            hydraulic_risk,
-                                            uncertainty_risk);
-    s.risk = raw.clamped();
+    WorkloadRiskVector risk_normalized = normalize_risk(
+        energy_req_j,
+        energy_surplus_j,
+        hydraulic_risk,
+        uncertainty_risk
+    );
+    s.risk = risk_normalized;
+
     s.vt_before = (vt_before < 0.0) ? 0.0 : vt_before;
     s.vt_after = s.risk.residual();
     s.delta_vt = s.vt_after - s.vt_before;
+
     compute_ker(s.risk, s.delta_vt, s.k_factor, s.e_factor, s.r_factor);
     return s;
 }
@@ -167,28 +170,28 @@ static void ensure_daily_progress_schema(sqlite3 *db) {
     const char *sql =
         "PRAGMA foreign_keys=ON;"
         "CREATE TABLE IF NOT EXISTS daily_progress ("
-        "  progress_id   INTEGER PRIMARY KEY AUTOINCREMENT,"
-        "  yyyymmdd      TEXT NOT NULL,"
-        "  domain        TEXT NOT NULL,"
-        "  subtask_id    TEXT NOT NULL,"
-        "  node_id       TEXT NOT NULL,"
-        "  sample_id     TEXT NOT NULL,"
-        "  timestamp_utc TEXT NOT NULL,"
-        "  energy_req_j  REAL NOT NULL,"
+        "  progress_id      INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  yyyymmdd         TEXT NOT NULL,"
+        "  domain           TEXT NOT NULL,"
+        "  subtask_id       TEXT NOT NULL,"
+        "  node_id          TEXT NOT NULL,"
+        "  sample_id        TEXT NOT NULL,"
+        "  timestamp_utc    TEXT NOT NULL,"
+        "  energy_req_j     REAL NOT NULL,"
         "  energy_surplus_j REAL NOT NULL,"
-        "  hydraulic_risk REAL NOT NULL,"
+        "  hydraulic_risk   REAL NOT NULL,"
         "  uncertainty_risk REAL NOT NULL,"
-        "  renergy       REAL NOT NULL,"
-        "  rhydraulic    REAL NOT NULL,"
-        "  runcertainty  REAL NOT NULL,"
-        "  vt_before     REAL NOT NULL,"
-        "  vt_after      REAL NOT NULL,"
-        "  delta_vt      REAL NOT NULL,"
-        "  k_factor      REAL NOT NULL,"
-        "  e_factor      REAL NOT NULL,"
-        "  r_factor      REAL NOT NULL,"
-        "  phoenix_hex   TEXT NOT NULL,"
-        "  prior_pointer TEXT NOT NULL"
+        "  renergy          REAL NOT NULL,"
+        "  rhydraulic       REAL NOT NULL,"
+        "  runcertainty     REAL NOT NULL,"
+        "  vt_before        REAL NOT NULL,"
+        "  vt_after         REAL NOT NULL,"
+        "  delta_vt         REAL NOT NULL,"
+        "  k_factor         REAL NOT NULL,"
+        "  e_factor         REAL NOT NULL,"
+        "  r_factor         REAL NOT NULL,"
+        "  phoenix_hex      TEXT NOT NULL,"
+        "  prior_pointer    TEXT NOT NULL"
         ");"
         "CREATE INDEX IF NOT EXISTS idx_daily_progress_date "
         "  ON daily_progress(yyyymmdd);"
@@ -276,7 +279,7 @@ static void insert_daily_progress(sqlite3 *db,
     sqlite3_finalize(stmt);
 }
 
-// Simple CLI:
+// CLI:
 //   cyboquatic_workload_energyreq_dvt <db_path> <node_id> <sample_id> <timestamp_utc>
 //                                     <energy_req_j> <energy_surplus_j>
 //                                     <hydraulic_risk> <uncertainty_risk> <vt_before>
@@ -299,26 +302,29 @@ int main(int argc, char **argv) {
     double uncertainty_risk = std::atof(argv[8]);
     double vt_before = std::atof(argv[9]);
 
-    // daily domain metadata for 2026-07-13
     const std::string yyyymmdd = "20260713";
     const std::string subtask_id = "PHX-CANAL-WL-2026-07-13";
     const std::string phoenix_hex = "0x20260713PHX3345NWorkloadEnergyDeltaVtCpp";
     const std::string prior_pointer = "20260709/workload_energy_dvt_rust";
 
     try {
-        WorkloadSample sample = make_sample(sample_id,
-                                            node_id,
-                                            timestamp_utc,
-                                            energy_req_j,
-                                            energy_surplus_j,
-                                            hydraulic_risk,
-                                            uncertainty_risk,
-                                            vt_before);
+        WorkloadSample sample = make_sample(
+            sample_id,
+            node_id,
+            timestamp_utc,
+            energy_req_j,
+            energy_surplus_j,
+            hydraulic_risk,
+            uncertainty_risk,
+            vt_before
+        );
 
         sqlite3 *db = nullptr;
         int rc = sqlite3_open(db_path.c_str(), &db);
         if (rc != SQLITE_OK) {
-            throw std::runtime_error("Unable to open DB: " + std::string(sqlite3_errmsg(db)));
+            std::string msg = sqlite3_errmsg(db);
+            sqlite3_close(db);
+            throw std::runtime_error("Unable to open DB: " + msg);
         }
 
         ensure_daily_progress_schema(db);
@@ -329,6 +335,7 @@ int main(int argc, char **argv) {
                   << " with K=" << sample.k_factor
                   << " E=" << sample.e_factor
                   << " R=" << sample.r_factor << "\n";
+
         return 0;
     } catch (const std::exception &ex) {
         std::cerr << "Error: " << ex.what() << "\n";
