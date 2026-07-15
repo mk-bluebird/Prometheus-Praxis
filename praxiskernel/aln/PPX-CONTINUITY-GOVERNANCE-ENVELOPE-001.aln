@@ -1,0 +1,131 @@
+aln-spec v1.0
+PPX-CONTINUITY-GOVERNANCE-ENVELOPE-001
+
+version,1.0.0
+owner-aln-id,bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+binding.hostdid,didalnorganic-host
+binding.kernel-crate,ppx_continuity_kernel
+binding.kernel-module,continuity_governance_kernel
+
+schema.role,continuity-and-neurorights-governance-envelope
+schema.domain,Prometheus-Praxis.continuity.kernel
+schema.roh-ceiling,0.30
+schema.nonactuating,true
+schema.invariant.no-identity-classification,true
+schema.invariant.no-rights-downgrade-by-metric,true
+
+SECTION,CONTEXT
+field.subject_did.type,string
+field.system_id.type,string
+field.context_tag.type,string
+field.from_utc.type,optional-rfc3339
+field.to_utc.type,optional-rfc3339
+field.override_min_score.type,optional-f64
+field.override_min_score.bounds,[0.0,1.0]
+field.min_evidence_count_for_allow.type,optional-u32
+field.min_evidence_count_for_allow.default,3
+
+SECTION,CONTINUITY-AGGREGATE
+field.continuity.avg_score.type,f64
+field.continuity.avg_score.bounds,[0.0,1.0]
+field.continuity.min_score.type,f64
+field.continuity.min_score.bounds,[0.0,1.0]
+field.continuity.max_score.type,f64
+field.continuity.max_score.bounds,[0.0,1.0]
+field.continuity.evidence_count.type,u32
+
+SECTION,SYSTEM-WELLBEING-AGGREGATE
+field.wellbeing.avg_value.type,f64
+field.wellbeing.avg_value.bounds,[0.0,1.0]
+field.wellbeing.min_value.type,f64
+field.wellbeing.min_value.bounds,[0.0,1.0]
+field.wellbeing.max_value.type,f64
+field.wellbeing.max_value.bounds,[0.0,1.0]
+field.wellbeing.component_count.type,u32
+
+SECTION,NEURORIGHT-CORRIDOR-BAND
+band.id.type,string
+band.right_name.type,string
+band.min_protection_level.type,f64
+band.min_protection_level.bounds,[0.0,1.0]
+band.max_risk_tolerance.type,f64
+band.max_risk_tolerance.bounds,[0.0,1.0]
+
+SECTION,DECISION
+decision.enum,Allow,Warn,Stop
+
+SECTION,PREFERRED-MIN-SCORE
+field.preferred_min_score.type,f64
+field.preferred_min_score.bounds,[0.0,1.0]
+source.override_min_score,optional-context
+source.user_preference,ppx_usercontinuitypreference.preferred_min_score
+fallback.default,0.70
+
+SECTION,PREDICATES
+
+predicate.SPARSE-EVIDENCE
+description,Continuity evidence window is sparse for strong Allow verdicts.
+expr,continuity.evidence_count < min_evidence_count_for_allow
+kind,soft-guard
+
+predicate.CONTINUITY-BELOW-FLOOR
+description,Continuity min or average falls below preferred floor.
+expr,(continuity.min_score < preferred_min_score) OR (continuity.avg_score < preferred_min_score)
+kind,hard-guard
+
+predicate.CORRIDOR-BREACH
+description,Neuroright corridor band breached by protection or risk proxies.
+mapping.protection_level,wellbeing.min_value
+mapping.risk_level,1.0 - wellbeing.avg_value
+expr,EXISTS band: (protection_level < band.min_protection_level) OR (risk_level > band.max_risk_tolerance)
+kind,hard-guard
+
+predicate.EXTREME-CONTINUITY-BREACH
+description,Continuity min_score far below acceptable floor.
+expr,continuity.min_score < (preferred_min_score * 0.5)
+kind,hard-guard
+
+SECTION,DECISION-RULES
+
+rule.DECISION-STOP
+description,Stop if any neurorights corridor is breached or continuity is extremely low.
+when,CORRIDOR-BREACH OR EXTREME-CONTINUITY-BREACH
+decision,Stop
+
+rule.DECISION-WARN
+description,Warn when continuity is below floor or evidence is sparse, with no corridor breach.
+when,(NOT CORRIDOR-BREACH) AND (CONTINUITY-BELOW-FLOOR OR SPARSE-EVIDENCE)
+decision,Warn
+
+rule.DECISION-ALLOW
+description,Allow only when corridors are intact, continuity meets floor, and evidence is sufficient.
+when,(NOT CORRIDOR-BREACH) AND (NOT CONTINUITY-BELOW-FLOOR) AND (NOT SPARSE-EVIDENCE)
+decision,Allow
+
+SECTION,ALIGNMENT-WITH-RUST
+
+rust.struct.ContinuityGovernanceContext.fields,subject_did,system_id,context_tag,from_utc,to_utc,override_min_score,min_evidence_count_for_allow
+rust.struct.ContinuityAggregate.fields,avg_score,min_score,max_score,evidence_count
+rust.struct.SystemWellBeingAggregate.fields,avg_value,min_value,max_value,component_count
+rust.struct.EffectiveNeurorightBand.fields,id,right_name,min_protection_level,max_risk_tolerance
+rust.enum.ContinuityDecision.variants,Allow,Warn,Stop
+rust.struct.ContinuityGovernanceResult.fields,decision,continuity,wellbeing,corridors,preferred_min_score,subject_did,system_id,context_tag
+
+alignment.invariant.CLAMP01
+description,ALN [0.0,1.0] bands must match Rust clamp01 semantics.
+expr,(forall v in {preferred_min_score, band.min_protection_level, band.max_risk_tolerance}: 0.0 <= v <= 1.0)
+
+alignment.invariant.NON-ACTUATING
+description,Governing kernel is read-only; no actuator fields or commands.
+forbid.fields,torque,current,stimpattern,autopilot,missioncommand,hostmode
+forbid.side-effects,write-sqlite,send-actuator-ffi
+
+alignment.invariant.NO-RIGHTS-DOWNGRADE-BY-METRIC
+description,Lower continuity or corridor metrics must never yield more permissive decisions.
+expr,if continuity' <= continuity AND corridors' <= corridors then decision' >= decision
+note,Decision order Stop > Warn > Allow
+
+SECTION,METADATA
+hexanchor,0xPPX2026CONTINUITYGOVERNANCEENVELOPEbostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+rohceiling,0.30
+aln.migration.authority,ALN.MIGRATION.CYBERCOREAUTHORITY.v1
