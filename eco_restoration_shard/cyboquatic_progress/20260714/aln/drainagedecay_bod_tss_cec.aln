@@ -1,0 +1,50 @@
+# File: eco_restoration_shard/cyboquatic_progress/20260714/aln/drainagedecay_bod_tss_cec.aln
+# Domain (e): drainagedecay frames (BOD, TSS, CEC).
+# ALN v2 fragment expressing knowledge (K), eco-impact (E), and risk (R) bindings for this daily artifact.
+# All identifiers are hex-anchored to DID bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7.
+
+ALN_VERSION 2;
+
+DID "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7";
+
+PARTICLE drainagedecay_e_20260714 {
+    HEX_STAMP "0x6464725f6532303236303731345f70686f656e6978";
+
+    K {
+        focus "drainagedecay_frames_BOD_TSS_CEC";
+        standards [
+            "ISO 14851 aerobic biodegradation (closed respirometry)",
+            "ISO 14855 controlled composting of plastics",
+            "OECD 301 ready biodegradability (screening)",
+            "OECD 201 algal growth inhibition",
+            "OECD 202 Daphnia acute immobilisation"
+        ];
+        model "first_order_decay_with_temperature_correction";
+    }
+
+    E {
+        objective "minimize_aeration_energy_by_tracking_BOD_decay";
+        region "Phoenix_AZ_cyboquatic_channels";
+        telemetry "low_frequency_sampling_safe_for_low_power_controllers";
+        carbon_path "optimize_drainage_routes_to_support_carbon_negative_bioreactors";
+    }
+
+    R {
+        bound "r_score<=0.25";
+        constraint "no_negative_concentrations";
+        constraint "disallow_negative_time_steps";
+        monitoring "field_calibration_required_before_high_load_routing";
+    }
+
+    LINK_CPP    "eco_restoration_shard/cyboquatic_progress/20260714/cpp/drainagedecay_bod_tss_cec.cpp";
+    LINK_JAVA   "eco_restoration_shard/cyboquatic_progress/20260714/java/DrainagedecayBodTssCec.java";
+    LINK_KOTLIN "eco_restoration_shard/cyboquatic_progress/20260714/kotlin/drainagedecay_bod_tss_cec.kt";
+    LINK_LUA    "eco_restoration_shard/cyboquatic_progress/20260714/lua/drainagedecay_bod_tss_cec.lua";
+    LINK_SQL    "eco_restoration_shard/cyboquatic_progress/20260714/sql/cyboquatic_daily_progress_20260714.sql";
+
+    NEXT_RESEARCH {
+        q1 "derive temperature-specific decay constants for Phoenix wastewater using ISO 14851-like respirometric curves";
+        q2 "quantify impact of CEC variation on PFAS and nutrient sorption in cyboquatic media";
+        q3 "co-design sampling frequencies that satisfy OECD 201/202 toxicity observation windows while minimizing sensor energy use";
+    }
+}
