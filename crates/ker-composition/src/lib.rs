@@ -1,6 +1,8 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_float, c_int};
 
+use rlua::Lua;
+
 #[repr(C)]
 pub struct KerParticle2026v1 {
     pub particle_id: *const c_char,
@@ -60,6 +62,19 @@ pub struct RustKerComposition {
     pub rule_id: String,
     pub evidencehex: Option<String>,
     pub signinghex: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RustKerCompositionRow {
+    pub left: RustKerParticle,
+    pub right: RustKerParticle,
+    pub comp_lane: String,
+    pub k_combined: f32,
+    pub e_combined: f32,
+    pub r_combined: f32,
+    pub members: String,
+    pub ruleid: String,
+    pub evidencehex: Option<String>,
 }
 
 fn to_c_string(s: &str) -> CString {
@@ -148,5 +163,51 @@ pub fn ker_oplus_geom_min_max_rust(
         } else {
             Some(from_c_str(out.signinghex))
         },
+    })
+}
+
+pub fn validate_composition_with_lua(
+    row: &RustKerCompositionRow,
+) -> Result<bool, rlua::Error> {
+    let lua = Lua::new();
+    lua.context(|ctx| {
+        let validator_src = std::fs::read_to_string(
+            "rust/ker-composition/lua/ker_composition_validator.lua",
+        )
+        .expect("ker_composition_validator.lua not found");
+
+        let module: rlua::Table = ctx.load(&validator_src).eval()?;
+        let validate: rlua::Function = module.get("validate")?;
+
+        let left_tbl = ctx.create_table()?;
+        left_tbl.set("K", row.left.k)?;
+        left_tbl.set("E", row.left.e)?;
+        left_tbl.set("R", row.left.r)?;
+        left_tbl.set("lane", row.left.lane.as_str())?;
+
+        let right_tbl = ctx.create_table()?;
+        right_tbl.set("K", row.right.k)?;
+        right_tbl.set("E", row.right.e)?;
+        right_tbl.set("R", row.right.r)?;
+        right_tbl.set("lane", row.right.lane.as_str())?;
+
+        let comp_tbl = ctx.create_table()?;
+        comp_tbl.set("Kcombined", row.k_combined)?;
+        comp_tbl.set("Ecombined", row.e_combined)?;
+        comp_tbl.set("Rcombined", row.r_combined)?;
+        comp_tbl.set("members", row.members.as_str())?;
+        comp_tbl.set("ruleid", row.ruleid.as_str())?;
+        comp_tbl.set("lane", row.comp_lane.as_str())?;
+        if let Some(ehx) = &row.evidencehex {
+            comp_tbl.set("evidencehex", ehx.as_str())?;
+        }
+
+        let row_tbl = ctx.create_table()?;
+        row_tbl.set("left", left_tbl)?;
+        row_tbl.set("right", right_tbl)?;
+        row_tbl.set("comp", comp_tbl)?;
+
+        let result: bool = validate.call(row_tbl)?;
+        Ok(result)
     })
 }
