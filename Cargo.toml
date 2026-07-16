@@ -17,6 +17,7 @@ members = [
     "crates/ker_triad",
     "crates/ker-intelligence-scheduler",
     "crates/steward_identity",
+    "crates/ai_node_shard",
 
     # eco_wealth standalone crate
     "eco_wealth",
