@@ -1,0 +1,19 @@
+# filename: crates/ai_node_shard/Cargo.toml
+
+[package]
+name = "ai_node_shard"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "Non-actuating AI data center node shards and Phoenix Hex registry bindings for EcoNet / Cyboquatics."
+repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
+
+[dependencies]
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
+serde_with = "3.11.0"
+thiserror = "1.0.64"
+time = { version = "0.3.36", features = ["formatting", "parsing", "macros"] }
+rusqlite = { version = "0.31.0", features = ["bundled"] }
+steward_identity = { path = "../steward_identity" }
