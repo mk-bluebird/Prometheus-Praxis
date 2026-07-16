@@ -21,6 +21,7 @@ members = [
     "crates/ai_plane_ci_guard",
     "crates/ker-composition",
     "crates/aln-definition-registry",
+    "crates/eco-repo-index",
 
     # eco_wealth standalone crate
     "eco_wealth",
