@@ -1,0 +1,70 @@
+aln LaneRollbackTest2026v1.aln
+network ALN-MAINNET
+shardid 0xlanerollbacktest2026abcd000000000000000000000005
+owner.bostrom bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+timestamp.utc 2026-07-16T22:20:00Z
+
+title LaneRollbackTest2026v1
+version 1
+
+comment
+  Scenario exercising lane-governance-topology downgraders under rapid HARD-band
+  breaches. Ensures downgrade fires within two windows.
+endcomment
+
+particle LaneRollbackScenario2026v1
+  field scenario_id string required true
+  field node_id string required true
+  field region_id string required true
+  field initial_lane string required true  ; e.g., "PROD"
+  field window_ms int required true        ; sliding window size in ms
+endparticle
+
+particle LaneRollbackSample2026v1
+  field scenario_id string required true
+  field t_index int required true          ; sample index
+  field timestamp_ms int required true
+  field lane string required true
+  field r_metric float required true       ; normalized risk metric
+  field vt float required true             ; Lyapunov residual
+  field hard_band float required true      ; HARD threshold for R or Vt
+endparticle
+
+block scenario
+  language TEXT
+  content
+    ; scenario_id | node_id | region_id | initial_lane | window_ms
+    S1           | NODE_A  | PHX       | PROD         | 600000
+  endcontent
+endblock
+
+block samples
+  language TEXT
+  content
+    ; scenario_id | t_index | timestamp_ms | lane | r_metric | vt  | hard_band
+    ; Baseline window: safe values.
+    S1           | 0       | 0            | PROD | 0.20     | 0.10| 0.80
+    S1           | 1       | 300000       | PROD | 0.25     | 0.12| 0.80
+
+    ; First HARD-band breach: R > hard_band
+    S1           | 2       | 600000       | PROD | 0.85     | 0.90| 0.80
+
+    ; Second window still in HARD band: downgrade must have fired by here.
+    S1           | 3       | 900000       | PROD | 0.90     | 0.95| 0.80
+
+    ; After downgrade: lane should be PILOT or RESEARCH.
+    S1           | 4       | 1200000      | PILOT| 0.60     | 0.50| 0.80
+  endcontent
+endblock
+
+block rust_test
+  language RUST
+  module lane_governance_topology_tests
+  content
+    /// Auto-generated integration test for lane rollback under HARD-band breaches.
+    ///
+    /// Loads LaneRollbackTest2026v1.aln samples and feeds them into the
+    /// lane-governance-topology engine, asserting that downgrade occurs within
+    /// two windows after a HARD-band breach.
+  endcontent
+endblock
