@@ -22,7 +22,7 @@ serde_json = { version = "1.0.120" }
 cc = "1.0.99"
 
 [dev-dependencies]
-kani = "0.67.0"
+kani-verifier = "0.67.0"
 
 [[test]]
 name = "kani_ker_composition"
