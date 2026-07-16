@@ -1,33 +1,58 @@
-<!-- filename: eco_restoration_shard/cyboquatic_progress/ai_datacenter_governance/docs/10axis_to_risk_mapping.md
-     purpose : Exhaustive table mapping each of the ten measurement axes to its
-               risk coordinate, normalization function, weight, and plane. -->
+# 10‑Axis Telemetry → Risk Coordinates
 
-# 10‑Axis Telemetry → Lyapunov Risk Coordinates
+This document is the normative mapping from AI node telemetry into the risk
+coordinates used by `AiDatacenterNode2026v1` and by `ai_node_shard`.[file:91]
 
-This document is the normative reference for translating raw AI‑data‑centre telemetry into the
-risk coordinates used by `AiDatacenterNode2026v1.aln`.  All corridors are initial values;
-they may only be **tightened** over time (always‑improve rule).
+## Primary axes (contribute to Vt)
 
-## Primary Constraint Axes (feed into Vt)
+- CUE (kg CO₂/kWh)
+  - Ideal: 0.05
+  - Ceiling: 0.40
+  - Risk: \( r_{\text{cue}} = \max(0, \min(1, (x - 0.05) / (0.40 - 0.05))) \).[file:91]
+- Eco‑per‑Joule
+  - Ideal: 1.0
+  - Floor: 0.2
+  - Risk: 0 if \(x \ge 1.0\); else \( r = \max(0, \min(1, (1.0 - x) / (1.0 - 0.2))) \).[file:91]
+- PUE
+  - Ideal: 1.05
+  - Ceiling: 1.40
+  - Risk: \( r_{\text{pue}} = \max(0, \min(1, (x - 1.05) / (1.40 - 1.05))) \).[file:91]
+- Eco‑task ratio (fraction)
+  - Ideal: 0.50+
+  - Floor: 0.20
+  - Risk: 0 if \(x \ge 0.50\); else \( r = \max(0, \min(1, (0.50 - x) / (0.50 - 0.20))) \).[file:91]
+- WUE (L/kWh)
+  - Ideal: 0.20
+  - Ceiling: 1.50
+  - Risk: \( r_{\text{wue}} = \max(0, \min(1, (x - 0.20) / (1.50 - 0.20))) \).[file:91]
+- Embodied CO₂
+  - Ideal: 0
+  - Ceiling: 100
+  - Risk: \( r_{\text{embodied}} = \max(0, \min(1, x / 100)) \).[file:91]
+- Energy intensity
+  - Ideal: 0.10 kWh/workload
+  - Ceiling: 0.50
+  - Risk: \( r_{\text{energy}} = \max(0, \min(1, (x - 0.10) / (0.50 - 0.10))) \).[file:91]
+- Joules per inference
+  - Ideal: 1.0
+  - Ceiling: 10.0
+  - Risk: \( r_{\text{jin}} = \max(0, \min(1, (x - 1.0) / (10.0 - 1.0))) \).[file:91]
+- Heat reuse (ERE)
+  - Ideal: ≥ 0.5
+  - Risk: 0 if \(x \ge 0.5\); else \( r_{\text{heat}} = \max(0, \min(1, (0.5 - x) / 0.5)) \).[file:91]
+- Topology violations
+  - Ideal: 0
+  - Ceiling: 5
+  - Risk: \( r_{\text{top}} = \max(0, \min(1, \text{violations} / 5)) \).[file:91]
 
-| Axis / Metric               | Ideal Value | Corridor Ceiling | Normalisation Rule               | Plane              | Weight |
-|-----------------------------|-------------|------------------|----------------------------------|--------------------|--------|
-| **CUE** (kg CO₂/kWh)        | 0.0         | 0.5              | `r = (CUE - 0.0) / (0.5 - 0.0)` | AI_CARBON          | 0.25   |
-| **Eco‑per‑Joule** (benefit/J) | 1.0       | 0.2              | `r = (1.0 - x) / (1.0 - 0.2)` if x < 1.0, else 0 | AI_CARBON | 0.25 |
-| **PUE** (ratio)             | 1.09        | 1.5              | `r = (PUE - 1.09) / (1.5 - 1.09)` | AI_POWER         | 0.15   |
-| **Eco‑Task Ratio** (fraction)| 1.0        | 0.4              | `r = (1.0 - x) / (1.0 - 0.4)`    | AI_ECO_RATIO      | 0.15   |
-| **WUE** (L/kWh)             | 0.5         | 2.0              | `r = (WUE - 0.5) / (2.0 - 0.5)`  | AI_WATER_MATERIALS| 0.10   |
-| **Materials Intensity** (kgCO₂/TFLOP‑yr)| 0.1 | 1.0        | `r = (x - 0.1) / (1.0 - 0.1)`    | AI_WATER_MATERIALS| 0.05   |
-| **Topology Risk** (score)   | 0.0         | 0.3              | `r = x / 0.3`                    | AI_TOPOLOGY       | 0.05   |
+## Secondary axes (K‑boost only)
 
-All `r` values are clamped to `[0,1]`.  If a metric exceeds its ceiling, `r = 1`.
+- Tokens per joule:
+  - Normalized as \( b_{\text{tok}} = \max(0, \min(1, x / 10^6)) \).[file:91]
+- Utilisation:
+  - \( b_{\text{util}} = \max(0, \min(1, x / 0.9)) \).[file:91]
+- ERE:
+  - \( b_{\text{ere}} = \max(0, \min(1, x / 1.0)) \).[file:91]
 
-## Secondary Guidance Axes (affect K‑boost only, not Vt)
-
-| Axis / Metric               | Ideal Value | How It Boosts K                      |
-|-----------------------------|-------------|--------------------------------------|
-| **Tokens per Joule**        | 1e6         | `boost = 0.4 * clamp(x / 1e6, 0, 1)` |
-| **Utilisation** (fraction)  | 0.9         | `boost = 0.3 * clamp(x / 0.9, 0, 1)` |
-| **ERE** (heat reuse ratio)  | 1.0         | `boost = 0.3 * clamp(x / 1.0, 0, 1)` |
-
-Total K‑boost = `0.05 * ( boost_tokens + boost_util + boost_ere )`.
+K‑boost fraction:
+- \(K_{\text{boost}} = 0.05 \cdot (0.4\,b_{\text{tok}} + 0.3\,b_{\text{util}} + 0.3\,b_{\text{ere}})\).[file:92]
