@@ -1,0 +1,21 @@
+// File: tee/ker_enclave/ker_enclave.edl
+// Destination: Prometheus-Praxis/tee/ker_enclave/ker_enclave.edl
+//
+// EDL definition for the enclave interface. This file is consumed by the SGX
+// or equivalent TEE toolchain to generate Enclave_t.h and Enclave_u.h.
+
+enclave {
+    trusted {
+        public void ker_compute_and_sign(
+            [in, size=data_len] const uint8_t* data,
+            size_t data_len,
+            [out, size=signature_buf_len] uint8_t* signature_buf,
+            size_t signature_buf_len,
+            [out] size_t* signature_len
+        );
+    };
+
+    untrusted {
+        void ocall_log([in, string] const char* msg);
+    };
+};
