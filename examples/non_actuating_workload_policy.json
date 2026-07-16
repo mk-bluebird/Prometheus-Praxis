@@ -1,0 +1,15 @@
+{
+  "forbiddenClasses": [
+    "org.eco.actuator.ValveController",
+    "org.eco.actuator.PumpActuator"
+  ],
+  "forbiddenPackages": [
+    "org.eco.actuator",
+    "org.eco.deploy"
+  ],
+  "forbiddenMethods": [
+    "org.eco.deploy.DeployToggle.toggle",
+    "org.eco.actuator.ValveController.open",
+    "org.eco.actuator.ValveController.close"
+  ]
+}
