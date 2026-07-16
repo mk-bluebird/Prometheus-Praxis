@@ -9,11 +9,29 @@ license = "MIT OR Apache-2.0"
 description = "Non-actuating AI data center node shards and Phoenix Hex registry bindings for EcoNet / Cyboquatics."
 repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
 
+[lib]
+name = "ai_node_shard"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
 [dependencies]
-serde = { version = "1.0.203", features = ["derive"] }
-serde_json = { version = "1.0.120" }
+serde = { version = "1.0.203", features = ["derive"] }          # aligned with repo-wide serde pin [file:15]
+serde_json = { version = "1.0.120" }                            # aligned with repo-wide serde_json pin [file:15]
 serde_with = "3.11.0"
 thiserror = "1.0.64"
 time = { version = "0.3.36", features = ["formatting", "parsing", "macros"] }
 rusqlite = { version = "0.31.0", features = ["bundled"] }
-steward_identity = { path = "../steward_identity" }
+steward_identity = { path = "../steward_identity" }             # crate directory preserved [file:15]
+
+[dev-dependencies]
+# Kani is mandatory and versioned precisely; used for verification harnesses
+kani = "0.67.0"
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
+
+[features]
+# Default feature set is non-actuating and CPU-only; no optional Kani.
+default = []
+
+# Explicit verification feature to group Kani-related tests/harnesses if needed.
+verify-kani = []
