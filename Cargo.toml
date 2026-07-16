@@ -16,6 +16,7 @@ members = [
     "crates/always-improve-core",
     "crates/ker_triad",
     "crates/ker-intelligence-scheduler",
+    "crates/steward_identity",
 
     # eco_wealth standalone crate
     "eco_wealth",
