@@ -1,0 +1,20 @@
+# filename: crates/steward_identity/Cargo.toml
+
+[package]
+name = "steward_identity"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "Shared steward identity types and ALN-friendly helpers for EcoNet / Cyboquatics."
+repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
+
+[dependencies]
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
+thiserror = "1.0.64"
+time = { version = "0.3.36", features = ["formatting", "parsing", "macros"] }
+
+[dev-dependencies]
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
