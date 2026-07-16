@@ -22,6 +22,7 @@ members = [
     "crates/ker-composition",
     "crates/aln-definition-registry",
     "crates/eco-repo-index",
+    "crates/lane-governance-topology",
 
     # eco_wealth standalone crate
     "eco_wealth",
