@@ -1,0 +1,23 @@
+{
+  "version": "2026.1",
+  "generated_at_utc": "2026-07-16T22:16:00Z",
+  "entries": [
+    {
+      "repo_id": "Prometheus-Praxis/aln/KERComposition2026v1.aln",
+      "aln_particle": "KERComposition2026v1",
+      "ker_targets": [
+        {
+          "k_min": 0.0,
+          "k_max": 1.0,
+          "e_min": 0.0,
+          "e_max": 1.0,
+          "r_min": 0.0,
+          "r_max": 1.0
+        }
+      ],
+      "lane": "PROD",
+      "region": "PHX",
+      "scope": "ECO_REPO"
+    }
+  ]
+}
