@@ -1,0 +1,14 @@
+[package]
+name = "ker-composition"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+rlua = "0.19"
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
+
+[build-dependencies]
+cc = "1.0"
