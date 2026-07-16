@@ -1,0 +1,163 @@
+# filename: eco_restoration_shard/cyboquatic_progress/ai_datacenter_governance/aln/AiDatacenterNode2026v1.aln
+# purpose : ALN v2 template particle for any AI data centre operating as a Cyboquatic node.
+#           Defines physical + governance planes, corridor bounds, K,E,R engine, and DID binding.
+
+particle AiDatacenterNode2026v1 {
+  signing_did    = "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7";
+  evidence_hex   = "0x20260716PHXAIDCGOVFRAMEWORKV1";
+  lane           = "RESEARCH";        # initial lane; promotion governed by lane contract (Object 14)
+  node_role      = "AI_DATA_CENTER";
+  region_code    = "PHX-CAZ-CEIM";
+
+  #############################################################################
+  # PHYSICAL PLANES – each a risk corridor with ideal and ceiling values.
+  #############################################################################
+
+  plane AI_CARBON {
+    metric CUE {                               # Carbon Usage Effectiveness (kg CO2eq / kWh)
+      ideal          = 0.0;
+      ceiling        = 0.5;                    # 0.5 kg CO2 / kWh is max allowed
+      unit           = "kg_CO2_per_kWh";
+    }
+    metric ECO_PER_JOULE {                     # eco‑benefit per joule of IT energy
+      ideal          = 1.0;                    # 1 normalized benefit unit per joule
+      ceiling        = 0.2;                    # must be >= 0.2 benefit units / J
+      unit           = "EcoBenefitUnit_per_J";
+      invert_norm    = true;                   # smaller is worse, so r = 1 - (x/ideal) if x<ideal
+    }
+  }
+
+  plane AI_POWER {
+    metric PUE {
+      ideal          = 1.09;
+      ceiling        = 1.5;
+      unit           = "ratio";
+    }
+  }
+
+  plane AI_ECO_RATIO {
+    metric ECO_TASK_RATIO {
+      ideal          = 1.0;                    # 100 % of energy on eco‑tasks
+      ceiling        = 0.4;                    # at least 40 % must be eco‑tasks
+      unit           = "fraction";
+      invert_norm    = true;
+    }
+  }
+
+  plane AI_WATER_MATERIALS {
+    metric WUE {
+      ideal          = 0.5;                    # L / kWh, very water‑efficient
+      ceiling        = 2.0;
+      unit           = "L_per_kWh";
+    }
+    metric MATERIALS_INTENSITY {
+      ideal          = 0.1;                    # kg CO2e per TFLOP‑year (placeholder)
+      ceiling        = 1.0;
+      unit           = "kgCO2e_per_TFLOPyear";
+    }
+  }
+
+  plane AI_TOPOLOGY {
+    metric TOPOLOGY_RISK {                     # 0 = no violations, 1 = systemic breach
+      ideal          = 0.0;
+      ceiling        = 0.3;                    # any sustained r > 0.3 triggers demotion
+      unit           = "score";
+    }
+  }
+
+  #############################################################################
+  # SECONDARY GUIDANCE METRICS (affect K boost only, not Vt)
+  #############################################################################
+
+  guidance THROUGHPUT {
+    metric TOKENS_PER_JOULE {
+      ideal          = 1e6;                    # tokens per joule (aspirational)
+      unit           = "tokens_per_J";
+    }
+    metric UTILISATION {
+      ideal          = 0.9;
+      unit           = "fraction";
+    }
+    metric ERE {
+      ideal          = 1.0;                    # 100 % of waste heat reused
+      unit           = "fraction";
+    }
+  }
+
+  #############################################################################
+  # LYAPUNOV RESIDUAL & KER ENGINE
+  #############################################################################
+
+  ker_engine {
+    # Vt is computed only from PRIMARY constraint planes (six risk coordinates).
+    # Weights reflect relative environmental severity.
+    weight w_cue          = 0.25;
+    weight w_eco_per_j    = 0.25;
+    weight w_pue          = 0.15;
+    weight w_eco_ratio    = 0.15;
+    weight w_wue          = 0.10;
+    weight w_materials    = 0.05;
+    weight w_topology     = 0.05;
+
+    # Normalization function for each metric:
+    #   r = clamp01( (x - ideal) / (ceiling - ideal) )         for normal metrics
+    #   r = clamp01( (ideal - x) / (ideal - ceiling) )         for inverted (smaller is worse)
+    # where ideal < ceiling for normal, ideal > ceiling for inverted.
+
+    function compute_vt(metrics) -> Vt {
+      local r_cue      = norm(metrics.CUE,      plane.AI_CARBON.CUE);
+      local r_eco_j    = norm(metrics.ECO_PER_JOULE, plane.AI_CARBON.ECO_PER_JOULE);
+      local r_pue      = norm(metrics.PUE,      plane.AI_POWER.PUE);
+      local r_eco_r    = norm(metrics.ECO_TASK_RATIO, plane.AI_ECO_RATIO.ECO_TASK_RATIO);
+      local r_wue      = norm(metrics.WUE,      plane.AI_WATER_MATERIALS.WUE);
+      local r_mat      = norm(metrics.MATERIALS_INTENSITY, plane.AI_WATER_MATERIALS.MATERIALS_INTENSITY);
+      local r_top      = norm(metrics.TOPOLOGY_RISK, plane.AI_TOPOLOGY.TOPOLOGY_RISK);
+
+      return w_cue * r_cue^2 + w_eco_per_j * r_eco_j^2 + w_pue * r_pue^2 +
+             w_eco_ratio * r_eco_r^2 + w_wue * r_wue^2 + w_mat * r_mat^2 + w_top * r_top^2;
+    }
+
+    function compute_ker(metrics, Vt_prev, Vt_curr) {
+      local deltaVt = Vt_curr - Vt_prev;
+
+      # Base K from residual magnitude and trend
+      local K_base = 0.95 - 0.3 * Vt_curr - 0.2 * max(0, deltaVt);
+      K_base = clamp01(K_base);
+
+      # Secondary K boost from throughput, utilisation, ERE (all contribute up to +0.05 total)
+      local K_boost = 0.05 * (
+        0.4 * clamp01(metrics.TOKENS_PER_JOULE / 1e6) +
+        0.3 * clamp01(metrics.UTILISATION / 0.9) +
+        0.3 * clamp01(metrics.ERE / 1.0)
+      );
+      local K = clamp01(K_base + K_boost);
+
+      # Eco‑impact E: high when Vt is low and not worsening
+      local E = 0.95 - Vt_curr - 0.15 * max(0, deltaVt);
+      E = clamp01(E);
+
+      # Residual risk R: absolute residual + excess over previous
+      local R = Vt_curr + max(0, deltaVt);
+      R = clamp01(R);
+
+      return { K = K, E = E, R = R };
+    }
+
+    # Monotonicity invariant: if R > 0.13 the node must be derated or blocked.
+    invariant R_ceiling = 0.13;
+  }
+
+  #############################################################################
+  # EVIDENCE CHAINING
+  #############################################################################
+  chaining {
+    daily_progress_table = "daily_progress_ai_node";
+    evidence_column      = "evidence_hex";
+    prior_pointer_column = "prior_pointer";
+    ker_columns          = ["k_factor", "e_factor", "r_factor"];
+  }
+
+  description = "Template ALN particle for AI data centres operating as Cyboquatic nodes. \
+                Defines six primary risk planes and three guidance metrics, with explicit \
+                Lyapunov residual and K,E,R derivation."
+}
