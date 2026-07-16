@@ -1,0 +1,28 @@
+particle FogHeuristicDrainage2026v1
+  versiontag 2026v1
+  category   FOG_HEURISTIC
+  title      FOG drainage-decay heuristic frame
+  description
+    Non-actuating, DID-signed predicates for unmodeled media
+    in Phoenix drainage-decay nodes (BOD/TSS/CEC).
+
+  record FogHeuristicRow
+    field node_id        string
+    field region         string
+    field t_seen         datetime
+    field sensor_id      string
+
+    field bod_mg_per_l   f64
+    field tss_mg_per_l   f64
+    field cec_proxy      f64
+
+    field flag_turbid_spike     bool
+    field flag_unmodeled_media  bool
+    field flag_cold_shock       bool
+
+    field corridor_id    string
+    field evidence_hex   string
+    field signing_did    string
+    field created_utc    datetime
+  end
+end
