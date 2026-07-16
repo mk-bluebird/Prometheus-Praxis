@@ -1,94 +1,152 @@
 -- filename: eco_restoration_shard/cyboquatic_progress/ai_datacenter_governance/sql/daily_progress_ai_node.sql
--- purpose : Schema and daily seed INSERT for the AI data centre daily progress table.
---           This extends the existing cyboquatic daily_progress convention with AI‑specific columns.
 
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS daily_progress_ai_node (
-    progress_id        INTEGER PRIMARY KEY AUTOINCREMENT,
-    yyyymmdd           TEXT NOT NULL,                 -- date of the telemetry window
-    node_id            TEXT NOT NULL,                 -- e.g., 'PHX-AI-DC-01'
-    domain             TEXT NOT NULL DEFAULT 'AI_DATA_CENTER',
+    nodeid                    TEXT    NOT NULL,
+    region                    TEXT    NOT NULL,
+    lane                      TEXT    NOT NULL,
+    steward_uuid              TEXT    NOT NULL,
+    steward_signinghex        TEXT    NOT NULL,
+    yyyymmdd                  TEXT    NOT NULL,
+    twindow_start             TEXT    NOT NULL,
+    twindow_end               TEXT    NOT NULL,
 
-    -- 10‑axis raw telemetry (all required; NULL allowed only if sensor missing)
-    core_energy_intensity_kWh_per_workload   REAL,    -- kWh / (10^6 tokens or inference)
-    joules_per_inference                    REAL,
-    pue                                      REAL,
-    cue_kg_per_kWh                           REAL,
-    tokens_per_second                        REAL,
-    inferences_per_second                    REAL,
-    utilisation_pct                          REAL,    -- fraction
-    ere                                      REAL,    -- heat reuse effectiveness
-    eco_task_ratio                           REAL,    -- fraction of energy on eco‑tasks
-    wue_l_per_kWh                            REAL,
-    materials_intensity_kgCO2e_per_TFLOPyr   REAL,
-    topology_risk_score                      REAL,
+    core_energy_kwh_per_workload REAL NOT NULL CHECK(core_energy_kwh_per_workload >= 0.0),
+    joules_per_inference          REAL NOT NULL CHECK(joules_per_inference >= 0.0),
+    pue                           REAL NOT NULL CHECK(pue >= 0.0),
+    cue_kg_co2_per_kwh            REAL NOT NULL CHECK(cue_kg_co2_per_kwh >= 0.0),
+    eco_per_joule                 REAL NOT NULL,
+    throughput_tokens_per_s       REAL NOT NULL,
+    throughput_inferences_per_s   REAL NOT NULL,
+    utilization_pct               REAL NOT NULL CHECK(utilization_pct >= 0.0 AND utilization_pct <= 100.0),
+    ere                           REAL NOT NULL,
+    eco_task_ratio_pct            REAL NOT NULL,
+    wue_l_per_kwh                 REAL NOT NULL CHECK(wue_l_per_kwh >= 0.0),
+    embodied_kg_co2eq             REAL NOT NULL CHECK(embodied_kg_co2eq >= 0.0),
+    topology_violation_count      INTEGER NOT NULL CHECK(topology_violation_count >= 0),
 
-    -- Derived Lyapunov residual and ΔVt
-    vt_residual           REAL NOT NULL,
-    vt_previous           REAL NOT NULL,
-    delta_vt              REAL NOT NULL,
+    r_pue             REAL NOT NULL CHECK(r_pue             >= 0.0 AND r_pue             <= 1.0),
+    r_cue             REAL NOT NULL CHECK(r_cue             >= 0.0 AND r_cue             <= 1.0),
+    r_eco_per_joule   REAL NOT NULL CHECK(r_eco_per_joule   >= 0.0 AND r_eco_per_joule   <= 1.0),
+    r_eco_task_ratio  REAL NOT NULL CHECK(r_eco_task_ratio  >= 0.0 AND r_eco_task_ratio  <= 1.0),
+    r_wue             REAL NOT NULL CHECK(r_wue             >= 0.0 AND r_wue             <= 1.0),
+    r_embodied        REAL NOT NULL CHECK(r_embodied        >= 0.0 AND r_embodied        <= 1.0),
+    r_topology        REAL NOT NULL CHECK(r_topology        >= 0.0 AND r_topology        <= 1.0),
+    r_energy          REAL NOT NULL CHECK(r_energy          >= 0.0 AND r_energy          <= 1.0),
+    r_joule_inf       REAL NOT NULL CHECK(r_joule_inf       >= 0.0 AND r_joule_inf       <= 1.0),
+    r_heat_reuse      REAL NOT NULL CHECK(r_heat_reuse      >= 0.0 AND r_heat_reuse      <= 1.0),
+    r_utilization     REAL NOT NULL CHECK(r_utilization     >= 0.0 AND r_utilization     <= 1.0),
+    r_bandwidth       REAL NOT NULL CHECK(r_bandwidth       >= 0.0 AND r_bandwidth       <= 1.0),
 
-    -- K,E,R triad
-    k_factor              REAL NOT NULL,
-    e_factor              REAL NOT NULL,
-    r_factor              REAL NOT NULL,
+    vt                REAL NOT NULL CHECK(vt >= 0.0),
+    k                 REAL NOT NULL CHECK(k  >= 0.0 AND k  <= 1.0),
+    e                 REAL NOT NULL CHECK(e  >= 0.0 AND e  <= 1.0),
+    r                 REAL NOT NULL CHECK(r  >= 0.0 AND r  <= 1.0),
 
-    -- Evidence chain
-    evidence_hex          TEXT NOT NULL,
-    prior_pointer         TEXT NOT NULL,
+    strength_index_s  REAL NOT NULL CHECK(strength_index_s >= 0.0 AND strength_index_s <= 1.0),
 
-    created_utc           TEXT NOT NULL DEFAULT (datetime('now'))
+    evidencehex       TEXT    NOT NULL,
+    prior_evidencehex TEXT,
+    phoenix_anchor_id TEXT,
+    created_utc       TEXT    NOT NULL,
+
+    PRIMARY KEY (nodeid, yyyymmdd)
 );
 
-CREATE INDEX IF NOT EXISTS idx_ai_node_date_node
-    ON daily_progress_ai_node(yyyymmdd, node_id);
+CREATE INDEX IF NOT EXISTS idx_daily_ai_node_lane_time
+    ON daily_progress_ai_node (lane, yyyymmdd);
 
--- Seed row for 2026‑07‑16 (example values; replace with real telemetry)
-INSERT INTO daily_progress_ai_node (
+CREATE INDEX IF NOT EXISTS idx_daily_ai_node_steward_time
+    ON daily_progress_ai_node (steward_uuid, yyyymmdd);
+
+CREATE INDEX IF NOT EXISTS idx_daily_ai_node_evidence
+    ON daily_progress_ai_node (evidencehex);
+
+INSERT OR IGNORE INTO daily_progress_ai_node (
+    nodeid,
+    region,
+    lane,
+    steward_uuid,
+    steward_signinghex,
     yyyymmdd,
-    node_id,
-    core_energy_intensity_kWh_per_workload,
+    twindow_start,
+    twindow_end,
+    core_energy_kwh_per_workload,
     joules_per_inference,
     pue,
-    cue_kg_per_kWh,
-    tokens_per_second,
-    inferences_per_second,
-    utilisation_pct,
+    cue_kg_co2_per_kwh,
+    eco_per_joule,
+    throughput_tokens_per_s,
+    throughput_inferences_per_s,
+    utilization_pct,
     ere,
-    eco_task_ratio,
-    wue_l_per_kWh,
-    materials_intensity_kgCO2e_per_TFLOPyr,
-    topology_risk_score,
-    vt_residual,
-    vt_previous,
-    delta_vt,
-    k_factor,
-    e_factor,
-    r_factor,
-    evidence_hex,
-    prior_pointer
+    eco_task_ratio_pct,
+    wue_l_per_kwh,
+    embodied_kg_co2eq,
+    topology_violation_count,
+    r_pue,
+    r_cue,
+    r_eco_per_joule,
+    r_eco_task_ratio,
+    r_wue,
+    r_embodied,
+    r_topology,
+    r_energy,
+    r_joule_inf,
+    r_heat_reuse,
+    r_utilization,
+    r_bandwidth,
+    vt,
+    k,
+    e,
+    r,
+    strength_index_s,
+    evidencehex,
+    prior_evidencehex,
+    phoenix_anchor_id,
+    created_utc
 ) VALUES (
-    '20260716',
     'PHX-AI-DC-01',
-    1.2,
-    350.0,
+    'Phoenix-AZ',
+    'RESEARCH',
+    '87cb8e02-c918-4b2a-aa40-36a8efa37e52',
+    'bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7',
+    '20260716',
+    '2026-07-16T00:00:00Z',
+    '2026-07-16T23:59:59Z',
+    0.25,
+    3.5,
     1.15,
-    0.1,
-    50000,
-    1200,
-    0.82,
-    0.4,
-    0.6,
-    1.1,
-    0.3,
-    0.05,
-    0.0725,    -- example Vt
-    0.08,
-    -0.0075,
-    0.92,
+    0.20,
+    0.80,
+    1200.0,
+    35.0,
+    76.0,
+    0.10,
+    0.65,
+    0.90,
+    15.0,
+    0,
+    0.25,
+    0.30,
+    0.20,
+    0.20,
+    0.25,
+    0.15,
+    0.00,
+    0.15,
+    0.20,
+    0.10,
+    0.0,
+    0.0,
+    0.42,
+    0.93,
+    0.91,
+    0.13,
     0.88,
-    0.065,
     '0x20260716PHXAIDCNODE01SEED',
-    '0x20260715PHXENERGYREQDV'
+    NULL,
+    '0x20260716PHXAIDCGOVFRAMEWORKV1',
+    '2026-07-16T00:00:00Z'
 );
