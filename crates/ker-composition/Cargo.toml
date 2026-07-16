@@ -4,11 +4,27 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
+description = "KERComposition2026v1 CPP-backed composition operator with Lua invariants for ecosafety governance."
+repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
+readme = "../../aln/README.md"
+
+[lib]
+name = "ker_composition"
+path = "src/lib.rs"
+crate-type = ["rlib"]
 
 [dependencies]
-rlua = "0.19"
+rlua = "0.19.8"
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = { version = "1.0.120" }
 
 [build-dependencies]
-cc = "1.0"
+cc = "1.0.99"
+
+[dev-dependencies]
+kani = "0.67.0"
+
+[[test]]
+name = "kani_ker_composition"
+path = "tests/kani_ker_composition.rs"
+harness = false
