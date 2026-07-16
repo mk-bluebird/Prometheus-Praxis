@@ -1,0 +1,245 @@
+# filename: aln/AiDatacenterNode2026v1.aln
+
+particle AiDatacenterNode2026v1
+  version 1
+  steward_signinghex "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+  steward_id        "wallet_fetch18sd2uj"
+  steward_uuid      "87cb8e02-c918-4b2a-aa40-36a8efa37e52"
+  lane_default      "RESEARCH"
+
+  # Identity and governance planes
+  plane AI-IDENTITY
+    field nodeid           string
+    field region           string
+    field lane             string      # RESEARCH | EXP | PROD
+    field steward_id       string
+    field steward_uuid     string
+    field signinghex       string
+    field evidencehex      string
+    field twindow_start    string      # ISO-8601
+    field twindow_end      string      # ISO-8601
+  endplane
+
+  # Physical / telemetry planes
+
+  plane AI-ENERGY
+    field core_energy_kwh_per_workload float  # kWh / workload
+    field joules_per_inference         float  # J / inference
+  endplane
+
+  plane AI-Power
+    field pue float                    # Power Usage Effectiveness
+  endplane
+
+  plane AI-CARBON
+    field cue_kg_co2_per_kwh float     # Carbon Usage Effectiveness
+    field eco_per_joule       float     # normalized eco benefit per joule
+  endplane
+
+  plane AI-BANDWIDTH
+    field throughput_tokens_per_s     float
+    field throughput_inferences_per_s float
+  endplane
+
+  plane AI-UTIL
+    field utilization_pct float        # 0–100
+  endplane
+
+  plane AI-HEAT
+    field ere float                    # Energy Reuse Effectiveness
+  endplane
+
+  plane AI-ECO-RATIO
+    field eco_task_ratio_pct float     # % energy on eco-restorative workloads
+  endplane
+
+  plane AI-WATER
+    field wue_l_per_kwh float          # Water Usage Effectiveness
+  endplane
+
+  plane AI-MATERIALS
+    field embodied_kg_co2eq float      # amortized embodied carbon per window
+  endplane
+
+  plane AI-TOPOLOGY
+    field topology_violation_count int  # integer count per window
+  endplane
+
+  # Normalized risk coordinates rx (0–1) and residual
+  plane AI-RISK
+    field r_pue             float
+    field r_cue             float
+    field r_eco_per_joule   float
+    field r_eco_task_ratio  float
+    field r_wue             float
+    field r_embodied        float
+    field r_topology        float
+    field r_energy          float
+    field r_joule_inf       float
+    field r_heat_reuse      float
+    field r_utilization     float
+    field r_bandwidth       float
+    field vt                float      # Lyapunov residual
+  endplane
+
+  # KER and strength index
+  plane AI-KER
+    field k float           # Knowledge
+    field e float           # Eco-impact
+    field r float           # Risk-of-harm
+    field strength_index_s float
+  endplane
+
+  # Corridor table for primary axes
+  corridor AI-ENERGY
+    coord core_energy_kwh_per_workload
+      ideal   0.10      # example: 0.10 kWh / workload (corridor to tighten in time)
+      ceiling 0.50
+    endcoord
+    coord joules_per_inference
+      ideal   1.0       # J / inference
+      ceiling 10.0
+    endcoord
+  endcorridor
+
+  corridor AI-Power
+    coord pue
+      ideal   1.05
+      ceiling 1.40
+    endcoord
+  endcorridor
+
+  corridor AI-CARBON
+    coord cue_kg_co2_per_kwh
+      ideal   0.05
+      ceiling 0.40
+    endcoord
+    coord eco_per_joule
+      ideal   1.00      # 1.0 = net restorative; 0 = neutral; negative disallowed
+      floor   0.00      # floor used for reverse-mapping to risk
+    endcoord
+  endcorridor
+
+  corridor AI-ECO-RATIO
+    coord eco_task_ratio_pct
+      min_required 50.0  # %
+      floor        20.0
+    endcoord
+  endcorridor
+
+  corridor AI-WATER
+    coord wue_l_per_kwh
+      ideal   0.20
+      ceiling 1.50
+    endcoord
+  endcorridor
+
+  corridor AI-MATERIALS
+    coord embodied_kg_co2eq
+      ideal   0.0
+      ceiling 100.0       # amortized per window; tuned per deployment
+    endcoord
+  endcorridor
+
+  corridor AI-TOPOLOGY
+    coord topology_violation_count
+      ideal   0
+      ceiling 5
+    endcoord
+  endcorridor
+
+  # Lyapunov / KER engine definition
+  ker_engine AiDatacenterNode2026v1Ker
+    # Risk coordinate mappings (normalized 0–1)
+    # For axes where higher is worse:
+    r_pue = max(0, min(1, (pue - 1.05) / (1.40 - 1.05)))
+    r_cue = max(0, min(1, (cue_kg_co2_per_kwh - 0.05) / (0.40 - 0.05)))
+    r_wue = max(0, min(1, (wue_l_per_kwh - 0.20) / (1.50 - 0.20)))
+    r_embodied = max(0, min(1, embodied_kg_co2eq / 100.0))
+
+    # Eco-per-joule: lower than 1.0 is worse, so invert
+    r_eco_per_joule = max(0, min(1, (1.0 - eco_per_joule) / 1.0))
+
+    # Eco-task ratio: lower than 50% is worse, invert
+    r_eco_task_ratio =
+      if eco_task_ratio_pct >= 50.0 then
+        0.0
+      else
+        max(0, min(1, (50.0 - eco_task_ratio_pct) / (50.0 - 20.0)))
+      end
+
+    # Energy and joule-per-inference
+    r_energy =
+      max(0, min(1, (core_energy_kwh_per_workload - 0.10) / (0.50 - 0.10)))
+    r_joule_inf =
+      max(0, min(1, (joules_per_inference - 1.0) / (10.0 - 1.0)))
+
+    # Heat reuse: higher ERE is better; treat low ERE as risk
+    r_heat_reuse =
+      if ere >= 0.5 then
+        0.0
+      else
+        max(0, min(1, (0.5 - ere) / 0.5))
+      end
+
+    # Utilization: under-utilization is a soft risk (for K), not primary
+    r_utilization =
+      if utilization_pct >= 50.0 then
+        0.0
+      else
+        max(0, min(1, (50.0 - utilization_pct) / 50.0))
+      end
+
+    # Bandwidth: treat as guidance; r_bandwidth only used in S, not primary
+    r_bandwidth = 0.0   # placeholder mapping to be refined
+
+    # Topology: count-based
+    r_topology =
+      max(0, min(1, topology_violation_count / 5.0))
+
+    # Lyapunov residual over AI planes
+    # Weights reflect hazard ordering: carbon/water/eco-ratio highest.
+    vt =
+      0.20 * r_cue^2 +
+      0.20 * r_eco_per_joule^2 +
+      0.15 * r_eco_task_ratio^2 +
+      0.15 * r_wue^2 +
+      0.10 * r_pue^2 +
+      0.05 * r_energy^2 +
+      0.05 * r_joule_inf^2 +
+      0.05 * r_embodied^2 +
+      0.03 * r_heat_reuse^2 +
+      0.02 * r_topology^2
+
+    # KER derivation (per window) with baseline bands
+    # K0 ~ 0.95, E0 ~ 0.93, R0 ~ 0.12; alpha/beta tuned to keep bands in [0.9,0.93]
+    delta_vt = vt - vt_prev_clamped
+
+    k_raw = 0.95 - 0.30 * vt - 0.10 * max(0, delta_vt)
+    e_raw = 0.93 - 0.25 * vt
+    r_raw = 0.12 + 0.40 * vt + 0.20 * max(0, delta_vt)
+
+    k = max(0.0, min(1.0, k_raw))
+    e = max(0.0, min(1.0, e_raw))
+    r = max(0.0, min(1.0, r_raw))
+
+    # Strength index S (soft guidance)
+    # B = eco_per_joule * (eco_task_ratio_pct / 100); normalized.
+    B_raw = eco_per_joule * (eco_task_ratio_pct / 100.0)
+    B_norm =
+      if B_raw >= 1.0 then
+        1.0
+      else
+        max(0.0, B_raw)
+      end
+
+    gR =
+      if r >= 0.20 then
+        0.0
+      else
+        max(0.0, 1.0 - r / 0.20)
+      end
+
+    strength_index_s = gR * sqrt(B_norm)
+  endker
+endparticle
