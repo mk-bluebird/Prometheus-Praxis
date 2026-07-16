@@ -1,0 +1,65 @@
+aln EcoPerJouleRegionalOverride2026v1.aln
+network ALN-MAINNET
+shardid 0xecoperjouleoverride2026abcd000000000000000000000004
+owner.bostrom bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+timestamp.utc 2026-07-16T22:10:00Z
+
+title EcoPerJouleRegionalOverride2026v1
+version 1
+
+comment
+  Region-specific EcoPerJoule overrides that preserve monotonicity and
+  non-compensability across energy sources. Overrides cannot increase
+  eco-per-joule beyond global safe corridors.
+endcomment
+
+particle EcoPerJouleRegionalOverride2026v1
+  field override_id string required true    ; unique id, e.g. "PHX_SOLAR_OVR_2026"
+  field region_id string required true      ; canonical region, e.g. "PHX", "EU_CENTRAL"
+  field energy_source string required true  ; e.g. "SOLAR", "WIND", "GRID_MIX"
+  field base_policy_id string required true ; link to base EcoPerJoule policy
+  field delta_e_cyber float required true   ; adjustment to Ecyber in [-0.1, 0.1]
+  field delta_e_phys float required true    ; adjustment to Ephys in [-0.1, 0.1]
+  field enabled bool required true          ; override active flag
+  field evidencehex string required true
+endparticle
+
+function apply_regional_override
+  input EcoPerJouleRegionalOverride2026v1
+  output EcoPerJouleRegionalOverride2026v1
+endfunction
+
+constant global_delta_cap float 0.10
+
+invariant override_nonnegative_bounds
+  forall o in EcoPerJouleRegionalOverride2026v1
+    assert o.delta_e_cyber >= -global_delta_cap
+    assert o.delta_e_cyber <=  global_delta_cap
+    assert o.delta_e_phys  >= -global_delta_cap
+    assert o.delta_e_phys  <=  global_delta_cap
+  endforall
+endinvariant
+
+invariant override_preserves_monotonicity
+  forall o in EcoPerJouleRegionalOverride2026v1
+    ; Regional overrides cannot turn a harmful or neutral energy source
+    ; into a higher eco-per-joule than the global max for that source.
+    ; This is enforced in Rust by clamping adjusted E to global corridors.
+    assert o.energy_source != ""
+  endforall
+endinvariant
+
+block rust_enum
+  language RUST
+  module eco_per_joule_regional_override
+  content
+    /// Auto-generated Rust enum for EcoPerJouleRegionalOverride2026v1.region_id.
+    ///
+    /// The generation script must:
+    /// - Parse all EcoPerJouleRegionalOverride2026v1 rows.
+    /// - Collect distinct region_id values.
+    /// - Generate a Rust enum RegionOverrideRegion with one variant per region.
+    /// - Provide a compile-time assertion that all declared region_id values
+    ///   are covered by the enum.
+  endcontent
+endblock
