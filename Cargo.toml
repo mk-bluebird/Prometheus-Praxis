@@ -20,6 +20,7 @@ members = [
     "crates/ai_node_shard",
     "crates/ai_plane_ci_guard",
     "crates/ker-composition",
+    "crates/aln-definition-registry",
 
     # eco_wealth standalone crate
     "eco_wealth",
