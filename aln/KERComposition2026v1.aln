@@ -1,0 +1,182 @@
+
+aln KERComposition2026v1
+network ALN-MAINNET
+shardid 0xkercomp2026abcd000000000000000000000000000001
+owner.bostrom bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+timestamp.utc 2026-07-16T21:00:00Z
+
+# Base KER particle: single evidence shard with K, E, R, and evidence_hex.
+particle KERParticle2026v1 {
+  field particle_id    string required true;
+  field topic_id       string required true;
+  field lane           string required true;      # e.g. RESEARCH, PILOT, PROD
+  field K              float  required true;      # normalized [0,1]
+  field E              float  required true;      # normalized [0,1]
+  field R              float  required true;      # normalized [0,1]
+  field evidence_hex   string required true;      # hex-encoded provenance
+  field signing_hex    string required true;      # DID-bound signature
+}
+
+# Composition particle: result of binary KER combination under ⊕.
+particle KERComposition2026v1 {
+  field left_particle_id   string required true ref KERParticle2026v1.particle_id;
+  field right_particle_id  string required true ref KERParticle2026v1.particle_id;
+  field combined_id        string required true;
+  field K_combined         float  required true;
+  field E_combined         float  required true;
+  field R_combined         float  required true;
+  field members            string required true;  # canonical member list, e.g. "p1,p2"
+  field rule_id            string required true;  # e.g. "ker_oplus_geom_min_max_v1"
+  field evidence_hex       string required true;  # combined evidence hash
+  field signing_hex        string required true;  # DID-bound signature for composition
+}
+
+# KER combination operator: geomean for K, min for E, max for R.
+# This is specified as a pure, non-actuating function over two base particles.
+function ker_oplus_geom_min_max(
+    left  : KERParticle2026v1,
+    right : KERParticle2026v1
+) -> KERComposition2026v1 {
+
+  let k_left  = left.K;
+  let k_right = right.K;
+
+  # Geometric mean for K; inputs are expected in [0,1].
+  let k_prod  = k_left * k_right;
+  let Kp      = sqrt(k_prod);
+
+  # Conservative E and R aggregations.
+  let Ep      = min(left.E, right.E);
+  let Rp      = max(left.R, right.R);
+
+  # Canonical member ordering to make composition order-independent.
+  let id_min  = min(left.particle_id, right.particle_id);
+  let id_max  = max(left.particle_id, right.particle_id);
+  let combined_id = id_min ++ "_⊕_" ++ id_max;
+
+  # Members list is a deterministic, comma-separated list.
+  let members = id_min ++ "," ++ id_max;
+
+  # Rule identifier to lock this algebra version.
+  let rule_id = "ker_oplus_geom_min_max_v1";
+
+  # Combined evidence_hex commits to:
+  # - ordered member IDs
+  # - both parent evidence_hex values
+  # - Kp, Ep, Rp
+  # - rule_id
+  let evidence_hex = hash256(
+    id_min ++ id_max ++
+    left.evidence_hex ++ right.evidence_hex ++
+    serialize(Kp) ++ serialize(Ep) ++ serialize(Rp) ++
+    rule_id
+  );
+
+  # signing_hex is produced by the KER signing DID inside a secure enclave
+  # or equivalent TEE; ALN records the field but does not define the signing primitive.
+  let signing_hex = "<SIGNED_BY_DID_IN_TEE>";
+
+  return KERComposition2026v1 {
+    left_particle_id  = left.particle_id,
+    right_particle_id = right.particle_id,
+    combined_id       = combined_id,
+    K_combined        = Kp,
+    E_combined        = Ep,
+    R_combined        = Rp,
+    members           = members,
+    rule_id           = rule_id,
+    evidence_hex      = evidence_hex,
+    signing_hex       = signing_hex
+  };
+}
+
+# Risk-cap invariant: if both parents satisfy R <= theta, the composition must too.
+# theta is a corridor-level constant defined elsewhere in the ecosafety spine.
+constant theta float = 0.30;
+
+invariant ker_combine_risk_cap {
+  forall c in KERComposition2026v1 {
+    let left  = KERParticle2026v1[c.left_particle_id];
+    let right = KERParticle2026v1[c.right_particle_id];
+
+    if left.R <= theta && right.R <= theta {
+      assert(c.R_combined <= theta);
+    }
+  }
+}
+
+# K/E bounds invariant: K_combined must lie between parent Ks; E_combined is no better than either parent.
+invariant ker_combine_K_E_bounds {
+  forall c in KERComposition2026v1 {
+    let left  = KERParticle2026v1[c.left_particle_id];
+    let right = KERParticle2026v1[c.right_particle_id];
+
+    let k_min = min(left.K, right.K);
+    let k_max = max(left.K, right.K);
+
+    assert(c.K_combined >= k_min);
+    assert(c.K_combined <= k_max);
+
+    assert(c.E_combined <= left.E);
+    assert(c.E_combined <= right.E);
+  }
+}
+
+# Monotone risk invariant: R_combined must be at least as large as each parent R.
+invariant ker_combine_R_monotone {
+  forall c in KERComposition2026v1 {
+    let left  = KERParticle2026v1[c.left_particle_id];
+    let right = KERParticle2026v1[c.right_particle_id];
+
+    assert(c.R_combined >= left.R);
+    assert(c.R_combined >= right.R);
+  }
+}
+
+# Provenance invariant: evidence_hex must depend on parent evidence_hex values
+# and rule_id; any mismatch indicates a malformed composition.
+invariant ker_combine_provenance {
+  forall c in KERComposition2026v1 {
+    let left  = KERParticle2026v1[c.left_particle_id];
+    let right = KERParticle2026v1[c.right_particle_id];
+
+    let id_min  = min(left.particle_id, right.particle_id);
+    let id_max  = max(left.particle_id, right.particle_id);
+    let k_min   = min(left.K, right.K);
+    let k_max   = max(left.K, right.K);
+
+    let k_prod  = left.K * right.K;
+    let Kp      = sqrt(k_prod);
+    let Ep      = min(left.E, right.E);
+    let Rp      = max(left.R, right.R);
+
+    let expected_hex = hash256(
+      id_min ++ id_max ++
+      left.evidence_hex ++ right.evidence_hex ++
+      serialize(Kp) ++ serialize(Ep) ++ serialize(Rp) ++
+      c.rule_id
+    );
+
+    assert(c.evidence_hex == expected_hex);
+
+    # Optional: check K/E/R consistency too.
+    assert(c.K_combined == Kp);
+    assert(c.E_combined == Ep);
+    assert(c.R_combined == Rp);
+  }
+}
+
+# Lane safety invariant: compositions used in production lanes must be built
+# only from particles already allowed in production lanes.
+invariant ker_combine_lane_safety {
+  forall c in KERComposition2026v1 {
+    let left  = KERParticle2026v1[c.left_particle_id];
+    let right = KERParticle2026v1[c.right_particle_id];
+
+    # For simplicity: if either parent is RESEARCH, composition cannot be PROD.
+    if c.lane == "PROD" {
+      assert(left.lane  == "PROD");
+      assert(right.lane == "PROD");
+    }
+  }
+}
