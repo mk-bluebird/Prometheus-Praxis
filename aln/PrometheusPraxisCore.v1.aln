@@ -3,7 +3,7 @@ version 2026v1
 auditdate 2026-06-29
 audithex 0x50524F4D4554484555535F5052415849535F434F52455F56315F414C4E5F53504543
 
-binding.host_did did:aln:organic-host
+binding.host_did didalnorganic-host
 binding.bostrom_address bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
 
 ref.neurorights_envelope neurorights.envelope.citizen.v1
@@ -20,14 +20,134 @@ prometheuspraxis.role AdaptiveImplementationEngine
 prometheuspraxis.domain EcosystemRestoration, Healthcare, Cybernetics, SmartCity
 prometheuspraxis.scope PlanetaryStewardship, HumanAugmentation, EcoPayments
 
+ALN_SHARD PrometheusPraxisCore.v1
+  HOST_DID        = didalnorganic-host
+  BOSTROM_ADDRESS = bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+  AUTHORITY       = ALN.MIGRATION.CYBERCORE_AUTHORITY.v1
+
+SECTION META
+  PURPOSE = "Prometheus Praxis core shard for fairness, non-actuation, and CI enforcement."
+  VERSION = "v1"
+  DATE    = "2026-06-29"
+  SCOPE   = "Rust crates in Cybercore workspace that implement Prometheus Praxis core logic."
+
+SECTION NON_ACTUATION_FIELDS
+  DESCRIPTION = "Fields that must never be exported as public Rust symbols in Prometheus Praxis core crates."
+  FORBIDDEN_FIELDS = [
+    "torque",
+    "current",
+    "stimpattern",
+    "autopilot"
+  ]
+
+SECTION FAIRNESS
+  DESCRIPTION = "Fairness constraints for Prometheus Praxis workloads."
+  DUTY_DELTA_MAX_PER_HOST    = 0.10
+  DUTY_DELTA_MAX_PER_COHORT  = 0.15
+  ERROR_DELTA_MAX_PER_HOST   = 0.05
+  ERROR_DELTA_MAX_PER_COHORT = 0.07
+
+SECTION CORRIDORS
+  DESCRIPTION = "Corridor rules mapping Prometheus Praxis core workloads to ecosafety envelopes."
+  CORRIDOR_DEFAULT_ID     = "PROMETHEUS_Praxis_Default_V1"
+  CORRIDOR_LOW_INTENSITY  = "PROMETHEUS_Praxis_LowIntensity_V1"
+  CORRIDOR_HIGH_INTENSITY = "PROMETHEUS_Praxis_HighIntensity_V1"
+
+  ALLOWED_CORRIDORS = [
+    "PROMETHEUS_Praxis_Default_V1",
+    "PROMETHEUS_Praxis_LowIntensity_V1",
+    "PROMETHEUS_Praxis_HighIntensity_V1"
+  ]
+
+  FORBIDDEN_CORRIDOR_PATTERNS = [
+    "PROMETHEUS_Praxis_*_Autopilot",
+    "PROMETHEUS_Praxis_*_StimPattern"
+  ]
+
+SECTION ROH_ENVELOPES
+  DESCRIPTION = "RoH and lifeforce envelopes for Prometheus Praxis workloads."
+  ROH_CEILING        = 0.30
+  LIFEFORCE_FLOOR    = 0.57
+  BCR_FLOOR          = 0.57
+  PAIN_CEILING       = 0.73
+  FEAR_MIN           = 0.31
+  FEAR_MAX           = 0.68
+
+SECTION CI_BINDINGS
+  DESCRIPTION = "CI bindings that connect this shard to GitHub Actions and Rust modules."
+  CI_WORKFLOW_NAME            = "prometheus-praxis-core-ci"
+  CI_FORBIDDEN_FIELDS_SECTION = "NON_ACTUATION_FIELDS.FORBIDDEN_FIELDS"
+  CI_TARGET_CRATE             = "prometheus-praxis-core"
+  CI_TARGET_PATHS             = [
+    "crates/prometheus-praxis-core/**",
+    "aln/PrometheusPraxisCore.v1.aln",
+    ".github/workflows/prometheus-praxis-core-ci.yml"
+  ]
+
+SECTION RUST_BINDINGS
+  DESCRIPTION = "Rust-level bindings and expectations for Prometheus Praxis core crates."
+  RUST_CRATE_NAME        = "prometheus-praxis-core"
+  RUST_EDITION           = "2024"
+  RUST_VERSION           = "1.85"
+  RUST_FORBIDDEN_EXPORTS = [
+    "pub torque",
+    "pub current",
+    "pub stimpattern",
+    "pub autopilot"
+  ]
+  RUST_EXPECTED_METADATA = {
+    hostdid        = "didalnorganic-host",
+    bostromaddress = "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7",
+    alnclause      = "ALN.MIGRATION.CYBERCORE_AUTHORITY.v1",
+    alnprofile     = "PrometheusPraxisCore2026v1"
+  }
+
+SECTION FAIRNESS_VALIDATOR_MAP
+  DESCRIPTION = "Mapping between fairness validator checks and shard invariants."
+
+  VALIDATOR validate_duty_distribution {
+    SHARDS     = ["PrometheusPraxisCore.v1"]
+    INVARIANTS = [
+      "FAIRNESS.DUTY_DELTA_MAX_PER_HOST",
+      "FAIRNESS.DUTY_DELTA_MAX_PER_COHORT"
+    ]
+  }
+
+  VALIDATOR validate_error_rates {
+    SHARDS     = ["PrometheusPraxisCore.v1"]
+    INVARIANTS = [
+      "FAIRNESS.ERROR_DELTA_MAX_PER_HOST",
+      "FAIRNESS.ERROR_DELTA_MAX_PER_COHORT"
+    ]
+  }
+
+  VALIDATOR validate_corridor_assignment {
+    SHARDS     = ["PrometheusPraxisCore.v1"]
+    INVARIANTS = [
+      "CORRIDORS.ALLOWED_CORRIDORS",
+      "CORRIDORS.FORBIDDEN_CORRIDOR_PATTERNS"
+    ]
+  }
+
+SECTION NEURORIGHTS
+  DESCRIPTION = "Neurorights invariants for Prometheus Praxis core workloads."
+  NEURORIGHTS_INVARIANTS = [
+    "No_prometheus_praxis_operation_may_reduce_host_capabilities",
+    "No_prometheus_praxis_operation_may_weaken_RoH_or_lifeforce_corridors",
+    "No_queue_or_scheduler_may_be_actuating_without_guard_review",
+    "Fairness_enforcement_must_be_non_punitive_and_non_carceral"
+  ]
+
+END_SHARD
+
 link.tellus_synoptikos tellus-synoptikos.v1
-link.nova_terra nova-terra.v1
-link.gaia_orbis gaia-orbis.v1
-link.summus_civitas summus-civitas.v1
+link.nova_terra      nova-terra.v1
+link.gaia_orbis      gaia-orbis.v1
+link.summus_civitas  summus-civitas.v1
 link.hestia_continuus hestia-continuus.v1
-link.perknos_nexus perknos-nexus.v1
-link.veritas_chain veritas-chain.v1
-link.themis_axiom themis-axiom.v1
+link.perkunos_nexus  perkunos-nexus.v1
+link.veritas_chain   veritas-chain.v1
+link.themis_axiom    themis-axiom.v1
 
 corridor.eco_restoration
   description All restoration plans must reduce or hold EcoImpactScore and RiskOfHarm compared to baseline.
