@@ -1,0 +1,80 @@
+name: prometheus-praxis-core-ci
+
+on:
+  push:
+    paths:
+      - "crates/prometheus-praxis-core/**"
+      - "aln/PrometheusPraxisCore2026v1.aln"
+      - ".github/workflows/prometheus-praxis-core-ci.yml"
+  pull_request:
+    paths:
+      - "crates/prometheus-praxis-core/**"
+      - "aln/PrometheusPraxisCore2026v1.aln"
+      - ".github/workflows/prometheus-praxis-core-ci.yml"
+
+jobs:
+  forbidden-fields-enforcement:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify crate and ALN shard existence
+        run: |
+          CRATE_DIR="crates/prometheus-praxis-core"
+          ALN_FILE="aln/PrometheusPraxisCore2026v1.aln"
+
+          if [ ! -d "$CRATE_DIR" ]; then
+            echo "Prometheus Praxis core crate directory '$CRATE_DIR' does not exist; skipping enforcement job."
+            exit 0
+          fi
+
+          if [ ! -f "$ALN_FILE" ]; then
+            echo "ALN shard '$ALN_FILE' does not exist; skipping enforcement job."
+            exit 0
+          fi
+
+      - name: Parse PrometheusPraxisCore ALN shard
+        id: parse_aln
+        run: |
+          ALN_FILE="aln/PrometheusPraxisCore2026v1.aln"
+
+          FORBIDDEN_FIELDS=$(grep -E "FORBIDDEN_FIELDS" "$ALN_FILE" || true)
+          echo "forbidden_fields_line=$FORBIDDEN_FIELDS" >> "$GITHUB_OUTPUT"
+
+      - name: Enforce forbidden fields in Rust modules
+        run: |
+          CRATE_DIR="crates/prometheus-praxis-core"
+          SRC_DIR="$CRATE_DIR/src"
+
+          if [ ! -d "$SRC_DIR" ]; then
+            echo "Source directory '$SRC_DIR' does not exist; skipping enforcement."
+            exit 0
+          fi
+
+          FORBIDDEN=("torque" "current" "stimpattern" "autopilot")
+
+          EXIT_CODE=0
+
+          for FIELD in "${FORBIDDEN[@]}"; do
+            MATCHES=$(grep -R "pub .*${FIELD}" "$SRC_DIR" || true)
+            if [ -n "$MATCHES" ]; then
+              echo "Forbidden field '${FIELD}' exported in prometheus-praxis-core:"
+              echo "$MATCHES"
+              EXIT_CODE=1
+            fi
+          done
+
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "Forbidden fields detected; build cannot proceed."
+            exit $EXIT_CODE
+          fi
+
+      - name: Run tests (if crate exists)
+        run: |
+          if cargo metadata --no-deps --format-version 1 | jq -e '.packages[] | select(.name=="prometheus-praxis-core")' >/dev/null; then
+            cargo test -p prometheus-praxis-core --all-features
+          else
+            echo "prometheus-praxis-core crate not present in workspace; skipping tests."
+          fi
