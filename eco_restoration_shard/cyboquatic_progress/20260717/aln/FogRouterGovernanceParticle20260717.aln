@@ -1,0 +1,68 @@
+-- filename: ecorestoration_shard/cyboquatic_progress/20260717/aln/FogRouterGovernanceParticle20260717.aln
+-- destination: ecorestoration_shard/cyboquatic_progress/20260717/aln/FogRouterGovernanceParticle20260717.aln
+-- repo-target: https://github.com/mk-bluebird/Prometheus-Praxis
+
+PARTICLE FogRouterGovernanceParticle20260717
+ROLE GOVERNANCE
+CATEGORY CYBOQUATIC_FOG_ROUTER
+VERSIONTAG 20260717
+
+TITLE Cyboquatic FOG-router governance particle for unmodeled media (Phoenix, 2026-07-17)
+DESCRIPTION
+  Non-actuating governance record binding FOG-router predicates for BOD/TSS/CEC/PFAS planes
+  to Phoenix hex registry and Bostrom DID, with explicit K,E,R triad and residual corridor
+  commentary for domain (c) FOG-router predicates. [file:2][file:21]
+
+FIELDS
+  regionid        string   -- e.g. PHX-CAZ-CEIM
+  subtaskid       string   -- PHX-FOG-UM-2026-07-17
+  domain          string   -- c_FOG_ROUTER_PRED
+  phoenixhex      string   -- 0x20260717PHXFOGROUTERPRED (to be registered). [file:3]
+  kscore          f64      -- Knowledge factor for this shard (0..1)
+  escore          f64      -- Eco-impact factor (0..1)
+  rscore          f64      -- Risk-of-harm factor (0..1)
+  vtresidual      f64      -- Aggregate Lyapunov residual for representative FOG segments
+  corridor_note   string   -- Text summary of corridor tightening and planes
+  prioranchorhex  string   -- Optional prior day hex for chain semantics
+  signingdid      string   -- Bostrom DID binding
+  createdutc      datetime -- Creation timestamp (UTC ISO-8601)
+
+ROWS
+  regionid,
+  subtaskid,
+  domain,
+  phoenixhex,
+  kscore,
+  escore,
+  rscore,
+  vtresidual,
+  corridor_note,
+  prioranchorhex,
+  signingdid,
+  createdutc
+
+  PHX-CAZ-CEIM,
+  PHX-FOG-UM-2026-07-17,
+  c_FOG_ROUTER_PRED,
+  0x20260717PHXFOGROUTERPRED,
+  0.95,
+  0.91,
+  0.12,
+  0.18,
+  "FOG-router predicates defined over BOD,TSS,CEC,PFAS,data-quality planes; corridors tightened so high-PFAS/high-CEC segments are classified FOG_UNSAFE_DIAGNOSTIC_ONLY and cannot be promoted into PROD lanes; K,E,R aligned with Phoenix EcoNet grammar.",
+  0x20260716PHXWORKLOADENERGYDV,  -- example prior-day workload anchor; must match registry. [file:2][file:3]
+  "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7",
+  2026-07-17T23:27:00Z
+
+END
+
+PREDICATES
+  invariant_non_actuating
+    expr escore >= 0.80
+         and rscore <= 0.20
+         and corridor_note contains "non-actuating"
+
+  invariant_chain_forward_only
+    expr prioranchorhex != phoenixhex
+
+END
