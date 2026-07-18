@@ -1,7 +1,3 @@
--- filename: ecorestoration_shard/cyboquatic_progress/20260717/aln/FogRouterGovernanceParticle20260717.aln
--- destination: ecorestoration_shard/cyboquatic_progress/20260717/aln/FogRouterGovernanceParticle20260717.aln
--- repo-target: https://github.com/mk-bluebird/Prometheus-Praxis
-
 PARTICLE FogRouterGovernanceParticle20260717
 ROLE GOVERNANCE
 CATEGORY CYBOQUATIC_FOG_ROUTER
