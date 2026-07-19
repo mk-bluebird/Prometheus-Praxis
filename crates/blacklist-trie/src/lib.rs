@@ -39,10 +39,7 @@ pub struct BlacklistMatch {
     pub risk_level: String,
 }
 
-/// Simple character-based trie node.
-///
-/// Each terminal node can carry multiple pattern_ids and their categories,
-/// enabling overlapping patterns and category-aware routing.
+/// Character-based trie node.
 struct TrieNode {
     is_terminal: bool,
     pattern_ids: Vec<i64>,
@@ -109,9 +106,6 @@ impl BlacklistTrie {
     }
 
     /// Return all structured blacklist matches found in the prompt.
-    ///
-    /// This performs a multi-start traversal: for each starting index in the
-    /// normalized prompt, walk the trie as far as possible and collect terminals.
     pub fn matches_all(&self, prompt: &str) -> Vec<BlacklistMatch> {
         let normalized = normalize_text(prompt);
         let chars: Vec<char> = normalized.chars().collect();
@@ -126,13 +120,10 @@ impl BlacklistTrie {
                 if let Some(child) = current.children.get(&ch) {
                     current = child;
                     if current.is_terminal {
-                        // Collect all pattern_ids at this terminal node.
                         for idx in 0..current.pattern_ids.len() {
                             let pid = current.pattern_ids[idx];
                             let category = current.categories[idx].clone();
                             let risk_level = current.risk_levels[idx].clone();
-
-                            // Extract the matched substring for context.
                             let matched_substr: String =
                                 chars[start..=i].iter().collect();
 
@@ -145,7 +136,6 @@ impl BlacklistTrie {
                         }
                     }
                 } else {
-                    // No child; stop exploring this start position.
                     break;
                 }
             }
@@ -155,11 +145,7 @@ impl BlacklistTrie {
     }
 }
 
-/// Normalize text for matching:
-/// - Lowercase.
-/// - Trim leading/trailing whitespace.
-/// - Collapse multiple spaces into single spaces.
-/// - Remove control characters.
+/// Normalize text for matching.
 pub fn normalize_text(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
     let mut prev_space = false;
@@ -195,8 +181,8 @@ pub struct BlacklistPatternRow {
 ///   blacklist_patterns(
 ///     pattern_id   INTEGER PRIMARY KEY,
 ///     pattern_text TEXT NOT NULL,
-///     category     TEXT NOT NULL,   -- e.g. 'hydraulic', 'energy', 'biology'
-///     risk_level   TEXT NOT NULL,   -- e.g. 'hard_forbidden'
+///     category     TEXT NOT NULL,
+///     risk_level   TEXT NOT NULL,
 ///     frequency    INTEGER NOT NULL
 ///   )
 pub fn load_blacklist_trie_from_sqlite(db_path: &str) -> rusqlite::Result<BlacklistTrie> {
@@ -239,16 +225,10 @@ pub fn load_blacklist_trie_from_sqlite(db_path: &str) -> rusqlite::Result<Blackl
 }
 
 /// High-level helper: load trie once and test prompt for any match.
-/// In production, you typically load the trie at startup and reuse it,
-/// rather than opening the DB per call.
 pub fn matches_blacklist_prompt(db_path: &str, prompt: &str) -> bool {
     match load_blacklist_trie_from_sqlite(db_path) {
         Ok(trie) => trie.matches(prompt),
-        Err(_) => {
-            // On DB error, fail-safe policy; here we return false to avoid
-            // over-blocking due to transient DB issues.
-            false
-        }
+        Err(_) => false,
     }
 }
 
