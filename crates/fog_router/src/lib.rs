@@ -19,15 +19,54 @@ use serde::{Deserialize, Serialize};
 use cyboquatic_ecosafety::{
     CyboLane,
     CyboNodeEcosafetyEnvelope,
+    FogGuardConfig,
+    FogGuardVerdict,
     KERWindow,
     LyapunovResidual,
     LyapunovWeights,
     RiskCoord,
     RiskVector,
-    FogGuardConfig,
-    FogGuardVerdict,
     safestep,
 };
+
+use blacklist_trie::{BlacklistTrie, PatternCategory};
+
+fn route_prompt(trie: &BlacklistTrie, prompt: &str) -> RouterDecision {
+    let matches = trie.matches_all(prompt);
+    if !matches.is_empty() {
+        let m = &matches[0];
+        match m.category {
+            PatternCategory::Hydraulic => RouterDecision::Reject {
+                reason: "hydraulic actuator blacklist".into(),
+            },
+            PatternCategory::Energy => RouterDecision::Reject {
+                reason: "energy actuator blacklist".into(),
+            },
+            PatternCategory::Biology => RouterDecision::Reject {
+                reason: "biology actuator blacklist".into(),
+            },
+            PatternCategory::Governance => RouterDecision::Reject {
+                reason: "governance/policy blacklist".into(),
+            },
+            PatternCategory::Generic => RouterDecision::Reject {
+                reason: "generic actuator blacklist".into(),
+            },
+        }
+    } else {
+        RouterDecision::Accept {
+            node_id: "none".to_string(),
+            projected_shard: QpuDataShard {
+                node_id: "none".to_string(),
+                vt_prev: 0.0,
+                vt_next_est: 0.0,
+                tailwind_valid: true,
+                biosurface_ok: true,
+                hydraulic_ok: true,
+                lyapunov_ok: true,
+            },
+        }
+    }
+}
 
 /// Minimal qpudatashard view for routing decisions.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -73,11 +112,7 @@ fn envelope_from_snapshot(snapshot: &FogNodeSnapshot) -> CyboNodeEcosafetyEnvelo
     )
 }
 
-/// Safestep-based routing decision for a FOG node snapshot.
-pub fn decide_route(
-    snapshot: &FogNodeSnapshot,
-    cfg: Option<FogGuardConfig>,
-) -> FogRouteDecision {
+pub fn decide_route(snapshot: &FogNodeSnapshot, cfg: Option<FogGuardConfig>) -> FogRouteDecision {
     let envelope = envelope_from_snapshot(snapshot);
     let verdict = safestep(&envelope, snapshot.corridor_present, cfg);
     match verdict {
@@ -127,7 +162,6 @@ pub const TREE_OF_LIFE_WEIGHTS_PHX_V1: RiskWeights = RiskWeights {
     wsigma: 0.6,
 };
 
-/// Lyapunov residual V_t = sum_j w_j r_j^2.
 pub fn lyapunov_residual(coords: &RiskCoords, weights: RiskWeights) -> f32 {
     let mut v = 0.0_f32;
     v += weights.whydraulic * coords.rhydraulic * coords.rhydraulic;
