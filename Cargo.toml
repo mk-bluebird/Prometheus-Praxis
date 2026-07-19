@@ -23,6 +23,7 @@ members = [
     "crates/aln-definition-registry",
     "crates/eco-repo-index",
     "crates/lane-governance-topology",
+    "crates/blacklist-trie",
 
     # eco_wealth standalone crate
     "eco_wealth",
