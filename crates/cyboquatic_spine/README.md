@@ -94,6 +94,34 @@ Exact signatures live in `src/lib.rs` and are kept minimal for easy binding.
 
 ---
 
+### Hydraulic breach queries (non‑actuating)
+
+The `hydraulic_breach_queries.rs` module provides readonly, spatially‑aware diagnostics for canal nodes that experience hydraulic surcharge events within a Cyboquatic basin.[file:99]
+
+- It uses the `rtree_canal_node` and `canal_node` SQLite tables to select candidate nodes within a latitude/longitude envelope around a breach coordinate `(lat_b, lon_b)` with window sizes `dlat` and `dlon`.[file:99]
+- It joins these spatial candidates against `node_surcharge` to compute, per node, the maximum `surcharge_pa` observed in a specified UTC time window `[ts_window_start, ts_window_end]`, returning nodes whose `max_surcharge_pa` exceeds a threshold `X_pa`.[file:99]
+- It provides a second query over `daily_surcharge` that, for the same spatial envelope and a single `breach_day`, returns `max_surcharge_pa` together with KER and Lyapunov residual fields `K`, `E`, `R`, and `Vt` for nodes above the same `X_pa` threshold.[file:99]
+- All queries are strictly non‑actuating: they open the EcoNet/Cyboquatic spine in readonly mode and never write to SQLite, hardware, or control surfaces.[file:99]
+
+#### Rust types and bundle
+
+The module defines small Rust structs that match the query outputs, making them easy to surface as JSON through the Cyboquatic cdylib.[file:99]
+
+- `HydraulicInstantHit` captures `node_id` and `max_surcharge_pa` for a single node over the breach time window.[file:99]
+- `HydraulicDailyHit` captures `node_id`, `max_surcharge_pa`, `K`, `E`, `R`, and `Vt` for daily surcharge diagnostics around the breach day.[file:99]
+- `HydraulicBreachParams` holds the input parameters: `lat_b`, `lon_b`, `dlat`, `dlon`, `ts_window_start`, `ts_window_end`, `X_pa`, and `breach_day`, keeping the API explicit and reproducible.[file:99]
+- `HydraulicBreachBundle` aggregates both instant and daily hits, so higher‑level tooling (Lua, Kotlin, ALN, C) can request a single breach context blob per basin.[file:99]
+
+#### Intended use in the Cyboquatic spine
+
+These queries are designed to plug into the broader Cyboquatic EcoNet spine as evidence‑driven diagnostics.[file:99]
+
+- They help identify canal nodes whose surcharge behavior may interact with Cyboquatic restoration surfaces, blast‑radius tables, and ecoper‑joule windows.[file:99]
+- They feed KER and Lyapunov governance logic without ever controlling pumps, valves, or any physical actuators, preserving the RESEARCH/non‑actuating corridor for Cyboquatic machinery.[file:99]
+- They can be wrapped by the existing cdylib JSON/FFI layer so AI‑driven tools and dashboards can inspect hydraulic breach contexts while staying within readonly, sovereignty‑respecting corridors.[file:99]
+
+---
+
 ## Design constraints
 
 - Non‑actuating: the library must never open device handles or send commands to field machinery.
