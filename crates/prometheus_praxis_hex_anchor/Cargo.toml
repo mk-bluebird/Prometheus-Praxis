@@ -1,0 +1,22 @@
+[package]
+name = "prometheus_praxis_hex_anchor"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "Non-actuating hex-anchor DID binding and zk-proof verification for ALNv2 particles in Prometheus-Praxis / eco_restoration_shard."
+authors = ["Prometheus-Praxis eco_restoration_shard"]
+repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
+
+[lib]
+name = "prometheus_praxis_hex_anchor"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[dependencies]
+ed25519-dalek = { version = "2.0.0", default-features = false, features = ["std"] }
+hex = "0.4.3"
+serde = { version = "1.0.203", features = ["derive"] }
+
+[dev-dependencies]
+rand = "0.8.5"
