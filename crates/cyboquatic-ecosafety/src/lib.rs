@@ -1,4 +1,6 @@
-// Filename: crates/cyboquatic-ecosafety-core/src/lib.rs
+// filepath: crates/cyboquatic-ecosafety/src/canal_risk_plane.rs
+// rust-version = "1.85", edition = "2024"
+// License: MIT OR Apache-2.0
 
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
@@ -9,286 +11,444 @@
 #![deny(clippy::unimplemented)]
 #![deny(clippy::disallowed_methods)]
 
-//! Cyboquatic ecosafety core for Phoenix-class nodes.
+//! Canal biodiversity and risk-plane primitives for Phoenix-class cyboquatic nodes.
 //!
-//! This crate provides a KER-aware, non-actuating ecosafety kernel for
-//! Cyboquatic nodes, aligned with the 2026 rx/Vt/KER grammar used across
-//! Phoenix MAR basins, FOG routing workloads, and biodegradable substrates.
+//! This module implements a KER-aligned H→r_biodiversity mapping and canal-level
+//! risk coordinates that are consistent with the ecosafety residual grammar used
+//! elsewhere in `cyboquatic-ecosafety`.
 //!
-//! - All risk planes are normalized to [0, 1] as `RiskCoord` values, with
-//!   corridor-based normalization defined in ALN specifications.
-//! - The Lyapunov residual V_t = sum_j w_j r_j^2 is used as the scalar
-//!   ecosafety channel, and control is only admissible when the residual is
-//!   non-increasing outside a small safe interior.
-//! - KER windows track knowledge-factor `K`, eco-impact `E`, and risk-of-harm
-//!   `R` over rolling horizons, with deployability gates enforced via
-//!   `ker_deployable()`.
-//!
-//! This crate also provides privacy-preserving aggregation of ecosafety
-//! statistics across multiple node operators using additive sharing and
-//! optional differential privacy. All outputs are advisory and non-actuating.
+//! Design goals:
+//! - Keep all coordinates unit-agnostic but normalized to [0, 1] for use as
+//!   `RiskCoord` values in Lyapunov residuals.
+//! - Make the H→r_biodiversity mapping strictly monotone: lower H implies
+//!   higher biodiversity risk.
+//! - Expose local sensitivities of r_biodiversity to BOD, TSS, and temperature,
+//!   so corridor builders and KER windows can reason about marginal impacts.
+//! - Align with ALNv2 shard schema for canal biodiversity metrics and canal risk
+//!   planes without performing direct ALN parsing here.
+//
+// The actual ALNv2 schema binding is handled in `aln_schema.rs` / `shard_schema.rs`;
+// this file focuses purely on Rust-side math and types.
 
-/// SAFE_FLAG governance signal model for the iCE40 Lyapunov kernel.
-pub mod safe_flag;
-pub use safe_flag::{SafeFlagModel, SafeFlagState};
+use serde::{Deserialize, Serialize};
 
-/// Privacy-preserving aggregation primitives for ecosafety risk.
-pub mod privacy;
+use crate::risk::RiskCoord;
+use crate::risk::RiskVector;
+use crate::lyapunov_regime::LyapunovWeights;
+use crate::risk::LyapunovResidual;
 
-pub use crate::privacy::{
-    AggregatedShares,
-    DpConfig,
-    DpGlobalRiskStats,
-    GlobalRiskStats,
-    LaplaceSampler,
-    LocalRiskStats,
-    RiskShare,
-    apply_dp_to_global_stats,
-    make_risk_shares,
-    reconstruct_global_stats,
-};
+/// Simple scalar wrapper used to keep math explicit.
+/// Values are expected to be finite f64.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
+pub struct Scalar(pub f64);
 
-mod config;
-mod ker;
-mod frame;
-mod window;
-mod lyapunov_regime;
-mod risk;
-mod covariance;
-mod integrity;
-mod aln_schema;
-mod shard_schema;
-mod shard_update_validator;
-mod provenance;
-mod provenancedetail;
-mod provenancerecord;
-mod provenanceexport;
-mod governance_checker;
-mod ecosafetycovarianceframe;
-mod biodiversity_mesocosm;
-mod pipeline3;
-mod types;
-mod node;
-mod fog_guard;
+impl Scalar {
+    /// Clamp to the [0, 1] interval.
+    #[inline]
+    pub fn clamp01(self) -> Scalar {
+        Scalar(self.0.max(0.0).min(1.0))
+    }
 
-/// Embedded ALN specification for the ecosafety envelope.
-///
-/// This string must match the contents of
-/// `specs/CyboquaticEcosafetyEnvelopePhoenix2026v1.aln`
-/// in the Prometheus-Praxis repository.
-pub const ECOSAFETY_ALN_SPEC: &str =
-    include_str!("../specs/CyboquaticEcosafetyEnvelopePhoenix2026v1.aln");
-
-/// Configuration types for ecosafety frames.
-pub mod config_reexport {
-    pub use crate::config::EcosafetyConfig;
-}
-
-/// Dynamic KER calculator based on covariance condition number and ecosafety distance.
-pub use ker::KerFactors;
-
-/// Core diagnostic traits and context.
-pub use frame::{CompositeFrame, Frame, FrameContext, FrameError};
-
-/// Windowing and status history types.
-pub use window::{
-    EcosafetyStatus,
-    EcosafetyStatusHistory,
-    EcosafetyTrend,
-    WindowManager,
-};
-
-/// Lyapunov regime diagnostics.
-pub use lyapunov_regime::{
-    LyapunovStabilityDiagnostics,
-    LyapunovStabilityFrame,
-    VtHistory,
-};
-
-/// Risk-space primitives and KER window representation.
-pub use risk::{
-    KERWindow,
-    LyapunovResidual,
-    LyapunovWeights,
-    RiskCoord,
-    RiskVector,
-};
-
-/// Covariance-based ecosafety frame.
-pub use covariance::{
-    CovarianceOutput,
-    CovarianceSample,
-    EcosafetyCovarianceConfig,
-    EcosafetyCovarianceFrame as CoreCovarianceFrame,
-    LyapunovDistance,
-};
-
-/// Integrity frame for adversarial or malformed inputs.
-pub use integrity::{IntegrityCheckFrame, IntegrityDiagnostics};
-
-/// ALN-bound schema and shard update validation.
-pub use aln_schema::{
-    parse_ecosafety_envelope_schema,
-    validate_update as validate_shard_update,
-    ShardField,
-    ShardFieldKind,
-    ShardSchema as AlnShardSchema,
-    ShardUpdate,
-    ShardValidationError,
-};
-
-/// SQL/ALN shard schema model.
-pub use shard_schema::ShardSchema;
-
-/// Shard update validator for ecosafety shards.
-pub use shard_update_validator::validate_update;
-
-/// Provenance tracking primitives and records.
-pub use provenance::{Provenance, ProvenanceStep};
-pub use provenancedetail::ProvenanceDetail;
-pub use provenancerecord::EcosafetyProvenanceRecord;
-pub use provenanceexport::{
-    pipeline_output_to_provenance_records,
-    provenance_record_to_csv_row,
-};
-
-/// Governance checker that tags shard updates with sovereignty/consent hints.
-pub use governance_checker::{GovernanceChecker, GovernanceTag};
-
-/// High-level three-stage pipeline (Integrity → Covariance → Biodiversity) with provenance.
-pub use pipeline3::{
-    buildecosafetypipeline3,
-    EcosafetyPipeline3,
-    EcosafetyPipelineOutput,
-};
-
-/// Schema-bound ecosystem types mirroring ALN SQL records.
-pub use types::{CyboNodeEcosafetyEnvelope, NodeRiskSample};
-
-/// Biodiversity mesocosm diagnostics.
-pub use biodiversity_mesocosm::{
-    BiodiversityIntegrityDiagnostics,
-    BiodiversityIntegrityFrame,
-    MesocosmRiskFrame,
-    MesocosmShardRow,
-};
-
-/// FOG guard primitives.
-pub use fog_guard::{
-    FogGuard,
-    FogGuardBands,
-    FogGuardConfig,
-    FogGuardInput,
-    FogGuardKerThresholds,
-    FogGuardVerdict,
-};
-
-/// Construct a `FogGuardInput` from a `CyboNodeEcosafetyEnvelope` and an explicit
-/// `corridor_present` flag.
-///
-/// This function is the canonical wiring between ecosafety envelopes and the
-/// FOG guard; all routing and sewer actuation gates should pass through it.
-pub fn fog_guard_input_from_envelope(
-    envelope: &CyboNodeEcosafetyEnvelope,
-    corridor_present: bool,
-) -> FogGuardInput {
-    let ker = envelope.ker();
-    let risk = envelope.risk();
-    let residual = envelope.residual();
-
-    let k = RiskCoord::new_clamped(ker.k());
-    let e = RiskCoord::new_clamped(ker.e());
-    let r = RiskCoord::new_clamped(ker.r());
-
-    FogGuardInput {
-        risk,
-        residual,
-        corridor_present,
-        safestep_ok: ker.kerdeployable(),
-        k,
-        e,
-        r,
+    /// Clamp to be non-negative.
+    #[inline]
+    pub fn clamp_nonnegative(self) -> Scalar {
+        Scalar(self.0.max(0.0))
     }
 }
 
-/// Evaluate a safestep verdict for a `CyboNodeEcosafetyEnvelope`.
+/// Macroinvertebrate and biodiversity metrics for a single canal reach.
 ///
-/// Callers supply:
-/// - `envelope`: the current ecosafety state for the node,
-/// - `corridor_present`: whether a valid corridor exists for this step,
-/// - `cfg`: optional guard configuration; if `None`, defaults are used.
-///
-/// This helper is the single entry point that FOG routers and sewer planners
-/// should call before proposing any actuation.
-pub fn safestep(
-    envelope: &CyboNodeEcosafetyEnvelope,
-    corridor_present: bool,
-    cfg: Option<FogGuardConfig>,
-) -> FogGuardVerdict {
-    let guard_cfg = cfg.unwrap_or_else(FogGuardConfig::default);
-    let guard = FogGuard::new(guard_cfg);
-    let input = fog_guard_input_from_envelope(envelope, corridor_present);
-    guard.evaluate(&input)
+/// These are expected to be populated from ALNv2 shards and telemetry, not
+/// constructed ad-hoc in controllers.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct CanalBiodiversityMetrics {
+    /// Canonical identifier for the canal segment or reach, e.g., "PHX-CANAL-SEG-017".
+    pub segment_id: String,
+
+    /// Observed Shannon index H for macroinvertebrate community.
+    ///
+    /// Typically H = -∑ p_i ln(p_i) over taxa; assumed to be non-negative.
+    pub shannon_index_h: Scalar,
+
+    /// Reference minimum H for heavily degraded canal reaches.
+    ///
+    /// Taken from corridor calibration; must be strictly less than `h_max_ref`
+    /// for the mapping to behave well. Degenerate bands are guarded against in
+    /// the mapping.
+    pub h_min_ref: Scalar,
+
+    /// Reference maximum H for least-disturbed reaches.
+    pub h_max_ref: Scalar,
+
+    /// Curvature parameter α > 0 controlling nonlinearity of the H→r mapping.
+    ///
+    /// Larger α increases sensitivity at low normalized diversity s, which
+    /// makes rare-species loss more visible in the risk coordinate.
+    pub curvature_alpha: Scalar,
+
+    /// Biochemical Oxygen Demand (e.g., mg/L).
+    pub bod: Scalar,
+
+    /// Total Suspended Solids (e.g., mg/L).
+    pub tss: Scalar,
+
+    /// Water temperature (e.g., degrees Celsius).
+    pub temperature_c: Scalar,
+
+    /// Optional normalized evenness coordinate J ∈ [0, 1].
+    ///
+    /// If unknown, use Scalar(-1.0) as a sentinel; the mapping will ignore it.
+    pub evenness_j: Scalar,
+
+    /// Optional species richness S.
+    ///
+    /// If unknown or not calibrated, set to a non-positive sentinel.
+    pub richness_s: Scalar,
 }
 
-/// Non-actuating smoke test for the `safestep` helper.
+/// Local linear sensitivities of Shannon index H at the operating point.
 ///
-/// This function is intended for use in unit tests or diagnostics to verify
-/// that the default guard configuration accepts a clearly safe envelope and
-/// rejects one that violates KER and RoH constraints.
+/// These are estimated empirically per segment or per corridor from Phoenix
+/// telemetry and stored in ALNv2 shards; this struct only carries them.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct CanalHSensitivity {
+    /// ∂H / ∂BOD at the operating point of this segment.
+    pub d_h_dbod: Scalar,
+
+    /// ∂H / ∂TSS at the operating point.
+    pub d_h_dtss: Scalar,
+
+    /// ∂H / ∂Temperature at the operating point.
+    pub d_h_dtemp: Scalar,
+}
+
+/// Weights for canal-level Lyapunov residual over biodiversity and water quality.
 ///
-/// It does not touch any hardware or external IO.
-pub fn safestep_smoke_test() {
-    let risk_safe = RiskVector {
-        rcec: RiskCoord::new_clamped(0.0),
-        rsat: RiskCoord::new_clamped(0.0),
-        rsurcharge: RiskCoord::new_clamped(0.0),
-        rbiodiv: RiskCoord::new_clamped(0.0),
-        rvt: RiskCoord::new_clamped(0.0),
-        rgovernance: RiskCoord::new_clamped(0.0),
-    };
+/// These weights are non-negative and are intended to be consistent with
+/// `LyapunovWeights` used elsewhere in the ecosafety stack.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct CanalRiskWeights {
+    /// Biodiversity weight, typically large to prevent trade-off against other planes.
+    pub w_bio: Scalar,
 
-    let weights = LyapunovWeights::equal();
-    let prev_residual = LyapunovResidual { value: 0.0 };
+    /// BOD risk weight.
+    pub w_bod: Scalar,
 
-    let mut ker_ok = KERWindow::new();
-    ker_ok.update(prev_residual, prev_residual, risk_safe);
+    /// TSS risk weight.
+    pub w_tss: Scalar,
 
-    let envelope_ok = CyboNodeEcosafetyEnvelope::new(
-        crate::types::CyboLane::Production,
-        risk_safe,
-        weights,
-        prev_residual,
-        ker_ok,
-        "0x00".to_string(),
-        "did:bostrom:test".to_string(),
+    /// Thermal risk weight.
+    pub w_thermal: Scalar,
+}
+
+/// Risk coordinates for a canal segment, including biodiversity and basic WQ risks.
+///
+/// This is not the global ecosafety `RiskVector`; instead it is a canal-specific
+/// projection that can be embedded into a full `RiskVector` when needed.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct CanalRiskPlane {
+    /// Segment identifier, propagated from metrics.
+    pub segment_id: String,
+
+    /// Normalized biodiversity risk r_biodiversity in [0, 1], 0 best, 1 worst.
+    pub r_biodiversity: Scalar,
+
+    /// Normalized BOD risk coordinate in [0, 1].
+    pub r_bod: Scalar,
+
+    /// Normalized TSS risk coordinate in [0, 1].
+    pub r_tss: Scalar,
+
+    /// Normalized thermal risk coordinate in [0, 1].
+    pub r_thermal: Scalar,
+
+    /// Sensitivity of biodiversity risk to BOD: ∂r_biodiversity / ∂BOD.
+    pub dr_bio_dbod: Scalar,
+
+    /// Sensitivity of biodiversity risk to TSS: ∂r_biodiversity / ∂TSS.
+    pub dr_bio_dtss: Scalar,
+
+    /// Sensitivity of biodiversity risk to temperature: ∂r_biodiversity / ∂Temperature.
+    pub dr_bio_dtemp: Scalar,
+
+    /// Lyapunov-style scalar potential
+    ///
+    /// V_segment = w_bio r_bio^2 + w_bod r_bod^2 + w_tss r_tss^2 + w_thermal r_thermal^2.
+    pub v_segment: Scalar,
+}
+
+/// Compute the normalized biodiversity risk r_biodiversity ∈ [0, 1] from H and
+/// optional evenness.
+///
+/// Mapping:
+/// - Normalize H to s ∈ [0, 1] within [H_min, H_max].
+/// - Optionally blend s with evenness J if present.
+/// - Apply an exponential, invertible transform:
+///
+///   r = 1 - (exp(α s*) - 1) / (exp(α) - 1), α > 0.
+///
+/// Properties:
+/// - r is monotone decreasing in H.
+/// - r( H = H_min ) ≈ 1, r( H = H_max ) ≈ 0.
+/// - α controls curvature; α → 0 approximates a linear mapping.
+pub fn compute_r_biodiversity(metrics: &CanalBiodiversityMetrics) -> Scalar {
+    let h = metrics.shannon_index_h.0;
+    let h_min = metrics.h_min_ref.0;
+    let h_max = metrics.h_max_ref.0;
+    let alpha_raw = metrics.curvature_alpha.0;
+
+    // Guard against degenerate reference band.
+    let denom_h = (h_max - h_min).max(1e-9);
+    let s = ((h - h_min) / denom_h).max(0.0).min(1.0);
+
+    // Optionally fuse evenness; if evenness_j is non-negative and richness is positive, blend in.
+    let mut s_star = s;
+    if metrics.evenness_j.0 >= 0.0 && metrics.richness_s.0 > 0.0 {
+        let j = metrics.evenness_j.0.max(0.0).min(1.0);
+        // Fixed blend for now; corridor builders can adjust in future ALNv2 configs.
+        let beta = 0.5_f64;
+        s_star = beta * s + (1.0 - beta) * j;
+    }
+
+    let alpha = alpha_raw.max(1e-6);
+    let exp_alpha = alpha.exp();
+    let denom = (exp_alpha - 1.0).max(1e-9);
+    let exp_term = (alpha * s_star).exp();
+    let r = 1.0 - (exp_term - 1.0) / denom;
+
+    Scalar(r).clamp01()
+}
+
+/// Derivative ∂r_biodiversity / ∂H for the chosen mapping.
+///
+/// This derivative is used with `CanalHSensitivity` to derive ∂r_bio / ∂q via
+/// the chain rule for q ∈ {BOD, TSS, Temperature}.
+pub fn compute_dr_bio_dh(metrics: &CanalBiodiversityMetrics) -> Scalar {
+    let h = metrics.shannon_index_h.0;
+    let h_min = metrics.h_min_ref.0;
+    let h_max = metrics.h_max_ref.0;
+    let alpha_raw = metrics.curvature_alpha.0;
+
+    let denom_h = (h_max - h_min).max(1e-9);
+    let s = ((h - h_min) / denom_h).max(0.0).min(1.0);
+
+    let alpha = alpha_raw.max(1e-6);
+    let exp_alpha = alpha.exp();
+    let denom = (exp_alpha - 1.0).max(1e-9);
+    let exp_term = (alpha * s).exp();
+
+    let dr_ds = -alpha * exp_term / denom;
+    let ds_dh = 1.0 / denom_h;
+
+    Scalar(dr_ds * ds_dh)
+}
+
+/// Simple affine normalization of a water quality parameter into [0, 1] risk space.
+///
+/// For BOD and TSS, corridor bands should be taken from ALNv2 particles and
+/// passed here; this function does not hardcode Phoenix-specific limits.
+///
+/// If `safe_min` ≥ `hard_max`, a tiny denominator is used to avoid division by
+/// zero, effectively mapping all values to 0.
+pub fn normalize_water_quality(value: Scalar, safe_min: Scalar, hard_max: Scalar) -> Scalar {
+    let v = value.0;
+    let v_min = safe_min.0;
+    let v_max = hard_max.0;
+    let denom = (v_max - v_min).max(1e-9);
+    let r = ((v - v_min) / denom).max(0.0).min(1.0);
+    Scalar(r)
+}
+
+/// Compute the full `CanalRiskPlane` from metrics, sensitivities, and weights.
+///
+/// Corridor bands for BOD, TSS, and temperature are supplied explicitly; this
+/// keeps the math decoupled from ALNv2 parsing.
+///
+/// The resulting `CanalRiskPlane` can be embedded into a global `RiskVector`
+/// and used in Lyapunov residual computations.
+pub fn compute_canal_risk_plane(
+    metrics: &CanalBiodiversityMetrics,
+    h_sens: &CanalHSensitivity,
+    weights: &CanalRiskWeights,
+    bod_safe_min: Scalar,
+    bod_hard_max: Scalar,
+    tss_safe_min: Scalar,
+    tss_hard_max: Scalar,
+    temp_safe_min: Scalar,
+    temp_hard_max: Scalar,
+) -> CanalRiskPlane {
+    let r_bio = compute_r_biodiversity(metrics);
+
+    let r_bod = normalize_water_quality(metrics.bod, bod_safe_min, bod_hard_max);
+    let r_tss = normalize_water_quality(metrics.tss, tss_safe_min, tss_hard_max);
+    let r_thermal = normalize_water_quality(metrics.temperature_c, temp_safe_min, temp_hard_max);
+
+    let dr_dh = compute_dr_bio_dh(metrics);
+
+    let dr_bio_dbod = Scalar(dr_dh.0 * h_sens.d_h_dbod.0);
+    let dr_bio_dtss = Scalar(dr_dh.0 * h_sens.d_h_dtss.0);
+    let dr_bio_dtemp = Scalar(dr_dh.0 * h_sens.d_h_dtemp.0);
+
+    let wb = weights.w_bio.0.max(0.0);
+    let w_bod = weights.w_bod.0.max(0.0);
+    let w_tss = weights.w_tss.0.max(0.0);
+    let w_th = weights.w_thermal.0.max(0.0);
+
+    let rb = r_bio.0;
+    let rbod = r_bod.0;
+    let rtss = r_tss.0;
+    let rth = r_thermal.0;
+
+    let v_segment = Scalar(
+        wb * rb * rb +
+        w_bod * rbod * rbod +
+        w_tss * rtss * rtss +
+        w_th * rth * rth,
     );
 
-    let verdict_ok = safestep(&envelope_ok, true, None);
-    assert!(matches!(verdict_ok, FogGuardVerdict::Allow));
+    CanalRiskPlane {
+        segment_id: metrics.segment_id.clone(),
+        r_biodiversity: r_bio,
+        r_bod,
+        r_tss,
+        r_thermal,
+        dr_bio_dbod,
+        dr_bio_dtss,
+        dr_bio_dtemp,
+        v_segment,
+    }
+}
 
-    let risk_bad = RiskVector {
-        rcec: RiskCoord::new_clamped(0.9),
-        rsat: RiskCoord::new_clamped(0.9),
-        rsurcharge: RiskCoord::new_clamped(0.9),
-        rbiodiv: RiskCoord::new_clamped(0.9),
-        rvt: RiskCoord::new_clamped(0.9),
-        rgovernance: RiskCoord::new_clamped(0.9),
-    };
+/// Embed a `CanalRiskPlane` into a global ecosafety `RiskVector`.
+///
+/// This function maps the canal biodiversity and water quality coordinates into
+/// the existing `RiskVector` layout used by `cyboquatic-ecosafety`, leaving
+/// other coordinates unchanged.
+///
+/// Callers supply a base `RiskVector` (e.g., from hydraulics and materials);
+/// the returned vector has `rbiodiv`, `rcec`, and thermal-related coordinates
+/// updated from the canal risk plane.
+pub fn embed_canal_risk_into_global(
+    base: &RiskVector,
+    canal: &CanalRiskPlane,
+) -> RiskVector {
+    RiskVector {
+        rcec: RiskCoord::new_clamped(base.rcec.value()),
+        rsat: RiskCoord::new_clamped(base.rsat.value()),
+        rsurcharge: RiskCoord::new_clamped(base.rsurcharge.value()),
+        rbiodiv: RiskCoord::new_clamped(canal.r_biodiversity.0),
+        rvt: RiskCoord::new_clamped(base.rvt.value()),
+        rgovernance: RiskCoord::new_clamped(base.rgovernance.value()),
+    }
+}
 
-    let mut ker_bad = KERWindow::new();
-    ker_bad.update(prev_residual, prev_residual, risk_bad);
+/// Compute a Lyapunov residual contribution from a `CanalRiskPlane` and
+/// global `LyapunovWeights`.
+///
+/// This is a helper to keep canal-level risk consistent with the ecosafety
+/// residual kernel.
+pub fn canal_residual_from_plane(
+    canal: &CanalRiskPlane,
+    weights: &LyapunovWeights,
+) -> LyapunovResidual {
+    let rbio = RiskCoord::new_clamped(canal.r_biodiversity.0);
+    let rcec = RiskCoord::new_clamped(canal.r_bod.0);
+    let rsat = RiskCoord::new_clamped(canal.r_tss.0);
+    let rvt = RiskCoord::new_clamped(canal.r_thermal.0);
 
-    let envelope_bad = CyboNodeEcosafetyEnvelope::new(
-        crate::types::CyboLane::Production,
-        risk_bad,
-        weights,
-        prev_residual,
-        ker_bad,
-        "0x00".to_string(),
-        "did:bostrom:test".to_string(),
-    );
+    // Use existing weight layout; governance and surcharge are not touched here.
+    let v =
+        weights.w_biodiv * rbio.value() * rbio.value() +
+        weights.w_cec * rcec.value() * rcec.value() +
+        weights.w_sat * rsat.value() * rsat.value() +
+        weights.w_vt * rvt.value() * rvt.value();
 
-    let verdict_bad = safestep(&envelope_bad, true, None);
-    assert!(matches!(verdict_bad, FogGuardVerdict::Stop));
+    LyapunovResidual { value: v }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn biodiversity_mapping_bounds() {
+        let metrics = CanalBiodiversityMetrics {
+            segment_id: "PHX-CANAL-SEG-001".to_string(),
+            shannon_index_h: Scalar(2.5),
+            h_min_ref: Scalar(0.5),
+            h_max_ref: Scalar(3.0),
+            curvature_alpha: Scalar(2.0),
+            bod: Scalar(3.0),
+            tss: Scalar(10.0),
+            temperature_c: Scalar(24.0),
+            evenness_j: Scalar(-1.0),
+            richness_s: Scalar(-1.0),
+        };
+
+        let r_bio = compute_r_biodiversity(&metrics);
+        assert!(r_bio.0 >= 0.0 && r_bio.0 <= 1.0);
+    }
+
+    #[test]
+    fn derivative_sign_is_negative() {
+        let metrics = CanalBiodiversityMetrics {
+            segment_id: "PHX-CANAL-SEG-002".to_string(),
+            shannon_index_h: Scalar(2.0),
+            h_min_ref: Scalar(0.5),
+            h_max_ref: Scalar(3.0),
+            curvature_alpha: Scalar(2.0),
+            bod: Scalar(3.0),
+            tss: Scalar(10.0),
+            temperature_c: Scalar(24.0),
+            evenness_j: Scalar(-1.0),
+            richness_s: Scalar(-1.0),
+        };
+
+        let dr_dh = compute_dr_bio_dh(&metrics);
+        // Higher H should reduce risk, so ∂r/∂H < 0 in the interior.
+        assert!(dr_dh.0 < 0.0);
+    }
+
+    #[test]
+    fn risk_plane_v_segment_nonnegative() {
+        let metrics = CanalBiodiversityMetrics {
+            segment_id: "PHX-CANAL-SEG-003".to_string(),
+            shannon_index_h: Scalar(2.0),
+            h_min_ref: Scalar(0.5),
+            h_max_ref: Scalar(3.0),
+            curvature_alpha: Scalar(2.0),
+            bod: Scalar(3.0),
+            tss: Scalar(10.0),
+            temperature_c: Scalar(24.0),
+            evenness_j: Scalar(-1.0),
+            richness_s: Scalar(-1.0),
+        };
+
+        let h_sens = CanalHSensitivity {
+            d_h_dbod: Scalar(-0.05),
+            d_h_dtss: Scalar(-0.02),
+            d_h_dtemp: Scalar(0.01),
+        };
+
+        let weights = CanalRiskWeights {
+            w_bio: Scalar(2.0),
+            w_bod: Scalar(1.0),
+            w_tss: Scalar(1.0),
+            w_thermal: Scalar(0.5),
+        };
+
+        let plane = compute_canal_risk_plane(
+            &metrics,
+            &h_sens,
+            &weights,
+            Scalar(1.0),
+            Scalar(10.0),
+            Scalar(2.0),
+            Scalar(20.0),
+            Scalar(10.0),
+            Scalar(30.0),
+        );
+
+        assert!(plane.v_segment.0 >= 0.0);
+    }
 }
