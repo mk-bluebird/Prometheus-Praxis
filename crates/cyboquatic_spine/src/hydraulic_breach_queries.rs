@@ -4,19 +4,19 @@
 // rust-version = "1.85"
 // !forbidunsafecode
 
+use std::os::raw::c_char;
+
 use rusqlite::{params, Connection, Row};
 use serde::Serialize;
 
-use crate::SpineError;
+use crate::{cstr_to_str, implffiquery, ShardIndex, SpineError};
 
-/// Instant hydraulic breach hit for a node in a given time window.
 #[derive(Debug, Clone, Serialize)]
 pub struct HydraulicInstantHit {
     pub node_id: String,
     pub max_surcharge_pa: f64,
 }
 
-/// Daily surcharge diagnostics around a breach day for a given node.
 #[derive(Debug, Clone, Serialize)]
 pub struct HydraulicDailyHit {
     pub node_id: String,
@@ -27,21 +27,24 @@ pub struct HydraulicDailyHit {
     pub vt: f64,
 }
 
-/// Input parameters describing a spatial breach window and thresholds.
 #[derive(Debug, Clone)]
 pub struct HydraulicBreachParams {
     pub lat_b: f64,
     pub lon_b: f64,
     pub dlat: f64,
     pub dlon: f64,
-    pub ts_window_start: String, // ISO-8601 UTC
-    pub ts_window_end: String,   // ISO-8601 UTC
-    pub x_pa: f64,               // surcharge threshold in Pascals
-    pub breach_day: String,      // YYYY-MM-DD UTC day
+    pub ts_window_start: String,
+    pub ts_window_end: String,
+    pub x_pa: f64,
+    pub breach_day: String,
 }
 
-/// Query function: nodes with surcharge > X_pa in the given time window,
-/// restricted to an rtree_canal_node spatial envelope around (lat_b, lon_b).
+#[derive(Debug, Clone, Serialize)]
+pub struct HydraulicBreachBundle {
+    pub instant_hits: Vec<HydraulicInstantHit>,
+    pub daily_hits: Vec<HydraulicDailyHit>,
+}
+
 pub fn query_hydraulic_instant_hits(
     conn: &Connection,
     params_in: &HydraulicBreachParams,
@@ -68,9 +71,7 @@ pub fn query_hydraulic_instant_hits(
         WHERE h.max_surcharge_pa > :X_pa
     "#;
 
-    let mut stmt = conn
-        .prepare(sql_spatial_candidates)
-        .map_err(SpineError::from)?;
+    let mut stmt = conn.prepare(sql_spatial_candidates).map_err(SpineError::from)?;
 
     let rows = stmt
         .query_map(
@@ -96,8 +97,6 @@ pub fn query_hydraulic_instant_hits(
     Ok(out)
 }
 
-/// Query function: daily surcharge KER/Vt diagnostics for spatial envelope
-/// on a single breach day, thresholded by X_pa.
 pub fn query_hydraulic_daily_hits(
     conn: &Connection,
     params_in: &HydraulicBreachParams,
@@ -119,9 +118,7 @@ pub fn query_hydraulic_daily_hits(
           AND d.max_surcharge_pa > :X_pa
     "#;
 
-    let mut stmt = conn
-        .prepare(sql_daily)
-        .map_err(SpineError::from)?;
+    let mut stmt = conn.prepare(sql_daily).map_err(SpineError::from)?;
 
     let rows = stmt
         .query_map(
@@ -144,13 +141,6 @@ pub fn query_hydraulic_daily_hits(
     }
 
     Ok(out)
-}
-
-/// Convenience helper: run both instant and daily queries in one call.
-#[derive(Debug, Clone, Serialize)]
-pub struct HydraulicBreachBundle {
-    pub instant_hits: Vec<HydraulicInstantHit>,
-    pub daily_hits: Vec<HydraulicDailyHit>,
 }
 
 pub fn query_hydraulic_breach_bundle(
@@ -181,4 +171,79 @@ fn map_daily_hit_row(row: &Row) -> rusqlite::Result<HydraulicDailyHit> {
         r: row.get(4)?,
         vt: row.get(5)?,
     })
+}
+
+implffiquery! {
+    #[no_mangle]
+    pub extern "C" fn cyboquatic_get_hydraulic_breach_bundle(
+        handle: *mut ShardIndex,
+        breach_lat: *const c_char,
+        breach_lon: *const c_char,
+        dlat: *const c_char,
+        dlon: *const c_char,
+        ts_window_start: *const c_char,
+        ts_window_end: *const c_char,
+        x_pa: *const c_char,
+        breach_day: *const c_char,
+    ) -> *mut c_char {
+        if handle.is_null() {
+            return Err(SpineError::InvalidArgument(
+                "Null ShardIndex handle passed to cyboquatic_get_hydraulic_breach_bundle".to_string(),
+            ));
+        }
+
+        let lat_str = cstr_to_str(breach_lat)?;
+        let lon_str = cstr_to_str(breach_lon)?;
+        let dlat_str = cstr_to_str(dlat)?;
+        let dlon_str = cstr_to_str(dlon)?;
+        let ts_start_str = cstr_to_str(ts_window_start)?;
+        let ts_end_str = cstr_to_str(ts_window_end)?;
+        let x_pa_str = cstr_to_str(x_pa)?;
+        let breach_day_str = cstr_to_str(breach_day)?;
+
+        if lat_str.is_empty()
+            || lon_str.is_empty()
+            || dlat_str.is_empty()
+            || dlon_str.is_empty()
+            || ts_start_str.is_empty()
+            || ts_end_str.is_empty()
+            || x_pa_str.is_empty()
+            || breach_day_str.is_empty()
+        {
+            return Err(SpineError::InvalidArgument(
+                "All hydraulic breach parameters must be non-empty strings".to_string(),
+            ));
+        }
+
+        let lat_b: f64 = lat_str.parse().map_err(|e| {
+            SpineError::InvalidArgument(format!("Invalid breach_lat '{}': {}", lat_str, e))
+        })?;
+        let lon_b: f64 = lon_str.parse().map_err(|e| {
+            SpineError::InvalidArgument(format!("Invalid breach_lon '{}': {}", lon_str, e))
+        })?;
+        let dlat_val: f64 = dlat_str.parse().map_err(|e| {
+            SpineError::InvalidArgument(format!("Invalid dlat '{}': {}", dlat_str, e))
+        })?;
+        let dlon_val: f64 = dlon_str.parse().map_err(|e| {
+            SpineError::InvalidArgument(format!("Invalid dlon '{}': {}", dlon_str, e))
+        })?;
+        let x_pa_val: f64 = x_pa_str.parse().map_err(|e| {
+            SpineError::InvalidArgument(format!("Invalid X_pa '{}': {}", x_pa_str, e))
+        })?;
+
+        let params = HydraulicBreachParams {
+            lat_b,
+            lon_b,
+            dlat: dlat_val,
+            dlon: dlon_val,
+            ts_window_start: ts_start_str.to_string(),
+            ts_window_end: ts_end_str.to_string(),
+            x_pa: x_pa_val,
+            breach_day: breach_day_str.to_string(),
+        };
+
+        let shard_index = unsafe { &mut *handle };
+        let bundle = query_hydraulic_breach_bundle(&shard_index.conn, &params)?;
+        Ok(bundle)
+    }
 }
