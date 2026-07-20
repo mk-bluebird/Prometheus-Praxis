@@ -1,6 +1,5 @@
 // filename: crates/alncore/src/lib.rs
 // destination: github.com/mk-bluebird/Prometheus-Praxis
-
 #![forbid(unsafe_code)]
 
 pub mod model;
@@ -34,11 +33,21 @@ pub use crate::eval::{
     DeployDecision,
 };
 
+use serde_json::json;
+
+// Hex-anchor DID binding + zk corridor verification crate.
+// This keeps ALNv2 documents bound to governance DID and KER-safe.
+use prometheus_praxis_hex_anchor::{
+    KerPolicy,
+    HexAnchorPublicInputs,
+    HexAnchorVerificationResult,
+    verify_hex_anchor_did_binding,
+    GOVERNANCE_DID,
+};
+
 /// Serialize an AlnDocument to canonical JSON for cross-language conformance testing.
 /// This JSON is the bridge format for C++ and other languages to consume ALNv2 contracts.
 pub fn to_canonical_json(doc: &AlnDocument) -> String {
-    use serde_json::json;
-
     let safesteprules: Vec<_> = doc
         .safesteprules
         .iter()
@@ -245,4 +254,85 @@ pub fn ffi_eval_deploy_from_json(
         lane: lane_code,
         code: decision.code as i32,
     }
+}
+
+/// Build a KerPolicy from an AlnDocument's RepoManifest.
+/// This maps ALNv2 ker_target_* fields into the hex-anchor corridor policy.
+pub fn ker_policy_from_repo_manifest(doc: &AlnDocument) -> Option<KerPolicy> {
+    doc.repo_manifest.as_ref().map(|m| KerPolicy {
+        k_min: m.ker_target_k,
+        e_min: m.ker_target_e,
+        r_max: m.ker_target_r,
+        non_actuating: m.non_actuating_only,
+    })
+}
+
+/// Verify that an AlnDocument is DID-bound and KER-safe using hex-anchor.
+///
+/// This function is non-actuating and intended for governance/audit flows.
+/// `zk_proof_bytes` should come from the external zk prover asserting that
+/// the hidden particle document obeys KerPolicy.
+pub fn verify_document_hex_anchor(
+    doc: &AlnDocument,
+    zk_proof_bytes: &[u8],
+) -> Result<HexAnchorVerificationResult, String> {
+    let policy = ker_policy_from_repo_manifest(doc)
+        .ok_or_else(|| "RepoManifest missing; cannot derive KerPolicy".to_string())?;
+
+    // Map ALNv2 RepoManifest owner_did / signing_hex / evidence_hex to hex-anchor inputs.
+    let manifest = doc
+        .repo_manifest
+        .as_ref()
+        .ok_or_else(|| "RepoManifest missing; cannot verify DID binding".to_string())?;
+
+    if manifest.owner_did != GOVERNANCE_DID {
+        return Err(format!(
+            "owner_did mismatch: expected {}, got {}",
+            GOVERNANCE_DID, manifest.owner_did
+        ));
+    }
+
+    let public_inputs = HexAnchorPublicInputs {
+        did: manifest.owner_did.clone(),
+        pubkey_hex: manifest.signing_hex.clone(),   // RepoManifest should store pk_gov in signing_hex
+        evidencehex: manifest.evidence_hex.clone(), // hex commitment to the RepoManifest particle
+        sig_hex: doc.signing_hex.clone(),           // signature over evidence_hex (document-level)
+        policy,
+    };
+
+    verify_hex_anchor_did_binding(&public_inputs, zk_proof_bytes)
+        .map_err(|e| format!("hex-anchor verification failed: {:?}", e))
+}
+
+/// Convenience: verify a RepoManifest hex-anchor binding directly.
+/// This is useful for tools that work primarily at repo-level rather than document-level.
+pub fn verify_repo_manifest_hex_anchor(
+    manifest: &RepoManifest,
+    zk_proof_bytes: &[u8],
+    doc_signing_hex: &str,
+) -> Result<HexAnchorVerificationResult, String> {
+    if manifest.owner_did != GOVERNANCE_DID {
+        return Err(format!(
+            "owner_did mismatch: expected {}, got {}",
+            GOVERNANCE_DID, manifest.owner_did
+        ));
+    }
+
+    let policy = KerPolicy {
+        k_min: manifest.ker_target_k,
+        e_min: manifest.ker_target_e,
+        r_max: manifest.ker_target_r,
+        non_actuating: manifest.non_actuating_only,
+    };
+
+    let public_inputs = HexAnchorPublicInputs {
+        did: manifest.owner_did.clone(),
+        pubkey_hex: manifest.signing_hex.clone(),
+        evidencehex: manifest.evidence_hex.clone(),
+        sig_hex: doc_signing_hex.to_string(),
+        policy,
+    };
+
+    verify_hex_anchor_did_binding(&public_inputs, zk_proof_bytes)
+        .map_err(|e| format!("hex-anchor verification failed: {:?}", e))
 }
