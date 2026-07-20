@@ -59,6 +59,142 @@ WorkloadScheduleSolution solve_daily_workload_mip(
     result.feasible = false;
     result.objective_value = 0.0;
     result.delta_Vt_day = 0.0;
+    result.scheduled_task_slots.clear();
+
+    // Create solver instance (CBC or SCIP backend).
+    MPSolver solver("eco_restoration_daily_workload", MPSolver::CBC_MIXED_INTEGER_PROGRAMMING);
+
+    const int num_tasks = static_cast<int>(tasks.size());
+    const int num_slots = static_cast<int>(time_slots.size());
+
+    if (num_tasks == 0 || num_slots == 0 || nodes.empty()) {
+        // No tasks or slots: trivial schedule, infeasible by design.
+        return result;
+    }
+
+    // Map node_id -> capacity for quick lookup.
+    std::unordered_map<std::string, NodeCapacity> node_caps;
+    for (const auto& n : nodes) {
+        node_caps.emplace(n.node_id, n);
+    }
+
+    // Decision variables x_{i,t} ∈ {0,1}.
+    std::vector<std::vector<MPVariable*>> x_vars(num_tasks, std::vector<MPVariable*>(num_slots, nullptr));
+
+    for (int i = 0; i < num_tasks; ++i) {
+        for (int t = 0; t < num_slots; ++t) {
+            const std::string var_name = "x_" + tasks[i].id + "_t" + std::to_string(time_slots[t].index);
+            x_vars[i][t] = solver.MakeIntVar(0.0, 1.0, var_name);
+        }
+    }
+
+    // Constraint 1: Each task scheduled at most once.
+    for (int i = 0; i < num_tasks; ++i) {
+        MPConstraint* c = solver.MakeRowConstraint(0.0, 1.0, "task_once_" + tasks[i].id);
+        for (int t = 0; t < num_slots; ++t) {
+            c->SetCoefficient(x_vars[i][t], 1.0);
+        }
+    }
+
+    // Constraint 2: Node capacity per slot.
+    for (const auto& n : nodes) {
+        for (int t = 0; t < num_slots; ++t) {
+            MPConstraint* c = solver.MakeRowConstraint(
+                0.0,
+                static_cast<double>(n.capacity_slots),
+                "node_capacity_" + n.node_id + "_slot_" + std::to_string(time_slots[t].index)
+            );
+            for (int i = 0; i < num_tasks; ++i) {
+                if (tasks[i].node_id == n.node_id) {
+                    c->SetCoefficient(x_vars[i][t], 1.0);
+                }
+            }
+        }
+    }
+
+    // Constraint 3: Energy budget per node over the day.
+    for (const auto& n : nodes) {
+        MPConstraint* c = solver.MakeRowConstraint(
+            0.0,
+            n.energy_budget_max_J,
+            "energy_budget_" + n.node_id
+        );
+        for (int i = 0; i < num_tasks; ++i) {
+            if (tasks[i].node_id == n.node_id) {
+                for (int t = 0; t < num_slots; ++t) {
+                    c->SetCoefficient(x_vars[i][t], tasks[i].energy_req_J);
+                }
+            }
+        }
+    }
+
+    // Constraint 4: Daily ΔVt <= 0.
+    MPConstraint* vt_constraint = solver.MakeRowConstraint(
+        -solver.infinity(),
+        0.0,
+        "delta_Vt_day_constraint"
+    );
+    for (int i = 0; i < num_tasks; ++i) {
+        for (int t = 0; t < num_slots; ++t) {
+            vt_constraint->SetCoefficient(x_vars[i][t], tasks[i].delta_Vt);
+        }
+    }
+
+    // Optional constraint 5: Hard forbid tasks with strictly positive ΔVt
+    // (can be relaxed if SafeStepRule allows offsetting).
+    for (int i = 0; i < num_tasks; ++i) {
+        if (tasks[i].delta_Vt > 0.0) {
+            MPConstraint* c = solver.MakeRowConstraint(
+                0.0,
+                0.0,
+                "forbid_positive_deltaVt_" + tasks[i].id
+            );
+            for (int t = 0; t < num_slots; ++t) {
+                c->SetCoefficient(x_vars[i][t], 1.0);
+            }
+        }
+    }
+
+    // Objective: maximize total restoration_score, with a small penalty on energy use
+    // to favor lower energy trajectories when scores tie.
+    MPObjective* objective = solver.MutableObjective();
+    const double energy_penalty_weight = 1e-6;
+
+    for (int i = 0; i < num_tasks; ++i) {
+        for (int t = 0; t < num_slots; ++t) {
+            objective->SetCoefficient(x_vars[i][t],
+                                      tasks[i].restoration_score
+                                      - energy_penalty_weight * tasks[i].energy_req_J);
+        }
+    }
+
+    objective->SetMaximization();
+
+    const MPSolver::ResultStatus status = solver.Solve();
+
+    if (status != MPSolver::OPTIMAL && status != MPSolver::FEASIBLE) {
+        // No feasible solution under current constraints.
+        return result;
+    }
+
+    result.feasible = true;
+    result.objective_value = objective->Value();
+
+    // Compute realized ΔVt_day and extract scheduled assignments.
+    double delta_Vt_day = 0.0;
+    for (int i = 0; i < num_tasks; ++i) {
+        for (int t = 0; t < num_slots; ++t) {
+            double val = x_vars[i][t]->solution_value();
+            if (val > 0.5) {
+                result.scheduled_task_slots.emplace_back(tasks[i].id, time_slots[t].index);
+                delta_Vt_day += tasks[i].delta_Vt;
+            }
+        }
+    }
+    result.delta_Vt_day = delta_Vt_day;
+
+    return result;
+}
 
     // Create MIP solver (e.g., SCIP, CBC, or CP-SAT via OR-Tools).
     MPSolver solver("eco_restoration_daily_workload", MPSolver::CBC_MIXED_INTEGER_PROGRAMMING);
