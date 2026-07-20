@@ -1,0 +1,369 @@
+alnversion 2.0.0
+alnnamespace CyboquaticEcosafetyEnvelopePhoenix2026v1
+
+------------------------------------------------------------------------------
+-- Core identifiers and envelope root
+------------------------------------------------------------------------------
+
+particle CyboNodeEcosafetyEnvelopePhoenix2026v1
+    id                         str.v1
+    corridor_id                str.v1           -- Phoenix corridor or basin code
+    region_id                  str.v1           -- e.g., PHX-MAR, PHX-CANAL
+    node_kind                  enum.v1          -- CANAL_SEGMENT, LATERAL, SEWER_NODE, MAR_VAULT, LIFT_STATION
+    node_label                 str.v1           -- human-readable label
+    evidence_hex               hex.v1           -- 0x-prefixed evidence digest
+    signing_did                did.v1           -- e.g., bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+    signing_hex                hex.v1           -- signature over envelope fields
+    vt_residual                f64.v1           -- Lyapunov residual V_t ≥ 0
+    vt_trend                   f64.v1           -- discrete derivative ΔV_t = V_{t+1} - V_t
+    ker_window_id              str.v1           -- linkage to KERWindow particle
+    ker_k                      f64.v1           -- Knowledge factor K ∈ [0,1]
+    ker_e                      f64.v1           -- Eco-impact factor E ∈ [0,1]
+    ker_r                      f64.v1           -- Risk-of-harm factor R ∈ [0,1]
+    ker_deployable             bool.v1          -- true iff window admissible for PROD routing
+    created_utc                datetime.v1
+    lane                       enum.v1          -- RESEARCH, PILOT, PROD
+    scope                      enum.v1          -- CITY_MESH, CYBOQUATIC, ECOSAFETY_CORE
+    corridor_version           str.v1           -- e.g., ECOSAFETY_CORRIDORS_PHX_2026v1
+    vt_channel                 enum.v1          -- ENERGY, HYDRAULICS, BIOLOGY, CARBON, MATERIALS, BIODIVERSITY, DATA_QUALITY, TOPOLOGY
+
+------------------------------------------------------------------------------
+-- Risk coordinates (normalized 0–1, ecosafety.risk.coordinates.v1)
+------------------------------------------------------------------------------
+
+particle CyboNodeRiskCoordinatesPhoenix2026v1
+    envelope_id                ref.CyboNodeEcosafetyEnvelopePhoenix2026v1
+    r_energy                   f64.v1           -- energy plane risk
+    r_hydraulics               f64.v1           -- surcharge, head-loss, corridor risk
+    r_biology                  f64.v1           -- pathogens, fouling
+    r_carbon                   f64.v1           -- carbon / PFAS / persistent pollutants
+    r_materials                f64.v1           -- debris, microplastics, residuals
+    r_biodiversity             f64.v1           -- canal biodiversity (derived from Shannon H)
+    r_data_quality             f64.v1           -- ingest calibration / uncertainty
+    r_topology                 f64.v1           -- topology, governance, lane wiring
+    r_pk_local                 f64.v1           -- local PK risk (effect-site concentration)
+    r_pk_systemic              f64.v1           -- systemic PK risk
+    r_pk_auc                   f64.v1           -- cumulative PK exposure risk
+    r_bio_align                f64.v1           -- biospatial alignment risk
+    r_bio_cone                 f64.v1           -- biospatial cone-of-danger risk
+
+invariant ecosafety_risk_coordinates_bounds
+    forall rc in CyboNodeRiskCoordinatesPhoenix2026v1
+        assert rc.r_energy        >= 0.0
+        assert rc.r_energy        <= 1.0
+        assert rc.r_hydraulics    >= 0.0
+        assert rc.r_hydraulics    <= 1.0
+        assert rc.r_biology       >= 0.0
+        assert rc.r_biology       <= 1.0
+        assert rc.r_carbon        >= 0.0
+        assert rc.r_carbon        <= 1.0
+        assert rc.r_materials     >= 0.0
+        assert rc.r_materials     <= 1.0
+        assert rc.r_biodiversity  >= 0.0
+        assert rc.r_biodiversity  <= 1.0
+        assert rc.r_data_quality  >= 0.0
+        assert rc.r_data_quality  <= 1.0
+        assert rc.r_topology      >= 0.0
+        assert rc.r_topology      <= 1.0
+        assert rc.r_pk_local      >= 0.0
+        assert rc.r_pk_local      <= 1.0
+        assert rc.r_pk_systemic   >= 0.0
+        assert rc.r_pk_systemic   <= 1.0
+        assert rc.r_pk_auc        >= 0.0
+        assert rc.r_pk_auc        <= 1.0
+        assert rc.r_bio_align     >= 0.0
+        assert rc.r_bio_align     <= 1.0
+        assert rc.r_bio_cone      >= 0.0
+        assert rc.r_bio_cone      <= 1.0
+
+------------------------------------------------------------------------------
+-- Lyapunov weights and residual decomposition
+------------------------------------------------------------------------------
+
+particle CyboNodeLyapunovWeightsPhoenix2026v1
+    envelope_id                ref.CyboNodeEcosafetyEnvelopePhoenix2026v1
+    w_energy                   f64.v1
+    w_hydraulics               f64.v1
+    w_biology                  f64.v1
+    w_carbon                   f64.v1
+    w_materials                f64.v1
+    w_biodiversity             f64.v1
+    w_data_quality             f64.v1
+    w_topology                 f64.v1
+    w_pk                       f64.v1          -- combined PK slice weight
+    w_biospatial               f64.v1          -- combined biospatial slice weight
+
+invariant lyapunov_weights_nonnegative
+    forall w in CyboNodeLyapunovWeightsPhoenix2026v1
+        assert w.w_energy        >= 0.0
+        assert w.w_hydraulics    >= 0.0
+        assert w.w_biology       >= 0.0
+        assert w.w_carbon        >= 0.0
+        assert w.w_materials     >= 0.0
+        assert w.w_biodiversity  >= 0.0
+        assert w.w_data_quality  >= 0.0
+        assert w.w_topology      >= 0.0
+        assert w.w_pk            >= 0.0
+        assert w.w_biospatial    >= 0.0
+
+invariant lyapunov_residual_consistency
+    forall env in CyboNodeEcosafetyEnvelopePhoenix2026v1
+        let rc  = CyboNodeRiskCoordinatesPhoenix2026v1{ envelope_id = env.id }
+        let w   = CyboNodeLyapunovWeightsPhoenix2026v1{ envelope_id = env.id }
+
+        let v_energy       = w.w_energy       * rc.r_energy       * rc.r_energy
+        let v_hydraulics   = w.w_hydraulics   * rc.r_hydraulics   * rc.r_hydraulics
+        let v_biology      = w.w_biology      * rc.r_biology      * rc.r_biology
+        let v_carbon       = w.w_carbon       * rc.r_carbon       * rc.r_carbon
+        let v_materials    = w.w_materials    * rc.r_materials    * rc.r_materials
+        let v_biodiversity = w.w_biodiversity * rc.r_biodiversity * rc.r_biodiversity
+        let v_data_quality = w.w_data_quality * rc.r_data_quality * rc.r_data_quality
+        let v_topology     = w.w_topology     * rc.r_topology     * rc.r_topology
+
+        let r_pk_combined  = (rc.r_pk_local + rc.r_pk_systemic + rc.r_pk_auc) / 3.0
+        let v_pk           = w.w_pk          * r_pk_combined     * r_pk_combined
+
+        let r_bio_combined = (rc.r_bio_align + rc.r_bio_cone) / 2.0
+        let v_biospatial   = w.w_biospatial  * r_bio_combined    * r_bio_combined
+
+        let v_sum = v_energy + v_hydraulics + v_biology + v_carbon + v_materials
+                    + v_biodiversity + v_data_quality + v_topology
+                    + v_pk + v_biospatial
+
+        assert env.vt_residual >= 0.0
+        assert abs(env.vt_residual - v_sum) <= 1e-9
+
+------------------------------------------------------------------------------
+-- KER window and deployability
+------------------------------------------------------------------------------
+
+particle CyboNodeKerWindowPhoenix2026v1
+    id                         str.v1
+    envelope_id                ref.CyboNodeEcosafetyEnvelopePhoenix2026v1
+    window_start_utc           datetime.v1
+    window_end_utc             datetime.v1
+    k_factor                   f64.v1
+    e_factor                   f64.v1
+    r_factor                   f64.v1
+    vt_max                     f64.v1          -- max V_t in window
+    vt_min                     f64.v1          -- min V_t in window
+    ker_deployable             bool.v1
+    lane                       enum.v1
+
+invariant ker_bounds_and_linkage
+    forall win in CyboNodeKerWindowPhoenix2026v1
+        assert win.k_factor >= 0.0
+        assert win.k_factor <= 1.0
+        assert win.e_factor >= 0.0
+        assert win.e_factor <= 1.0
+        assert win.r_factor >= 0.0
+        assert win.r_factor <= 1.0
+        assert win.vt_max    >= 0.0
+        assert win.vt_min    >= 0.0
+        assert win.vt_max    >= win.vt_min
+
+        let env = CyboNodeEcosafetyEnvelopePhoenix2026v1{ id = win.envelope_id }
+        assert env.ker_k        == win.k_factor
+        assert env.ker_e        == win.e_factor
+        assert env.ker_r        == win.r_factor
+        assert env.ker_window_id == win.id
+        assert env.ker_deployable == win.ker_deployable
+
+invariant ker_deployable_semantics
+    forall win in CyboNodeKerWindowPhoenix2026v1
+        if win.ker_deployable == true then
+            assert win.r_factor <= 0.20
+            assert win.e_factor >= 0.80
+            assert win.vt_max - win.vt_min <= 0.05
+        end
+
+------------------------------------------------------------------------------
+-- FogGuard input and verdict (non-actuating routing gate)
+------------------------------------------------------------------------------
+
+particle CyboNodeFogGuardInputPhoenix2026v1
+    envelope_id                ref.CyboNodeEcosafetyEnvelopePhoenix2026v1
+    corridor_present           bool.v1
+    vt_residual                f64.v1
+    ker_k                      f64.v1
+    ker_e                      f64.v1
+    ker_r                      f64.v1
+    r_energy                   f64.v1
+    r_hydraulics               f64.v1
+    r_biodiversity             f64.v1
+    r_carbon                   f64.v1
+    r_pk_local                 f64.v1
+    r_pk_systemic              f64.v1
+    r_pk_auc                   f64.v1
+
+particle CyboNodeFogGuardVerdictPhoenix2026v1
+    envelope_id                ref.CyboNodeEcosafetyEnvelopePhoenix2026v1
+    decision                   enum.v1          -- ALLOW, DERATE, STOP
+    reason_code                enum.v1          -- KER_R_HIGH, VT_TREND_UP, CORRIDOR_MISSING, BIODIVERSITY_RISK, PK_RISK, CARBON_RISK
+    created_utc                datetime.v1
+
+invariant safestep_nonactuating_contract
+    forall env in CyboNodeEcosafetyEnvelopePhoenix2026v1
+        let fg_in  = CyboNodeFogGuardInputPhoenix2026v1{ envelope_id = env.id }
+        let fg_out = CyboNodeFogGuardVerdictPhoenix2026v1{ envelope_id = env.id }
+
+        -- If corridor is missing, STOP regardless of other fields.
+        if fg_in.corridor_present == false then
+            assert fg_out.decision == STOP
+            assert fg_out.reason_code == CORRIDOR_MISSING
+        end
+
+        -- KER-based deployability gate.
+        if env.ker_deployable == false then
+            assert fg_out.decision != ALLOW
+        end
+
+        -- Simple safestep semantics: reject if vt_trend > 0 outside tolerance.
+        if env.vt_trend > 1e-6 then
+            assert fg_out.decision == STOP or fg_out.decision == DERATE
+        end
+
+------------------------------------------------------------------------------
+-- Canal biodiversity mesocosm and canal risk plane
+------------------------------------------------------------------------------
+
+particle CanalBiodiversityMesocosmPhoenix2026v1
+    envelope_id                ref.CyboNodeEcosafetyEnvelopePhoenix2026v1
+    segment_id                 str.v1
+    shannon_h                  f64.v1          -- Shannon index H
+    h_min_ref                  f64.v1
+    h_max_ref                  f64.v1
+    curvature_alpha            f64.v1          -- curvature parameter for H→risk mapping
+    bod_mg_per_l               f64.v1
+    tss_mg_per_l               f64.v1
+    temperature_c              f64.v1
+    evenness_j                 f64.v1
+    richness_s                 f64.v1
+
+invariant biodiversity_refs_positive
+    forall bio in CanalBiodiversityMesocosmPhoenix2026v1
+        assert bio.h_max_ref > bio.h_min_ref
+        assert bio.curvature_alpha > 0.0
+
+particle CanalRiskPlanePhoenix2026v1
+    envelope_id                ref.CyboNodeEcosafetyEnvelopePhoenix2026v1
+    segment_id                 str.v1
+    r_biodiversity             f64.v1          -- same scalar as envelope.r_biodiversity
+    r_bod                      f64.v1
+    r_tss                      f64.v1
+    r_thermal                  f64.v1
+    v_segment                  f64.v1          -- segment-level Lyapunov potential
+    d_rbio_d_h                 f64.v1
+    bod_norm                   f64.v1
+    tss_norm                   f64.v1
+    temp_norm                  f64.v1
+
+invariant canal_risk_plane_bounds
+    forall cp in CanalRiskPlanePhoenix2026v1
+        assert cp.r_biodiversity >= 0.0
+        assert cp.r_biodiversity <= 1.0
+        assert cp.r_bod          >= 0.0
+        assert cp.r_bod          <= 1.0
+        assert cp.r_tss          >= 0.0
+        assert cp.r_tss          <= 1.0
+        assert cp.r_thermal      >= 0.0
+        assert cp.r_thermal      <= 1.0
+
+        assert cp.bod_norm       >= 0.0
+        assert cp.bod_norm       <= 1.0
+        assert cp.tss_norm       >= 0.0
+        assert cp.tss_norm       <= 1.0
+        assert cp.temp_norm      >= 0.0
+        assert cp.temp_norm      <= 1.0
+
+invariant canal_biodiversity_linkage
+    forall cp in CanalRiskPlanePhoenix2026v1
+        let env = CyboNodeEcosafetyEnvelopePhoenix2026v1{ id = cp.envelope_id }
+        let rc  = CyboNodeRiskCoordinatesPhoenix2026v1{ envelope_id = env.id }
+        assert cp.r_biodiversity == rc.r_biodiversity
+
+------------------------------------------------------------------------------
+-- PK state and biospatial state references (non-actuating)
+------------------------------------------------------------------------------
+
+particle CyboNodePkStatePhoenix2026v1
+    envelope_id                ref.CyboNodeEcosafetyEnvelopePhoenix2026v1
+    cc_normalized              f64.v1          -- central compartment (Cc / Cc_ref)
+    cp_normalized              f64.v1          -- peripheral compartment (Cp / Cp_ref)
+    ce_normalized              f64.v1          -- effect-site compartment (Ce / Ce_ref)
+    auc_c_normalized           f64.v1          -- normalized AUC central
+    auc_p_normalized           f64.v1          -- normalized AUC peripheral
+    auc_e_normalized           f64.v1          -- normalized AUC effect-site
+
+invariant pk_state_bounds
+    forall pk in CyboNodePkStatePhoenix2026v1
+        assert pk.cc_normalized      >= 0.0
+        assert pk.cp_normalized      >= 0.0
+        assert pk.ce_normalized      >= 0.0
+        assert pk.auc_c_normalized   >= 0.0
+        assert pk.auc_p_normalized   >= 0.0
+        assert pk.auc_e_normalized   >= 0.0
+
+particle CyboNodeBiospatialStatePhoenix2026v1
+    envelope_id                ref.CyboNodeEcosafetyEnvelopePhoenix2026v1
+    x                          f64.v1          -- position x
+    y                          f64.v1          -- position y
+    z                          f64.v1          -- position z
+    v1                         f64.v1          -- velocity component along e1
+    v2                         f64.v1          -- velocity component along e2
+    v3                         f64.v1          -- velocity component along e3
+    n1                         f64.v1          -- sensitive direction component n1
+    n2                         f64.v1          -- sensitive direction component n2
+    n3                         f64.v1          -- sensitive direction component n3
+
+------------------------------------------------------------------------------
+-- Governance and provenance bindings
+------------------------------------------------------------------------------
+
+particle CyboNodeEcosafetyProvenancePhoenix2026v1
+    envelope_id                ref.CyboNodeEcosafetyEnvelopePhoenix2026v1
+    provenance_id              str.v1
+    daily_progress_window_id   str.v1
+    merkle_root_hex            hex.v1          -- Merkle root over dailyprogress rows
+    merkle_algo_id             str.v1          -- Hash256AlgoX.v1 or equivalent
+    zk_proof_scheme_id         str.v1          -- e.g., Groth16PhoenixKER2026v1
+    zk_proof_bytes             bytes.v1
+    signer_did                 did.v1
+    signer_hex                 hex.v1
+
+invariant ecosafety_provenance_bounds
+    forall p in CyboNodeEcosafetyProvenancePhoenix2026v1
+        assert p.merkle_root_hex matches "^0x[0-9a-fA-F]{64}$"
+        assert p.signer_hex      matches "^0x[0-9a-fA-F]{64}$"
+        assert p.signer_did      == "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+
+------------------------------------------------------------------------------
+-- Envelope-level safety invariants (monotone Lyapunov, non-offsettable planes)
+------------------------------------------------------------------------------
+
+invariant ecosafety_monotone_lyapunov_and_noncompensation
+    forall env in CyboNodeEcosafetyEnvelopePhoenix2026v1
+        let rc = CyboNodeRiskCoordinatesPhoenix2026v1{ envelope_id = env.id }
+
+        -- Lyapunov residual must be nonnegative.
+        assert env.vt_residual >= 0.0
+
+        -- Non-offsettable carbon and biodiversity: if these worsen beyond corridor,
+        -- envelope cannot be PROD and ker_deployable must be false.
+        if rc.r_carbon       > 0.70 or
+           rc.r_biodiversity > 0.70 then
+            assert env.lane           != PROD
+            assert env.ker_deployable == false
+        end
+
+        -- Data quality noncompensation: if data quality risk rises above 0.50,
+        -- K must not increase and E must not increase relative to window baseline.
+        let win = CyboNodeKerWindowPhoenix2026v1{ envelope_id = env.id }
+        if rc.r_data_quality > 0.50 then
+            assert env.ker_k <= win.k_factor
+            assert env.ker_e <= win.e_factor
+        end
+
+------------------------------------------------------------------------------
+-- End of CyboquaticEcosafetyEnvelopePhoenix2026v1
+------------------------------------------------------------------------------
