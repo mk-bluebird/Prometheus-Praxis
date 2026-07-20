@@ -1,0 +1,60 @@
+# filename: ecorestorationshard/cyboquaticprogress/20260719/aln/WorkloadEnergyDeltaVt20260719v1.aln
+# destination: ecorestorationshard/cyboquaticprogress/20260719/aln/WorkloadEnergyDeltaVt20260719v1.aln
+# repo-target: https://github.com/mk-bluebird/Prometheus-Praxis
+# Purpose: ALN v2 particle binding K,E,R triad and ΔVt workload residual for
+# 2026‑07‑19 to the Phoenix hex anchor PHXWORKLOADENERGYDV20260719, chained to
+# prior workload anchors per the Phoenix Hex Registry grammar. [file:2][file:36]
+
+particle WorkloadEnergyDeltaVt20260719v1
+  versiontag 20260719v1
+  domain CYBOQUATIC
+  subdomain WORKLOADENERGYDV
+  regioncode PHX-CAZ-CEIM
+  signingdid bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+  evidencehex 0x20260719PHXWORKLOADENERGYDV
+  prior_evidencehex 0x20260709PHX3345NWorkloadEnergyDeltaVt
+  hex_logical_name PHXWORKLOADENERGYDV20260719
+  lane RESEARCH
+  nonactuating true
+
+record WorkloadEnergyDeltaVtRow
+  field workday_yyyymmdd string required true
+  field subtask_id       string required true
+  field node_id          string required true
+  field energyreq_j      float  required true
+  field energy_j_baseline float required true
+  field delta_energy_j   float  required true
+  field vt_prev          float  required true
+  field vt_curr          float  required true
+  field delta_vt         float  required true
+  field k_factor         float  required true
+  field e_factor         float  required true
+  field r_factor         float  required true
+  field r_energy         float  required true
+  field r_carbon         float  required true
+  field r_hydraulics     float  required true
+  field r_materials      float  required true
+  field r_dataquality    float  required true
+  field evidence_hex     string required true
+  field hex_logical_name string required true
+
+predicate vt_contractive
+  expr forall row in WorkloadEnergyDeltaVtRow,
+       row.delta_vt <= 0.0
+
+predicate ker_bounds
+  expr forall row in WorkloadEnergyDeltaVtRow,
+       0.0 <= row.k_factor and row.k_factor <= 1.0 and
+       0.0 <= row.e_factor and row.e_factor <= 1.0 and
+       0.0 <= row.r_factor and row.r_factor <= 1.0
+
+predicate planes_normalized
+  expr forall row in WorkloadEnergyDeltaVtRow,
+       0.0 <= row.r_energy      and row.r_energy      <= 1.0 and
+       0.0 <= row.r_carbon      and row.r_carbon      <= 1.0 and
+       0.0 <= row.r_hydraulics  and row.r_hydraulics  <= 1.0 and
+       0.0 <= row.r_materials   and row.r_materials   <= 1.0 and
+       0.0 <= row.r_dataquality and row.r_dataquality <= 1.0
+
+invariant workload_nonactuating
+  requires vt_contractive and ker_bounds and planes_normalized
