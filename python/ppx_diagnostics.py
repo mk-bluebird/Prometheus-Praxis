@@ -1,51 +1,25 @@
 # filename: python/ppx_diagnostics.py
-# destination: github.com/mk-bluebird/Prometheus-Praxis
+# destination: github.com/mk-bluebird/Prometheus-Praxis/python/ppx_diagnostics.py
 #
-# Purpose:
-#   Unified diagnostics schema for Prometheus-style metrics + code deltas.
-#   Provides data models that collaborators can use to:
-#     - Record structured metrics with Prometheus-compliant keys.
-#     - Capture parsed file diffs (additions, deletions, context lines).
-#     - Aggregate diagnostics into a single snapshot object suitable for logging,
-#       persistence, or export to monitoring backends.
-#
-#   This module is intended to be language-agnostic glue for Rust/CPP/Python:
-#     - Rust kernels can emit metrics and structured file deltas as JSON.
-#     - CPP tools can generate diff hunks and metrics and send them to Python.
-#     - Python agents can ingest these diagnostics and push them into Prometheus
-#       or other observability stacks.
+# Unified diagnostics schema for Prometheus-style metrics and structured file deltas.
+# Minimal comments, production-ready wiring for Rust/CPP/Python and local agents.
 
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
 
-# ---------------------------------------------------------------------------
-# Enum definitions
-# ---------------------------------------------------------------------------
-
 class ChangeTypeEnum(str, Enum):
-    """Kind of change represented in a parsed diff line."""
     CONTEXT = "context"
     ADDITION = "addition"
     DELETION = "deletion"
 
 
-# ---------------------------------------------------------------------------
-# Metrics models
-# ---------------------------------------------------------------------------
-
 class TelemetryPayloadLabel(BaseModel):
-    """
-    A single Prometheus label (key/value pair).
-
-    Example:
-        TelemetryPayloadLabel(name="node_id", value="PHX-NODE-01")
-    """
     name: str = Field(
         ...,
         min_length=1,
@@ -59,14 +33,6 @@ class TelemetryPayloadLabel(BaseModel):
 
 
 class StructuredMetricData(BaseModel):
-    """
-    Structured representation of a single metric observation.
-
-    - `name` must conform to Prometheus metric naming rules.
-    - `labels` capture dimensions (node ID, region, file, etc.).
-    - `recorded_value` is the measured numeric value.
-    - `collection_epoch` is the UTC timestamp when the measurement was taken.
-    """
     name: str = Field(
         ...,
         pattern=r"^[a-zA-Z_:][a-zA-Z0-9_:]*$",
@@ -86,15 +52,6 @@ class StructuredMetricData(BaseModel):
     )
 
     def to_prometheus_sample(self) -> str:
-        """
-        Render as a Prometheus exposition line (text format).
-
-        Example output:
-            eco_impact_score{node_id="PHX-NODE-01",region="Phoenix-AZ"} 0.82 1710878400
-
-        Returns:
-            A single line ready for Prometheus text exposition.
-        """
         label_str = ""
         if self.labels:
             parts = [f'{lbl.name}="{lbl.value}"' for lbl in self.labels]
@@ -103,19 +60,7 @@ class StructuredMetricData(BaseModel):
         return f"{self.name}{label_str} {self.recorded_value} {ts}"
 
 
-# ---------------------------------------------------------------------------
-# Diff models
-# ---------------------------------------------------------------------------
-
 class ParsedCodeLine(BaseModel):
-    """
-    A single line in a parsed diff hunk.
-
-    - `old_line_number` is the original line offset (or None/-1 for new file).
-    - `new_line_number` is the updated line offset (or None/-1 for deletions).
-    - `modification_type` encodes whether this line is context, addition, or deletion.
-    - `line_payload` is the raw text of the line (without diff prefix).
-    """
     old_line_number: Optional[int] = Field(
         None,
         description="Previous line offset.",
@@ -139,12 +84,6 @@ class ParsedCodeLine(BaseModel):
 
 
 class ParsedDiffHunk(BaseModel):
-    """
-    Represents a unified diff hunk.
-
-    Fields mirror the standard unified diff header:
-        @@ -old_start,old_count +new_start,new_count @@
-    """
     old_start: int
     old_count: int
     new_start: int
@@ -156,14 +95,6 @@ class ParsedDiffHunk(BaseModel):
 
 
 class StructuredFileDelta(BaseModel):
-    """
-    Represents the delta between two versions of a file.
-
-    - `origin_filepath` is the original path.
-    - `target_filepath` is the new path (may be identical for in-place edits).
-    - `is_new_file` indicates whether this is a newly created file.
-    - `hunks` contains the structured diff hunks.
-    """
     origin_filepath: str
     target_filepath: str
     is_new_file: bool = False
@@ -173,7 +104,6 @@ class StructuredFileDelta(BaseModel):
     )
 
     def total_added_lines(self) -> int:
-        """Return the total number of added lines across all hunks."""
         return sum(
             1
             for h in self.hunks
@@ -182,7 +112,6 @@ class StructuredFileDelta(BaseModel):
         )
 
     def total_deleted_lines(self) -> int:
-        """Return the total number of deleted lines across all hunks."""
         return sum(
             1
             for h in self.hunks
@@ -190,24 +119,18 @@ class StructuredFileDelta(BaseModel):
             if line.modification_type == ChangeTypeEnum.DELETION
         )
 
+    def to_summary_dict(self) -> Dict[str, Any]:
+        return {
+            "origin_filepath": self.origin_filepath,
+            "target_filepath": self.target_filepath,
+            "is_new_file": self.is_new_file,
+            "hunks": len(self.hunks),
+            "added_lines": self.total_added_lines(),
+            "deleted_lines": self.total_deleted_lines(),
+        }
 
-# ---------------------------------------------------------------------------
-# Unified diagnostic snapshot
-# ---------------------------------------------------------------------------
 
 class UnifiedSystemDiagnosticState(BaseModel):
-    """
-    A unified snapshot of system diagnostics at a single point in time.
-
-    Includes:
-    - `collected_metrics`: a list of metric observations.
-    - `detected_deltas`: a list of file deltas from code changes.
-    - `diagnostic_timestamp`: when the snapshot was assembled.
-
-    Intended use:
-    - Serialize to JSON for logging or audit.
-    - Feed to monitoring pipelines or analysis tools.
-    """
     collected_metrics: List[StructuredMetricData] = Field(
         default_factory=list,
         description="Collected metric samples.",
@@ -222,7 +145,6 @@ class UnifiedSystemDiagnosticState(BaseModel):
     )
 
     def to_json_dict(self) -> Dict[str, Any]:
-        """Return a JSON-serializable dictionary representation."""
         return self.model_dump()
 
     def add_metric(
@@ -232,16 +154,7 @@ class UnifiedSystemDiagnosticState(BaseModel):
         labels: Optional[Dict[str, str]] = None,
         epoch: Optional[datetime] = None,
     ) -> None:
-        """
-        Convenience method to append a metric.
-
-        Args:
-            name: Prometheus-compliant metric name.
-            value: Numeric value.
-            labels: Optional dict of labelname -> value.
-            epoch: Optional timestamp; defaults to now (UTC).
-        """
-        label_models = []
+        label_models: List[TelemetryPayloadLabel] = []
         if labels:
             label_models = [
                 TelemetryPayloadLabel(name=k, value=v) for k, v in labels.items()
@@ -255,16 +168,9 @@ class UnifiedSystemDiagnosticState(BaseModel):
         self.collected_metrics.append(metric)
 
     def add_file_delta(self, delta: StructuredFileDelta) -> None:
-        """Append a file delta to the diagnostic snapshot."""
         self.detected_deltas.append(delta)
 
     def summarize(self) -> str:
-        """
-        Return a human-readable summary of metrics and deltas.
-
-        Example:
-            "Metrics: 3 samples, Deltas: 2 files (10 additions, 3 deletions)"
-        """
         metric_count = len(self.collected_metrics)
         file_count = len(self.detected_deltas)
         additions = sum(d.total_added_lines() for d in self.detected_deltas)
@@ -274,10 +180,31 @@ class UnifiedSystemDiagnosticState(BaseModel):
             f"Deltas: {file_count} files ({additions} additions, {deletions} deletions)"
         )
 
+    def metrics_as_prometheus_text(self) -> str:
+        lines = [m.to_prometheus_sample() for m in self.collected_metrics]
+        return "\n".join(lines)
 
-# ---------------------------------------------------------------------------
-# Diff parsing helper (unified diff -> StructuredFileDelta)
-# ---------------------------------------------------------------------------
+    def deltas_summary(self) -> List[Dict[str, Any]]:
+        return [d.to_summary_dict() for d in self.detected_deltas]
+
+
+def _parse_hunk_header(header_line: str) -> Tuple[int, int, int, int]:
+    header = header_line.strip("@ ")
+    parts = header.split(" ")
+    old_spec = parts[0]
+    new_spec = parts[1]
+
+    def parse_spec(spec: str) -> Tuple[int, int]:
+        spec = spec.lstrip("+-")
+        if "," in spec:
+            s, c = spec.split(",", 1)
+            return int(s), int(c)
+        return int(spec), 1
+
+    old_start, old_count = parse_spec(old_spec)
+    new_start, new_count = parse_spec(new_spec)
+    return old_start, old_count, new_start, new_count
+
 
 def parse_unified_diff(
     origin_path: str,
@@ -285,22 +212,6 @@ def parse_unified_diff(
     diff_lines: Iterable[str],
     is_new_file: bool = False,
 ) -> StructuredFileDelta:
-    """
-    Parse a unified diff (lines) into a StructuredFileDelta.
-
-    This is a lightweight helper intended for collaborators who already have
-    unified diff output (e.g., from `git diff`), and want to feed it into
-    UnifiedSystemDiagnosticState.
-
-    Arguments:
-        origin_path: Original file path.
-        target_path: New file path.
-        diff_lines: Iterable of raw diff lines (including @@ hunk headers).
-        is_new_file: True if the file is newly created.
-
-    Returns:
-        StructuredFileDelta object with parsed hunks and lines.
-    """
     hunks: List[ParsedDiffHunk] = []
     current_hunk: Optional[ParsedDiffHunk] = None
     old_line = 0
@@ -310,23 +221,7 @@ def parse_unified_diff(
         line = raw.rstrip("\n")
 
         if line.startswith("@@"):
-            # Example header: @@ -old_start,old_count +new_start,new_count @@
-            # We do a simple parse; for more robust parsing, hook into existing diff libs.
-            header = line.strip("@ ")
-            parts = header.split(" ")
-            old_spec = parts[0]  # "-old_start,old_count"
-            new_spec = parts[1]  # "+new_start,new_count"
-
-            def parse_spec(spec: str) -> (int, int):
-                spec = spec.lstrip("+-")
-                if "," in spec:
-                    s, c = spec.split(",", 1)
-                    return int(s), int(c)
-                return int(spec), 1
-
-            old_start, old_count = parse_spec(old_spec)
-            new_start, new_count = parse_spec(new_spec)
-
+            old_start, old_count, new_start, new_count = _parse_hunk_header(line)
             current_hunk = ParsedDiffHunk(
                 old_start=old_start,
                 old_count=old_count,
@@ -340,11 +235,9 @@ def parse_unified_diff(
             continue
 
         if current_hunk is None:
-            # Skip lines before first hunk.
             continue
 
         if not line:
-            # Empty line: treat as context.
             current_hunk.lines.append(
                 ParsedCodeLine(
                     old_line_number=old_line,
@@ -392,7 +285,6 @@ def parse_unified_diff(
             )
             old_line += 1
         else:
-            # Unknown prefix; treat as context.
             current_hunk.lines.append(
                 ParsedCodeLine(
                     old_line_number=old_line,
