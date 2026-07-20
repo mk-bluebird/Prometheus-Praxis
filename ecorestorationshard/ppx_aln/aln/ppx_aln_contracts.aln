@@ -1,0 +1,112 @@
+# filename: ecorestorationshard/ppx_aln/aln/ppx_aln_contracts.aln
+# destination: ecorestorationshard/ppx_aln/aln/ppx_aln_contracts.aln
+# repo-target: https://github.com/mk-bluebird/Prometheus-Praxis
+#
+# Purpose
+# ALN v2 contracts mirroring the C++ bridge types: SafeStepRule,
+# DeployDecisionKernel, PlaneWeights, and RepoManifest. C++ code reads
+# these via lightweight parsers; hardware repos use the same contracts
+# to gate actuation under CEIM/KER. [file:34]
+
+particle PPX_ALN_SafeStep2026v1
+  versiontag 2026v1
+  domain ECOSAFETY
+  subdomain SAFESTEP
+  regioncode PHX-CAZ-CEIM
+  signingdid bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+  evidencehex 0x20260720PHXPPXALNSAFESTEP
+  lane RESEARCH
+  nonactuating true
+
+record SafeStepRuleRow
+  field rule_id      string required true
+  field epsilon      float  required true
+  field vt_ceiling   float  required true
+
+predicate safesteprule_valid
+  expr forall row in SafeStepRuleRow,
+       row.epsilon >= 0.0 and
+       row.vt_ceiling >= 0.0 and row.vt_ceiling <= 1.0
+
+invariant safesteprule_invariant
+  requires safesteprule_valid
+
+particle PPX_ALN_DeployKernel2026v1
+  versiontag 2026v1
+  domain ECOSAFETY
+  subdomain DEPLOYKERNEL
+  regioncode PHX-CAZ-CEIM
+  signingdid bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+  evidencehex 0x20260720PHXPPXALNDEPLOY
+  lane RESEARCH
+  nonactuating true
+
+record DeployKernelRow
+  field kernel_id string required true
+  field k_min     float  required true
+  field e_min     float  required true
+  field r_max     float  required true
+
+predicate deploykernel_valid
+  expr forall row in DeployKernelRow,
+       0.0 <= row.k_min and row.k_min <= 1.0 and
+       0.0 <= row.e_min and row.e_min <= 1.0 and
+       0.0 <= row.r_max and row.r_max <= 1.0
+
+invariant deploykernel_invariant
+  requires deploykernel_valid
+
+particle PPX_ALN_PlaneWeights2026v1
+  versiontag 2026v1
+  domain ECOSAFETY
+  subdomain PLANEWEIGHTS
+  regioncode PHX-CAZ-CEIM
+  signingdid bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+  evidencehex 0x20260720PHXPPXALNPLANEW
+  lane RESEARCH
+  nonactuating true
+
+record PlaneWeightsRow
+  field profile_id     string required true
+  field w_energy       float  required true
+  field w_hydraulics   float  required true
+  field w_carbon       float  required true
+  field w_biodiversity float  required true
+  field w_materials    float  required true
+  field w_dataquality  float  required true
+
+predicate planeweights_nonnegative
+  expr forall row in PlaneWeightsRow,
+       row.w_energy       >= 0.0 and
+       row.w_hydraulics   >= 0.0 and
+       row.w_carbon       >= 0.0 and
+       row.w_biodiversity >= 0.0 and
+       row.w_materials    >= 0.0 and
+       row.w_dataquality  >= 0.0
+
+invariant planeweights_invariant
+  requires planeweights_nonnegative
+
+particle PPX_ALN_RepoManifest2026v1
+  versiontag 2026v1
+  domain ECONETREPO
+  subdomain MANIFEST
+  regioncode PHX-CAZ-CEIM
+  signingdid bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+  evidencehex 0x20260720PHXPPXALNREPO
+  lane RESEARCH
+  nonactuating true
+
+record RepoManifestRow
+  field reponame         string required true
+  field repo_path        string required true
+  field roleband         string required true
+  field nonactuatingonly bool   required true
+
+predicate repo_manifest_research_only
+  expr forall row in RepoManifestRow,
+       row.roleband = "RESEARCH" and row.nonactuatingonly = true and
+       row.repo_path startswith "ecorestorationshard/ppx_aln"
+
+invariant repo_manifest_invariant
+  requires repo_manifest_research_only
