@@ -4,8 +4,8 @@
 #![forbid(unsafe_code)]
 
 use crate::model::{
-    AlnDocument, DeployDecisionKernel, KerCompleteness, Lane, OverridePolicy, RepoManifest,
-    SafeStepRule,
+    AlnDocument, DeployDecisionKernel, KerCompleteness, KerSnapshot, Lane, OverridePolicy,
+    RepoManifest, SafeStepRule,
 };
 use std::fmt;
 
@@ -148,9 +148,9 @@ pub fn parse_aln_str(input: &str) -> Result<AlnDocument, AlnParseError> {
     let mut deploy_kernels: Vec<DeployDecisionKernel> = Vec::new();
     let mut override_policies: Vec<OverridePolicy> = Vec::new();
     let mut repo_manifest: Option<RepoManifest> = None;
+    let mut ker_snapshots: Vec<KerSnapshot> = Vec::new();
 
     while let Some(line) = tok.next_non_empty() {
-        // Check for document-level metadata
         if line.starts_with("docid ") || line.starts_with("doc_id ") {
             let val = line.split_whitespace().nth(1).unwrap_or("");
             doc_id = val.to_string();
@@ -202,7 +202,6 @@ pub fn parse_aln_str(input: &str) -> Result<AlnDocument, AlnParseError> {
             continue;
         }
 
-        // Handle record blocks
         if line.starts_with("record ") {
             let record_name = line.strip_prefix("record ").unwrap().trim();
             match record_name {
@@ -219,8 +218,10 @@ pub fn parse_aln_str(input: &str) -> Result<AlnDocument, AlnParseError> {
                     }
                 }
                 "KerSnapshot2026v1" | "KerSnapshot" => {
-                    // For now, skip KerSnapshot records in top-level parsing
-                    skip_record_block(&mut tok)?;
+                    let snapshot = parse_ker_snapshot(&mut tok)?;
+                    if let Some(s) = snapshot {
+                        ker_snapshots.push(s);
+                    }
                 }
                 "RepoManifest2026v1" | "RepoManifest" => {
                     let manifest = parse_repo_manifest(&mut tok)?;
@@ -235,23 +236,29 @@ pub fn parse_aln_str(input: &str) -> Result<AlnDocument, AlnParseError> {
                     }
                 }
                 "AlnDocument2026v1" | "AlnDocument" => {
-                    // Parse inline document fields if present
-                    parse_inline_document_fields(&mut tok, &mut doc_id, &mut schema_name, &mut version_tag,
-                        &mut category, &mut region, &mut role_band, &mut owner_did,
-                        &mut evidence_hex, &mut signing_hex, &mut parent_evidence_hex)?;
+                    parse_inline_document_fields(
+                        &mut tok,
+                        &mut doc_id,
+                        &mut schema_name,
+                        &mut version_tag,
+                        &mut category,
+                        &mut region,
+                        &mut role_band,
+                        &mut owner_did,
+                        &mut evidence_hex,
+                        &mut signing_hex,
+                        &mut parent_evidence_hex,
+                    )?;
                 }
                 _ => {
-                    // Unknown record - skip but could store in extras field later
                     skip_record_block(&mut tok)?;
                 }
             }
         } else if line.starts_with("section ") {
-            // Skip section blocks for now
             skip_section_block(&mut tok)?;
         }
     }
 
-    // Build the document
     let mut doc = AlnDocument::new(
         doc_id,
         schema_name,
@@ -271,13 +278,19 @@ pub fn parse_aln_str(input: &str) -> Result<AlnDocument, AlnParseError> {
     for kernel in deploy_kernels {
         doc.add_deploy_kernel(kernel);
     }
+    for snapshot in ker_snapshots {
+        doc.add_ker_snapshot(snapshot);
+    }
+
     doc.override_policies = override_policies;
     doc.repo_manifest = repo_manifest;
 
-    // Validate the document
     let errors = validate_aln_document(&doc);
     if !errors.is_empty() {
-        return Err(parse_error(1, format!("Validation errors: {}", errors.join("; "))));
+        return Err(parse_error(
+            1,
+            format!("Validation errors: {}", errors.join("; ")),
+        ));
     }
 
     Ok(doc)
@@ -289,7 +302,10 @@ fn skip_record_block(tok: &mut Tokenizer) -> Result<(), AlnParseError> {
             return Ok(());
         }
     }
-    Err(parse_error(tok.current_line_num(), "Unexpected end of input while parsing record"))
+    Err(parse_error(
+        tok.current_line_num(),
+        "Unexpected end of input while parsing record",
+    ))
 }
 
 fn skip_section_block(tok: &mut Tokenizer) -> Result<(), AlnParseError> {
@@ -298,7 +314,10 @@ fn skip_section_block(tok: &mut Tokenizer) -> Result<(), AlnParseError> {
             return Ok(());
         }
     }
-    Err(parse_error(tok.current_line_num(), "Unexpected end of input while parsing section"))
+    Err(parse_error(
+        tok.current_line_num(),
+        "Unexpected end of input while parsing section",
+    ))
 }
 
 fn parse_inline_document_fields(
@@ -318,7 +337,7 @@ fn parse_inline_document_fields(
         if line == "endrecord" || line == "end" {
             return Ok(());
         }
-        
+
         let parts: Vec<&str> = line.split_whitespace().collect();
         if parts.len() >= 2 {
             let key = parts[0].to_lowercase();
@@ -333,12 +352,17 @@ fn parse_inline_document_fields(
                 "ownerdid" | "owner_did" => *owner_did = val.to_string(),
                 "evidencehex" | "evidence_hex" => *evidence_hex = val.to_string(),
                 "signinghex" | "signing_hex" => *signing_hex = val.to_string(),
-                "parentevidencehex" | "parent_evidence_hex" => *parent_evidence_hex = Some(val.to_string()),
+                "parentevidencehex" | "parent_evidence_hex" => {
+                    *parent_evidence_hex = Some(val.to_string())
+                }
                 _ => {}
             }
         }
     }
-    Err(parse_error(tok.current_line_num(), "Unexpected end of input while parsing document fields"))
+    Err(parse_error(
+        tok.current_line_num(),
+        "Unexpected end of input while parsing document fields",
+    ))
 }
 
 fn parse_safestep_rule(tok: &mut Tokenizer) -> Result<Option<SafeStepRule>, AlnParseError> {
@@ -379,7 +403,13 @@ fn parse_safestep_rule(tok: &mut Tokenizer) -> Result<Option<SafeStepRule>, AlnP
         return Ok(None);
     }
 
-    Ok(Some(SafeStepRule::new(rule_id, description, vt_ceiling, epsilon, lyap_channel)))
+    Ok(Some(SafeStepRule::new(
+        rule_id,
+        description,
+        vt_ceiling,
+        epsilon,
+        lyap_channel,
+    )))
 }
 
 fn parse_deploy_kernel(tok: &mut Tokenizer) -> Result<Option<DeployDecisionKernel>, AlnParseError> {
@@ -424,7 +454,14 @@ fn parse_deploy_kernel(tok: &mut Tokenizer) -> Result<Option<DeployDecisionKerne
         return Ok(None);
     }
 
-    Ok(Some(DeployDecisionKernel::new(kernel_id, description, k_min, e_min, r_max, lane_scope)))
+    Ok(Some(DeployDecisionKernel::new(
+        kernel_id,
+        description,
+        k_min,
+        e_min,
+        r_max,
+        lane_scope,
+    )))
 }
 
 fn parse_repo_manifest(tok: &mut Tokenizer) -> Result<Option<RepoManifest>, AlnParseError> {
@@ -551,33 +588,90 @@ fn parse_override_policy(tok: &mut Tokenizer) -> Result<Option<OverridePolicy>, 
     )))
 }
 
-// Validation functions
-pub fn validate_aln_document(doc: &AlnDocument) -> Vec<String> {
-    let mut errors = Vec::new();
+fn parse_ker_snapshot(tok: &mut Tokenizer) -> Result<Option<KerSnapshot>, AlnParseError> {
+    let mut k: f32 = 0.0;
+    let mut e: f32 = 0.0;
+    let mut r: f32 = 0.0;
+    let mut vt: f32 = 0.0;
+    let mut lane: Option<Lane> = None;
+    let mut completeness: Option<KerCompleteness> = None;
 
-    // INV-ALNDOC-1: evidencehex/signinghex non-empty if roleband != "RESEARCH"
-    if doc.role_band.to_uppercase() != "RESEARCH" {
-        if doc.evidence_hex.is_empty() {
-            errors.push("INV-ALNDOC-1: evidence_hex must be non-empty for non-RESEARCH roleband".to_string());
+    while let Some(line) = tok.next_non_empty() {
+        if line == "endrecord" || line == "end" {
+            break;
         }
-        if doc.signing_hex.is_empty() {
-            errors.push("INV-ALNDOC-1: signing_hex must be non-empty for non-RESEARCH roleband".to_string());
+
+        let parts: Vec<&str> = line.splitn(2, char::is_whitespace).collect();
+        if parts.is_empty() {
+            continue;
+        }
+
+        let key = parts[0].to_lowercase();
+        let val = if parts.len() > 1 { parts[1].trim() } else { "" };
+
+        match key.as_str() {
+            "k" => {
+                k = parse_value_f32(val).unwrap_or(0.0);
+            }
+            "e" => {
+                e = parse_value_f32(val).unwrap_or(0.0);
+            }
+            "r" => {
+                r = parse_value_f32(val).unwrap_or(0.0);
+            }
+            "vt" => {
+                vt = parse_value_f32(val).unwrap_or(0.0);
+            }
+            "lane" => {
+                lane = parse_lane(val);
+            }
+            "completeness" => {
+                completeness = parse_ker_completeness(val);
+            }
+            _ => {}
         }
     }
 
-    // INV-REPO-1: for ecorestorationshard, roleband == "RESEARCH" and nonactuatingonly == true
+    if lane.is_none() || completeness.is_none() {
+        return Ok(None);
+    }
+
+    Ok(Some(KerSnapshot::new(k, e, r, vt, lane.unwrap(), completeness.unwrap())))
+}
+
+pub fn validate_aln_document(doc: &AlnDocument) -> Vec<String> {
+    let mut errors = Vec::new();
+
+    if doc.role_band.to_uppercase() != "RESEARCH" {
+        if doc.evidence_hex.is_empty() {
+            errors.push(
+                "INV-ALNDOC-1: evidence_hex must be non-empty for non-RESEARCH roleband".to_string(),
+            );
+        }
+        if doc.signing_hex.is_empty() {
+            errors.push(
+                "INV-ALNDOC-1: signing_hex must be non-empty for non-RESEARCH roleband".to_string(),
+            );
+        }
+    }
+
     if let Some(ref manifest) = doc.repo_manifest {
-        if manifest.github_slug.contains("ecorestorationshard") 
-            || manifest.repo_name.contains("ecorestorationshard") {
+        if manifest.github_slug.contains("ecorestorationshard")
+            || manifest.repo_name.contains("ecorestorationshard")
+        {
             if manifest.role_band.to_uppercase() != "RESEARCH" {
-                errors.push("INV-REPO-1: ecorestorationshard must have roleband == RESEARCH".to_string());
+                errors.push(
+                    "INV-REPO-1: ecorestorationshard must have roleband == RESEARCH".to_string(),
+                );
             }
             if !manifest.non_actuating_only {
-                errors.push("INV-REPO-1: ecorestorationshard must have non_actuating_only == true".to_string());
+                errors.push(
+                    "INV-REPO-1: ecorestorationshard must have non_actuating_only == true"
+                        .to_string(),
+                );
             }
         }
 
-        // INV-REPO-2: ownerdid in allowed Bostrom DID set
         let allowed_dids = [
             "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7",
             "bostrom1ldgmtf20d6604a24ztr0jxht7xt7az4jhkmsrc",
@@ -590,7 +684,6 @@ pub fn validate_aln_document(doc: &AlnDocument) -> Vec<String> {
         }
     }
 
-    // Validate SafeStepRules
     for rule in &doc.safesteprules {
         let rule_errors = validate_safestep_rule(rule);
         for err in rule_errors {
@@ -598,11 +691,17 @@ pub fn validate_aln_document(doc: &AlnDocument) -> Vec<String> {
         }
     }
 
-    // Validate DeployDecisionKernels
     for kernel in &doc.deploy_kernels {
         let kernel_errors = validate_deploy_kernel(kernel);
         for err in kernel_errors {
             errors.push(format!("DeployDecisionKernel '{}': {}", kernel.kernel_id, err));
+        }
+    }
+
+    for snapshot in &doc.ker_snapshots {
+        let snapshot_errors = validate_ker_snapshot(snapshot);
+        for err in snapshot_errors {
+            errors.push(format!("KerSnapshot: {}", err));
         }
     }
 
@@ -637,15 +736,24 @@ pub fn validate_deploy_kernel(kernel: &DeployDecisionKernel) -> Vec<String> {
     let mut errors = Vec::new();
 
     if kernel.k_min < 0.0 || kernel.k_min > 1.0 {
-        errors.push(format!("k_min must be in range [0, 1], got {}", kernel.k_min));
+        errors.push(format!(
+            "k_min must be in range [0, 1], got {}",
+            kernel.k_min
+        ));
     }
 
     if kernel.e_min < 0.0 || kernel.e_min > 1.0 {
-        errors.push(format!("e_min must be in range [0, 1], got {}", kernel.e_min));
+        errors.push(format!(
+            "e_min must be in range [0, 1], got {}",
+            kernel.e_min
+        ));
     }
 
     if kernel.r_max < 0.0 || kernel.r_max > 1.0 {
-        errors.push(format!("r_max must be in range [0, 1], got {}", kernel.r_max));
+        errors.push(format!(
+            "r_max must be in range [0, 1], got {}",
+            kernel.r_max
+        ));
     }
 
     if kernel.kernel_id.is_empty() {
@@ -655,7 +763,7 @@ pub fn validate_deploy_kernel(kernel: &DeployDecisionKernel) -> Vec<String> {
     errors
 }
 
-pub fn validate_ker_snapshot(snapshot: &crate::model::KerSnapshot) -> Vec<String> {
+pub fn validate_ker_snapshot(snapshot: &KerSnapshot) -> Vec<String> {
     let mut errors = Vec::new();
 
     if snapshot.k < 0.0 || snapshot.k > 1.0 {
