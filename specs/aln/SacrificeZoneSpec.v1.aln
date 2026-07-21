@@ -1,0 +1,146 @@
+aln
+
+SECTION,SACRIFICE-ZONE-SPEC
+version,v1.0.0
+
+# Host / authority binding (ALNv2 owner binding)
+hostdid,OrganicCPU
+bostromaddress,bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+aln.migration.authority,ALN.MIGRATION.CYBERCOREAUTHORITY.v1
+
+# Doctrine and evolution flags
+forbid.downgrade,true
+monotone.tightening.only,true
+
+# Semantic axis
+axis.label,sacrifice.zone
+axis.description,Sacrifice zones and exclusion corridors for high-contamination, structurally uninhabitable regions, with KER/RoH and pollinator/wildlife invariants.
+
+# Global invariants (documentation-grade here; enforced in Rust/Kani)
+invariant.domain,Actions referencing a SacrificeZoneSpec row must treat it as a governance envelope, not a free-form coordinate.
+invariant.roh.global.ceiling,Resilience-of-Health RoH ceiling for any sacrifice zone must not exceed 0.30 and is non-offsettable.
+invariant.monotone,Any accepted update for a given zone-id must not increase roh_ceiling, rmax, or contamination ceilings, and must not relax biosphere protection flags or sovereignty tags.
+invariant.geo.required,No nanoswarm or cyboquatic planning may target a zone without geometry_ref and proof_hash_hex present and validated.
+invariant.pollinator.hardstop,Zones with non-zero pollinator or wildlife activity cannot be treated as lifeless; nanoswarm actuation must be explicitly pollinator- and wildlife-safe or restricted to sealed micro-sites.
+
+# Column schema (ALNv2 flat schema; one row = one Sacrifice Zone)
+# zone_id                - Stable identifier for the sacrifice zone (e.g., SZ.CHERNO.UA.001, SZ.MARVAULT.PHX.001).
+# region_id              - Region / corridor binding (watershed_id, district_id, or corridor_id from smartcity/eco_restoration catalogs).
+# authority_id           - DID or authority identifier (UNEP, EPA, local regulator, etc.).
+# geometry_ref           - Reference to ALN/GeoJSON shard or grid index set defining the zone geometry.
+# exclusion_status       - NONE, HUMAN_EXCLUSION, INDUSTRIAL_EXCLUSION, FULL_EXCLUSION.
+# evidence_bundle_id     - Reference to evidence bundle shard (measurements, maps, legal orders).
+# proof_hash_hex         - Hex hash of the geo-proof bundle anchored in Veritas/Organichain.
+#
+# primary_class          - RADIATION, HEAVY_METALS, PERSISTENT_ORGANICS, HYDROCARBONS, MICROPLASTICS, AIR_POLLUTION, MULTI_MODAL.
+# secondary_classes_json - JSON/ALN list of secondary contamination classes.
+# contamination_radiation      - 0..1 normalized radiation contamination index.
+# contamination_heavy_metals   - 0..1 normalized heavy metals contamination index.
+# contamination_organics       - 0..1 normalized persistent organics index.
+# contamination_microplastics  - 0..1 normalized microplastics index.
+# contamination_air            - 0..1 normalized air pollution index.
+# contamination_other          - 0..1 generic index for other contaminants.
+#
+# pollinator_activity     - NONE_DETECTED, SPARSE, MODERATE, HIGH.
+# wildlife_activity       - NONE_DETECTED, SPARSE, MODERATE, HIGH.
+# biosignal_proof_id      - Reference to biosurvey / VitalNet shard documenting life presence/absence.
+#
+# lane                   - RESEARCH, PILOT, PRODUCTION, CITY_CRITICAL (Prometheus-Praxis lanes).
+# roh_ceiling            - 0..1 RoH ceiling for actions in this zone (must be ≤ 0.30).
+# kmin                   - 0..1 minimum Knowledge K for actions referencing this zone.
+# emin                   - 0..1 minimum EcoImpact E for actions referencing this zone.
+# rmax                   - 0..1 maximum Risk-of-Harm R (must be ≤ roh_ceiling).
+#
+# neurorights_envelope_id - Reference to neurorights envelope shard if any neuro/cyber systems are relevant.
+# sovereignty_tags_json   - JSON/ALN list: e.g., ["INDIGENOUS_LAND","CONFLICT_ZONE","SACRED_SITE"].
+# notes                   - Free-text, short description; not used in guard logic but visible in dashboards.
+
+columns,zone_id,region_id,authority_id,geometry_ref,exclusion_status,evidence_bundle_id,proof_hash_hex,primary_class,secondary_classes_json,contamination_radiation,contamination_heavy_metals,contamination_organics,contamination_microplastics,contamination_air,contamination_other,pollinator_activity,wildlife_activity,biosignal_proof_id,lane,roh_ceiling,kmin,emin,rmax,neurorights_envelope_id,sovereignty_tags_json,notes
+
+# Example rows (PHOENIX DEMO ONLY — replace with real IDs and values during calibration).
+
+# Example 1: Sealed industrial dump, capped, with strong human exclusion, minimal pollinator use.
+zone_id,SZ.PHX.INDUSTRIAL.DUMP.001
+region_id,PHX-WEST-INDUSTRIAL-01
+authority_id,did:org:epa-phx
+geometry_ref,geo.szone.phx.industrial.dump.001.v1
+exclusion_status,HUMAN_EXCLUSION
+evidence_bundle_id,evidence-bundle20.phx-industrial-dump-001
+proof_hash_hex,0xSZONEPHXINDDUMP001HASH
+primary_class,PERSISTENT_ORGANICS
+secondary_classes_json,["HEAVY_METALS"]
+contamination_radiation,0.00
+contamination_heavy_metals,0.70
+contamination_organics,0.85
+contamination_microplastics,0.20
+contamination_air,0.10
+contamination_other,0.15
+pollinator_activity,SPARSE
+wildlife_activity,SPARSE
+biosignal_proof_id,biosignal-bundle10.phx-industrial-dump-001
+lane,RESEARCH
+roh_ceiling,0.25
+kmin,0.80
+emin,0.80
+rmax,0.20
+neurorights_envelope_id,neurorights.envelope.citizen.v1
+sovereignty_tags_json,["INDUSTRIAL_CORRIDOR"]
+notes,PHX capped industrial dump with high PCB and metal load; candidate sealed micro-sites only.
+
+# Example 2: Nuclear exclusion interior rubble field, strong human exclusion, low wildlife occupancy inside structures.
+zone_id,SZ.CHERNO.UA.REACTOR.STRUCTURE.001
+region_id,UA-CHERNO-EXCLUSION-CORE
+authority_id,did:org:iaea
+geometry_ref,geo.szone.cherno.reactor.structure.001.v1
+exclusion_status,FULL_EXCLUSION
+evidence_bundle_id,evidence-bundle30.cherno-reactor-structure-001
+proof_hash_hex,0xSZCHERNOCORESTRUCT001HASH
+primary_class,RADIATION
+secondary_classes_json,["HEAVY_METALS"]
+contamination_radiation,0.95
+contamination_heavy_metals,0.60
+contamination_organics,0.05
+contamination_microplastics,0.00
+contamination_air,0.10
+contamination_other,0.10
+pollinator_activity,NONE_DETECTED
+wildlife_activity,SPARSE
+biosignal_proof_id,biosignal-bundle20.cherno-structure-001
+lane,RESEARCH
+roh_ceiling,0.30
+kmin,0.85
+emin,0.85
+rmax,0.25
+neurorights_envelope_id,neurorights.envelope.citizen.v1
+sovereignty_tags_json,["NUCLEAR_EXCLUSION_ZONE"]
+notes,Chernobyl reactor interior rubble; human exclusion and rubble-only micro-sites; wildlife outside structures.
+
+# Example 3: Cyboquatic toxic canal segment with strong contamination and documented pollinator corridors (non-eligible for lifeless assumption).
+zone_id,SZ.PHX.CYBOQUATIC.CANAL.001
+region_id,PHX-CANAL-REACH-001
+authority_id,did:org:phx-water
+geometry_ref,geo.szone.phx.cyboquatic.canal.001.v1
+exclusion_status,INDUSTRIAL_EXCLUSION
+evidence_bundle_id,evidence-bundle25.phx-cyboquatic-canal-001
+proof_hash_hex,0xSZPHXCYBOCANA001HASH
+primary_class,MULTI_MODAL
+secondary_classes_json,["HEAVY_METALS","HYDROCARBONS"]
+contamination_radiation,0.00
+contamination_heavy_metals,0.65
+contamination_organics,0.40
+contamination_microplastics,0.55
+contamination_air,0.30
+contamination_other,0.20
+pollinator_activity,MODERATE
+wildlife_activity,HIGH
+biosignal_proof_id,biosignal-bundle15.phx-cyboquatic-canal-001
+lane,RESEARCH
+roh_ceiling,0.20
+kmin,0.90
+emin,0.90
+rmax,0.18
+neurorights_envelope_id,neurorights.envelope.citizen.v1
+sovereignty_tags_json,["URBAN_CORRIDOR","WATERSHED_CRITICAL"]
+notes,Cyboquatic canal segment with significant pollinator and wildlife corridors; nanoswarm limited to sealed sub-structures only.
+
+ENDSECTION
