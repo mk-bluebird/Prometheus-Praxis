@@ -25,6 +25,7 @@ members = [
     "crates/lane-governance-topology",
     "crates/blacklist-trie",
     "crates/prometheus_praxis_hex_anchor",
+    "crates/sacrifice-zone-envelope",
 
     # eco_wealth standalone crate
     "eco_wealth",
