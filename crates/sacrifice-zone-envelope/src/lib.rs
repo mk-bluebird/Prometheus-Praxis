@@ -107,6 +107,7 @@ impl SacrificeZoneEnvelope {
     ///
     /// This function is intended to be used by ALN loaders and governance
     /// shells; any violation indicates a configuration or migration error.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         zone_id: String,
         region_id: String,
@@ -276,7 +277,7 @@ impl SacrificeZoneEnvelope {
     ///   - roh_ceiling_new <= roh_ceiling_old.
     ///   - rmax_new <= rmax_old.
     ///   - KER floors non-decreasing: kmin_new >= kmin_old, emin_new >= emin_old.
-    ///   - Contamination indices do not decrease silently (no "washing" without evidence):
+    ///   - Contamination indices do not decrease silently:
     ///       contamination_*_new >= contamination_*_old.
     ///
     /// Sovereignty and neurorights flags are treated as protection bits and
