@@ -1,0 +1,224 @@
+aln2-spec "WorkloadKernel2026v1" {
+  version: 2
+  license: "MIT OR Apache-2.0"
+}
+
+did-root {
+  primary: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+}
+
+particle governance.workload.kernel2026v1 {
+  id: "gov.workload.kernel2026v1"
+  did: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+
+  ker-axis {
+    knowledge:   k in [0.0, 1.0]
+    ecoImpact:   e in [0.0, 1.0]
+    risk:        r in [0.0, 1.0]
+    kerScore:    k * (e - r)
+  }
+
+  coord {
+    vt:          residual in [0.0, +inf)
+  }
+
+  domain workload {
+    body {
+      frameId:          hex256
+      yyyymmdd:         string
+
+      workloadId:       string      // unique workload sample id
+      nodeId:           string      // cyboquatic node / canal node id
+      taskType:         string      // e.g., "sensor_deploy", "debris_clear", "biocompound_apply"
+
+      timestamputc:     string      // ISO-8601 UTC
+
+      energyreqJ:       float       // required energy for workload [J]
+      energysurplusJ:   float       // surplus energy available [J]
+
+      hydraulicrisk:    float       // 0..1 proxy from hydraulics kernel
+      uncertaintyrisk:  float       // 0..1 telemetry/model trust
+
+      // normalized risk coordinates derived from energetics + proxies
+      r_energy:         float       // 0..1, energy shortfall vs tailwind
+      r_hydraulics:     float       // 0..1, surcharge / instability risk
+      r_uncertainty:    float       // 0..1, data trust / sensor health
+
+      vt_before:        float
+      vt_after:         float
+      delta_vt:         float
+
+      k:                float
+      e:                float
+      r:                float
+      kerScore:         float
+
+      lane:             string      // "RESEARCH" | "PILOT" | "PRODUCTION"
+
+      phoenix_hex_anchor: string
+      prior_frame_id:     hex256
+    }
+
+    invariant ranges {
+      const ENERGY_MIN_J:    float = 0.0
+      const ENERGY_MAX_J:    float = 1.0e9
+      const ENERGY_TAILWIND_SAFE_RATIO: float = 1.2
+      const ENERGY_RATIO_MAX:          float = 2.5
+
+      require:
+        energyreqJ      >= ENERGY_MIN_J && energyreqJ      <= ENERGY_MAX_J
+        energysurplusJ  >= 0.0
+
+        hydraulicrisk   >= 0.0 && hydraulicrisk   <= 1.0
+        uncertaintyrisk >= 0.0 && uncertaintyrisk <= 1.0
+
+        r_energy        >= 0.0 && r_energy        <= 1.0
+        r_hydraulics    >= 0.0 && r_hydraulics    <= 1.0
+        r_uncertainty   >= 0.0 && r_uncertainty   <= 1.0
+
+        vt_before       >= 0.0
+        vt_after        >= 0.0
+
+        k               >= 0.0 && k               <= 1.0
+        e               >= 0.0 && e               <= 1.0
+        r               >= 0.0 && r               <= 1.0
+        kerScore        >  0.0
+
+        lane == "RESEARCH" ||
+        lane == "PILOT"    ||
+        lane == "PRODUCTION"
+    }
+
+    invariant residual {
+      // Residual is a weighted quadratic form over workload risk coordinates.
+      // Weights are aligned with the 2026-07-09 workload crate:
+      // WENERGY 0.8, WHYDRAULIC 1.0, WUNCERTAINTY 0.6.
+      const w_energy:       float = 0.8
+      const w_hydraulics:   float = 1.0
+      const w_uncertainty:  float = 0.6
+
+      require:
+        vt_after ~= (
+          w_energy      * (r_energy      * r_energy) +
+          w_hydraulics  * (r_hydraulics  * r_hydraulics) +
+          w_uncertainty * (r_uncertainty * r_uncertainty)
+        ) ± 0.000001
+
+        delta_vt ~= vt_after - vt_before ± 0.000001
+    }
+
+    invariant ker_axis {
+      require:
+        kerScore ~= k * (e - r) ± 0.000001
+    }
+
+    invariant energy_tailwind_mapping {
+      // Energy tailwind ratio Rt = energysurplusJ / energyreqJ (bounded)
+      // and qualitative mapping to r_energy must be monotone:
+      // - Strong tailwind (Rt >= SAFE) => r_energy near 0.
+      // - Severe shortfall (Rt <= 0)   => r_energy near 1.
+      const SAFE_RATIO: float = ENERGY_TAILWIND_SAFE_RATIO
+
+      require:
+        // Only enforce when energyreqJ > 0 to avoid division by zero.
+        if energyreqJ > 0.0 {
+          let Rt: float =
+            if energysurplusJ / energyreqJ > ENERGY_RATIO_MAX {
+              ENERGY_RATIO_MAX
+            } else {
+              energysurplusJ / energyreqJ
+            };
+
+          // qualitative constraints:
+          if Rt >= SAFE_RATIO {
+            r_energy <= 0.2
+          }
+
+          if Rt <= 0.0 {
+            r_energy >= 0.8
+          }
+        }
+    }
+
+    rule frame.accept {
+      input:
+        frameId:            hex256
+        yyyymmdd:           string
+
+        workloadId:         string
+        nodeId:             string
+        taskType:           string
+        timestamputc:       string
+
+        energyreqJ:         float
+        energysurplusJ:     float
+
+        hydraulicrisk:      float
+        uncertaintyrisk:    float
+
+        r_energy:           float
+        r_hydraulics:       float
+        r_uncertainty:      float
+
+        vt_before:          float
+        vt_after:           float
+        delta_vt:           float
+
+        k:                  float
+        e:                  float
+        r:                  float
+        kerScore:           float
+
+        lane:               string
+
+        phoenix_hex_anchor: string
+        prior_frame_id:     hex256
+
+      require:
+        // reuse range invariants
+        energyreqJ      >= ENERGY_MIN_J && energyreqJ      <= ENERGY_MAX_J
+        energysurplusJ  >= 0.0
+
+        hydraulicrisk   >= 0.0 && hydraulicrisk   <= 1.0
+        uncertaintyrisk >= 0.0 && uncertaintyrisk <= 1.0
+
+        r_energy        >= 0.0 && r_energy        <= 1.0
+        r_hydraulics    >= 0.0 && r_hydraulics    <= 1.0
+        r_uncertainty   >= 0.0 && r_uncertainty   <= 1.0
+
+        vt_before       >= 0.0
+        vt_after        >= 0.0
+        delta_vt        ~= vt_after - vt_before ± 0.000001
+
+        k               >= 0.0 && k               <= 1.0
+        e               >= 0.0 && e               <= 1.0
+        r               >= 0.0 && r               <= 1.0
+
+        kerScore        >  0.0
+        kerScore        ~= k * (e - r) ± 0.000001
+
+        lane == "RESEARCH" ||
+        lane == "PILOT"    ||
+        lane == "PRODUCTION"
+
+        // residual invariant
+        vt_after ~= (
+          0.8 * (r_energy      * r_energy) +
+          1.0 * (r_hydraulics  * r_hydraulics) +
+          0.6 * (r_uncertainty * r_uncertainty)
+        ) ± 0.000001
+
+        // simple Lyapunov monotonicity guard:
+        // production workloads must not increase vt.
+        if lane == "PRODUCTION" {
+          vt_after <= vt_before
+        }
+
+      effect:
+        hexstamp {
+          owner:  "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+          anchor: phoenix_hex_anchor
+          frame:  frameId
+        }
+    }
+}
