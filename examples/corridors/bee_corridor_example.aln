@@ -1,0 +1,48 @@
+-- Example corridor specification for bee corridor ecosafety
+-- Demonstrates how corridors define bounds and safety margins
+
+-- Record for corridor evidence
+record BeeCorridorEvidence {
+    corridor_id = string
+    epoch_utc = string
+    pollinator_count = integer
+    flora_density = float
+    pesticide_level = float
+}
+
+-- Instance: Healthy corridor observation
+row BeeCorridorEvidence {
+    corridor_id = "sunflower_corridor_01"
+    epoch_utc = "2026-07-15T10:00:00Z"
+    pollinator_count = 142
+    flora_density = 0.85
+    pesticide_level = 0.02
+}
+
+-- Instance: Stressed corridor observation
+row BeeCorridorEvidence {
+    corridor_id = "urban_canyon_03"
+    epoch_utc = "2026-07-15T10:00:00Z"
+    pollinator_count = 23
+    flora_density = 0.31
+    pesticide_level = 0.18
+}
+
+-- Corridor bounds for acceptable conditions
+corridor BeeCorridorBounds {
+    min_pollinator_count = 50
+    min_flora_density = 0.5
+    max_pesticide_level = 0.1
+}
+
+-- Ledger entry with Merkle root (simplified)
+row BeeCorridorLedgerEntry {
+    corridor_id = "sunflower_corridor_01"
+    epoch_utc = "2026-07-15T10:00:00Z"
+    merkle_root_hex = "a1b2c3d4e5f6..."
+    evidence_leaves = [
+        "pollinator_count:142",
+        "flora_density:0.85",
+        "pesticide_level:0.02"
+    ]
+}

@@ -343,3 +343,77 @@ Attribution and rewards for contributions are intended to bind to these identiti
 - And KER‑based scoring of sustained, ecosafe improvements.
 
 Please open issues or proposals in this repo only after reading this README and the relevant ALN shards, and align all new work with the principles and constraints described above.
+
+---
+
+## 12. Getting Started for AI-Chat Assistants
+
+This section explains how AI assistants should interact with this repository.
+
+### Preferred Entry Points
+
+AI agents should start with these files and directories:
+
+| Entry Point | Purpose | Safe to Modify? |
+|-------------|---------|-----------------|
+| `docs/ALN-SPECS.md` | Index of all ALN specs and their consumers | Yes (add entries) |
+| `CONTRIBUTING.md` | Contribution guidelines and checklists | No (read-only) |
+| `python/*.py` | Python utilities for diagnostics and metrics | Yes (with tests) |
+| `tools/*.py` | Validation and quality tools | Yes (extend functionality) |
+| `examples/` | Example scenarios demonstrating KER/corridor logic | Yes (add examples) |
+| `tests/python/` | Unit tests for Python tools | Yes (add tests) |
+
+### Naming Conventions to Respect
+
+- **ALN files**: `domain_purpose.v1.aln` or `domain-purpose-v1.aln`
+- **Python modules**: `snake_case.py` with module-level docstring
+- **Rust crates**: `snake_case` under `crates/`
+- **Lua scripts**: `snake_case.lua` under `tools/` or `lua/`
+
+### AI-Chat Safety Checklist
+
+Before making any changes, verify:
+
+- [ ] **Respect ALN invariants**: Never weaken safety constraints or governance gates
+- [ ] **Avoid blacklisted primitives**: No Argon2, BLAKE, SHA3-256, "digital twins"
+- [ ] **Use native tools only**: No `pip install`, no cargo for simple tasks
+- [ ] **Read ALN specs first**: Understand governance before modifying code
+- [ ] **Add docstrings**: All public functions/classes must have docstrings
+- [ ] **Run validations**: `python tools/repo_quality_check.py` passes
+- [ ] **Update docs**: Add entries to `docs/ALN-SPECS.md` for new specs
+
+### Safe Modification Patterns
+
+**Safe operations for AI assistants:**
+
+```bash
+# Run tests to verify changes
+python -m unittest discover tests/python
+
+# Check for quality issues
+python tools/repo_quality_check.py
+
+# Find documentation gaps
+python tools/docstring_check.py
+
+# Run example scenarios
+python examples/ker/compute_ker_scores.py
+```
+
+**Avoid these operations:**
+
+- Modifying core ALN specs in `aln/` without understanding all consumers
+- Changing Rust crate APIs without updating dependent code
+- Installing new Python packages (use stdlib only for tools)
+- Modifying database schemas in `db/` without migration paths
+
+### Data Flow Understanding
+
+To understand how data flows through the system:
+
+1. Start at `docs/ALN-SPECS.md` to find spec definitions
+2. Check "Consumed by" section to see which modules use each spec
+3. Read Python/Lua/Rust code that references the spec
+4. Trace inputs → processing → outputs
+
+For more details, see `CONTRIBUTING.md` and `docs/MAINTENANCE_SESSION.md`.

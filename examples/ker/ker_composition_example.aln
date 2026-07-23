@@ -1,0 +1,31 @@
+-- Example KER composition scenario
+-- This demonstrates how Knowledge/Eco-impact/Risk scores are composed
+
+-- Record definition for KER inputs
+record KerInput {
+    knowledge_factor = float
+    eco_impact_value = float
+    risk_of_harm_score = float
+}
+
+-- Instance: High-quality deployment with low risk
+row KerInput {
+    name = "cyboquatic_node_deploy"
+    knowledge_factor = 0.92
+    eco_impact_value = 0.88
+    risk_of_harm_score = 0.08
+}
+
+-- Instance: Moderate deployment with higher risk
+row KerInput {
+    name = "nanoswarm_urban_test"
+    knowledge_factor = 0.75
+    eco_impact_value = 0.65
+    risk_of_harm_score = 0.35
+}
+
+-- Corridor: Acceptable KER bounds for deployment
+corridor KerDeploymentCorridor {
+    min_composite_score = 0.6
+    max_risk_threshold = 0.3
+}
