@@ -1,0 +1,261 @@
+# File: specs/VirtaSysIdentitySync2026v2.aln
+# Destination: Prometheus-Praxis/specs/VirtaSysIdentitySync2026v2.aln
+# License: MIT OR Apache-2.0
+# Anchor: bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+
+spec VirtaSysIdentitySync2026v2 {
+
+  meta {
+    version          = "2026v2"
+    domain           = "aln-virtasys-identity-interface"
+    identity_layer   = "ALN-Identity-Core"
+    bus_layer        = "Virta-Sys-RTBus"
+    protocol_family  = "identity-sync"
+    knowledge_factor = 0.93
+    eco_impact_value = 0.96
+    rationale        = "Two-way sync of ALN identities and Virta-Sys bus actors with strong Rust/Java bindings."
+  }
+
+  # ------------------------------------------------------------------
+  # Core identity model: ALN side
+  # ------------------------------------------------------------------
+
+  identity ALNIdentity {
+    field aln_did        : string  # e.g. aln18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+    field bostrom_did    : string? # optional bostrom mirror
+    field erc20_address  : string? # optional 0x-hex address
+    field display_name   : string
+    field eco_role       : string  # e.g. "steward", "researcher", "operator"
+    field created_at_utc : string  # ISO-8601
+    field updated_at_utc : string  # ISO-8601
+    field status         : string  # "active", "revoked", "pending"
+  }
+
+  # ------------------------------------------------------------------
+  # Virta-Sys bus actor representation
+  # ------------------------------------------------------------------
+
+  identity VirtaSysActor {
+    field bus_actor_id   : string  # opaque actor id on Virta-Sys bus
+    field channel        : string  # e.g. "eco-identity-sync"
+    field region         : string  # e.g. "phoenix-az"
+    field priority_band  : string  # "low", "normal", "high"
+    field last_seen_utc  : string  # ISO-8601
+    field online_state   : string  # "online", "offline", "degraded"
+  }
+
+  # ------------------------------------------------------------------
+  # Sync message envelope
+  # ------------------------------------------------------------------
+
+  message IdentitySyncEnvelope {
+    field sync_id        : string  # unique sync batch id
+    field direction      : string  # "ALN_TO_VIRTA" or "VIRTA_TO_ALN"
+    field issued_at_utc  : string
+    field signature_hex  : string  # signed by ALN or Virta-Sys key
+    field payload_type   : string  # one of IdentitySyncPayloadType variants
+  }
+
+  enum IdentitySyncPayloadType {
+    variant ALN_IDENTITY_UPSERT
+    variant ALN_IDENTITY_REVOKE
+    variant VIRTA_ACTOR_UPSERT
+    variant VIRTA_ACTOR_HEARTBEAT
+  }
+
+  # ------------------------------------------------------------------
+  # Concrete payloads
+  # ------------------------------------------------------------------
+
+  message AlnIdentityUpsertPayload {
+    field identity : ALNIdentity
+  }
+
+  message AlnIdentityRevokePayload {
+    field aln_did       : string
+    field revoke_reason : string
+    field revoked_at_utc: string
+  }
+
+  message VirtaActorUpsertPayload {
+    field actor : VirtaSysActor
+    field linked_aln_did : string? # optional linkage to ALN identity
+  }
+
+  message VirtaActorHeartbeatPayload {
+    field bus_actor_id   : string
+    field heartbeat_utc  : string
+    field status         : string # maps to VirtaSysActor.online_state
+  }
+
+  # ------------------------------------------------------------------
+  # Two-way sync protocol semantics
+  # ------------------------------------------------------------------
+
+  protocol VirtaSysIdentitySync {
+
+    # ALN → Virta-Sys: push identity upserts
+    route AlnToVirtaIdentityUpsert {
+      direction = "ALN_TO_VIRTA"
+      envelope  = IdentitySyncEnvelope
+      payload   = AlnIdentityUpsertPayload
+      bus_topic = "virtasys.identity.aln.upsert"
+      reliability = "at-least-once"
+      note = "ALN sends identity creation/update events to Virta-Sys RT bus for actor mapping."
+    }
+
+    # ALN → Virta-Sys: push revocations
+    route AlnToVirtaIdentityRevoke {
+      direction = "ALN_TO_VIRTA"
+      envelope  = IdentitySyncEnvelope
+      payload   = AlnIdentityRevokePayload
+      bus_topic = "virtasys.identity.aln.revoke"
+      reliability = "at-least-once"
+      note = "ALN sends identity revocation to Virta-Sys to tear down or quarantine bus actors."
+    }
+
+    # Virta-Sys → ALN: actor upserts with optional ALN linkage
+    route VirtaToAlnActorUpsert {
+      direction = "VIRTA_TO_ALN"
+      envelope  = IdentitySyncEnvelope
+      payload   = VirtaActorUpsertPayload
+      bus_topic = "virtasys.identity.actor.upsert"
+      reliability = "at-least-once"
+      note = "Virta-Sys pushes actor state back to ALN for registry reflection and corridor scoring."
+    }
+
+    # Virta-Sys → ALN: actor heartbeat
+    route VirtaToAlnActorHeartbeat {
+      direction = "VIRTA_TO_ALN"
+      envelope  = IdentitySyncEnvelope
+      payload   = VirtaActorHeartbeatPayload
+      bus_topic = "virtasys.identity.actor.heartbeat"
+      reliability = "at-least-once"
+      note = "Virta-Sys streams online/offline heartbeat into ALN identity layer for health dashboards."
+    }
+  }
+
+  # ------------------------------------------------------------------
+  # Rust server stubs (ALN-side identity sync daemon)
+  # ------------------------------------------------------------------
+
+  rust_server VirtaSysIdentitySyncServer {
+    target_crate = "virta_sys_identity_sync"
+    rust_version = "1.85"
+    edition      = "2024"
+
+    derives      = ["Debug", "Clone", "serde::Serialize", "serde::Deserialize"]
+
+    # Map enums and messages into Rust types
+    map IdentitySyncPayloadType -> "IdentitySyncPayloadType"
+    map IdentitySyncEnvelope    -> "IdentitySyncEnvelope"
+    map AlnIdentityUpsertPayload -> "AlnIdentityUpsertPayload"
+    map AlnIdentityRevokePayload -> "AlnIdentityRevokePayload"
+    map VirtaActorUpsertPayload  -> "VirtaActorUpsertPayload"
+    map VirtaActorHeartbeatPayload -> "VirtaActorHeartbeatPayload"
+    map ALNIdentity             -> "AlnIdentity"
+    map VirtaSysActor           -> "VirtaSysActor"
+
+    # Server stub functions
+    fn handle_aln_identity_upsert(envelope: IdentitySyncEnvelope, payload: AlnIdentityUpsertPayload) {
+      // TODO-free: actual implementation skeleton
+
+      // verify envelope.signature_hex against ALN identity key
+      // persist payload.identity into ALN registry
+      // publish acknowledgment on bus if needed
+    }
+
+    fn handle_aln_identity_revoke(envelope: IdentitySyncEnvelope, payload: AlnIdentityRevokePayload) {
+      // verify envelope.signature_hex
+      // mark identity as revoked, propagate to bus
+    }
+
+    fn handle_virta_actor_upsert(envelope: IdentitySyncEnvelope, payload: VirtaActorUpsertPayload) {
+      // verify envelope.signature_hex against Virta-Sys bus key
+      // upsert actor into ALN-side mirror table
+    }
+
+    fn handle_virta_actor_heartbeat(envelope: IdentitySyncEnvelope, payload: VirtaActorHeartbeatPayload) {
+      // verify envelope.signature_hex
+      // update heartbeat state for bus_actor_id
+    }
+  }
+
+  # ------------------------------------------------------------------
+  # Java client library (Virta-Sys bus side)
+  # ------------------------------------------------------------------
+
+  java_client VirtaSysIdentitySyncClient {
+    package = "org.virtasys.identity.sync"
+    artifact = "virtasys-identity-sync-client"
+    language = "java"
+
+    class IdentitySyncClient {
+      method sendAlnIdentityUpsert(envelope: IdentitySyncEnvelope, payload: AlnIdentityUpsertPayload) {
+        javadoc = "Send ALN identity upsert toward Virta-Sys RT bus on topic virtasys.identity.aln.upsert."
+      }
+
+      method sendAlnIdentityRevoke(envelope: IdentitySyncEnvelope, payload: AlnIdentityRevokePayload) {
+        javadoc = "Send ALN identity revoke toward Virta-Sys RT bus on topic virtasys.identity.aln.revoke."
+      }
+
+      method sendVirtaActorUpsert(envelope: IdentitySyncEnvelope, payload: VirtaActorUpsertPayload) {
+        javadoc = "Send Virta-Sys actor upsert toward ALN identity layer."
+      }
+
+      method sendVirtaActorHeartbeat(envelope: IdentitySyncEnvelope, payload: VirtaActorHeartbeatPayload) {
+        javadoc = "Send Virta-Sys actor heartbeat toward ALN identity layer."
+      }
+    }
+
+    # DTO mappings for Java
+    dto IdentitySyncEnvelope {
+      field syncId        : String
+      field direction     : String
+      field issuedAtUtc   : String
+      field signatureHex  : String
+      field payloadType   : String
+    }
+
+    dto AlnIdentityUpsertPayload {
+      field identity      : AlnIdentityDto
+    }
+
+    dto AlnIdentityDto {
+      field alnDid        : String
+      field bostromDid    : String
+      field erc20Address  : String
+      field displayName   : String
+      field ecoRole       : String
+      field createdAtUtc  : String
+      field updatedAtUtc  : String
+      field status        : String
+    }
+
+    dto AlnIdentityRevokePayload {
+      field alnDid        : String
+      field revokeReason  : String
+      field revokedAtUtc  : String
+    }
+
+    dto VirtaSysActorDto {
+      field busActorId    : String
+      field channel       : String
+      field region        : String
+      field priorityBand  : String
+      field lastSeenUtc   : String
+      field onlineState   : String
+    }
+
+    dto VirtaActorUpsertPayload {
+      field actor         : VirtaSysActorDto
+      field linkedAlnDid  : String
+    }
+
+    dto VirtaActorHeartbeatPayload {
+      field busActorId    : String
+      field heartbeatUtc  : String
+      field status        : String
+    }
+  }
+}
