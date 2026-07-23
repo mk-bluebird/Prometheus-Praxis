@@ -1,0 +1,178 @@
+aln2-spec "DrainageDecayKernel2026v1" {
+  version: 2
+  license: "MIT OR Apache-2.0"
+}
+
+did-root {
+  primary: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+}
+
+particle governance.drainagedecay.kernel2026v1 {
+  id: "gov.drainagedecay.kernel2026v1"
+  did: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+
+  ker-axis {
+    knowledge:   k in [0.0, 1.0]
+    ecoImpact:   e in [0.0, 1.0]
+    risk:        r in [0.0, 1.0]
+    kerScore:    k * (e - r)
+  }
+
+  coord {
+    vt:          residual in [0.0, +inf)
+  }
+
+  domain hydraulics {
+    body {
+      frameId:          hex256
+      yyyymmdd:         string
+      canalSegmentId:   string
+      nodeId:           string
+
+      bod_mg_l:         float   // Biochemical Oxygen Demand
+      tss_mg_l:         float   // Total Suspended Solids
+      cec_cmol_per_kg:  float   // Cation Exchange Capacity
+
+      flow_rate_m3s:    float
+      water_temp_c:     float
+      elevation_m:      float
+
+      r_bod:            float   // normalized [0,1]
+      r_tss:            float   // normalized [0,1]
+      r_cec:            float   // normalized [0,1]
+      r_hydraulics:     float   // surcharge / instability proxy [0,1]
+      r_uncertainty:    float   // data trust / sensor health [0,1]
+
+      vt_before:        float
+      vt_after:         float
+      delta_vt:         float
+
+      k:                float
+      e:                float
+      r:                float
+      kerScore:         float
+
+      phoenix_hex_anchor: string
+      prior_frame_id:     hex256
+    }
+
+    invariant ranges {
+      require:
+        bod_mg_l         >= 0.0 && bod_mg_l         <= 80.0
+        tss_mg_l         >= 0.0 && tss_mg_l         <= 500.0
+        cec_cmol_per_kg  >= 0.0 && cec_cmol_per_kg  <= 50.0
+
+        flow_rate_m3s    >= 0.0
+        water_temp_c     >= 0.0 && water_temp_c     <= 45.0
+        elevation_m      >= -100.0 && elevation_m   <= 2000.0
+
+        r_bod            >= 0.0 && r_bod            <= 1.0
+        r_tss            >= 0.0 && r_tss            <= 1.0
+        r_cec            >= 0.0 && r_cec            <= 1.0
+        r_hydraulics     >= 0.0 && r_hydraulics     <= 1.0
+        r_uncertainty    >= 0.0 && r_uncertainty    <= 1.0
+
+        vt_before        >= 0.0
+        vt_after         >= 0.0
+
+        k                >= 0.0 && k                <= 1.0
+        e                >= 0.0 && e                <= 1.0
+        r                >= 0.0 && r                <= 1.0
+        kerScore         >  0.0
+    }
+
+    invariant residual {
+      // Residual is a weighted quadratic form over risk coordinates.
+      // We fix weights to match Phoenix corridor defaults; Rust and C++
+      // must use the same weights when computing vt_after.
+      const w_bod:         float = 0.9
+      const w_tss:         float = 0.7
+      const w_cec:         float = 0.6
+      const w_hydraulics:  float = 1.0
+      const w_uncertainty: float = 0.8
+
+      require:
+        vt_after ~= (
+          w_bod        * (r_bod        * r_bod) +
+          w_tss        * (r_tss        * r_tss) +
+          w_cec        * (r_cec        * r_cec) +
+          w_hydraulics * (r_hydraulics * r_hydraulics) +
+          w_uncertainty* (r_uncertainty* r_uncertainty)
+        ) ± 0.000001
+
+        delta_vt ~= vt_after - vt_before ± 0.000001
+    }
+
+    invariant ker_axis {
+      require:
+        kerScore  ~= k * (e - r) ± 0.000001
+    }
+
+    rule frame.accept {
+      input:
+        frameId:            hex256
+        yyyymmdd:           string
+        canalSegmentId:     string
+        nodeId:             string
+
+        bod_mg_l:           float
+        tss_mg_l:           float
+        cec_cmol_per_kg:    float
+
+        flow_rate_m3s:      float
+        water_temp_c:       float
+        elevation_m:        float
+
+        r_bod:              float
+        r_tss:              float
+        r_cec:              float
+        r_hydraulics:       float
+        r_uncertainty:      float
+
+        vt_before:          float
+        vt_after:           float
+        delta_vt:           float
+
+        k:                  float
+        e:                  float
+        r:                  float
+        kerScore:           float
+
+        phoenix_hex_anchor: string
+        prior_frame_id:     hex256
+
+      require:
+        // reuse all range and residual invariants
+        bod_mg_l         >= 0.0 && bod_mg_l         <= 80.0
+        tss_mg_l         >= 0.0 && tss_mg_l         <= 500.0
+        cec_cmol_per_kg  >= 0.0 && cec_cmol_per_kg  <= 50.0
+
+        r_bod            >= 0.0 && r_bod            <= 1.0
+        r_tss            >= 0.0 && r_tss            <= 1.0
+        r_cec            >= 0.0 && r_cec            <= 1.0
+        r_hydraulics     >= 0.0 && r_hydraulics     <= 1.0
+        r_uncertainty    >= 0.0 && r_uncertainty    <= 1.0
+
+        vt_before        >= 0.0
+        vt_after         >= 0.0
+        delta_vt         ~= vt_after - vt_before ± 0.000001
+
+        k                >= 0.0 && k                <= 1.0
+        e                >= 0.0 && e                <= 1.0
+        r                >= 0.0 && r                <= 1.0
+
+        kerScore         >  0.0
+        kerScore         ~= k * (e - r) ± 0.000001
+
+        // corridor rule: vt_after must not grow without lane explicitly in RESEARCH
+        // (lane is enforced in Rust; here we only forbid obvious explosions)
+        vt_after         <= vt_before + 5.0
+
+      effect:
+        hexstamp {
+          owner:  "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+          anchor: phoenix_hex_anchor
+          frame:  frameId
+        }
+    }
+}
