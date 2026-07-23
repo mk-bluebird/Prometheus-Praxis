@@ -1,6 +1,5 @@
-aln
 TITLE prometheus-shard-layout.v1.aln
-VERSION 1.0.0
+VERSION 1.1.0
 AUTHORITY ALN.MIGRATION.CYBERCOREAUTHORITY.v1
 NAMESPACE Prometheus-Praxis
 REPO mk-bluebird/Prometheus-Praxis
@@ -12,22 +11,100 @@ DOCREF docs/prometheus-shard-layout.md
 ENDMETA
 
 EPOCH
-SHARDLAYOUTSCHEMAVERSION 1
+SHARDLAYOUTSCHEMAVERSION 2
 ENDEPOCH
+
+spec PrometheusShardLayout2026v1 {
+
+  shard ShardNode {
+    field shard_id    : string
+    field zone        : string
+    field role        : string
+    field datadomain  : [string]
+    field trustbands  : [string]
+    field depends_on  : [string]
+  }
+
+  row ShardNode {
+    shard_id    = "prom-core-0"
+    zone        = "us-west1-a"
+    role        = "ingest"
+    datadomain  = ["metrics_raw","logs_raw"]
+    trustbands  = ["low","medium"]
+    depends_on  = ["prom-storage-0"]
+  }
+
+  row ShardNode {
+    shard_id    = "prom-core-1"
+    zone        = "us-west1-b"
+    role        = "ingest"
+    datadomain  = ["metrics_raw","logs_raw"]
+    trustbands  = ["low","medium"]
+    depends_on  = ["prom-storage-1"]
+  }
+
+  row ShardNode {
+    shard_id    = "prom-storage-0"
+    zone        = "us-west1-a"
+    role        = "storage"
+    datadomain  = ["metrics_curated","agents_state"]
+    trustbands  = ["medium","high"]
+    depends_on  = []
+  }
+
+  row ShardNode {
+    shard_id    = "prom-storage-1"
+    zone        = "us-west1-b"
+    role        = "storage"
+    datadomain  = ["metrics_curated","agents_state"]
+    trustbands  = ["medium","high"]
+    depends_on  = []
+  }
+
+  row ShardNode {
+    shard_id    = "prom-coord-0"
+    zone        = "us-west1-a"
+    role        = "coordination"
+    datadomain  = ["plans","policies"]
+    trustbands  = ["high","sovereign"]
+    depends_on  = ["prom-storage-0"]
+  }
+
+  row ShardNode {
+    shard_id    = "prom-coord-1"
+    zone        = "us-west1-b"
+    role        = "coordination"
+    datadomain  = ["plans","policies"]
+    trustbands  = ["high","sovereign"]
+    depends_on  = ["prom-storage-1"]
+  }
+
+  row ShardNode {
+    shard_id    = "prom-guard-0"
+    zone        = "us-west1-sov"
+    role        = "sovereign-guard"
+    datadomain  = ["global_envelopes","aln_shards","governance_ledgers"]
+    trustbands  = ["sovereign"]
+    depends_on  = ["prom-coord-0","prom-coord-1"]
+  }
+}
 
 SECTION SHARDS
 ROW SHARD Shard-1
   DESCRIPTION Primary telemetry ingress
   DATADOMAIN metrics_raw,logs_raw
   TRUSTBANDS_ALLOWED low,medium
+
 ROW SHARD Shard-2
   DESCRIPTION Validation and verification
   DATADOMAIN metrics_curated,agents_state
   TRUSTBANDS_ALLOWED medium,high
+
 ROW SHARD Shard-3
   DESCRIPTION Coordination and planning
   DATADOMAIN plans,policies
   TRUSTBANDS_ALLOWED high,sovereign
+
 ROW SHARD Shard-Guard
   DESCRIPTION Sovereign envelopes and policy engine
   DATADOMAIN global_envelopes,aln_shards,governance_ledgers
@@ -39,10 +116,14 @@ ROW BINDING AGENT-SHARD
 ROW FIELD agent_id string!
 ROW FIELD roleband string!
 ROW FIELD shard_id string!
+
 ROW INVARIANT roleband == "Guardian" implies shard_id == "Shard-Guard"
 ROW INVARIANT roleband == "DataIngestor" implies shard_id == "Shard-1"
 ROW INVARIANT roleband == "Validator" implies shard_id ∈ {"Shard-1","Shard-2"}
 ROW INVARIANT roleband == "Coordinator" implies shard_id ∈ {"Shard-2","Shard-3"}
+
+ROW INVARIANT roleband == "Sovereign" implies shard_id == "Shard-Guard"
+ROW INVARIANT roleband == "Observer" implies shard_id ∈ {"Shard-1","Shard-2"}
 ENDBINDINGS
 
 SECTION LEDGER
@@ -54,8 +135,10 @@ ROW FIELD shard_id string!
 ROW FIELD hostdid string!
 ROW FIELD bostromaddress string!
 ROW FIELD timestamputc RFC3339
+
 ROW INVARIANT hostdid == HOSTDID
 ROW INVARIANT bostromaddress == PRIMARYBOSTROMADDRESS
+ROW INVARIANT shard_id ∈ {"Shard-1","Shard-2","Shard-3","Shard-Guard"}
 ENDLEDGER
 
 ENDSHARD
