@@ -1,0 +1,162 @@
+# File: specs/CyboquaticPlotCoreToKER2026v1.aln
+# Destination: Prometheus-Praxis/specs/CyboquaticPlotCoreToKER2026v1.aln
+# License: MIT OR Apache-2.0
+# Anchor: bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+
+spec CyboquaticPlotCoreToKER2026v1 {
+
+  meta {
+    version          = "2026v1"
+    domain           = "cyboquatic-eco-plot-core"
+    kernel_target    = "KERParticle2026v1"
+    ecosphere        = "Cyboquatic-Plot-Core"
+    knowledge_factor = 0.93
+    eco_impact_value = 0.97
+    rationale        = "Translate ecological plot cores (soil, water, biomass, microplastics) into KER particles for hydrology and corridor scoring."
+  }
+
+  # ------------------------------------------------------------------
+  # Ecological plot core input model
+  # ------------------------------------------------------------------
+
+  plot EcologicalPlotCore2026v1 {
+    field plot_id                 : string
+    field region                  : string          # e.g. "phoenix-az-cyboquatic-bay-01"
+    field timestamp_utc           : string          # ISO-8601
+    field soil_carbon_t_ha        : float           # tonnes C per hectare
+    field water_microplastic_ppm  : float           # microplastic concentration in ppm
+    field biomass_index           : float           # 0.0 .. 1.0 normalized biomass
+    field biodiversity_index      : float           # 0.0 .. 1.0 normalized richness
+    field corridor_tag            : string          # e.g. "LOW_ENERGY_BIOCOMPATIBLE"
+    field steward_did             : string          # DID of steward capturing the plot
+  }
+
+  # ------------------------------------------------------------------
+  # KER particle output model
+  # ------------------------------------------------------------------
+
+  particle KERParticle2026v1 {
+    field particle_id             : string          # unique particle id
+    field source_plot_id          : string
+    field region                  : string
+    field timestamp_utc           : string
+    field ker_score               : float           # 0.0 .. 1.0
+    field carbon_component        : float           # contribution from soil carbon
+    field microplastic_component  : float           # contribution from microplastics
+    field biomass_component       : float           # contribution from biomass
+    field biodiversity_component  : float           # contribution from biodiversity
+    field corridor_tag            : string
+    field steward_did             : string
+  }
+
+  # ------------------------------------------------------------------
+  # Mapping function: EcologicalPlotCore → KERParticle2026v1
+  # ------------------------------------------------------------------
+
+  fn map_plot_to_ker_particle(plot: EcologicalPlotCore2026v1) -> KERParticle2026v1 {
+    let carbon_component        = normalize_carbon(plot.soil_carbon_t_ha)
+    let microplastic_component  = normalize_microplastics(plot.water_microplastic_ppm)
+    let biomass_component       = clamp01(plot.biomass_index)
+    let biodiversity_component  = clamp01(plot.biodiversity_index)
+
+    let ker_score = clamp01(
+      0.35 * carbon_component +
+      0.25 * (1.0 - microplastic_component) +  # microplastics reduce KER
+      0.20 * biomass_component +
+      0.20 * biodiversity_component
+    )
+
+    return KERParticle2026v1 {
+      particle_id            = make_particle_id(plot.plot_id, plot.timestamp_utc),
+      source_plot_id         = plot.plot_id,
+      region                 = plot.region,
+      timestamp_utc          = plot.timestamp_utc,
+      ker_score              = ker_score,
+      carbon_component       = carbon_component,
+      microplastic_component = microplastic_component,
+      biomass_component      = biomass_component,
+      biodiversity_component = biodiversity_component,
+      corridor_tag           = plot.corridor_tag,
+      steward_did            = plot.steward_did
+    }
+  }
+
+  # ------------------------------------------------------------------
+  # Normalization helpers
+  # ------------------------------------------------------------------
+
+  fn clamp01(x: float) -> float {
+    if x < 0.0 { return 0.0 }
+    if x > 1.0 { return 1.0 }
+    return x
+  }
+
+  fn normalize_carbon(soil_carbon_t_ha: float) -> float {
+    # Example: 0 t/ha → 0.0, 100 t/ha → 1.0, >100 capped.
+    if soil_carbon_t_ha <= 0.0 { return 0.0 }
+    if soil_carbon_t_ha >= 100.0 { return 1.0 }
+    return soil_carbon_t_ha / 100.0
+  }
+
+  fn normalize_microplastics(ppm: float) -> float {
+    # 0 ppm → 0.0 (best), 100 ppm → 1.0 (worst), capped thereafter.
+    if ppm <= 0.0 { return 0.0 }
+    if ppm >= 100.0 { return 1.0 }
+    return ppm / 100.0
+  }
+
+  fn make_particle_id(plot_id: string, timestamp_utc: string) -> string {
+    # Deterministic particle id from plot_id and timestamp.
+    return "kerp-" + plot_id + "-" + timestamp_utc
+  }
+
+  # ------------------------------------------------------------------
+  # Rust codegen: serializer/deserializer for KERParticle2026v1
+  # ------------------------------------------------------------------
+
+  rust_struct KERParticleRust {
+    target_crate = "cyboquatic_ker_core"
+    rust_version = "1.85"
+    edition      = "2024"
+    derives      = ["Debug", "Clone", "serde::Serialize", "serde::Deserialize"]
+
+    map KERParticle2026v1 -> "KERParticle2026v1"
+  }
+
+  rust_impl KERParticleSerde {
+    target_crate = "cyboquatic_ker_core"
+
+    fn serialize_particle(p: KERParticle2026v1) -> String {
+      # JSON serialization via serde_json in Rust.
+      # Here we declare intent; actual Rust uses serde_json::to_string.
+    }
+
+    fn deserialize_particle(s: String) -> KERParticle2026v1 {
+      # JSON deserialization via serde_json in Rust.
+      # Here we declare intent; actual Rust uses serde_json::from_str.
+    }
+  }
+
+  # ------------------------------------------------------------------
+  # Kotlin codegen: data class for KER particles
+  # ------------------------------------------------------------------
+
+  kotlin_data KERParticleKotlin {
+    package = "org.prometheuspraxis.cyboquatic"
+    file    = "KERParticle2026v1.kt"
+
+    class KERParticle2026v1 {
+      field particleId            : String
+      field sourcePlotId          : String
+      field region                : String
+      field timestampUtc          : String
+      field kerScore              : Double
+      field carbonComponent       : Double
+      field microplasticComponent : Double
+      field biomassComponent      : Double
+      field biodiversityComponent : Double
+      field corridorTag           : String
+      field stewardDid            : String
+    }
+  }
+}
