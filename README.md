@@ -417,3 +417,22 @@ To understand how data flows through the system:
 4. Trace inputs → processing → outputs
 
 For more details, see `CONTRIBUTING.md` and `docs/MAINTENANCE_SESSION.md`.
+
+## Task ↔ EcoNet / eco_restoration_shard Mapping Table
+
+Below is a compact mapping table showing, for each task, which eco_restoration_shard / EcoNet artifacts it should bind to, and which K/E/R band it is primarily meant to improve.[file:2][file:22]
+
+| Task ID        | Primary EcoNet / eco_restoration_shard Artifacts                                           | Main K/E/R Band Focus |
+|----------------|---------------------------------------------------------------------------------------------|------------------------|
+| PPX-TASK-0001  | `ecorestoration_shard/.econet/econetrepoindex.sql`, `Eco-Fort/db/ecoconstellationindex.sql` | K (knowledge, topology) and R (risk visibility) |
+| PPX-TASK-0002  | `Eco-Fort/db/planeweightsschema.sql`, `Eco-Fort/db/blastradiusspine.sql`                    | R (blast-radius), E (ecosafety envelope), K (policy clarity) |
+| PPX-TASK-0003  | `ppx.function.meta.v1.aln`, `Eco-Fort/db/repostatussemantics.sql`                           | K (governance metadata) |
+| PPX-TASK-0004  | `Eco-Fort/db/virtasysgovernance.db`, `ppx.function.meta.v1.aln`                             | R (operational risk gating) |
+| PPX-TASK-0005  | KER/Lyapunov crates in `eco_restoration_shard/crates/*`, `Eco-Fort/db/corridordefinitionschema.sql` | E (ecosafety envelope) and K (multi-plane coupling) |
+| PPX-TASK-0006  | `Eco-Fort/db/econetrepoindexecosafetybinding.sql`                                          | R (actuation risk) |
+| PPX-TASK-0007  | `Eco-Fort/db/contributionresumebostrom.sql`, `Eco-Fort/db/ecoperjoulepolicyenergy.sql`, `Eco-Fort/db/psychriskengine.db` | E (reward eco-alignment), R (psych/neurorights), K (sovereignty grammar) |
+| PPX-TASK-0008  | `ppx.function.meta.v1.aln`, ALN spec index in `docs/ALN-SPECS.md`                           | K (spec discoverability) |
+| PPX-TASK-0009  | `Eco-Fort/db/phoenixheatcorridor.db`, `Eco-Fort/db/psychriskengine.db`, `Eco-Fort/db/contributionresumebostrom.sql` | E (eco-health coupling), R (cross-corridor risk), K (cross-domain knowledge) |
+| PPX-TASK-0010  | `Eco-Fort/db/virtaupgradeledger.sql`, `PrometheusPraxisCodingTaskList2026v1.aln`           | K (upgrade ledger), R (monotone safety) |
+
+This shard and mapping are designed to be **directly usable**: you can drop the ALN block into `workspacealn/alnPrometheusPraxisCodingTaskList2026v1.aln` and start instantiating tasks, while the table guides which EcoNet and eco_restoration_shard artifacts each task should touch and which K/E/R band it is intended to strengthen.[file:21][file:22]
