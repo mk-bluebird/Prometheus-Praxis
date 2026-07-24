@@ -1,7 +1,7 @@
 TITLE PrometheusPraxisCodingTaskList2026v1
 VERSION 1
 CATEGORY GOVERNANCE
-SUMMARY Coding-task backlog to bring Prometheus‑Praxis into a fully aligned, execution-ready state matching its README and Eco‑Fort grammar.[file:2][file:21]
+SUMMARY Coding-task backlog to bring Prometheus-Praxis into a fully aligned, execution-ready state matching its README and Eco-Fort grammar.
 
 meta
   ownerrepo        string Prometheus-Praxis
@@ -31,19 +31,19 @@ enum TaskStatus2026v1
 endenum
 
 record PrometheusPraxisCodingTask2026v1
-  taskid            string
-  title             string
-  priority          TaskPriority2026v1
-  status            TaskStatus2026v1
-  ownerteam         string
-  dependson         list string
-  summary           string
-  codetargets       list string
-  dbtargets         list string
-  alntargets        list string
-  kerimpact         string
+  taskid             string
+  title              string
+  priority           TaskPriority2026v1
+  status             TaskStatus2026v1
+  ownerteam          string
+  dependson          list string
+  summary            string
+  codetargets        list string
+  dbtargets          list string
+  alntargets         list string
+  kerimpact          string
   acceptancecriteria string
-  notes             string
+  notes              string
 endrecord
 
 section tasks
@@ -55,20 +55,20 @@ PrometheusPraxisCodingTask2026v1
   status   PLANNED
   ownerteam Prometheus-Core
   dependson []
-  summary  "Create explicit spine modules and docs that bind Prometheus-Praxis to eco_restoration_shard and sibling repos as the README promises."[file:2]
+  summary  "Create explicit spine modules and docs that bind Prometheus-Praxis to eco_restoration_shard and sibling repos as the README promises."
   codetargets
     Prometheus-Praxis/ARCHITECTURE.md
     Prometheus-Praxis/src/spine/mod.rs
     Prometheus-Praxis/src/spine/e_restoration_spine.rs
   dbtargets
     Eco-Fort/db/ecoconstellationindex.sql
-    Eco-Fort/db/repoindexrestoration.sql
+    Eco-Fort/db/econetrepoindex.sql
   alntargets
-    workspacealn/alnPrometheusPraxisCore.v1.aln
+    workspacealn/alnPrometheusPraxisCore2026v1.aln
     workspacealn-specs/alnEcoRepoIndex2026v1.aln
   kerimpact "K E R"
-  acceptancecriteria "ARCHITECTURE.md lists concrete crates, ALN shards, and SQL files that implement the execution-layer role; spine modules expose non-actuating functions that map eco_restoration_shard KER/Lyapunov math into Prometheus-Praxis without duplicating residual logic."[file:2]
-  notes "Keep spine modules thin, declarative, and governance-first; avoid adding new Rust crates for this task and rely on existing eco_restoration_shard crates and ALN specs."[file:2]
+  acceptancecriteria "ARCHITECTURE.md lists concrete crates, ALN shards, and SQL files that implement the execution-layer role; spine modules expose non-actuating functions that map eco_restoration_shard KER/Lyapunov math into Prometheus-Praxis without duplicating residual logic; references to econetrepoindex and ecoconstellationindex are correctly wired and validated via a small Python/SQL harness."
+  notes "Keep spine modules thin, declarative, and governance-first; rely on existing eco_restoration_shard crates and ALN specs instead of introducing new Rust crates."
 
 PrometheusPraxisCodingTask2026v1
   taskid   PPX-TASK-0002
@@ -77,7 +77,7 @@ PrometheusPraxisCodingTask2026v1
   status   PLANNED
   ownerteam Prometheus-Governance
   dependson [PPX-TASK-0001]
-  summary  "Create non-actuating Rust and ALN modules for blast-radius B_f, health/reward H_f, and governance flag G_f = max(B_f,H_f), aligned with README semantics."[file:2][file:1]
+  summary  "Create non-actuating Rust and ALN modules for blast-radius B_f, health/reward H_f, and governance flag G_f = max(B_f,H_f) aligned with README semantics."
   codetargets
     Prometheus-Praxis/src/governance_flag.rs
     Prometheus-Praxis/src/ker/ker_superloop.rs
@@ -87,10 +87,10 @@ PrometheusPraxisCodingTask2026v1
     Eco-Fort/db/blastradiusspine.sql
   alntargets
     workspacealn-specs/alnPrometheusGovernanceFlags2026v1.aln
-    workspacealn-specs/aln-specsPlaneWeightsShard2026v1.aln
+    workspacealn-specs/alnPlaneWeightsShard2026v1.aln
   kerimpact "K E R"
-  acceptancecriteria "governance_flag.rs exposes pure functions that, given KER triads, residual V_t, and topology risk, compute B_f, H_f, G_f with documented thresholds; tests and Kani harnesses prove that non-offsettable planes and blast-radius limits obey monotone safety evolution and match Eco-Fort planeweights and blast-radius specs."[file:1][file:22]
-  notes "No IO or actuator calls; map results into small structs and ALN particles; use rust-version 1.85, edition 2024, and !forbid(unsafe_code)."
+  acceptancecriteria "governance_flag.rs exposes pure functions that, given KER triads, residual V_t, and topology risk, compute B_f, H_f, and G_f with documented thresholds; tests and Kani harnesses prove that non-offsettable planes and blast-radius limits obey monotone safety evolution and match Eco-Fort planeweights and blast-radius specs; ALN shards encode the same semantics and are referenced by docs and CI."
+  notes "No IO or actuator calls; results are small structs and ALN records; use edition 2024, rust-version 1.85, and forbid unsafe code."
 
 PrometheusPraxisCodingTask2026v1
   taskid   PPX-TASK-0003
@@ -99,7 +99,7 @@ PrometheusPraxisCodingTask2026v1
   status   PLANNED
   ownerteam Prometheus-MCP
   dependson [PPX-TASK-0001]
-  summary  "Populate ppx.function.meta.v1.aln with all MCP/AI-exposed functions and add CI checks that block new functions lacking meta or gate bindings."[file:21]
+  summary  "Populate ppx.function.meta.v1.aln with all MCP/AI-exposed functions and add CI checks that block new functions lacking meta or gate bindings."
   codetargets
     Prometheus-Praxis/aln/ppx.function.meta.v1.aln
     Prometheus-Praxis/tools/function_meta_ci_check.py
@@ -108,10 +108,10 @@ PrometheusPraxisCodingTask2026v1
     Eco-Fort/db/repostatussemantics.sql
   alntargets
     workspacealn-specs/ppx.function.meta.v1.aln
-    workspacealn-specs/alnPrometheusPraxisCore.v1.aln
+    workspacealn-specs/alnPrometheusPraxisCore2026v1.aln
   kerimpact "K"
-  acceptancecriteria "All MCP verbs and AI-callable functions in Prometheus-Praxis and linked tools appear in ppx.function.meta.v1.aln with domains, corridors, capitals, and actuation flags; CI fails when an exported function has no meta record or lacks required gate bindings; the CI helper uses only native Python and ALN parsing, no new external tools."[file:21][file:1]
-  notes "Treat any function touching health, nanoswarms, or multi-node workloads as requiring REQUIRES_GATE until governance shards say otherwise."
+  acceptancecriteria "All MCP verbs and AI-callable functions in Prometheus-Praxis and linked tools appear in ppx.function.meta.v1.aln with domains, corridors, capitals, and actuation flags; CI fails when an exported function has no meta record or lacks required gate bindings; the CI helper uses only native Python and ALN parsing with no external tool installation."
+  notes "Treat any function touching health, nanoswarms, or multi-node workloads as requiring REQUIRES_GATE until governance shards explicitly relax that constraint."
 
 PrometheusPraxisCodingTask2026v1
   taskid   PPX-TASK-0004
@@ -120,7 +120,7 @@ PrometheusPraxisCodingTask2026v1
   status   PLANNED
   ownerteam Prometheus-MCP
   dependson [PPX-TASK-0002, PPX-TASK-0003]
-  summary  "Create MCP configuration and dev-tunnel filters that expose only non-actuating, governance-gated functions and log all calls for ecosafety and neurorights analysis."[file:2]
+  summary  "Create MCP configuration and dev-tunnel filters that expose only non-actuating, governance-gated functions and log all calls for ecosafety and neurorights analysis."
   codetargets
     Prometheus-Praxis/tools/mcp/dev_tunnel_filter.py
     Prometheus-Praxis/tools/mcp/mcp_server_config.yaml
@@ -130,17 +130,17 @@ PrometheusPraxisCodingTask2026v1
     workspacealn-specs/ppx.function.meta.v1.aln
     workspacealn-specs/alnPrometheusGovernanceFlags2026v1.aln
   kerimpact "R"
-  acceptancecriteria "MCP configuration lists only non-actuating diagnostic verbs as callable; dev_tunnel_filter.py reads governance flags and function meta and rejects or logs calls where G_f = 1 without approved gates; example runs show how an AI agent can call safe functions while blast-radius and neurorights constraints are enforced."[file:21][file:2]
-  notes "Use Python stdlib only; avoid network server implementation and focus on filter logic and configuration schemas."
+  acceptancecriteria "MCP configuration lists only non-actuating diagnostic verbs; dev_tunnel_filter.py reads governance flags and function meta and rejects or logs calls when G_f = 1 without approved gates; example runs demonstrate safe AI usage with enforced blast-radius and neurorights constraints."
+  notes "Use Python standard library; focus on filter logic and configuration schemas rather than building a full network stack."
 
 PrometheusPraxisCodingTask2026v1
   taskid   PPX-TASK-0005
-  title    Surface Lyapunov & KER math via ker_superloop
+  title    Surface Lyapunov and KER math via ker_superloop
   priority P1
   status   PLANNED
   ownerteam Prometheus-KER
   dependson [PPX-TASK-0001]
-  summary  "Expose unified Lyapunov residual and KER composition APIs in Prometheus-Praxis that wrap existing KER/Lyapunov crates and ALN specs."[file:2][file:22]
+  summary  "Expose unified Lyapunov residual and KER composition APIs in Prometheus-Praxis that wrap existing KER and Lyapunov crates and ALN specs."
   codetargets
     Prometheus-Praxis/src/ker/ker_superloop.rs
     Prometheus-Praxis/tests/ker_superloop_tests.rs
@@ -151,8 +151,8 @@ PrometheusPraxisCodingTask2026v1
     workspacealn/alnKERComposition2026v1.aln
     workspacealn-specs/alnCyboquaticEcosafetyContinuity2026v1.aln
   kerimpact "K E R"
-  acceptancecriteria "ker_superloop.rs offers one or more functions that compute multi-plane KER and V_t using existing KER/Lyapunov crates; ALN shards define matching composition semantics; examples demonstrate water/heat/waste/air/topology KER windows passing through this API without any actuation or IO."[file:22][file:2]
-  notes "Do not re-implement residual math; re-export and compose existing kernels from eco_restoration_shard and KER crates."
+  acceptancecriteria "ker_superloop.rs offers functions that compute multi-plane KER and V_t using existing kernels; ALN shards define matching composition semantics; examples demonstrate water, heat, waste, air, and topology KER windows passing through this API without any actuation or IO."
+  notes "Compose existing kernels from eco_restoration_shard instead of re-implementing residual math; respect ecosystem corridors and non-offsettable planes."
 
 PrometheusPraxisCodingTask2026v1
   taskid   PPX-TASK-0006
@@ -161,17 +161,17 @@ PrometheusPraxisCodingTask2026v1
   status   PLANNED
   ownerteam Prometheus-Safety
   dependson [PPX-TASK-0001]
-  summary  "Add repo-wide checks to ensure Prometheus-Praxis crates do not perform network, device, or embedded IO, matching the README's non-actuating constraint."[file:2]
+  summary  "Add repo-wide checks to ensure Prometheus-Praxis crates do not perform network, device, or embedded IO, matching the README's non-actuating constraint."
   codetargets
     Prometheus-Praxis/tools/non_actuation_ci_check.py
     Prometheus-Praxis/.github/workflows/non-actuation-ci.yml
   dbtargets
     Eco-Fort/db/econetrepoindexecosafetybinding.sql
   alntargets
-    workspacealn-specs/aln-specsEcosafetyNonActuatingWorkload.v1.aln
+    workspacealn-specs/aln-specsEcosafetyNonActuatingWorkload2026v1.aln
   kerimpact "R"
-  acceptancecriteria "CI runs non_actuation_ci_check.py and fails when crates use forbidden APIs (std::net, direct device handles, embedded HALs) without explicit governance exceptions; all Prometheus-Praxis crates declare !forbid(unsafe_code), edition 2024, rust-version 1.85, and adhere to non-actuating roles as per ecosafety ALN specs."[file:2][file:22]
-  notes "Implement heuristic scanning first, then refine with ALN-driven allowlists to avoid false positives."
+  acceptancecriteria "CI runs non_actuation_ci_check.py and fails when crates use forbidden APIs such as network sockets or device handles without explicit governance exemption; all Prometheus-Praxis crates declare forbid unsafe code, edition 2024, rust-version 1.85, and align with non-actuating ecosafety bindings."
+  notes "Start with heuristic scanning for known APIs then refine with ALN-driven allowlists to control false positives."
 
 PrometheusPraxisCodingTask2026v1
   taskid   PPX-TASK-0007
@@ -180,7 +180,7 @@ PrometheusPraxisCodingTask2026v1
   status   PLANNED
   ownerteam Prometheus-Governance
   dependson [PPX-TASK-0001]
-  summary  "Complete ALN shards and SQL schemas for data sovereignty, eco-credits, and neurorights corridors, linked to Prometheus-Praxis governance flows."[file:22][file:2]
+  summary  "Complete ALN shards and SQL schemas for data sovereignty, eco-credits, and neurorights corridors linked to Prometheus-Praxis governance flows."
   codetargets
     Prometheus-Praxis/docs/GOVERNANCE_SOVEREIGNTY.md
   dbtargets
@@ -192,8 +192,8 @@ PrometheusPraxisCodingTask2026v1
     workspacealn/alnEcoWealthKernel2026v1.aln
     workspacealn/alnNeurorightsCorridor2026v1.aln
   kerimpact "K E R"
-  acceptancecriteria "ALN shards define fields and policies for sovereignty, eco-credits, and neurorights and bind them to actual DB tables; Prometheus-Praxis governance helpers can query these shards before exposing MCP functions touching biosignals, eco rewards, or identity; docs explain how Bostrom DIDs are recorded and rewarded under KER constraints."[file:22][file:2]
-  notes "Ensure all shards and tables are non-fungible and tied to public benefit, matching README language."
+  acceptancecriteria "ALN shards define fields and policies for sovereignty, eco-credits, and neurorights and bind them to actual DB tables; Prometheus-Praxis governance helpers consult these shards before exposing MCP functions involving biosignals, eco rewards, or identity; docs describe how Bostrom DIDs are recorded and rewarded under KER constraints."
+  notes "Ensure eco-credit and sovereignty flows remain non-fungible and tied to public benefit and neurorights corridors."
 
 PrometheusPraxisCodingTask2026v1
   taskid   PPX-TASK-0008
@@ -202,7 +202,7 @@ PrometheusPraxisCodingTask2026v1
   status   PLANNED
   ownerteam Prometheus-Docs
   dependson [PPX-TASK-0003, PPX-TASK-0006]
-  summary  "Create and align ALN-SPECS index, Python quality tools, and maintenance docs to match the Getting Started for AI-Chat Assistants section."[file:1][file:2]
+  summary  "Create and align ALN-SPECS index, Python quality tools, and maintenance docs to match the Getting Started for AI-Chat Assistants section."
   codetargets
     Prometheus-Praxis/docs/ALN-SPECS.md
     Prometheus-Praxis/docs/MAINTENANCE_SESSION.md
@@ -212,8 +212,8 @@ PrometheusPraxisCodingTask2026v1
   alntargets
     workspacealn-specs/ppx.function.meta.v1.aln
   kerimpact "K"
-  acceptancecriteria "docs/ALN-SPECS.md lists all major ALN specs and their consumers; repo_quality_check.py and docstring_check.py run with stdlib Python and help enforce documentation and spec references; MAINTENANCE_SESSION.md contains a one-sitting checklist that matches README guidance for AI-Chat assistants."[file:1][file:2]
-  notes "Keep all commands single-line, using Python and native tools only; no new package installation."
+  acceptancecriteria "ALN-SPECS.md lists major ALN specs and their consumers; repo_quality_check.py and docstring_check.py run using Python stdlib and help enforce documentation and spec references; MAINTENANCE_SESSION.md contains a one-sitting checklist that matches README guidance for AI-Chat assistants."
+  notes "All commands should be single-line, using only native tools; no new package installation."
 
 PrometheusPraxisCodingTask2026v1
   taskid   PPX-TASK-0009
@@ -222,7 +222,7 @@ PrometheusPraxisCodingTask2026v1
   status   PLANNED
   ownerteam Prometheus-ScenarioLab
   dependson [PPX-TASK-0001, PPX-TASK-0005, PPX-TASK-0007]
-  summary  "Create worked examples showing eco_restoration, Cybercore, and Augmented-Citizen coupling via unified KER/Lyapunov governance as a single city-OS plane."[file:2]
+  summary  "Create worked examples showing eco_restoration, Cybercore, and Augmented-Citizen coupling via unified KER and Lyapunov governance as a single city-OS plane."
   codetargets
     Prometheus-Praxis/docs/examples/CrossDomainScenario2026v1.md
     Prometheus-Praxis/examples/cross_domain/compute_ker_and_governance.py
@@ -235,8 +235,8 @@ PrometheusPraxisCodingTask2026v1
     workspacealn/alnEcoWealthQuarantineContract2026v1.aln
     workspacealn/alnKnowledgeFactorKernel2026v1.aln
   kerimpact "K E R"
-  acceptancecriteria "CrossDomainScenario2026v1.md traces a full path from a cyboquatic workload and health/cybernetics context through identity, eco-credit, and governance shards; example Python code computes KER and V_t from real ALN specs and DBs without actuation; scenario matches README claims about city-OS coupling."[file:2][file:22]
-  notes "Use small datasets and pure analytics; avoid any direct device or actuator integration."
+  acceptancecriteria "CrossDomainScenario2026v1.md traces a full path from a cyboquatic workload and health/cybernetics context through identity, eco-credit, and governance shards; example Python code computes KER and V_t from ALN specs and DBs without actuation; the scenario matches README claims about city-OS coupling."
+  notes "Use small datasets and pure analytics; do not introduce any actuator or device integration."
 
 PrometheusPraxisCodingTask2026v1
   taskid   PPX-TASK-0010
@@ -244,175 +244,18 @@ PrometheusPraxisCodingTask2026v1
   priority P2
   status   PLANNED
   ownerteam Prometheus-Core
-  dependson [PPX-TASK-0001..PPX-TASK-0009]
-  summary  "Translate README roadmap items into ALN task shards and a ROADMAP.md that cross-references coding tasks and KER impact."[file:2][file:21]
+  dependson [PPX-TASK-0001, PPX-TASK-0002, PPX-TASK-0003, PPX-TASK-0004, PPX-TASK-0005, PPX-TASK-0006, PPX-TASK-0007, PPX-TASK-0008, PPX-TASK-0009]
+  summary  "Translate README roadmap items into ALN task shards and a ROADMAP.md that cross-references coding tasks and KER impact."
   codetargets
     Prometheus-Praxis/docs/ROADMAP.md
   dbtargets []
   alntargets
     Prometheus-Praxis/aln/PrometheusPraxisCodingTaskList2026v1.aln
   kerimpact "K"
-  acceptancecriteria "ROADMAP.md lists richer ecosafety pipelines, deeper MCP integration, and cross-domain coupling as concrete milestones; PrometheusPraxisCodingTaskList2026v1.aln is referenced from ROADMAP.md and README; tasks have clear KER impact fields and acceptance criteria aligned with Eco-Fort grammar."[file:21][file:2]
+  acceptancecriteria "ROADMAP.md lists richer ecosafety pipelines, deeper MCP integration, and cross-domain coupling as concrete milestones; PrometheusPraxisCodingTaskList2026v1.aln is referenced from ROADMAP.md and README; tasks have clear KER impact fields and acceptance criteria aligned with Eco-Fort grammar."
   notes "Keep roadmap concise and executable; avoid speculative or fictional objectives."
 
 endsection
-
-fields
-  taskid             string
-  title              string
-  priority           string
-  status             string
-  ownerteam          string
-  dependson          string
-  summary            string
-  codetargets        string
-  dbtargets          string
-  alntargets         string
-  kerimpact          string
-  acceptancecriteria string
-  notes              string
-endfields
-
-tasks
-  taskid PPX-TASK-0001
-  title  Wire eco_restoration_shard spine into Prometheus-Praxis
-  priority P0
-  status PLANNED
-  ownerteam Prometheus-Core
-  dependson
-  summary Create explicit spine modules and docs that bind Prometheus-Praxis to eco_restoration_shard and sibling repos as the README promises.
-  codetargets Prometheus-Praxis/ARCHITECTURE.md,Prometheus-Praxis/src/spine/mod.rs,Prometheus-Praxis/src/spine/e_restoration_spine.rs
-  dbtargets Eco-Fort/db/ecoconstellationindex.sql,Eco-Fort/db/repoindexrestoration.sql
-  alntargets workspacealn/alnPrometheusPraxisCore.v1.aln,workspacealn-specs/alnEcoRepoIndex2026v1.aln
-  kerimpact K E R
-  acceptancecriteria ARCHITECTURE.md lists concrete crates, ALN shards, and SQL files that implement the execution-layer role; spine modules expose non-actuating functions that map eco_restoration_shard KER/Lyapunov math into Prometheus-Praxis without duplicating residual logic.
-  notes Keep spine modules thin, declarative, and governance-first; avoid adding new Rust crates for this task and rely on existing eco_restoration_shard crates and ALN specs.
-
-  taskid PPX-TASK-0002
-  title Implement governance_flag B_f, H_f, G_f kernel
-  priority P0
-  status PLANNED
-  ownerteam Prometheus-Governance
-  dependson PPX-TASK-0001
-  summary Create non-actuating Rust and ALN modules for blast-radius B_f, health/reward H_f, and governance flag G_f = max(B_f,H_f), aligned with README semantics.
-  codetargets Prometheus-Praxis/src/governance_flag.rs,Prometheus-Praxis/src/ker/ker_superloop.rs,Prometheus-Praxis/tests/governance_flag_tests.rs
-  dbtargets Eco-Fort/db/planeweightsschema.sql,Eco-Fort/db/blastradiusspine.sql
-  alntargets workspacealn-specs/alnPrometheusGovernanceFlags2026v1.aln,workspacealn-specs/aln-specsPlaneWeightsShard2026v1.aln
-  kerimpact K E R
-  acceptancecriteria governance_flag.rs exposes pure functions that, given KER triads, residual V_t, and topology risk, compute B_f, H_f, G_f with documented thresholds; tests and Kani harnesses prove that non-offsettable planes and blast-radius limits obey monotone safety evolution and match Eco-Fort planeweights and blast-radius specs.
-  notes No IO or actuator calls; map results into small structs and ALN particles; use rust-version 1.85, edition 2024, and !forbid(unsafe_code).
-
-  taskid PPX-TASK-0003
-  title Complete ppx.function.meta.v1.aln and CI enforcement
-  priority P0
-  status PLANNED
-  ownerteam Prometheus-MCP
-  dependson PPX-TASK-0001
-  summary Populate ppx.function.meta.v1.aln with all MCP/AI-exposed functions and add CI checks that block new functions lacking meta or gate bindings.
-  codetargets Prometheus-Praxis/aln/ppx.function.meta.v1.aln,Prometheus-Praxis/tools/function_meta_ci_check.py,Prometheus-Praxis/.github/workflows/function-meta-ci.yml
-  dbtargets Eco-Fort/db/repostatussemantics.sql
-  alntargets workspacealn-specs/ppx.function.meta.v1.aln,workspacealn-specs/alnPrometheusPraxisCore.v1.aln
-  kerimpact K
-  acceptancecriteria All MCP verbs and AI-callable functions in Prometheus-Praxis and linked tools appear in ppx.function.meta.v1.aln with domains, corridors, capitals, and actuation flags; CI fails when an exported function has no meta record or lacks required gate bindings; the CI helper uses only native Python and ALN parsing, no new external tools.
-  notes Treat any function touching health, nanoswarms, or multi-node workloads as requiring REQUIRES_GATE until governance shards say otherwise.
-
-  taskid PPX-TASK-0004
-  title Implement MCP dev-tunnel filters and safe verb surfaces
-  priority P1
-  status PLANNED
-  ownerteam Prometheus-MCP
-  dependson PPX-TASK-0002,PPX-TASK-0003
-  summary Create MCP configuration and dev-tunnel filters that expose only non-actuating, governance-gated functions and log all calls for ecosafety and neurorights analysis.
-  codetargets Prometheus-Praxis/tools/mcp/dev_tunnel_filter.py,Prometheus-Praxis/tools/mcp/mcp_server_config.yaml
-  dbtargets Eco-Fort/db/virtasysgovernance.db
-  alntargets workspacealn-specs/ppx.function.meta.v1.aln,workspacealn-specs/alnPrometheusGovernanceFlags2026v1.aln
-  kerimpact R
-  acceptancecriteria MCP configuration lists only non-actuating diagnostic verbs as callable; dev_tunnel_filter.py reads governance flags and function meta and rejects or logs calls where G_f = 1 without approved gates; example runs show how an AI agent can call safe functions while blast-radius and neurorights constraints are enforced.
-  notes Use Python stdlib only; avoid network server implementation and focus on filter logic and configuration schemas.
-
-  taskid PPX-TASK-0005
-  title Surface Lyapunov & KER math via ker_superloop
-  priority P1
-  status PLANNED
-  ownerteam Prometheus-KER
-  dependson PPX-TASK-0001
-  summary Expose unified Lyapunov residual and KER composition APIs in Prometheus-Praxis that wrap existing KER/Lyapunov crates and ALN specs.
-  codetargets Prometheus-Praxis/src/ker/ker_superloop.rs,Prometheus-Praxis/tests/ker_superloop_tests.rs
-  dbtargets Eco-Fort/db/planeweightshistory.sql,Eco-Fort/db/corridordefinitionschema.sql
-  alntargets workspacealn/alnKERComposition2026v1.aln,workspacealn-specs/alnCyboquaticEcosafetyContinuity2026v1.aln
-  kerimpact K E R
-  acceptancecriteria ker_superloop.rs offers one or more functions that compute multi-plane KER and V_t using existing KER/Lyapunov crates; ALN shards define matching composition semantics; examples demonstrate water/heat/waste/air/topology KER windows passing through this API without any actuation or IO.
-  notes Do not re-implement residual math; re-export and compose existing kernels from eco_restoration_shard and KER crates.
-
-  taskid PPX-TASK-0006
-  title Enforce non-actuation via CI and static checks
-  priority P0
-  status PLANNED
-  ownerteam Prometheus-Safety
-  dependson PPX-TASK-0001
-  summary Add repo-wide checks to ensure Prometheus-Praxis crates do not perform network, device, or embedded IO, matching the README's non-actuating constraint.
-  codetargets Prometheus-Praxis/tools/non_actuation_ci_check.py,Prometheus-Praxis/.github/workflows/non-actuation-ci.yml
-  dbtargets Eco-Fort/db/econetrepoindexecosafetybinding.sql
-  alntargets workspacealn-specs/aln-specsEcosafetyNonActuatingWorkload.v1.aln
-  kerimpact R
-  acceptancecriteria CI runs non_actuation_ci_check.py and fails when crates use forbidden APIs (std::net, direct device handles, embedded HALs) without explicit governance exceptions; all Prometheus-Praxis crates declare !forbid(unsafe_code), edition 2024, rust-version 1.85, and adhere to non-actuating roles as per ecosafety ALN specs.
-  notes Implement heuristic scanning first, then refine with ALN-driven allowlists to avoid false positives.
-
-  taskid PPX-TASK-0007
-  title Harden data sovereignty, eco-credit, and neurorights shards
-  priority P1
-  status PLANNED
-  ownerteam Prometheus-Governance
-  dependson PPX-TASK-0001
-  summary Complete ALN shards and SQL schemas for data sovereignty, eco-credits, and neurorights corridors, linked to Prometheus-Praxis governance flows.
-  codetargets Prometheus-Praxis/docs/GOVERNANCE_SOVEREIGNTY.md
-  dbtargets Eco-Fort/db/contributionresumebostrom.sql,Eco-Fort/db/ecoperjoulepolicyenergy.sql,Eco-Fort/db/psychriskengine.db
-  alntargets workspacealn-specs/aln-specsAbsoluteDataSovereigntyPolicy2026v1.aln,workspacealn/alnEcoWealthKernel2026v1.aln,workspacealn/alnNeurorightsCorridor2026v1.aln
-  kerimpact K E R
-  acceptancecriteria ALN shards define fields and policies for sovereignty, eco-credits, and neurorights and bind them to actual DB tables; Prometheus-Praxis governance helpers can query these shards before exposing MCP functions touching biosignals, eco rewards, or identity; docs explain how Bostrom DIDs are recorded and rewarded under KER constraints.
-  notes Ensure all shards and tables are non-fungible and tied to public benefit, matching README language.
-
-  taskid PPX-TASK-0008
-  title Align AI-Chat tooling and docs with README safety section
-  priority P2
-  status PLANNED
-  ownerteam Prometheus-Docs
-  dependson PPX-TASK-0003,PPX-TASK-0006
-  summary Create and align ALN-SPECS index, Python quality tools, and maintenance docs to match the Getting Started for AI-Chat Assistants section.
-  codetargets Prometheus-Praxis/docs/ALN-SPECS.md,Prometheus-Praxis/docs/MAINTENANCE_SESSION.md,Prometheus-Praxis/tools/repo_quality_check.py,Prometheus-Praxis/tools/docstring_check.py
-  dbtargets
-  alntargets workspacealn-specs/ppx.function.meta.v1.aln
-  kerimpact K
-  acceptancecriteria docs/ALN-SPECS.md lists all major ALN specs and their consumers; repo_quality_check.py and docstring_check.py run with stdlib Python and help enforce documentation and spec references; MAINTENANCE_SESSION.md contains a one-sitting checklist that matches README guidance for AI-Chat assistants.
-  notes Keep all commands single-line, using Python and native tools only; no new package installation.
-
-  taskid PPX-TASK-0009
-  title Document and implement cross-domain eco/health/identity scenarios
-  priority P2
-  status PLANNED
-  ownerteam Prometheus-ScenarioLab
-  dependson PPX-TASK-0001,PPX-TASK-0005,PPX-TASK-0007
-  summary Create worked examples showing eco_restoration, Cybercore, and Augmented-Citizen coupling via unified KER/Lyapunov governance as a single city-OS plane.
-  codetargets Prometheus-Praxis/docs/examples/CrossDomainScenario2026v1.md,Prometheus-Praxis/examples/cross_domain/compute_ker_and_governance.py
-  dbtargets Data_Lake/db/telemetrykernelTelemetryKernel2026v1.sql,Eco-Fort/db/qpudatashardwaterquality.sql,Eco-Fort/db/psychriskengine.db
-  alntargets workspacealn/alnCyboquaticRestorationSurface2026v1.aln,workspacealn/alnEcoWealthQuarantineContract2026v1.aln,workspacealn/alnKnowledgeFactorKernel2026v1.aln
-  kerimpact K E R
-  acceptancecriteria CrossDomainScenario2026v1.md traces a full path from a cyboquatic workload and health/cybernetics context through identity, eco-credit, and governance shards; example Python code computes KER and V_t from real ALN specs and DBs without actuation; scenario matches README claims about city-OS coupling.
-  notes Use small datasets and pure analytics; avoid any direct device or actuator integration.
-
-  taskid PPX-TASK-0010
-  title Encode Prometheus-Praxis roadmap into task shards
-  priority P2
-  status PLANNED
-  ownerteam Prometheus-Core
-  dependson PPX-TASK-0001,PPX-TASK-0002,PPX-TASK-0003,PPX-TASK-0004,PPX-TASK-0005,PPX-TASK-0006,PPX-TASK-0007,PPX-TASK-0008,PPX-TASK-0009
-  summary Translate README roadmap items into ALN task shards and a ROADMAP.md that cross-references coding tasks and KER impact.
-  codetargets Prometheus-Praxis/docs/ROADMAP.md
-  dbtargets
-  alntargets Prometheus-Praxis/aln/PrometheusPraxisCodingTaskList2026v1.aln
-  kerimpact K
-  acceptancecriteria ROADMAP.md lists richer ecosafety pipelines, deeper MCP integration, and cross-domain coupling as concrete milestones; PrometheusPraxisCodingTaskList2026v1.aln is referenced from ROADMAP.md and README; tasks have clear KER impact fields and acceptance criteria aligned with Eco-Fort grammar.
-  notes Keep roadmap concise and executable; avoid speculative or fictional objectives.
 
 filename PrometheusPraxisCodingTaskList2026v1.aln
 destination Prometheus-Praxis/aln/PrometheusPraxisCodingTaskList2026v1.aln
