@@ -26,6 +26,8 @@ members = [
     "crates/blacklist-trie",
     "crates/prometheus_praxis_hex_anchor",
     "crates/sacrifice-zone-envelope",
+    "crates/prometheus_praxis_governance",
+    "crates/prometheus_praxis_ker",
 
     # eco_wealth standalone crate
     "eco_wealth",
