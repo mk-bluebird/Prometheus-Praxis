@@ -1,0 +1,16 @@
+
+[package]
+name = "prometheus_praxis_ker"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+authors = ["Eco-Fort Cyboquatic Systems"]
+license = "MIT OR Apache-2.0"
+description = "Non-actuating KER and Lyapunov kernel interfaces for Prometheus-Praxis."
+publish = false
+
+[dependencies]
+
+[lib]
+name = "prometheus_praxis_ker"
+path = "src/lib.rs"
