@@ -1,0 +1,22 @@
+# Governance Policy Shard - Prometheus Governance Flags 2026v1
+# filename: aln-specs/alnPrometheusGovernanceFlags2026v1.aln
+# destination: aln-specs/alnPrometheusGovernanceFlags2026v1.aln
+# Purpose: Minimal governance policy shard describing plane-level thresholds for deployment gates
+
+schema,version,title,description,category
+PrometheusGovernanceFlags2026v1,v1,Governance Policy Flags for Plane Thresholds,Basic thresholds and gate requirements per plane,GOVERNANCE
+
+field,name,datatype,units,required,description
+1,plane_name,string,,true,Name of the plane (e.g. water, heat, carbon, topology)
+2,blast_radius_threshold,double,,true,Maximum allowed blast radius before gate review
+3,health_reward_threshold_k,double,,true,Minimum K score required for health reward eligibility
+4,health_reward_threshold_e,double,,true,Minimum E score required for health reward eligibility
+5,requires_gate,bool,,true,If true requires explicit governance gate approval for deployment
+
+record
+plane_name,blast_radius_threshold,health_reward_threshold_k,health_reward_threshold_e,requires_gate
+water,0.5,0.7,0.6,false
+heat,0.5,0.7,0.6,false
+carbon,0.3,0.8,0.8,true
+topology,0.2,0.9,0.9,true
+endrecord

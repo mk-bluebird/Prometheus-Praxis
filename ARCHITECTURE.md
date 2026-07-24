@@ -122,3 +122,10 @@ lua tools/prometheus_shard_layout_plantuml.lua
 ```
 
 For a complete maintenance session checklist, see `docs/MAINTENANCE_SESSION.md`.
+
+## Kernel & Governance Plumbing
+
+- `planeweightsplane` (in `Eco-Fort/db/planeweights.db`) is the source of truth for plane weights and non-compensatable flags.
+- `vshardker` and `vshardresidual` (in `db/cyboquatic_core.db`) are the canonical views for KER scores and Lyapunov residuals.
+- `lanestatusshard` and `virtalaneverdict` store lane status and governance verdicts; `vlatestlanestatus` shows the latest per entity.
+- Query these tables/views using Python stdlib `sqlite3` or native SQLite CLI tools.
