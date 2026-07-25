@@ -1,0 +1,61 @@
+# Filename: aln/ker_hex_interpolation.aln2
+# Destination: Prometheus-Praxis/aln/ker_hex_interpolation.aln2
+# License: MIT OR Apache-2.0
+
+aln2-spec ker-hex-interpolation-2026-v1
+version 2
+license MIT OR Apache-2.0
+
+did-root primary bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+
+particle ker.hex.sample
+  field sampleId       text
+  field hexId          text
+  field xCoordM        float
+  field yCoordM        float
+  field kFactor        float
+  field eFactor        float
+  field rFactor        float
+  field scalarKer      float
+  field timestampUtc   text
+  field evidenceHex    text
+
+  require kFactor 0.0 kFactor 1.0
+  require eFactor 0.0 eFactor 1.0
+  require rFactor 0.0 rFactor 1.0
+  require scalarKer 0.0 scalarKer 1.0
+  require scalarKer 0.0 kFactor eFactor - rFactor 0.000001
+end
+
+particle ker.hex.interpolated
+  field interpId      int
+  field targetHexId   text
+  field xCoordM       float
+  field yCoordM       float
+  field kFactor       float
+  field eFactor       float
+  field rFactor       float
+  field scalarKer     float
+  field neighbourCount int
+  field timestampUtc  text
+  field evidenceHex   text
+
+  require kFactor 0.0 kFactor 1.0
+  require eFactor 0.0 eFactor 1.0
+  require rFactor 0.0 rFactor 1.0
+  require scalarKer 0.0 scalarKer 1.0
+  require scalarKer 0.0 kFactor eFactor - rFactor 0.000001
+end
+
+rule ker.hex.interpolated.accept
+  input interpId      int
+        targetHexId   text
+        scalarKer     float
+        neighbourCount int
+  require scalarKer 0.0 scalarKer 1.0
+  require neighbourCount 1 neighbourCount 64
+  effect hexstamp owner bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+         interpolation interpId
+         hex targetHexId
+         ker scalarKer
+end
