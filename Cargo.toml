@@ -32,6 +32,7 @@ members = [
     "crates/ker_hex_interpolation",
     "crates/prometheus-praxis-kersuperloop",
     "crates/ecosafety-core-v2",
+    "contracts/eco_restoration_credit",
 
     # eco_wealth standalone crate
     "eco_wealth",
