@@ -30,6 +30,7 @@ members = [
     "crates/prometheus_praxis_ker",
     "crates/blast_radius_scaling",
     "crates/ker_hex_interpolation",
+    "crates/prometheus-praxis-kersuperloop",
 
     # eco_wealth standalone crate
     "eco_wealth",
