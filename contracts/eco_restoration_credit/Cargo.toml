@@ -1,0 +1,25 @@
+# filename: contracts/eco_restoration_credit/Cargo.toml
+# destination: https://github.com/mk-bluebird/Prometheus-Praxis/contracts/eco_restoration_credit/Cargo.toml
+# license: MIT OR Apache-2.0
+
+[package]
+name = "eco_restoration_credit"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "CosmWasm contract for Bostrom that mints and burns eco-restoration credits tied to Lyapunov-verified AI workloads and Phoenix hex risk shards."
+repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
+
+[lib]
+crate-type = ["cdylib"]
+name = "eco_restoration_credit"
+
+[dependencies]
+cosmwasm-std = "1.5.0"
+cosmwasm-schema = "1.5.0"
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
+
+[dev-dependencies]
+cosmwasm-vm = "1.5.0"
+cosmwasm-schema = "1.5.0"
