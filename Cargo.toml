@@ -28,6 +28,8 @@ members = [
     "crates/sacrifice-zone-envelope",
     "crates/prometheus_praxis_governance",
     "crates/prometheus_praxis_ker",
+    "crates/blast_radius_scaling",
+    "crates/ker_hex_interpolation",
 
     # eco_wealth standalone crate
     "eco_wealth",
