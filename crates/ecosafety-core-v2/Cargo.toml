@@ -1,9 +1,9 @@
-# filename: crates/ecosafety-core-v2/Cargo.toml
+# filename: crates/ecosafety-core-v2/Cargo.toml (updated)
 # destination: https://github.com/mk-bluebird/Prometheus-Praxis/crates/ecosafety-core-v2/Cargo.toml
 
 [package]
 name = "ecosafety-core-v2"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
@@ -14,3 +14,7 @@ repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = { version = "1.0.120" }
 thiserror = "1.0.57"
+
+[[bin]]
+name = "phoenix_uhi_hex_risk"
+path = "src/bin/phoenix_uhi_hex_risk.rs"
