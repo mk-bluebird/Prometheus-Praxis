@@ -1,6 +1,7 @@
-# FILE: Cargo.toml
-# DESTINATION: ./Cargo.toml
-# TARGET-REPO: https://github.com/mk-bluebird/eco_restoration_shard
+# filename: Cargo.toml
+# destination: ./Cargo.toml
+# target-repo: https://github.com/mk-bluebird/eco_restoration_shard
+# license: MIT OR Apache-2.0
 
 [workspace]
 members = [
@@ -196,22 +197,22 @@ env_logger    = "0.11.3"
 petgraph      = "0.6.5"
 hex           = "0.4.3"
 
-# Crypto and signatures (non-blacklisted primitives).
+# Crypto and signatures (avoid blacklisted primitives; Ed25519 for authorship only).
 ed25519-dalek = "2.1.0"
 
-# Async runtime (non-networked by policy; used for timers, fs, etc.).
+# Async runtime (non-networked by ecosafety policy; used for timers/fs in harnesses).
 tokio         = { version = "1.38.0", features = ["rt", "macros", "time", "io-util", "sync", "fs"] }
 
-# Proc-macro toolchain for internal derives.
+# Proc-macro toolchain for internal derives and DSLs.
 proc-macro2   = "1.0.85"
 quote         = "1.0.36"
 syn           = { version = "2.0.72", features = ["full"] }
 
-# ALN / MCP integration (globally present; individual crates gate usage via features).
+# ALN / MCP integration (global; individual crates gate usage via features).
 aln-core      = { version = "0.1.0", package = "aletheion-aln-core" }
 mcp-core      = { version = "0.1.0", package = "aletheion-mcp-core" }
 
-# Kani verifier (never optional at workspace level).
+# Mandatory Kani verifier (never optional).
 kani          = { version = "0.67.0", package = "kani-verifier" }
 
 [workspace.dev-dependencies]
@@ -220,7 +221,7 @@ csv        = "1.3.0"
 kani       = { version = "0.67.0", package = "kani-verifier" }
 
 [workspace.features]
-# Workspace-level feature toggles for integration; Kani remains mandatory.
+# Workspace-level toggles; actuation is never enabled here.
 default = ["sqlite", "aln"]
 sqlite  = ["rusqlite"]
 aln     = ["aln-core"]
@@ -318,10 +319,9 @@ aln-core      = { workspace = true }
 mcp-core      = { workspace = true }
 kani          = { workspace = true }
 
-[dev-dependencies]
-serde_json = { workspace = true }
-csv        = { workspace = true }
-kani       = { workspace = true }
+# Contract crate: contracts/eco_restoration_credit
+# We declare its own package section under its directory; this root Cargo.toml
+# provides workspace dependencies for it via workspace = true.
 
 [patch.crates-io]
-# Reserved for audited security / compatibility patches; keep empty unless needed.
+# Reserved for audited security / compatibility patches; keep empty unless explicitly needed.
