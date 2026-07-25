@@ -1,0 +1,16 @@
+# filename: crates/ecosafety-core-v2/Cargo.toml
+# destination: https://github.com/mk-bluebird/Prometheus-Praxis/crates/ecosafety-core-v2/Cargo.toml
+
+[package]
+name = "ecosafety-core-v2"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "KER-Lyapunov constitution core for Phoenix urban resilience in Prometheus-Praxis."
+repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
+
+[dependencies]
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
+thiserror = "1.0.57"
