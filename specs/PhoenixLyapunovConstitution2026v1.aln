@@ -1,0 +1,155 @@
+alnspec v1.0 PhoenixLyapunovConstitution2026v1
+description Phoenix UHI / MAR Lyapunov constitution binding RiskVector,
+             kerdeployable v2, eco-restoration credits Ceco, and replay invariants.
+version 2026.07.25
+owneralnid bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+groundinghex 0x50484e585f4c595041505f434f4e53545f323032365f56343f4b45525f5249534b5645435f45434f4c4544474552
+
+lane PHX-LYAP-CONSTITUTION
+nonfinancial true
+rewardinvisible true
+financeforbidden true
+tradeforbidden true
+
+type PhoenixLyapunovConstitution2026v1
+
+  invariant
+    field constitutionid type string required true
+      pattern phx-lyap-const-2026-v1-[A-Za-z0-9]{8,32}
+    field region type string required true
+      enum Phoenix-AZ
+    field uhilaneid type string required true
+      pattern phoenix.uhi.hex.risk.v1
+    field marlaneid type string required true
+      pattern phoenix.mar.hydrology.risk.v1
+
+    field riskvectorplaneids type liststring required true
+      minitems 3
+    field lyapunovweightsref type string required true
+      ref LyapunovWeights.v2.id
+    field kerpolicyid type string required true
+      ref kerdeployable.v2.id
+    field corridorbandsref type string required true
+      ref CorridorBands.v2.id
+    field replayprofileid type string required true
+      ref PhoenixReplaySuite2026v1.id
+
+    field cecospecid type string required true
+      ref EcoRestorationCreditSpecPhoenix2026v1.id
+    field cecolaneid type string required true
+      pattern phoenix.eco.credit.phx2026.v1
+
+    field vtmin type float required true
+      min 0.0
+    field vtmax type float required true
+      min 0.0
+    field epsilon type float required true
+      min 0.0 max 1e-3
+
+    field ktarget type float required true
+      min 0.90 max 1.00
+    field etarget type float required true
+      min 0.90 max 1.00
+    field rtargetmax type float required true
+      min 0.00 max 0.13
+
+    field nonoffsettableplanes type liststring required true
+      minitems 2
+    field carbonplaneid type string required true
+      pattern rcarbon
+    field biodivplaneid type string required true
+      pattern rbiodiv
+
+    field signingdid type string required true
+      pattern bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+    field evidencehex type string required true
+    field createdat type datetime required true
+
+    predicate vtbandvalid
+      expr vtmin 0.0 vtmax vtmin
+
+    predicate kertargetvalid
+      expr ktarget 0.90 etarget 0.90 rtargetmax 0.13
+
+    predicate nonoffsettablevalid
+      expr len(nonoffsettableplanes) 2
+           carbonplaneid in nonoffsettableplanes
+           biodivplaneid in nonoffsettableplanes
+
+    invariant all
+      ensures vtbandvalid
+      ensures kertargetvalid
+      ensures nonoffsettablevalid
+
+  endtype
+
+policy PhoenixLyapunovEcoCreditPolicy2026v1
+  description Coupling of Lyapunov residual and eco-restoration credit Ceco
+              for Phoenix UHI / MAR lanes.
+
+  rule mint_ceco_if_stable_improvement
+    when PhoenixNodeDiagnostic.v1.region == Phoenix-AZ
+         PhoenixNodeDiagnostic.v1.lane in [uhilaneid, marlaneid]
+         PhoenixNodeDiagnostic.v1.vtbefore > PhoenixNodeDiagnostic.v1.vtafter
+         PhoenixNodeDiagnostic.v1.alwaysimprove.residualnonpositiveok == true
+         PhoenixNodeDiagnostic.v1.alwaysimprove.carbonceilingok == true
+         PhoenixNodeDiagnostic.v1.alwaysimprove.biodivfloorok == true
+         PhoenixNodeDiagnostic.v1.ker.e  etarget
+         PhoenixNodeDiagnostic.v1.ker.r  rtargetmax
+    then admit
+         action mint Ceco
+           lane cecolaneid
+           amount f(PhoenixNodeDiagnostic.v1.totalreqj,
+                   PhoenixNodeDiagnostic.v1.totalsurplusj,
+                   PhoenixNodeDiagnostic.v1.meanrcarbon,
+                   PhoenixNodeDiagnostic.v1.meanrbiodiv)
+    else deny ceco_not_allowed
+  endrule
+
+  rule forbid_ceco_if_nonoffsettable_breach
+    when PhoenixNodeDiagnostic.v1.region == Phoenix-AZ
+         PhoenixNodeDiagnostic.v1.lane in [uhilaneid, marlaneid]
+         exists plane in nonoffsettableplanes :
+           PhoenixNodeDiagnostic.v1.rx[plane] CorridorBandHardBreach
+    then deny ceco_banned_nonoffsettable
+  endrule
+
+endpolicy
+
+policy PhoenixLyapunovReplayInvariant2026v1
+  description Replay invariants enforcing V(t+1) - V(t) <= -s_t and corridor bands
+              for Phoenix UHI / MAR nodes.
+
+  rule enforce_replay_monotone_residual
+    when PhoenixReplayStep.v1.region == Phoenix-AZ
+         PhoenixReplayStep.v1.constitutionid == constitutionid
+         PhoenixReplayStep.v1.vt  vtmin
+         PhoenixReplayStep.v1.vtnext  vtmax
+    then require PhoenixReplayStep.v1.vtnext - PhoenixReplayStep.v1.vt
+                 <= -PhoenixReplayStep.v1.st
+                 + epsilon
+  endrule
+
+  rule enforce_corridor_guard
+    when PhoenixReplayStep.v1.region == Phoenix-AZ
+         PhoenixReplayStep.v1.constitutionid == constitutionid
+    then require safestepcombined(
+             PhoenixReplayStep.v1.vt,
+             PhoenixReplayStep.v1.vtnext,
+             epsilon,
+             PhoenixReplayStep.v1.rx,
+             corridorbandsref
+           ) != ResidualStepStop
+  endrule
+
+  rule enforce_kerdeployable_v2
+    when PhoenixReplayStep.v1.region == Phoenix-AZ
+         PhoenixReplayStep.v1.constitutionid == constitutionid
+    then require kerdeployable_v2(
+             PhoenixReplayStep.v1.ker.k,
+             PhoenixReplayStep.v1.ker.e,
+             PhoenixReplayStep.v1.ker.r
+           ) == true
+  endrule
+
+endpolicy
