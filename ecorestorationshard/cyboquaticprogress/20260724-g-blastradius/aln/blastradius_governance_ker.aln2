@@ -1,0 +1,82 @@
+# file: ecorestorationshard/cyboquaticprogress/20260724-g-blastradius/aln/blastradius_governance_ker.aln2
+# destination: ecorestorationshard/cyboquaticprogress/20260724-g-blastradius/aln/blastradius_governance_ker.aln2
+# purpose: ALN v2 governance particle binding K,E,R triads and blast-radius diagnostics
+#          to DID bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7, with corridor-aware rules [file:8][file:31].
+
+aln2-spec blastradius-governance-ker-2026-07-24
+version 2
+license MIT OR Apache-2.0
+
+did-root primary bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+alternate bostrom1ldgmtf20d6604a24ztr0jxht7xt7az4jhkmsrc
+
+particle governance.blastradius
+id gov.blastradius.hex
+did bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+
+ker-axis
+  knowledge k in 0.0, 1.0
+  ecoImpact e in 0.0, 1.0
+  risk r in 0.0, 1.0
+  kerScore s in -1.0, 1.0
+
+fields
+  blastDiagId      text
+  surchargeEventId text
+  canalNodeId      text
+  fogRegionId      text
+  fogChannelId     text
+  radiusM          float
+  vtResidual       float
+  k                float
+  e                float
+  r                float
+  s                float
+  evidenceHex      hex256
+  createdUtc       datetime
+
+rule blast.accept
+  input blastDiagId text
+        surchargeEventId text
+        canalNodeId text
+        fogRegionId text
+        fogChannelId text
+        radiusM float
+        vtResidual float
+        k float
+        e float
+        r float
+        s float
+        evidenceHex hex256
+  require k >= 0.0 k <= 1.0
+          e >= 0.0 e <= 1.0
+          r >= 0.0 r <= 1.0
+          s = k * e - r
+          s > 0.0
+          vtResidual >= 0.0
+          radiusM >= 0.0
+  effect hexstamp
+    owner  bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+    blast  blastDiagId
+    event  surchargeEventId
+    canal  canalNodeId
+    fogRegion fogRegionId
+    fogChannel fogChannelId
+    kerK   k
+    kerE   e
+    kerR   r
+    kerS   s
+    vt     vtResidual
+    evidence evidenceHex
+
+rule blast.rejectHighRisk
+  input blastDiagId text
+        r float
+        vtResidual float
+        s float
+  require r >= 0.8
+          vtResidual > 0.5
+          s <= 0.0
+  effect ban
+    blast  blastDiagId
+    reason "High blast-radius risk: R >= 0.8 or vtResidual > 0.5 with non-positive KER score"
