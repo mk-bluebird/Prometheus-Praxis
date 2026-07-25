@@ -1,9 +1,9 @@
-# filename: crates/prometheus-praxis-kersuperloop/Cargo.toml
+# filename: crates/prometheus-praxis-kersuperloop/Cargo.toml (updated)
 # destination: https://github.com/mk-bluebird/Prometheus-Praxis/crates/prometheus-praxis-kersuperloop/Cargo.toml
 
 [package]
 name = "prometheus-praxis-kersuperloop"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
@@ -15,3 +15,8 @@ chrono = { version = "0.4.38", features = ["clock", "serde"] }
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = { version = "1.0.120" }
 thiserror = "1.0.57"
+cyboquatic-bliastradius-spine = { path = "../cyboquatic-blastradiusspine" }
+
+[[bin]]
+name = "phx-kersuperloop"
+path = "src/bin/phx_kersuperloop.rs"
