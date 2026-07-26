@@ -1,0 +1,36 @@
+# ALN Continuity Snapshot Schema
+# version: 0.1.0-draft
+# description: Draft message schema for continuity snapshot exchange
+
+message ContinuitySnapshot {
+    # Unique identifier for this snapshot
+    field snapshot_id: string = 1;
+    
+    # Timestamp of snapshot creation (Unix epoch nanoseconds)
+    field timestamp_ns: u64 = 2;
+    
+    # Plane identifier this snapshot belongs to
+    field plane_id: string = 3;
+    
+    # Continuity state vector
+    field state_vector: repeated f64 = 4;
+    
+    # Checksum for integrity verification
+    field checksum: string = 5;
+    
+    # Optional metadata
+    field metadata: map<string, string> = 6;
+}
+
+message SnapshotRequest {
+    field request_id: string = 1;
+    field plane_id: string = 2;
+    field from_timestamp_ns: u64 = 3;
+    field to_timestamp_ns: u64 = 4;
+}
+
+message SnapshotResponse {
+    field request_id: string = 1;
+    field snapshots: repeated ContinuitySnapshot = 2;
+    field status: string = 3;
+}

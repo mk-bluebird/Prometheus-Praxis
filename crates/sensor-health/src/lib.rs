@@ -27,3 +27,27 @@ pub fn update_sensor_trust(
         }
     }
 }
+
+/// Extension trait for converting sensor health into risk coordinates.
+pub trait IntoRiskCoord {
+    fn into_risk_coord(self) -> prometheus_praxis_spine::RiskCoord;
+}
+
+impl IntoRiskCoord for SensorHealthParticle {
+    /// Convert sensor health state into a RiskCoord for prometheus_praxis_spine integration.
+    /// Stub implementation - mapping logic to be filled in.
+    fn into_risk_coord(self) -> prometheus_praxis_spine::RiskCoord {
+        // TODO: Implement mapping from SensorHealthParticle to RiskCoord
+        // This stub tags the sensor-health plane and provides placeholder risk values.
+        prometheus_praxis_spine::RiskCoord {
+            plane_id: prometheus_praxis_spine::PlaneId::new("sensor-health"),
+            risk_value: 0.0,
+            confidence: 0.0,
+        }
+    }
+}
+
+/// Direct conversion function as requested in the task.
+pub fn into_risk_coord(health: SensorHealthParticle) -> prometheus_praxis_spine::RiskCoord {
+    health.into_risk_coord()
+}
