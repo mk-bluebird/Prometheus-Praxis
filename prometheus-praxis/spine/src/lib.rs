@@ -3,16 +3,12 @@
 //! Prometheus‑Praxis KER–Lyapunov spine crate.
 //!
 //! This crate codifies the non‑negotiable eco‑machine spine:
-//! - `RiskCoord`: single normalized risk coordinate r_j ∈ [0,1].
-//! - `RiskVector`: per‑plane aggregation of coordinates.
-//! - `LyapunovWeights`: per‑plane weights w_j with non‑offsettable flags.
-//! - `Residual`: Lyapunov energy V_t = ∑_j w_j r_j^2.
-//! - `SafeStepGate`: gatekeeper enforcing ΔV_t ≤ 0 and corridor grammar.
+//! - `PlaneId`, `RiskCoord`, `RiskVector` for plane and coordinate labelling.
+//! - `LyapunovWeight`, `LyapunovWeights` for per‑plane weights with non‑offsettable flags.
+//! - `Residual` for Lyapunov energy V_t = ∑_j w_j r_j².
+//! - `SafeStepGate` for enforcing ΔV_t ≤ 0 and corridor grammar.
+//! - KER window, lane predicates, and lane automaton for Phoenix‑constitution governance.
 //! - Corridor mapping helpers for harmful/beneficial metrics.
-//!
-//! It is deliberately minimal and self‑contained so all domain planes
-//! (hydrology, topology, microplastics, neurorights, Tree‑of‑Life)
-//! can plug in without modifying the residual kernel or invariants.
 
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
@@ -52,8 +48,7 @@ pub struct RiskCoord {
 impl RiskCoord {
     /// Construct a risk coordinate from raw domain units and a mapping function.
     ///
-    /// The `map_to_risk` closure must map the raw value into [0,1] according to
-    /// the corridor grammar; this helper clamps defensively.
+    /// The `map_to_risk` closure must map the raw value into [0,1]; this helper clamps defensively.
     pub fn from_raw<F>(
         plane: PlaneId,
         metric: impl Into<String>,
@@ -167,7 +162,7 @@ impl LyapunovWeights {
         Ok(LyapunovWeights { raw })
     }
 
-    /// Normalized weights: \tilde{w}_i = w_i / ∑_j w_j, preserving Lyapunov grammar.
+    /// Normalized weights: \tilde{w}_i = w_i / ∑_j w_j.
     pub fn normalized(&self) -> Vec<(PlaneId, f64, bool)> {
         let sum: f64 = self.raw.iter().map(|w| w.weight).sum();
         let denom = if sum == 0.0 { 1.0 } else { sum };
@@ -196,7 +191,7 @@ impl LyapunovWeights {
     }
 }
 
-/// Total Lyapunov energy V_t = ∑_j w_j r_j^2 at time t.
+/// Total Lyapunov energy V_t = ∑_j w_j r_j² at time t.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Residual {
     /// Energy value V_t ≥ 0.
@@ -243,10 +238,10 @@ impl SafeStepGate {
     /// Evaluate a proposed transition from current to next risk vectors.
     ///
     /// Invariants:
-    /// - r_j ∈ [0,1] for all coordinates
-    /// - non‑offsettable planes must not increase risk when `lock_non_offsettable` is true
-    /// - corridor grammar: HARD band forbidden (no‑corridor‑no‑build)
-    /// - Lyapunov: V_{t+1} ≤ V_t
+    /// - r_j ∈ [0,1] for all coordinates.
+    /// - non‑offsettable planes must not increase risk when `lock_non_offsettable` is true.
+    /// - corridor grammar: HARD band forbidden.
+    /// - Lyapunov: V_{t+1} ≤ V_t.
     pub fn evaluate_step(
         current_vectors: &[RiskVector],
         next_vectors: &[RiskVector],
@@ -434,6 +429,174 @@ pub fn beneficial_corridor_map(
     }
 }
 
+/// KER window aggregates at time t.
+#[derive(Debug, Clone, Copy)]
+pub struct KerWindow {
+    /// Knowledge factor k_t ∈ [0,1].
+    pub k_t: f64,
+    /// Workload energy e_t ≥ 0 (normalized).
+    pub e_t: f64,
+    /// Risk factor r_t ∈ [0,1] (e.g., max risk over window).
+    pub r_t: f64,
+}
+
+impl KerWindow {
+    /// Stability decay step s_t = k_t * e_t - r_t.
+    pub fn stability_step(&self) -> f64 {
+        self.k_t * self.e_t - self.r_t
+    }
+}
+
+/// Lane modes for workloads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LaneMode {
+    /// Experimental lane.
+    Exp,
+    /// Safe streak lane.
+    SafeStreak,
+    /// Production lane.
+    Prod,
+    /// Emergency halt lane.
+    Emerg,
+}
+
+/// Daily residual classification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DailyResidualClass {
+    /// Residual in safe band.
+    Safe,
+    /// Residual in warning band.
+    Warning,
+    /// Residual in emergency band.
+    Emergency,
+}
+
+/// Lane predicates for a proposed action.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LanePredicate {
+    Deploy,
+    ResearchOnly,
+    BlockedByRisk,
+    BlockedByCorridor,
+    BlockedByInvariant,
+}
+
+/// Lane automaton state.
+#[derive(Debug, Clone, Copy)]
+pub struct LaneState {
+    /// Current lane mode.
+    pub mode: LaneMode,
+    /// Length of current safe streak.
+    pub streak_count: u32,
+}
+
+impl LaneState {
+    /// Update lane state given daily residual classification.
+    pub fn advance(self, daily: DailyResidualClass) -> LaneState {
+        match (self.mode, daily) {
+            (LaneMode::Exp, DailyResidualClass::Safe) => LaneState {
+                mode: LaneMode::SafeStreak,
+                streak_count: 1,
+            },
+            (LaneMode::SafeStreak, DailyResidualClass::Safe) => LaneState {
+                mode: LaneMode::SafeStreak,
+                streak_count: self.streak_count + 1,
+            },
+            (LaneMode::SafeStreak, DailyResidualClass::Warning) => LaneState {
+                mode: LaneMode::Exp,
+                streak_count: 0,
+            },
+            (_, DailyResidualClass::Emergency) => LaneState {
+                mode: LaneMode::Emerg,
+                streak_count: 0,
+            },
+            (mode, _) => LaneState {
+                mode,
+                streak_count: 0,
+            },
+        }
+    }
+
+    /// Promote to production if safe streak length ≥ promotion_days.
+    pub fn maybe_promote(self, promotion_days: u32) -> LaneState {
+        if self.mode == LaneMode::SafeStreak && self.streak_count >= promotion_days {
+            LaneState {
+                mode: LaneMode::Prod,
+                streak_count: self.streak_count,
+            }
+        } else {
+            self
+        }
+    }
+}
+
+/// Evaluate a proposed action and classify its lane predicate according to Phoenix‑constitution rules.
+///
+/// Combines:
+/// - Lyapunov safe step gate (V_{t+1} ≤ V_t).
+/// - KER stability step s_t = k_t e_t - r_t.
+/// - Non‑offsettable plane corridors.
+/// - HARD corridor checks.
+pub fn classify_lane(
+    current_vectors: &[RiskVector],
+    next_vectors: &[RiskVector],
+    weights: &LyapunovWeights,
+    ker: KerWindow,
+    safe_max: f64,
+    gold_max: f64,
+    non_offsettable_planes: &[PlaneId],
+) -> LanePredicate {
+    let gate_decision = SafeStepGate::evaluate_step(
+        current_vectors,
+        next_vectors,
+        weights,
+        safe_max,
+        gold_max,
+        true,
+    );
+
+    let vt = match Residual::compute(current_vectors, weights) {
+        Ok(r) => r,
+        Err(_) => return LanePredicate::BlockedByInvariant,
+    };
+    let vt_next = match Residual::compute(next_vectors, weights) {
+        Ok(r) => r,
+        Err(_) => return LanePredicate::BlockedByInvariant,
+    };
+    let delta_v = Residual::delta(vt_next, vt);
+
+    let s_t = ker.stability_step();
+
+    if delta_v > -s_t {
+        return LanePredicate::BlockedByInvariant;
+    }
+
+    match gate_decision {
+        SafeStepDecision::Rejected(SpineError::CorridorHardViolation { plane, .. }) => {
+            if non_offsettable_planes.contains(&plane) {
+                LanePredicate::BlockedByCorridor
+            } else {
+                LanePredicate::BlockedByRisk
+            }
+        }
+        SafeStepDecision::Rejected(SpineError::NonOffsettablePlaneViolation { plane, .. }) => {
+            if non_offsettable_planes.contains(&plane) {
+                LanePredicate::BlockedByCorridor
+            } else {
+                LanePredicate::BlockedByRisk
+            }
+        }
+        SafeStepDecision::Rejected(_) => LanePredicate::BlockedByInvariant,
+        SafeStepDecision::Allowed => {
+            if s_t > 0.0 {
+                LanePredicate::Deploy
+            } else {
+                LanePredicate::ResearchOnly
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -519,5 +682,49 @@ mod tests {
             SafeStepDecision::Rejected(SpineError::UnstableStep { .. }) => {}
             other => panic!("expected unstable step rejection, got {:?}", other),
         }
+    }
+
+    #[test]
+    fn classify_lane_respects_ker_and_gate() {
+        let hydrology = PlaneId("hydrology".to_string());
+        let w_h = LyapunovWeight::new(hydrology.clone(), 1.0, true).unwrap();
+        let weights = LyapunovWeights::new(vec![w_h]).unwrap();
+
+        let current = RiskVector::new(
+            hydrology.clone(),
+            vec![RiskCoord {
+                plane: hydrology.clone(),
+                metric: "nitrate_ppm".to_string(),
+                value: 0.2,
+            }],
+        )
+        .unwrap();
+        let next = RiskVector::new(
+            hydrology.clone(),
+            vec![RiskCoord {
+                plane: hydrology.clone(),
+                metric: "nitrate_ppm".to_string(),
+                value: 0.1,
+            }],
+        )
+        .unwrap();
+
+        let ker = KerWindow {
+            k_t: 0.95,
+            e_t: 0.90,
+            r_t: 0.10,
+        };
+
+        let pred = classify_lane(
+            &[current],
+            &[next],
+            &weights,
+            ker,
+            0.3,
+            0.7,
+            &[hydrology.clone()],
+        );
+
+        assert!(matches!(pred, LanePredicate::Deploy | LanePredicate::ResearchOnly));
     }
 }
