@@ -1,0 +1,95 @@
+# File: ecofort/PhoenixHexRegistry2026v1.aln
+
+alnversion 1.0
+schema PhoenixHexRegistry2026v1
+title Eco-Fort Phoenix Hex Anchor Registry
+region Phoenix-CAP-Canal
+bostromdid bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+logical_name PhoenixHexAnchorRegistry
+phoenix_hex_anchor 0xPHXHEXREG2026
+
+# 1. Table definition for phoenix_hex_anchor / phoenix_hex_registry.
+table phoenix_hex_anchor
+    column hex_id            Utf8(64)       primary_key
+    column region_id         Utf8(64)       not_null
+    column lane_id           Utf8(64)       not_null
+    column anchor_hex        Utf8(128)      not_null
+    column description       Utf8(256)      not_null
+    column created_at_iso    Utf8(32)       not_null
+    column created_by_did    Utf8(128)      not_null
+    column plane_weights_id  Utf8(64)       not_null
+    column blast_radius_id   Utf8(64)       not_null
+    column continuity_grade  Utf8(32)       not_null
+    column sovereignty_tags  Utf8(256)      not_null
+    column evidence_hex      Utf8(128)      not_null
+    column active_flag       Bool           not_null
+endtable
+
+# 2. Integrity constraints (expressed declaratively).
+constraint PrimaryKeyHexId
+    require unique(hex_id)
+endconstraint
+
+constraint HexFormat
+    # All anchor_hex values must be hex-encoded with 0x prefix.
+    require matches(anchor_hex, "^0x[0-9A-Fa-f]+$")
+endconstraint
+
+constraint BostromBinding
+    # created_by_did must match the project Bostrom DID prefix.
+    require starts_with(created_by_did, "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7")
+endconstraint
+
+constraint ForeignKeys
+    # plane_weights_id references PlaneWeightsRow, blast_radius_id references BlastRadiusAsset.
+    require fk(plane_weights_id, "plane_weights", "plane_weights_id")
+    require fk(blast_radius_id, "blast_radius_assets", "shardid")
+endconstraint
+
+constraint ContinuityBands
+    # continuity_grade limited to safe, gold, hard.
+    require in_set(continuity_grade, ["SAFE","GOLD","HARD"])
+endconstraint
+
+# 3. Seed data rows.
+seed phoenix_hex_anchor
+    row
+        hex_id           "PHX-HEX-0001"
+        region_id        "PHX-CAP-SEG-A1"
+        lane_id          "LANE-HYD-01"
+        anchor_hex       "0xPHX3345NWorkloadEnergyDeltaVt"
+        description      "Phoenix canal segment A1 energy/Vt workload anchor."
+        created_at_iso   "2026-07-09T00:00:00Z"
+        created_by_did   "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+        plane_weights_id "PW-HYD-ENERGY-2026"
+        blast_radius_id  "BR-PHX-CAP-A1"
+        continuity_grade "GOLD"
+        sovereignty_tags "PHOENIX;CAP;ECOFORT"
+        evidence_hex     "0x20260709PHX3345NWorkloadEnergyDeltaVt"
+        active_flag      true
+    endrow
+
+    row
+        hex_id           "PHX-HEX-0002"
+        region_id        "PHX-CAP-SEG-B2"
+        lane_id          "LANE-BIO-02"
+        anchor_hex       "0xPHXSEG-B2-BIODIV"
+        description      "Phoenix canal segment B2 biodiversity anchor."
+        created_at_iso   "2026-07-10T00:00:00Z"
+        created_by_did   "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+        plane_weights_id "PW-BIO-2026"
+        blast_radius_id  "BR-PHX-CAP-B2"
+        continuity_grade "SAFE"
+        sovereignty_tags "PHOENIX;CAP;ECOFORT"
+        evidence_hex     "0x20260710PHXSEG-B2-BIODIV"
+        active_flag      true
+    endrow
+endseed
+
+ecoimpactscores
+    knowledgefactor 0.95
+    ecoimpact       0.91
+    residualrisk    0.12
+endecoimpactscores
+
+endschema
