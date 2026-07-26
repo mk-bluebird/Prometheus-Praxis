@@ -1,7 +1,20 @@
 ```
-# Database files
-*.db
+# Dependencies
+target/
+**/target/
 
-# Generated JSON inventory
-ecorestorationshard/output/
+# Build artifacts
+**/Cargo.lock
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+.env.*
 ```
