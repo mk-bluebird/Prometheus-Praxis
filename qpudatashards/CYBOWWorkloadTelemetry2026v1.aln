@@ -1,0 +1,51 @@
+# File: qpudatashards/CYBOWWorkloadTelemetry2026v1.aln
+
+alnversion 1.0
+schema CYBOWWorkloadTelemetry2026v1
+title Cyboquatic Workload Telemetry Binary Frame (CYBOW)
+region Phoenix-CAP-Canal
+kernelversion KER-2026-07
+phoenix_hex_anchor 0xCYBOWPHX20260725
+logical_name CYBOW.WorkloadSample
+
+# Fixed header; all fields are big-endian.
+field magic_u32        U32  # 0x43594257 = 'CYBW'
+field version_u16      U16  # 0x0001
+field frame_length_u32 U32  # total bytes including header
+
+# ALN type-hint segment: allows self-describing decoding.
+field aln_anchor_hex   Bytes(16)  # truncated phoenix_hex_anchor
+field logical_name_str Utf8(32)   # e.g. "WorkloadEnergyDeltaVt"
+
+# Core workload telemetry payload, mirroring WorkloadSample in Rust.
+field sample_id_len_u8 U8
+field sample_id_bytes  Bytes(sample_id_len_u8)
+field node_id_len_u8   U8
+field node_id_bytes    Bytes(node_id_len_u8)
+
+field timestamp_unix_s_i64 I64  # UTC seconds since epoch
+
+field energy_req_j_f64       F64
+field energy_surplus_j_f64   F64
+field hydraulic_risk_f32     F32  # normalized 0..1
+field uncertainty_risk_f32   F32  # normalized 0..1
+
+field renergy_f32            F32  # normalized 0..1
+field rhydraulic_f32         F32
+field runcertainty_f32       F32
+
+field vt_before_f64          F64
+field vt_after_f64           F64
+field delta_vt_f64           F64
+
+field kfactor_f32            F32
+field efactor_f32            F32
+field rfactor_f32            F32
+
+# Evidence and signing anchors.
+field evidence_hex_len_u8    U8
+field evidence_hex_bytes     Bytes(evidence_hex_len_u8)
+field signing_hex_len_u8     U8
+field signing_hex_bytes      Bytes(signing_hex_len_u8)
+
+endschema
