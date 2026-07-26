@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::models::RegionalEcoLedgerParticle;
-use ecospine::{KER, Residual, RiskCoord, CorridorBands};
+use prometheus_praxis_spine::{KER, Residual, CorridorBand};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KerContext {

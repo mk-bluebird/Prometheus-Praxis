@@ -9,12 +9,17 @@
 //! - `SafeStepGate` for enforcing ΔV_t ≤ 0 and corridor grammar.
 //! - KER window, lane predicates, and lane automaton for Phoenix‑constitution governance.
 //! - Corridor mapping helpers for harmful/beneficial metrics.
+//! - `EcoCredit` for output-only eco-restoration credit computation.
 
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
 #![deny(clippy::panic)]
+
+pub mod eco_credit;
+
+pub use eco_credit::EcoCredit;
 
 use serde::{Deserialize, Serialize};
 use std::fmt;

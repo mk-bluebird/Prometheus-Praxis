@@ -42,3 +42,9 @@ Domain crates (hydrology, topology, microplastics, neurorights, Tree‑of‑Life
 - Reject transitions when the gate returns `SafeStepDecision::Rejected`.
 
 This crate is designed to remain stable over decades; extensions occur in domain crates and ALN schemas, while the spine invariants stay unchanged.[file:84]
+
+## EcoCredit kernel (output-only)
+
+The `EcoCredit` type and `EcoCredit::mint` function compute eco-restoration credits from Lyapunov residuals, carbon risk, and workload energy.
+
+They are **output-only**: ledger crates may call `EcoCredit::mint` to record credits, but controllers and plane-weight logic MUST NOT use credits to change risk coordinates or weights, preserving the "credits cannot offset physical risk" constraint.
