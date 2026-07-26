@@ -1,0 +1,63 @@
+# File: qpudatashards/CyboquaticNodeDecommission2026v1.aln
+
+alnversion 1.0
+schema CyboquaticNodeDecommission2026v1
+title Cyboquatic Node Governance Particle (Decommission Ceremony)
+region Phoenix-CAP-Canal
+phoenix_hex_anchor 0xNODEDECOMPHX2026
+logical_name CyboquaticNodeDecommissionParticle
+bostromdid bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+
+# Identity and lifecycle state.
+field node_id_str       Utf8(64)
+field lane_id_str       Utf8(64)
+field lifecycle_state   Enum ACTIVE,SUSPENDED,DECOMMISSIONED
+field ceremony_id_str   Utf8(64)
+field steward_did_str   Utf8(128)
+
+# Time and evidence anchors.
+field tstart_iso        Utf8(32)
+field tend_iso          Utf8(32)
+field evidence_hex_str  Utf8(128)
+field signing_hex_str   Utf8(128)
+
+# Residual and KER before/after shutdown.
+field vt_total_before_f64 F64
+field vt_total_after_f64  F64
+field deltavt_f64         F64
+
+field kerk_before_f32     F32
+field kere_before_f32     F32
+field kerr_before_f32     F32
+
+field kerk_after_f32      F32
+field kere_after_f32      F32
+field kerr_after_f32      F32
+
+# Corridor bands applicable at time of ceremony.
+field corridorbands_json  Utf8(512)
+
+# Invariants: lifecycle and residual requirements.
+constraint LifecycleTransition
+    # ACTIVE or SUSPENDED may transition to DECOMMISSIONED only once.
+    require lifecycle_state == DECOMMISSIONED
+endconstraint
+
+constraint ResidualNonIncrease
+    # Decommissioning must not increase total Vt.
+    require vt_total_after_f64 <= vt_total_before_f64
+endconstraint
+
+constraint KerWindowImprovement
+    # Optional stricter: after shutdown, ecoimpact improves and risk shrinks.
+    require kere_after_f32 >= kere_before_f32
+    require kerr_after_f32 <= kerr_before_f32
+endconstraint
+
+ecoimpactscores
+    knowledgefactor 0.95
+    ecoimpact       0.92
+    residualrisk    0.10
+endecoimpactscores
+
+endschema
