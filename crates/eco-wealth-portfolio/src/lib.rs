@@ -56,3 +56,22 @@ pub use healthdata_tcr_core::{
     list_qf_campaigns_for_pool,
     list_qf_contributions_for_campaign,
 };
+
+/// Feature-gated ledger bridge module for eco credit integration.
+#[cfg(feature = "ledger-bridge")]
+pub mod ledger_bridge {
+    /// Re-export eco ledger particles for attenuated QF computation.
+    pub use eco_ledger_particles::EcoCredit;
+
+    /// Compute attenuated Quadratic Funding weights based on eco credits.
+    /// Stub implementation - bodies left as TODO comments.
+    pub fn compute_attenuated_qf(credits: &[EcoCredit]) -> f64 {
+        // TODO: Implement attenuated QF computation using eco credits
+        // This stub returns a placeholder value.
+        // The full implementation would:
+        // 1. Aggregate eco credits by contributor
+        // 2. Apply attenuation factor based on stewardship history
+        // 3. Compute QF matching pool allocation
+        0.0
+    }
+}

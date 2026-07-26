@@ -1,0 +1,41 @@
+# Education Prompts Index
+# ALN Schema Version: 0.1.0-draft
+# Description: Index structure for educational prompt topics
+
+version: "0.1.0"
+schema_version: "aln-education-v1"
+last_updated: "2026-01-01T00:00:00Z"
+
+prompts:
+  - id: "edu-001"
+    topic: "Eco-Wealth Fundamentals"
+    description: "Introduction to eco-wealth concepts and quadratic funding"
+    aln_schema_ref: "EcoWealthKernel2026v1.aln"
+    difficulty: "beginner"
+    estimated_duration_minutes: 30
+
+  - id: "edu-002"
+    topic: "Cyboquatic Systems"
+    description: "Understanding cyboquatic ecosystem monitoring and restoration"
+    aln_schema_ref: "CyboquaticEcoPlotCore2026v1.aln"
+    difficulty: "intermediate"
+    estimated_duration_minutes: 45
+
+  - id: "edu-003"
+    topic: "Prometheus Praxis Identity"
+    description: "Deep dive into Prometheus-Praxis identity kernel and continuity"
+    aln_schema_ref: "PrometheusPraxisCore.v1.aln"
+    difficulty: "advanced"
+    estimated_duration_minutes: 60
+
+  - id: "edu-004"
+    topic: "Health Data TCR"
+    description: "Health data token-curated registry mechanics"
+    aln_schema_ref: "HealthDataTCR2026v1.aln"
+    difficulty: "intermediate"
+    estimated_duration_minutes: 40
+
+metadata:
+  maintainer: "eco-education-team"
+  contact: "education@econet.example"
+  license: "CC-BY-4.0"
