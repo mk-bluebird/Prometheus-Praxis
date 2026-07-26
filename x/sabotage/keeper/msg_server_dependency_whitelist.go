@@ -8,7 +8,7 @@ import (
     "context"
 
     sdk "github.com/cosmos/cosmos-sdk/types"
-    "github.com/mk-bluebird/eco_restoration_shard/x/sabotage/types"
+    "https://github.com/mk-bluebird/Prometheus-Praxis/x/sabotage/types"
 )
 
 func (k msgServer) SetDependencyWhitelist(
