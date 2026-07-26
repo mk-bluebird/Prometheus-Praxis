@@ -1,0 +1,163 @@
+# filename: aln/phoenix.uhi.hex.risk.v1.aln
+# destination: Prometheus-Praxis/aln/phoenix.uhi.hex.risk.v1.aln
+# license: MIT OR Apache-2.0
+
+alnversion 1.0
+schema PhoenixUHIHexRiskV1
+title Phoenix Urban Heat Island Hex Risk Shard
+region Phoenix-AZ
+shardfamily phoenix.uhi.hex.risk.v1
+bostromdid bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+
+# Identity and spatial fields
+field shardid String
+field hexid String              # horizontal hex index (EcoNet hex grammar)
+field zlayer Int                # vertical layer (0 ground, 1 lower atm, 2 stratosphere)
+field regioncode String         # Phoenix region code or basin id
+field timestart String          # ISO8601
+field timeend String            # ISO8601
+
+# Raw telemetry for UHI and surface state
+field surfacetempC Float        # surface temperature in Celsius
+field airtempC Float            # near-surface air temperature
+field canopycoverpct Float      # canopy cover percentage
+field pavementsfraction Float   # fraction of paved area in hex
+field albedo Float              # effective albedo
+field nighttempdeltaC Float     # night-time temp delta vs reference rural baseline
+field humiditypct Float         # relative humidity
+
+# Risk coordinates on Phoenix UHI and ecology planes
+field ruhi Float                # 0..1 normalized UHI risk coordinate
+field rcanopyloss Float         # 0..1 canopy loss risk
+field rthermalstress Float      # 0..1 thermal stress risk for humans
+field rwaterstress Float        # 0..1 water stress risk (e.g. irrigation load)
+field rbiodiversity Float       # 0..1 biodiversity stress in UHI hex
+field rtopology Float           # 0..1 topology / governance drift for UHI corridors
+field rsigma Float              # 0..1 uncertainty coordinate
+
+# Global RiskVector projection for UHI shard
+field renergy Float             # energy plane residual (e.g. cooling energy demand)
+field rhydrology Float          # hydrology plane residual (e.g. groundwater draw)
+field rbiology Float            # biology plane residual
+field rcarbon Float             # carbon plane residual
+field rmaterials Float          # materials plane residual
+field rbiodiversitycoord Float  # biodiversity plane residual
+field rsigmacoord Float         # uncertainty plane residual
+
+# Lyapunov residual and KER window scores
+field vt Float
+field kwindow Float
+field ewindow Float
+field rwindow Float
+field lane String               # RESEARCH | EXP | PROD
+
+# Provenance and signatures
+field evidencehex String
+field signinghex String
+
+# Corridor tables referenced by this shard
+corridortable PhoenixUHITemp2026v1
+corridortable PhoenixCanopyCover2026v1
+corridortable PhoenixWaterStress2026v1
+corridortable PhoenixBiodiversityUHI2026v1
+corridortable PhoenixTopoUHICorridor2026v1
+
+admissibilityrules
+    surfacetempC nonan
+    airtempC nonan
+    canopycoverpct 0.0 100.0
+    pavementsfraction 0.0 1.0
+    albedo 0.0 1.0
+    nighttempdeltaC nonan
+    humiditypct 0.0 100.0
+
+    ruhi 0.0 1.0
+    rcanopyloss 0.0 1.0
+    rthermalstress 0.0 1.0
+    rwaterstress 0.0 1.0
+    rbiodiversity 0.0 1.0
+    rtopology 0.0 1.0
+    rsigma 0.0 1.0
+
+    renergy 0.0 1.0
+    rhydrology 0.0 1.0
+    rbiology 0.0 1.0
+    rcarbon 0.0 1.0
+    rmaterials 0.0 1.0
+    rbiodiversitycoord 0.0 1.0
+    rsigmacoord 0.0 1.0
+
+    vt nonan
+endadmissibilityrules
+
+# Risk mappings: physical telemetry -> normalized risk coordinates
+riskmapping uhi_temp_map
+    sourcecolumns surfacetempC, airtempC, nighttempdeltaC
+    targetcoordinate ruhi
+    corridortable PhoenixUHITemp2026v1
+endriskmapping
+
+riskmapping canopy_loss_map
+    sourcecolumn canopycoverpct
+    targetcoordinate rcanopyloss
+    corridortable PhoenixCanopyCover2026v1
+endriskmapping
+
+riskmapping water_stress_map
+    sourcecolumns pavementsfraction, humiditypct
+    targetcoordinate rwaterstress
+    corridortable PhoenixWaterStress2026v1
+endriskmapping
+
+riskmapping biodiversity_uhi_map
+    sourcecolumns canopycoverpct, pavementsfraction
+    targetcoordinate rbiodiversity
+    corridortable PhoenixBiodiversityUHI2026v1
+endriskmapping
+
+riskmapping topology_uhi_map
+    sourcecolumn rtopology
+    targetcoordinate rtopology
+    corridortable PhoenixTopoUHICorridor2026v1
+endriskmapping
+
+# Aggregations performed in Rust using cyboquatic-ecosafety-core + plane-weights
+riskmapping uhi_riskvector_projection
+    derivedinrust ecosafety-core::phoenix_uhi_hex_into_riskvector
+    targetcoordinates renergy, rhydrology, rbiology, rcarbon, rmaterials, rbiodiversitycoord, rsigmacoord
+endriskmapping
+
+riskmapping kerwindow_from_uhi_residuals
+    derivedinrust ecosafety-core::KerWindowfromresidualseries
+    targetcoordinates kwindow, ewindow, rwindow
+endriskmapping
+
+# Invariants: no corridor, no build and non-offsettable planes
+constraint UHICorridorPresence
+    require ruhi 1.0
+    require rcanopyloss 1.0
+    require rwaterstress 1.0
+    require rbiodiversity 1.0
+    require rtopology 1.0
+    require rsigma 1.0
+endconstraint
+
+constraint NonOffsettableCarbonBiodiversity
+    # Carbon and biodiversity planes are non-offsettable per plane-weights.
+    require rcarbon PhoenixUHITemp2026v1.corridormax
+    require rbiodiversitycoord PhoenixBiodiversityUHI2026v1.corridormax
+endconstraint
+
+constraint SafeStepAndKERBands
+    require kwindow 0.90
+    require ewindow 0.90
+    require rwindow 0.13
+endconstraint
+
+ecoimpactscores
+    knowledgefactor 0.95
+    ecoimpact 0.92
+    residualrisk 0.12
+endecoimpactscores
+
+endschema
