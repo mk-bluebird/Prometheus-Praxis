@@ -62,6 +62,171 @@ pub fn qsar_rmicro_prior(persistence_score: f32) -> f32 {
     persistence_score.clamp(0.0, 1.0)
 }
 
+/// Clamped risk coordinate in [0.0, 1.0] using f64 for core ecosafety math.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct RiskCoord {
+    /// Normalized risk value in [0.0, 1.0].
+    pub value: f64,
+}
+
+impl RiskCoord {
+    /// Construct a new clamped coordinate.
+    pub fn new(raw: f64) -> Self {
+        let v = if raw < 0.0 {
+            0.0
+        } else if raw > 1.0 {
+            1.0
+        } else {
+            raw
+        };
+        Self { value: v }
+    }
+}
+
+/// Full ecosafety risk vector using f64 coordinates.
+///
+/// This matches the ecosafety spine used by other crates.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct RiskVectorF64 {
+    pub renergy: RiskCoord,
+    pub rhydraulics: RiskCoord,
+    pub rbiology: RiskCoord,
+    pub rcarbon: RiskCoord,
+    pub rmaterials: RiskCoord,
+    pub rbiodiversity: RiskCoord,
+    pub rsigma: RiskCoord,
+}
+
+/// Lyapunov weights for the f64 risk vector.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct LyapunovWeights {
+    pub w_energy: f64,
+    pub w_hydraulics: f64,
+    pub w_biology: f64,
+    pub w_carbon: f64,
+    pub w_materials: f64,
+    pub w_biodiversity: f64,
+    pub w_sigma: f64,
+}
+
+/// Residual value and max coordinate for Lyapunov analysis.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct Residual {
+    /// Lyapunov residual V_t.
+    pub vt: f64,
+    /// Maximum plane coordinate across the risk vector.
+    pub maxcoord: f64,
+}
+
+impl LyapunovWeights {
+    /// Evaluate residual and max coordinate for a given risk vector.
+    pub fn evaluate(&self, rv: &RiskVectorF64) -> Residual {
+        let e = rv.renergy.value;
+        let h = rv.rhydraulics.value;
+        let b = rv.rbiology.value;
+        let c = rv.rcarbon.value;
+        let m = rv.rmaterials.value;
+        let bd = rv.rbiodiversity.value;
+        let s = rv.rsigma.value;
+
+        let vt = self.w_energy * e * e
+            + self.w_hydraulics * h * h
+            + self.w_biology * b * b
+            + self.w_carbon * c * c
+            + self.w_materials * m * m
+            + self.w_biodiversity * bd * bd
+            + self.w_sigma * s * s;
+
+        let maxcoord = e.max(h).max(b).max(c).max(m).max(bd).max(s);
+
+        Residual { vt, maxcoord }
+    }
+}
+
+/// KER window for residual series using f64 residuals.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct KerWindow {
+    /// Fraction of nonincreasing residual steps.
+    pub k: f64,
+    /// Mean eco-benefit across the window.
+    pub e: f64,
+    /// Maximum risk coordinate across the window.
+    pub r: f64,
+}
+
+impl KerWindow {
+    /// Build a KER window from residual and max risk series.
+    pub fn from_residual_series(vts: &[f64], maxrisks: &[f64]) -> Option<Self> {
+        if vts.len() < 2 || vts.len() != maxrisks.len() {
+            return None;
+        }
+
+        let mut nonincreasing_steps = 0usize;
+        let mut eco_benefit_sum = 0.0;
+        let mut max_risk = 0.0;
+
+        for i in 1..vts.len() {
+            if vts[i] <= vts[i - 1] {
+                nonincreasing_steps += 1;
+            }
+        }
+
+        for r in maxrisks {
+            if *r > max_risk {
+                max_risk = *r;
+            }
+            eco_benefit_sum += (1.0 - *r).max(0.0);
+        }
+
+        let k = nonincreasing_steps as f64 / (vts.len() - 1) as f64;
+        let e = eco_benefit_sum / vts.len() as f64;
+        let r = max_risk;
+
+        Some(KerWindow { k, e, r })
+    }
+
+    /// Check if this window is deployable under a production band.
+    pub fn is_deployable(&self, k_min: f64, e_min: f64, r_max: f64) -> bool {
+        self.k >= k_min && self.e >= e_min && self.r <= r_max
+    }
+}
+
+/// Safe-step decision for Lyapunov residual and corridor checks.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub enum SafeStepDecision {
+    /// Step is accepted.
+    Accept,
+    /// Step is rejected.
+    Reject,
+}
+
+/// Gate that enforces safestep invariant and corridor bounds.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct SafeStepGate {
+    weights: LyapunovWeights,
+    vt_current: Residual,
+}
+
+impl SafeStepGate {
+    /// Construct a new gate from weights and current residual.
+    pub fn new(weights: LyapunovWeights, vt_current: Residual) -> Self {
+        Self { weights, vt_current }
+    }
+
+    /// Evaluate a proposed next risk vector.
+    ///
+    /// Returns the next residual and the accept/reject decision.
+    pub fn evaluate_next(&self, next: RiskVectorF64) -> (Residual, SafeStepDecision) {
+        let res_next = self.weights.evaluate(&next);
+        let decision = if res_next.vt <= self.vt_current.vt && res_next.maxcoord <= 1.0 {
+            SafeStepDecision::Accept
+        } else {
+            SafeStepDecision::Reject
+        };
+        (res_next, decision)
+    }
+}
+
 /// Combine test-based r_micro and QSAR prior into a corridor classification.
 ///
 /// Returns the combined coordinate and the corridor label.
@@ -77,9 +242,8 @@ pub fn classify_rmicro(rmicro_test: f32, rmicro_qsar: f32) -> (f32, &'static str
     (rmicro_combined, corridor)
 }
 
-/// Risk vector with per-plane normalized risk coordinates.
-///
-/// All coordinates are expected in the interval [0, 1].
+/// Risk vector with per-plane normalized risk coordinates using f32 for
+/// lighter-weight KER scoring and AI-chat tooling.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RiskVector {
     pub renergy: f32,
@@ -92,7 +256,22 @@ pub struct RiskVector {
     pub rtopology: f32,
 }
 
-/// Plane weights used in residual computation.
+impl RiskVector {
+    /// Convert to the core f64-based RiskVectorF64 used by LyapunovWeights.
+    pub fn to_f64(&self, rsigma: f32) -> RiskVectorF64 {
+        RiskVectorF64 {
+            renergy: RiskCoord::new(self.renergy as f64),
+            rhydraulics: RiskCoord::new(self.rhydraulic as f64),
+            rbiology: RiskCoord::new(self.rbiology as f64),
+            rcarbon: RiskCoord::new(self.rcarbon as f64),
+            rmaterials: RiskCoord::new(self.rmaterials as f64),
+            rbiodiversity: RiskCoord::new(self.rbiodiversity as f64),
+            rsigma: RiskCoord::new(rsigma as f64),
+        }
+    }
+}
+
+/// Plane weights used in residual computation for the f32 risk vector.
 ///
 /// All weights must be non-negative.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -107,7 +286,7 @@ pub struct PlaneWeights {
     pub wtopology: f32,
 }
 
-/// Snapshot of KER values and residual for a shard window.
+/// Snapshot of KER values and residual for a shard window, using f32.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KerSnapshot {
     /// Knowledge factor in [0, 1].
@@ -120,9 +299,10 @@ pub struct KerSnapshot {
     pub vt: f32,
 }
 
-/// Compute Lyapunov residual V_t = sum_j w_j * r_j^2.
+/// Compute Lyapunov residual V_t = sum_j w_j * r_j^2 for f32 vectors.
 ///
-/// Inputs are purely numeric; the caller is responsible for normalization and corridor mapping.
+/// Inputs are purely numeric; the caller is responsible for normalization
+/// and corridor mapping.
 pub fn compute_residual(weights: &PlaneWeights, rv: &RiskVector) -> f32 {
     weights.wenergy * rv.renergy * rv.renergy
         + weights.whydraulic * rv.rhydraulic * rv.rhydraulic
@@ -154,12 +334,53 @@ pub fn check_safe_step(vt_before: f32, vt_after: f32, epsilon: f32) -> bool {
     vt_after <= vt_before + epsilon
 }
 
+#[cfg(kani)]
+mod kaniharness {
+    use super::*;
+    use kani::any;
+
+    #[kani::proof]
+    fn residual_non_negative_and_clamped() {
+        let re = any::<f64>();
+        let rh = any::<f64>();
+        let rb = any::<f64>();
+        let rc = any::<f64>();
+        let rm = any::<f64>();
+        let rbd = any::<f64>();
+        let rs = any::<f64>();
+
+        let rv = RiskVectorF64 {
+            renergy: RiskCoord::new(re),
+            rhydraulics: RiskCoord::new(rh),
+            rbiology: RiskCoord::new(rb),
+            rcarbon: RiskCoord::new(rc),
+            rmaterials: RiskCoord::new(rm),
+            rbiodiversity: RiskCoord::new(rbd),
+            rsigma: RiskCoord::new(rs),
+        };
+
+        let w = LyapunovWeights {
+            w_energy: 1.0,
+            w_hydraulics: 1.0,
+            w_biology: 1.0,
+            w_carbon: 1.0,
+            w_materials: 1.0,
+            w_biodiversity: 1.0,
+            w_sigma: 1.0,
+        };
+
+        let res = w.evaluate(&rv);
+        kani::assert!(res.vt >= 0.0);
+        kani::assert!(res.maxcoord >= 0.0 && res.maxcoord <= 1.0);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn residual_non_negative() {
+    fn residual_non_negative_f32() {
         let weights = PlaneWeights {
             wenergy: 1.0,
             whydraulic: 1.0,
@@ -240,5 +461,31 @@ mod tests {
         let (r_hard, c_hard) = classify_rmicro(0.8, 0.8);
         assert!(r_hard > 0.6);
         assert_eq!(c_hard, "HARD");
+    }
+
+    #[test]
+    fn kerwindow_is_deployable_band_check() {
+        let vts = vec![1.0_f64, 0.9, 0.8, 0.75];
+        let maxrisks = vec![0.3_f64, 0.25, 0.2, 0.2];
+        let kw = KerWindow::from_residual_series(&vts, &maxrisks).expect("window");
+        assert!(kw.is_deployable(0.5, 0.5, 0.4));
+    }
+
+    #[test]
+    fn riskvector_to_f64_conversion() {
+        let rv = RiskVector {
+            renergy: 0.2,
+            rhydraulic: 0.3,
+            rbiology: 0.4,
+            rcarbon: 0.1,
+            rmaterials: 0.5,
+            rbiodiversity: 0.6,
+            rdataquality: 0.7,
+            rtopology: 0.8,
+        };
+        let core = rv.to_f64(0.9);
+        assert!((core.renergy.value - 0.2).abs() < 1e-9);
+        assert!((core.rsigma.value - 0.9).abs() < 1e-9);
+        assert!(core.maxcoord <= 1.0);
     }
 }
