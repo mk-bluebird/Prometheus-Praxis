@@ -60,3 +60,20 @@ The SQLite registry is authoritative; this file is a convenience layer for human
 > - Add at least one `phoenix_hex_file` binding with the correct `relpath`.
 > - Optionally add a `phoenix_hex_particle_binding` row.
 > - Mirror the anchor here for human/agent convenience.[file:36]
+
+---
+
+### Logical name PHXBLASTRADIUS_SURCHARGE20260725
+
+- Evidence hex `0x20260725PHXBLASTRADIUS_SURCHARGE` [file:11]
+- Domain/subdomain `CYBOQUATIC BLASTRADIUS_SURCHARGE` [file:11]
+- Region `PHX-CAZ-CEIM`
+- Planes `ENERGY,HYDRAULICS,BIO,TOX,DATA,TOPOLOGY` [file:2]
+- Default path `ecorestorationshard/cyboquaticprogress/20260725`
+- Files
+  - SQL `ecorestorationshard/cyboquaticprogress/20260725/sql/blast_surcharge_radius.sql`
+  - C++ `ecorestorationshard/cyboquaticprogress/20260725/cpp/blast_surcharge_kernel.cpp`
+  - Java `ecorestorationshard/cyboquaticprogress/20260725/java/BlastSurchargeTelemetry.java`
+  - ALN `ecorestorationshard/cyboquaticprogress/20260725/aln/BlastRadiusSurcharge20260725.aln`
+- Particle bindings
+  - Particle `BlastRadiusSurcharge20260725v1` role `BLASTRADIUS_SURCHARGE` [file:2][file:11]
