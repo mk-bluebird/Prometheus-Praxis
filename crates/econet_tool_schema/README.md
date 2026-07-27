@@ -35,6 +35,33 @@ These artifacts are consumed by AI-chat backends, MCP tools, and other agents to
   - Use `generate_tool_schema` with a `SchemaProvider` implementation to derive tool schemas from Rust types and governance metadata.
   - Use `generate_all_tool_schemas_from_aln` (with `aln_catalog` feature) to bulk-generate schemas from the ALN catalog.
 
+## Prometheus-Praxis Shredding Snapshot Schema
+
+This crate provides a dedicated helper function for generating the tool schema for the Prometheus-Praxis shredding snapshot diagnostic:
+
+```rust
+use econet_tool_schema::generate_prometheus_praxis_shredding_snapshot_schema;
+
+let schema = generate_prometheus_praxis_shredding_snapshot_schema()?;
+```
+
+This generates:
+
+- `schemas/tools.prometheus_praxis_get_shredding_snapshot_json.v1.json` — The full tool schema binding governance metadata to input/output JSON schemas.
+- `schemas/prometheus_praxis_get_shredding_snapshot_json.input.json` — The input JSON schema.
+- `schemas/prometheus_praxis_get_shredding_snapshot_json.output.json` — The output JSON schema.
+
+### Non-actuating diagnostic role
+
+The `prometheus_praxis_get_shredding_snapshot_json` function is strictly **non-actuating**:
+
+- **Lanescope:** `RESEARCH`
+- **Roleband:** `DIAGNOSTIC`
+- **Blast-radius class:** `NONACTUATING_DIAGNOSTIC`
+- **AI capability level:** `DIAGNOSTICONLY`
+
+It returns a KER-weighted blast-radius and lane verdict snapshot for a Prometheus-Praxis shredding machine, suitable for AI-chat diagnostic queries but never for direct actuation.
+
 ## Sovereignty and safety
 
 This crate is designed to:

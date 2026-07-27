@@ -167,6 +167,10 @@ INSERT OR IGNORE INTO definitionregistry (
 ('EcosafetyContinuity2026v1', 'AICHAT', 'econet_get_blastradius_summary', 'FFI',
  'eco_restoration_shard', 'src', 'lib.rs', 'Rust', '2026v1', 1, 'RISK', 'AICHAT',
  'Returns JSON blast-radius summary for a node/machine.',
+ 'bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7', datetime('now'), datetime('now')),
+('EcosafetyContinuity2026v1', 'AICHAT', 'prometheus_praxis_get_shredding_snapshot_json', 'FFI',
+ 'prometheus_praxis_ai', 'src', 'lib.rs', 'Rust', '2026v1', 1, 'GOVERNANCE', 'AICHAT',
+ 'KER-weighted blast-radius and lane verdict snapshot for a Prometheus-Praxis shredding machine, strictly non-actuating.',
  'bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7', datetime('now'), datetime('now'));
 
 -------------------------------------------------------------------------------

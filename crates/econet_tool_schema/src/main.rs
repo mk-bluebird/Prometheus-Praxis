@@ -1,74 +1,42 @@
 // filename: crates/econet_tool_schema/src/main.rs
 
-use schemars::JsonSchema;
-use serde::Serialize;
-use serde_json::json;
-
-#[derive(Serialize, JsonSchema)]
-pub struct ShreddingSnapshotInput {
-    /// Opaque handle identifier; bound by the calling platform.
-    pub handle: String,
-    /// Machine identifier for the shredding node.
-    pub machine_id: String,
-}
-
-#[derive(Serialize, JsonSchema)]
-pub struct ShreddingSnapshotOutput {
-    pub machine_id: String,
-    pub region: String;
-    pub lane: String;
-
-    pub carbon_radius: f64;
-    pub biodiversity_radius: f64;
-    pub ker_weighted_carbon_radius: f64;
-    pub ker_weighted_biodiversity_radius: f64;
-
-    pub k_score: f64;
-    pub e_score: f64;
-    pub r_score: f64;
-    pub vt_residual: f64;
-    pub roh_scalar: f64;
-
-    pub carbon_negative_ok: bool;
-    pub restoration_ok: bool;
-
-    pub lane_admissible: bool;
-    pub lane_ker_ok: bool;
-    pub lane_cyboquatic_ok: bool;
-
-    pub shredding_safe_for_prod: bool;
-    pub shredding_requires_restoration_focus: bool;
-
-    pub lane_reason: String;
-}
+use econet_tool_schema::generate_prometheus_praxis_shredding_snapshot_schema;
+use std::fs;
+use std::path::Path;
 
 fn main() -> anyhow::Result<()> {
-    let input_schema = schemars::schema_for!(ShreddingSnapshotInput);
-    let output_schema = schemars::schema_for!(ShreddingSnapshotOutput);
+    // Generate the tool schema using the library function
+    let tool_schema = generate_prometheus_praxis_shredding_snapshot_schema()?;
 
-    let tool_schema = json!({
-        "function_id": "prometheus_praxis_get_shredding_snapshot_json.v1",
-        "ffi_symbol": "prometheus_praxis_get_shredding_snapshot_json",
-        "input_schema": input_schema,
-        "output_schema": output_schema,
-        "lanescope": "RESEARCH",
-        "roleband": "DIAGNOSTIC",
-        "blastradius_class": "NONACTUATING_DIAGNOSTIC"
-    });
+    // Create schemas directory if it doesn't exist
+    let schemas_dir = Path::new("schemas");
+    fs::create_dir_all(schemas_dir)?;
 
-    std::fs::create_dir_all("schemas")?;
-    std::fs::write(
-        "schemas/prometheus_praxis_get_shredding_snapshot_json.input.json",
-        serde_json::to_vec_pretty(&input_schema)?,
+    // Write the main tool schema JSON
+    let tool_schema_json = serde_json::to_string_pretty(&tool_schema)?;
+    fs::write(
+        schemas_dir.join("tools.prometheus_praxis_get_shredding_snapshot_json.v1.json"),
+        tool_schema_json,
     )?;
-    std::fs::write(
-        "schemas/prometheus_praxis_get_shredding_snapshot_json.output.json",
-        serde_json::to_vec_pretty(&output_schema)?,
+
+    // Write input schema separately
+    let input_schema_json = serde_json::to_string_pretty(&tool_schema.input_schema)?;
+    fs::write(
+        schemas_dir.join("prometheus_praxis_get_shredding_snapshot_json.input.json"),
+        input_schema_json,
     )?;
-    std::fs::write(
-        "schemas/tools.prometheus_praxis_get_shredding_snapshot_json.v1.json",
-        serde_json::to_vec_pretty(&tool_schema)?,
+
+    // Write output schema separately
+    let output_schema_json = serde_json::to_string_pretty(&tool_schema.output_schema)?;
+    fs::write(
+        schemas_dir.join("prometheus_praxis_get_shredding_snapshot_json.output.json"),
+        output_schema_json,
     )?;
+
+    println!("Generated tool schema files in schemas/:");
+    println!("  - tools.prometheus_praxis_get_shredding_snapshot_json.v1.json");
+    println!("  - prometheus_praxis_get_shredding_snapshot_json.input.json");
+    println!("  - prometheus_praxis_get_shredding_snapshot_json.output.json");
 
     Ok(())
 }

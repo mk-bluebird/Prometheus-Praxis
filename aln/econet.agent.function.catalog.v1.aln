@@ -148,6 +148,24 @@ INSERT OR REPLACE INTO agentfunctioncatalog (
     'ACTIVE'
 );
 
+-- Prometheus-Praxis shredding snapshot function (non-actuating diagnostic)
+INSERT OR REPLACE INTO agentfunctioncatalog (
+    functionid, summary, inputschema, outputschema, backingview_or_bin,
+    lanescope, riskbands, complexityscore, aicapabilitylevel, versiontag, status
+) VALUES (
+    'prometheus_praxis_get_shredding_snapshot_json.v1',
+    'KER-weighted blast-radius and lane verdict snapshot for a Prometheus-Praxis shredding machine, strictly non-actuating.',
+    'schemas/prometheus_praxis_get_shredding_snapshot_json.input.json',
+    'schemas/prometheus_praxis_get_shredding_snapshot_json.output.json',
+    'prometheus_praxis_get_shredding_snapshot_json',
+    'RESEARCH',
+    'LOW_RISK',
+    'O(1)',
+    'DIAGNOSTICONLY',
+    '2026v1',
+    'ACTIVE'
+);
+
 -------------------------------------------------------------------------------
 -- 3. Register catalog in definitionregistry
 -------------------------------------------------------------------------------
