@@ -1,0 +1,60 @@
+# File: crates/prometheus_praxis_sdk/Cargo.toml
+
+[package]
+name = "prometheus_praxis_sdk"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "Unified governance SDK for Prometheus-Praxis: telemetry, KER, Lyapunov, lane configuration, and C-ABI FFI."
+repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
+homepage = "https://github.com/mk-bluebird/Prometheus-Praxis"
+documentation = "https://github.com/mk-bluebird/Prometheus-Praxis"
+readme = "README.md"
+keywords = ["governance", "telemetry", "lyapunov", "ker", "ecology"]
+categories = ["algorithms", "science", "embedded", "simulation"]
+authors = ["mk-bluebird <bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7>"]
+
+# Kani must be enabled and precise; tests and verification harnesses
+# are configured via dev-dependencies and build scripts.
+[lib]
+name = "prometheus_praxis_sdk"
+path = "src/lib.rs"
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]
+rust_decimal = "1.36.0"
+
+[dev-dependencies]
+kani-verifier = "0.67.0"
+
+[features]
+# Default feature set for governance use.
+default = ["governance"]
+
+# Pure governance logic: lanes, telemetry, KER, Lyapunov.
+governance = []
+
+# Optional feature to build C-ABI FFI layer; enabled for C++ integration.
+ffi = []
+
+[profile.dev]
+opt-level = 1
+debug = true
+overflow-checks = true
+lto = false
+
+[profile.release]
+opt-level = 3
+debug = false
+overflow-checks = true
+lto = true
+codegen-units = 1
+
+[workspace]
+members = []
+
+[package.metadata.kani]
+# Kani configuration for this crate; harnesses reside in src/kani_harnesses.rs.
+# Kani is invoked via `cargo kani --package prometheus_praxis_sdk`.
+test-harnesses = ["kani_production_lane_never_halts_when_inside_bounds", "kani_no_corridor_always_halts"]
