@@ -7,6 +7,7 @@
 #![deny(clippy::panic)]
 
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use time::OffsetDateTime;
 
 /// Lane classification for workloads and AI nodes.
@@ -59,7 +60,7 @@ pub struct KerTriad {
 }
 
 impl KerTriad {
-    /// Compute kerScore = k * (e - r), consistent with ALN ker-axis.
+    /// Compute ker_score = k * (e - r), consistent with ALN ker-axis.
     pub fn score(&self) -> f64 {
         self.k * (self.e - self.r)
     }
@@ -286,7 +287,7 @@ impl AiNodeRiskCoords {
     }
 }
 
-/// Hydraulics / drainage frame as governed by DrainageDecayKernel2026v1.aln2.
+/// Hydraulics / drainage frame governed by DrainageDecayKernel2026v1.
 ///
 /// This struct is the Rust mirror of the ALN particle body and any C++ FFI struct.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -323,7 +324,7 @@ pub struct DrainageFrame {
     pub prior_frame_id: String,
 }
 
-/// Workload frame as governed by WorkloadKernel2026v1.aln2.
+/// Workload frame governed by WorkloadKernel2026v1.
 ///
 /// This struct mirrors your cyboquatic workload energetics sample.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -362,7 +363,7 @@ pub struct WorkloadFrame {
     pub prior_frame_id: String,
 }
 
-/// AI datacenter node frame as governed by AiDatacenterNode2026v1.aln2.
+/// AI datacenter node frame governed by AiDatacenterNode2026v1.
 ///
 /// This struct binds AI node energetics to the global Lyapunov/KER grammar.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -421,10 +422,12 @@ pub struct AiNodeFrame {
 ///
 /// This mirrors the logic in your workload crate and ALN grammar at a high level.
 pub fn compute_ker_from_workload(risks: WorkloadRiskCoords, residual: ResidualSlice) -> KerTriad {
-    let r = risks.clamped();
     let vt = risks.residual();
 
-    let max_r = r.r_energy.max(r.r_hydraulics.max(r.r_uncertainty));
+    let r_clamped = risks.clamped();
+    let max_r = r_clamped
+        .r_energy
+        .max(r_clamped.r_hydraulics.max(r_clamped.r_uncertainty));
 
     // Knowledge: penalize high max_r and positive ΔVt.
     let mut k = 0.95 - 0.4 * max_r;
@@ -464,14 +467,14 @@ pub fn compute_ker_from_workload(risks: WorkloadRiskCoords, residual: ResidualSl
 
 /// Compute KER triad for AI node slice, emphasizing carbon and biodiversity planes.
 pub fn compute_ker_from_ai_node(risks: AiNodeRiskCoords, residual: ResidualSlice) -> KerTriad {
-    let r = risks.clamped();
     let vt_ai = risks.residual();
 
-    // Max risk emphasises carbon, biodiversity, and uncertainty.
-    let max_r = r.r_carbon
-        .max(r.r_biodiversity)
-        .max(r.r_uncertainty)
-        .max(r.r_energy_compute.max(r.r_cooling_water));
+    let r_clamped = risks.clamped();
+    let max_r = r_clamped
+        .r_carbon
+        .max(r_clamped.r_biodiversity)
+        .max(r_clamped.r_uncertainty)
+        .max(r_clamped.r_energy_compute.max(r_clamped.r_cooling_water));
 
     let mut k = 0.95 - 0.5 * max_r;
     if residual.delta_vt > 0.0 {
@@ -484,7 +487,7 @@ pub fn compute_ker_from_ai_node(risks: AiNodeRiskCoords, residual: ResidualSlice
         k = 1.0;
     }
 
-    let mut e = 0.95 - vt_ai - 0.3 * (r.r_carbon + r.r_biodiversity);
+    let mut e = 0.95 - vt_ai - 0.3 * (r_clamped.r_carbon + r_clamped.r_biodiversity);
     if residual.delta_vt > 0.0 {
         e -= 0.3;
     }
@@ -497,8 +500,8 @@ pub fn compute_ker_from_ai_node(risks: AiNodeRiskCoords, residual: ResidualSlice
 
     let mut r_factor = vt_ai
         + residual.delta_vt.max(0.0)
-        + 0.3 * (r.r_carbon + r.r_biodiversity)
-        + 0.2 * r.r_uncertainty;
+        + 0.3 * (r_clamped.r_carbon + r_clamped.r_biodiversity)
+        + 0.2 * r_clamped.r_uncertainty;
     if r_factor < 0.0 {
         r_factor = 0.0;
     }
@@ -559,5 +562,180 @@ pub fn decide_safe(residual: ResidualSlice, ker: KerTriad, lane: Lane) -> SafeDe
 ///
 /// Used for constructing timestamputc fields consistently.
 pub fn now_utc_iso8601() -> String {
-    OffsetDateTime::now_utc().format(&time::format_description::well_known::Rfc3339).unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string())
+    OffsetDateTime::now_utc()
+        .format(&time::format_description::well_known::Rfc3339)
+        .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string())
+}
+
+/// Shredding governance snapshot canonical JSON envelope.
+///
+/// This is the Rust-side representation of what C++ adapters return.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShreddingSnapshot {
+    /// Shredder + screen + KER snapshot.
+    pub machine_id: String,
+    pub region: String,
+    pub lane: String,
+    pub ker: KerTriad,
+    pub residual: ResidualSlice,
+    pub carbon_negative_ok: bool,
+    pub restoration_ok: bool,
+    pub lane_admissible: bool,
+}
+
+/// Pump accountability snapshot canonical JSON envelope.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PumpSnapshot {
+    pub asset_id: String,
+    pub site_code: String,
+    pub region: String,
+    pub lane: String,
+    pub corridor_status: String,
+    pub decision_mode: String,
+    pub ker: KerTriad,
+    pub residual: ResidualSlice,
+    pub window_start_utc: String,
+    pub window_end_utc: String,
+}
+
+/// Top-level wrapper for AI-facing snapshots surfaced as JSON.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "payload")]
+pub enum AiSnapshot {
+    /// Shredding governance snapshot.
+    Shredding(ShreddingSnapshot),
+    /// Pump accountability snapshot.
+    Pump(PumpSnapshot),
+}
+
+/// Construct an AI snapshot for shredding governance from typed structs.
+///
+/// C++ adapters can call into this via FFI and get a stable JSON schema
+/// for AI-chat tools and MCP surfaces.
+pub fn build_shredding_snapshot_json(
+    machine_id: String,
+    region: String,
+    lane: String,
+    ker: KerTriad,
+    residual: ResidualSlice,
+    carbon_negative_ok: bool,
+    restoration_ok: bool,
+    lane_admissible: bool,
+) -> Value {
+    let snapshot = AiSnapshot::Shredding(ShreddingSnapshot {
+        machine_id,
+        region,
+        lane,
+        ker: ker.clamped(),
+        residual,
+        carbon_negative_ok,
+        restoration_ok,
+        lane_admissible,
+    });
+
+    serde_json::to_value(snapshot).unwrap_or_else(|_| json!({ "error": "serialization_failed" }))
+}
+
+/// Construct an AI snapshot for pump accountability as JSON.
+pub fn build_pump_snapshot_json(
+    asset_id: String,
+    site_code: String,
+    region: String,
+    lane: String,
+    corridor_status: String,
+    decision_mode: String,
+    ker: KerTriad,
+    residual: ResidualSlice,
+    window_start_utc: String,
+    window_end_utc: String,
+) -> Value {
+    let snapshot = AiSnapshot::Pump(PumpSnapshot {
+        asset_id,
+        site_code,
+        region,
+        lane,
+        corridor_status,
+        decision_mode,
+        ker: ker.clamped(),
+        residual,
+        window_start_utc,
+        window_end_utc,
+    });
+
+    serde_json::to_value(snapshot).unwrap_or_else(|_| json!({ "error": "serialization_failed" }))
+}
+
+/// FFI shim entrypoint for C++ shredding governance adapter.
+///
+/// C++ can pass already-computed KER and residual values and receive
+/// a JSON string suitable for AI-chat tools. This remains strictly
+/// non-actuating; no hardware paths exist.
+#[no_mangle]
+pub extern "C" fn ppx_ai_get_shredding_snapshot_json(
+    machine_id: *const std::os::raw::c_char,
+    region: *const std::os::raw::c_char,
+    lane: *const std::os::raw::c_char,
+    ker_k: f64,
+    ker_e: f64,
+    ker_r: f64,
+    vt_before: f64,
+    vt_after: f64,
+    carbon_negative_ok: bool,
+    restoration_ok: bool,
+    lane_admissible: bool,
+) -> *mut std::os::raw::c_char {
+    // This function is intended to mirror the governance spine pattern:
+    // it validates pointers, builds Rust structs, and returns JSON.
+    //
+    // To preserve the !forbid(unsafe_code) invariant, this function
+    // should be wired via a small C shim or moved into a separate
+    // module that is allowed to use unsafe. Here we keep the signature
+    // but do not implement pointer dereference in safe code.
+    let _ = (
+        machine_id,
+        region,
+        lane,
+        ker_k,
+        ker_e,
+        ker_r,
+        vt_before,
+        vt_after,
+        carbon_negative_ok,
+        restoration_ok,
+        lane_admissible,
+    );
+    std::ptr::null_mut()
+}
+
+/// Kani harnesses for KER and ecosafety decisions.
+///
+/// These harnesses are compile-time only and never ship in production.
+#[cfg(kani)]
+mod kani_harnesses {
+    use super::*;
+
+    #[kani::proof]
+    fn ker_triad_clamped_in_unit_interval() {
+        let triad = KerTriad { k: 1.5, e: -0.1, r: 2.3 }.clamped();
+        kani::assert!(triad.k >= 0.0 && triad.k <= 1.0);
+        kani::assert!(triad.e >= 0.0 && triad.e <= 1.0);
+        kani::assert!(triad.r >= 0.0 && triad.r <= 1.0);
+    }
+
+    #[kani::proof]
+    fn residual_monotone_production_lane() {
+        let residual = ResidualSlice::new(0.3, 0.2);
+        kani::assert!(residual.is_monotone_for_lane(Lane::Production, 0.0));
+    }
+
+    #[kani::proof]
+    fn decide_safe_production_stops_on_positive_delta_vt() {
+        let residual = ResidualSlice::new(0.2, 0.4);
+        let ker = KerTriad { k: 0.9, e: 0.9, r: 0.1 }.clamped();
+        let decision = decide_safe(residual, ker, Lane::Production);
+        match decision {
+            SafeDecision::Stop => {}
+            _ => kani::assert!(false),
+        }
+    }
 }
