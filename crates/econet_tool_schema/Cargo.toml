@@ -1,0 +1,33 @@
+# filename: crates/econet_tool_schema/Cargo.toml
+
+[package]
+name = "econet_tool_schema"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "Provider-agnostic JSON tool schema generator for EcoNet / Prometheus-Praxis AIsafe function catalogs."
+repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
+
+[lib]
+name = "econet_tool_schema"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[[bin]]
+name = "econet_tool_schema_gen"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
+schemars = { version = "0.8.21", features = ["serde_json"] }
+anyhow = "1.0.86"
+thiserror = "1.0.63"
+
+# For ALN catalog parsing; keep this as an internal parser crate you already use,
+# or stub behind a feature if needed.
+aln_catalog = { path = "../aln_catalog", optional = true }
+
+[features]
+default = ["aln_catalog"]
