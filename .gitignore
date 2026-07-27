@@ -1,21 +1,35 @@
 ```
 # Dependencies
 target/
+node_modules/
+**/node_modules/
+venv/
+.venv/
+__pycache__/
+*.egg-info/
+dist/
+build/
 
-# Logs and temp files
+# Logs
 *.log
-*.tmp
 
 # Environment
 .env
 .env.local
-*.env.*
+.env.*
 
 # Editors
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
-# Rust-specific
+# OS
+.DS_Store
+Thumbs.db
+
+# Rust specific
 Cargo.lock
 **/*.rs.bk
 ```
