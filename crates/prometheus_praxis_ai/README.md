@@ -310,3 +310,31 @@ Example rows: [file:3][file:13]
     - Use ALNv2 particles for schema‑driven code generation and governance proofs.
 
 This design fully defines `prometheus_praxis_ai` as a non‑actuating, ecosafety‑aligned AI engine crate, with Rust KER kernels, CPP numeric models under `src/engine`, ALNv2 bindings, and SQL + hex registries that keep everything discoverable and safe within the Phoenix EcoNet grammar. [file:3][file:13][file:34]
+
+---
+
+## Shredding governance snapshot (AIsafe)
+
+This crate exposes a non‑actuating governance adapter for shredding machinery, aligned with the EcoNet spine and Lyapunov corridor doctrine.
+
+- Function: `prometheus_praxis_get_shredding_snapshot_json`
+- Role: Read‑only diagnostic snapshot for a shredding machine’s KER‑weighted blast‑radius and lane verdict.
+- Lane scope: `RESEARCH` only; no direct actuation paths.
+- Backing FFI: Rust cdylib exported from `crates/prometheus_praxis_ai/src/lib.rs`.
+- Catalog entry: Registered in `econet.agent.function.catalog.v1.aln` with `blastradiusclass = NONACTUATING_DIAGNOSTIC`.
+
+The JSON payload returned by this function includes:
+
+- Identity: `machine_id`, `region`, `lane`.
+- Radii: `carbon_radius`, `biodiversity_radius`, `ker_weighted_carbon_radius`, `ker_weighted_biodiversity_radius`.
+- KER and Lyapunov metrics: `k_score`, `e_score`, `r_score`, `vt_residual`, `roh_scalar`.
+- Lane gates: `carbon_negative_ok`, `restoration_ok`, `lane_admissible`, `lane_ker_ok`, `lane_cyboquatic_ok`, `lane_reason`.
+- Derived shredding flags: `shredding_safe_for_prod`, `shredding_requires_restoration_focus`.
+
+AI‑chat platforms and agents MUST:
+
+- Treat this function as diagnostic‑only; it informs governance decisions but does not control hardware.
+- Respect lane gates: if `carbon_negative_ok` or `restoration_ok` is `false`, no promotion or actuation logic may be proposed for that machine.
+- Use the generated tool schema (`schemas/tools.prometheus_praxis_get_shredding_snapshot_json.v1.json`) for structured tool‑calling, avoiding ad‑hoc JSON parsing.
+
+This adapter is part of the AIsafe catalog and is governed by the same ecosafety, neurorights, and non‑offsettable plane invariants as the rest of the EcoNet spine.
