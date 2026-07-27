@@ -36,6 +36,7 @@ members = [
     "contracts/eco_restoration_credit",
     "prometheus-praxis/spine",
     "crates/econet_tool_schema",
+    "crates/prometheus_praxis_sdk",
 
     # eco_wealth standalone crate
     "eco_wealth",
