@@ -2,16 +2,11 @@
 
 #include <stdexcept>
 #include <cstring>
-
-// Minimal JSON parsing stub; replace with your preferred header-only JSON library.
-// For example, you can use nlohmann::json or a custom lightweight parser wired
-// to your AI-chat toolchain.
 #include <nlohmann/json.hpp>
 
 extern "C" {
 
 // Read-only EcoNet FFI: blast-radius diagnostics per node.
-// Signature pattern mirrors econetgetblastradiusfornode in ecorestorationshard.
 char* econetgetblastradiusfornode(const char* dbpath, const char* nodeid);
 
 // Read-only governance FFI: lane admissibility per shard.
@@ -52,17 +47,15 @@ KerSnapshot parse_ker_snapshot_from_blastradius_json(const json& j,
     KerSnapshot snapshot;
 
     snapshot.machine_id = machine_id;
+    snapshot.region     = j.value("region", "");
+    snapshot.lane       = j.value("lane", "");
 
-    // These fields are populated by the Rust blastradius kernel and governance spine.
-    snapshot.region = j.value("region", "");
-    snapshot.lane   = j.value("lane", "");
-
-    snapshot.carbon_radius      = j.value("carbon_radius", 0.0);
+    snapshot.carbon_radius       = j.value("carbon_radius", 0.0);
     snapshot.biodiversity_radius = j.value("biodiversity_radius", 0.0);
 
-    snapshot.k_score  = j.value("kscore", 0.0);
-    snapshot.e_score  = j.value("escore", 0.0);
-    snapshot.r_score  = j.value("rscore", 0.0);
+    snapshot.k_score = j.value("kscore", 0.0);
+    snapshot.e_score = j.value("escore", 0.0);
+    snapshot.r_score = j.value("rscore", 0.0);
 
     snapshot.vt_residual = j.value("vtresidual", 0.0);
     snapshot.roh_scalar  = j.value("rohscalar", 0.0);
@@ -75,74 +68,88 @@ KerSnapshot parse_ker_snapshot_from_blastradius_json(const json& j,
     return snapshot;
 }
 
-bool parse_lane_admissible_from_json(const json& j, std::string& reason_out) {
-    bool admissible = j.value("admissible", false);
-    reason_out = j.value("reason", "");
-    return admissible;
-}
-
 } // namespace
 
 BlastRadiusClient::BlastRadiusClient(const std::string& shared_lib_path)
-    : lib_path_(shared_lib_path) {
-    // The shared_lib_path is retained for symmetry with other clients;
-    // dynamic loading is assumed to be handled by the process or a higher layer.
-}
+    : lib_path_(shared_lib_path) {}
 
 KerSnapshot BlastRadiusClient::fetch_ker_snapshot(const std::string& db_path,
                                                   const std::string& machine_id) const {
-    // In your Rust FFI, blast-radius kernels are generally keyed by nodeid;
-    // here we treat machine_id as the node identifier for shredders.
     std::string json_str = call_ffi_json(&econetgetblastradiusfornode, db_path, machine_id);
-
     json j = json::parse(json_str);
     return parse_ker_snapshot_from_blastradius_json(j, machine_id);
 }
 
 LaneGovernanceClient::LaneGovernanceClient(const std::string& shared_lib_path)
-    : lib_path_(shared_lib_path) {
-}
+    : lib_path_(shared_lib_path) {}
 
-bool LaneGovernanceClient::check_lane_admissible(const std::string& db_path,
-                                                 const std::string& shard_id,
-                                                 std::string& reason_out) const {
+LaneVerdict LaneGovernanceClient::fetch_lane_verdict(const std::string& db_path,
+                                                     const std::string& shard_id) const {
     std::string json_str = call_ffi_json(&econetlanegovernancecheck, db_path, shard_id);
-
     json j = json::parse(json_str);
-    return parse_lane_admissible_from_json(j, reason_out);
+
+    LaneVerdict v{};
+    v.admissible     = j.value("admissible", false);
+    v.carbon_negative_ok = j.value("carbonnegativeok", false);
+    v.restoration_ok     = j.value("restorationok", false);
+    v.k_ok           = j.value("kok", false);
+    v.e_ok           = j.value("eok", false);
+    v.r_ok           = j.value("rok", false);
+    v.roh_ok         = j.value("rohok", false);
+    v.cyboquatic_ok  = j.value("cyboquaticok", false);
+    v.reason         = j.value("reason", std::string{});
+
+    return v;
 }
 
 ShreddingGovernanceAdapter::ShreddingGovernanceAdapter(const std::string& blastradius_lib_path,
                                                        const std::string& governance_lib_path)
     : blastradius_client_(blastradius_lib_path),
-      lane_governance_client_(governance_lib_path) {
-}
+      lane_governance_client_(governance_lib_path) {}
 
 ShreddingKerSnapshot ShreddingGovernanceAdapter::compute_snapshot(
     const std::string& db_path,
     const ShredderTelemetry& shredder,
     const ScreenDrumTelemetry& screen) const {
 
-    // Fetch KER-weighted blast-radius snapshot for the shredding machine/node.
     KerSnapshot ker = blastradius_client_.fetch_ker_snapshot(db_path, shredder.machine_id);
+    LaneVerdict lane = lane_governance_client_.fetch_lane_verdict(db_path, shredder.machine_id);
 
-    // Lane governance check: shard_id is aligned with machine_id in your governance views
-    // (e.g. shardinstance and vlaneadmissibility).
-    std::string lane_reason;
-    bool lane_ok = lane_governance_client_.check_lane_admissible(db_path,
-                                                                 shredder.machine_id,
-                                                                 lane_reason);
+    ShreddingKerSnapshot out{};
 
-    ShreddingKerSnapshot out;
     out.shredder = shredder;
     out.screen   = screen;
     out.ker      = ker;
 
-    // Derived flags: these are simple projections of governance metrics.
-    out.carbon_negative_ok = ker.ker_weighted_carbon_radius <= ker.carbon_radius &&
-                             j.value("carbonnegativeok", true);
-    out.restoration_ok     = j.value("restorationok", true);
-    out.lane_admissible    = lane_ok;
+    out.machine_id                       = ker.machine_id;
+    out.region                           = ker.region;
+    out.lane                             = ker.lane;
+    out.carbon_radius                    = ker.carbon_radius;
+    out.biodiversity_radius              = ker.biodiversity_radius;
+    out.k_score                          = ker.k_score;
+    out.e_score                          = ker.e_score;
+    out.r_score                          = ker.r_score;
+    out.vt_residual                      = ker.vt_residual;
+    out.roh_scalar                       = ker.roh_scalar;
+    out.ker_weighted_carbon_radius       = ker.ker_weighted_carbon_radius;
+    out.ker_weighted_biodiversity_radius = ker.ker_weighted_biodiversity_radius;
+
+    out.carbon_negative_ok = lane.carbon_negative_ok;
+    out.restoration_ok     = lane.restoration_ok;
+
+    out.lane_admissible    = lane.admissible &&
+                             lane.carbon_negative_ok &&
+                             lane.restoration_ok;
+    out.lane_ker_ok        = lane.k_ok && lane.e_ok && lane.r_ok && lane.roh_ok;
+    out.lane_cyboquatic_ok = lane.cyboquatic_ok;
+    out.lane_reason        = lane.reason;
+
+    out.shredding_safe_for_prod =
+        out.lane_admissible && out.lane_ker_ok && out.lane_cyboquatic_ok;
+
+    out.shredding_requires_restoration_focus =
+        (!out.restoration_ok && lane.admissible) ||
+        (out.restoration_ok && !out.carbon_negative_ok);
 
     return out;
 }
