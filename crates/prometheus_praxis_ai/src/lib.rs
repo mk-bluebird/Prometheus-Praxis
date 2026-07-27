@@ -6,9 +6,17 @@
 #![deny(clippy::expect_used)]
 #![deny(clippy::panic)]
 
+use std::ffi::{CStr, CString};
+use std::os::raw::c_char;
+use std::ptr;
+
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use time::OffsetDateTime;
+
+use econet_governance_spine::{ShardIndex, SpineError};
+use econet_governance_spine::blastradius::KerBlastRadiusSnapshot;
+use econet_governance_spine::laneguard::{LaneAdmissibilityVerdict, lane_check_for_machine};
 
 /// Lane classification for workloads and AI nodes.
 ///
@@ -429,7 +437,6 @@ pub fn compute_ker_from_workload(risks: WorkloadRiskCoords, residual: ResidualSl
         .r_energy
         .max(r_clamped.r_hydraulics.max(r_clamped.r_uncertainty));
 
-    // Knowledge: penalize high max_r and positive ΔVt.
     let mut k = 0.95 - 0.4 * max_r;
     if residual.delta_vt > 0.0 {
         k -= 0.25;
@@ -441,7 +448,6 @@ pub fn compute_ker_from_workload(risks: WorkloadRiskCoords, residual: ResidualSl
         k = 1.0;
     }
 
-    // Eco-impact: high when vt is small and ΔVt <= 0.
     let mut e = 0.95 - vt;
     if residual.delta_vt > 0.0 {
         e -= 0.3;
@@ -453,7 +459,6 @@ pub fn compute_ker_from_workload(risks: WorkloadRiskCoords, residual: ResidualSl
         e = 1.0;
     }
 
-    // Risk-of-harm: baseline vt plus positive ΔVt.
     let mut r_factor = vt + residual.delta_vt.max(0.0);
     if r_factor < 0.0 {
         r_factor = 0.0;
@@ -665,16 +670,204 @@ pub fn build_pump_snapshot_json(
     serde_json::to_value(snapshot).unwrap_or_else(|_| json!({ "error": "serialization_failed" }))
 }
 
-/// FFI shim entrypoint for C++ shredding governance adapter.
+/// Internal helper: convert C string pointer to &str using SpineError.
+fn cstr_to_str<'a>(ptr: *const c_char) -> Result<&'a str, SpineError> {
+    if ptr.is_null() {
+        return Err(SpineError::InvalidArgument("null pointer".into()));
+    }
+    unsafe { CStr::from_ptr(ptr) }
+        .to_str()
+        .map_err(|_| SpineError::InvalidArgument("invalid UTF-8".into()))
+}
+
+/// Internal helper: serialize any Serialize value to a C string.
+fn to_json_cstring<T: Serialize>(value: &T) -> *mut c_char {
+    match serde_json::to_string(value) {
+        Ok(s) => match CString::new(s) {
+            Ok(cstr) => cstr.into_raw(),
+            Err(_) => ptr::null_mut(),
+        },
+        Err(_) => ptr::null_mut(),
+    }
+}
+
+/// Internal helper: JSON error envelope as C string.
+fn error_json_internal(msg: &str) -> *mut c_char {
+    let payload = json!({ "error": msg.to_string() }).to_string();
+    match CString::new(payload) {
+        Ok(cstr) => cstr.into_raw(),
+        Err(_) => ptr::null_mut(),
+    }
+}
+
+macro_rules! impl_ffi_query {
+    (
+        $(#[$meta:meta])*
+        fn $name:ident(
+            $handle:ident : *mut ShardIndex,
+            $( $arg_name:ident : *const c_char ),* $(,)?
+        ) -> *mut c_char
+        {
+            $body:block
+        }
+    ) => {
+        $(#[$meta])*
+        #[no_mangle]
+        pub extern "C" fn $name(
+            $handle: *mut ShardIndex,
+            $( $arg_name: *const c_char ),*
+        ) -> *mut c_char {
+            if $handle.is_null() {
+                return error_json_internal("invalid null ShardIndex handle");
+            }
+
+            let shard = unsafe { &mut *$handle };
+
+            $(
+                let $arg_name = match cstr_to_str($arg_name) {
+                    Ok(s) => s.to_owned(),
+                    Err(e) => return error_json_internal(&e.to_string()),
+                };
+            )*
+
+            let result: Result<impl Serialize, SpineError> = (|| $body)();
+
+            match result {
+                Ok(value) => to_json_cstring(&value),
+                Err(e) => error_json_internal(&e.to_string()),
+            }
+        }
+    };
+}
+
+/// Shredding KER + lane snapshot as JSON for governance adapters.
 ///
-/// C++ can pass already-computed KER and residual values and receive
-/// a JSON string suitable for AI-chat tools. This remains strictly
-/// non-actuating; no hardware paths exist.
+/// This FFI entry stays strictly non-actuating and reads from the
+/// EcoNet governance spine via ShardIndex.
+#[repr(C)]
+#[derive(Debug, Serialize)]
+pub struct ShreddingKerSnapshotJson {
+    /// Machine identifier (shredder / node id).
+    pub machine_id: String,
+    /// Region / basin.
+    pub region: String,
+    /// Lane string (RESEARCH / PILOT / PRODUCTION).
+    pub lane: String,
+    /// Raw carbon radius.
+    pub carbon_radius: f64,
+    /// Raw biodiversity radius.
+    pub biodiversity_radius: f64,
+    /// KER-weighted carbon radius.
+    pub ker_weighted_carbon_radius: f64,
+    /// KER-weighted biodiversity radius.
+    pub ker_weighted_biodiversity_radius: f64,
+    /// Knowledge factor.
+    pub k_score: f64,
+    /// Eco-impact factor.
+    pub e_score: f64,
+    /// Risk-of-harm factor.
+    pub r_score: f64,
+    /// Lyapunov residual.
+    pub vt_residual: f64,
+    /// Rule-of-harm scalar.
+    pub roh_scalar: f64,
+    /// Lane carbon-negative gate.
+    pub carbon_negative_ok: bool,
+    /// Lane restoration gate.
+    pub restoration_ok: bool,
+    /// Overall lane admissible flag.
+    pub lane_admissible: bool,
+    /// KER predicate OK for lane.
+    pub lane_ker_ok: bool,
+    /// Cyboquatic predicate OK for lane.
+    pub lane_cyboquatic_ok: bool,
+    /// Derived production safety flag.
+    pub shredding_safe_for_prod: bool,
+    /// Derived restoration-focus flag.
+    pub shredding_requires_restoration_focus: bool,
+    /// Human-readable lane reason.
+    pub lane_reason: String,
+}
+
+fn build_shredding_snapshot(
+    ker: KerBlastRadiusSnapshot,
+    lane: LaneAdmissibilityVerdict,
+) -> ShreddingKerSnapshotJson {
+    let carbon_negative_ok = lane.carbonnegativeok;
+    let restoration_ok = lane.restorationok;
+
+    let lane_admissible = lane.admissible && carbon_negative_ok && restoration_ok;
+    let lane_ker_ok = lane.kok && lane.eok && lane.rok && lane.rohok;
+    let lane_cyboquatic_ok = lane.cyboquaticok;
+
+    let shredding_safe_for_prod = lane_admissible && lane_ker_ok && lane_cyboquatic_ok;
+    let shredding_requires_restoration_focus =
+        (!restoration_ok && lane.admissible) || (restoration_ok && !carbon_negative_ok);
+
+    ShreddingKerSnapshotJson {
+        machine_id: ker.machine_id.clone(),
+        region: ker.region.clone(),
+        lane: ker.lane.clone(),
+        carbon_radius: ker.carbon_radius,
+        biodiversity_radius: ker.biodiversity_radius,
+        ker_weighted_carbon_radius: ker.ker_weighted_carbon_radius,
+        ker_weighted_biodiversity_radius: ker.ker_weighted_biodiversity_radius,
+        k_score: ker.kscore,
+        e_score: ker.escore,
+        r_score: ker.rscore,
+        vt_residual: ker.vt_residual,
+        roh_scalar: ker.roh_scalar,
+        carbon_negative_ok,
+        restoration_ok,
+        lane_admissible,
+        lane_ker_ok,
+        lane_cyboquatic_ok,
+        shredding_safe_for_prod,
+        shredding_requires_restoration_focus,
+        lane_reason: lane.reason.clone(),
+    }
+}
+
+impl_ffi_query! {
+    /// FFI entrypoint: return shredding governance snapshot JSON for a machine id.
+    fn prometheus_praxis_get_shredding_snapshot_json(
+        handle: *mut ShardIndex,
+        machine_id: *const c_char,
+    ) -> *mut c_char {
+        {
+            let ker = econet_governance_spine::blastradius::fetch_ker_snapshot_for_machine(
+                &shard.conn,
+                &machine_id,
+            )?;
+
+            let lane = lane_check_for_machine(&shard.conn, &machine_id)?;
+
+            Ok(build_shredding_snapshot(ker, lane))
+        }
+    }
+}
+
+/// Free a JSON string returned from FFI entrypoints.
+#[no_mangle]
+pub extern "C" fn prometheus_praxis_free_json(ptr_: *mut c_char) {
+    if ptr_.is_null() {
+        return;
+    }
+    unsafe {
+        let _ = CString::from_raw(ptr_);
+    }
+}
+
+/// FFI shim entrypoint for legacy C++ shredding governance adapter.
+///
+/// Currently returns a null pointer; pointer dereference must live in
+/// a separate module that can use unsafe code if this entrypoint is
+/// wired for production.
 #[no_mangle]
 pub extern "C" fn ppx_ai_get_shredding_snapshot_json(
-    machine_id: *const std::os::raw::c_char,
-    region: *const std::os::raw::c_char,
-    lane: *const std::os::raw::c_char,
+    machine_id: *const c_char,
+    region: *const c_char,
+    lane: *const c_char,
     ker_k: f64,
     ker_e: f64,
     ker_r: f64,
@@ -683,14 +876,7 @@ pub extern "C" fn ppx_ai_get_shredding_snapshot_json(
     carbon_negative_ok: bool,
     restoration_ok: bool,
     lane_admissible: bool,
-) -> *mut std::os::raw::c_char {
-    // This function is intended to mirror the governance spine pattern:
-    // it validates pointers, builds Rust structs, and returns JSON.
-    //
-    // To preserve the !forbid(unsafe_code) invariant, this function
-    // should be wired via a small C shim or moved into a separate
-    // module that is allowed to use unsafe. Here we keep the signature
-    // but do not implement pointer dereference in safe code.
+) -> *mut c_char {
     let _ = (
         machine_id,
         region,
@@ -704,7 +890,7 @@ pub extern "C" fn ppx_ai_get_shredding_snapshot_json(
         restoration_ok,
         lane_admissible,
     );
-    std::ptr::null_mut()
+    ptr::null_mut()
 }
 
 /// Kani harnesses for KER and ecosafety decisions.
