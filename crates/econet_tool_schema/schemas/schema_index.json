@@ -1,0 +1,14 @@
+{
+  "tools": [
+    {
+      "function_id": "prometheus_praxis_get_shredding_snapshot_json.v1",
+      "backing_symbol": "prometheus_praxis_get_shredding_snapshot_json",
+      "lanescope": "RESEARCH",
+      "roleband": "DIAGNOSTIC",
+      "blastradius_class": "NONACTUATING_DIAGNOSTIC",
+      "ai_capability_level": "DIAGNOSTICONLY",
+      "input_schema_ref": "schemas/prometheus_praxis_get_shredding_snapshot_json.input.json",
+      "output_schema_ref": "schemas/prometheus_praxis_get_shredding_snapshot_json.output.json"
+    }
+  ]
+}
