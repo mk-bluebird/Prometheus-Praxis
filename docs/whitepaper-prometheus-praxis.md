@@ -1179,3 +1179,129 @@ This governance spine turns the mathematical KER–Lyapunov framework into concr
     - May only add new diagnostics, tighten filters, or add stricter KER/RoH constraints; it may not remove guards or loosen ceilings. [file:18]
   - This workflow:
     - Ensures that functionality and AI‑chat surfaces expand over time, but security, ecosafety, and sovereignty constraints evolve monotonically in the protective direction. [file:18]
+
+## 23. Conclusion and Future Extensions
+
+### 23.1 Summary of guarantees
+
+- Safer eco‑machinery:
+  - Prometheus‑Praxis enforces a strict non‑actuating governance spine: all SQLite schemas, Rust crates, and FFI surfaces are diagnostic only and never control hardware. [file:18]
+  - Core invariants (KER bands, RoH ceilings, Lyapunov non‑increase) are embedded in rich views and always‑improve kernels, then proven with tools like Kani to prevent unsafe promotions of Cyboquatic machinery. [file:18]
+
+- Sovereignty and neurorights:
+  - An AI‑safe catalog and sovereign‑consent engine gate every AI‑facing surface, permanently excluding raw EEG, high‑frequency biosignals, and identity‑linked lab traces. [file:18]
+  - Only aggregated, DP‑safe, consented eco‑health metrics (e.g., microplastic burden, detox stress, BCI load bands) may appear, and only when TelemetryVerdict is positive. [file:18]
+
+- Mathematically governed evolution:
+  - KER monotonicity, RoH ceilings, and Lyapunov residual constraints are encoded as hard gates in lane guards and always‑improve scoring; Kani harnesses check that kernels never violate these invariants. [file:18]
+  - The no‑corridor, no‑build rule and CI schema verifiers prevent unbounded machinery or un‑evidenced workloads from entering production, keeping evolution monotone toward safer, more restorative configurations. [file:18]
+
+### 23.2 Future work
+
+- Large‑particle summary engines:
+  - Build “large‑particle” summary engines that:
+    - Aggregate shard‑level data (blastradius, ecoperjoule, restoration metrics) into higher‑order ALN particles for regions, corridors, and Tree‑of‑Life branches. [file:18]
+  - These engines would:
+    - Provide succinct, corridor‑level diagnostics and eco‑wealth summaries safe for AI‑chat and human stewards. [file:18]
+
+- AI‑chat lane auditors:
+  - Implement AI‑chat lane auditors as non‑actuating Rust tools that:
+    - Recompute KER, RoH, Lyapunov, carbonnegativeok, and restorationok for shards and compare to lane flags and EcoWealth state. [file:18]
+  - CI would:
+    - Treat these auditors as proof harnesses, failing when lane states or rewards diverge from recomputed invariants. [file:18]
+
+- CrossSync into external registries:
+  - Design CrossSync modules that:
+    - Export curated, ALN‑backed, blastradius‑normalized metrics into external sustainability registries and public ledgers without exposing sensitive telemetry. [file:18]
+  - CrossSync must:
+    - Preserve Bostrom DID bindings and ALN spechash hex‑stamping so external consumers can verify provenance and invariants. [file:18]
+
+- Extended Tree‑of‑Life integrations:
+  - Extend Tree‑of‑Life (ToL) grammars:
+    - To represent biodiversity risk, species‑level restoration, and eco‑substrate feedback loops as Lyapunov channels and corridor variables. [file:18]
+  - Future work links:
+    - Machinery blastradius and eco‑metrics to ToL residuals, ensuring that improvements in pumps and substrates map directly into lower ecological risk across taxa and habitats. [file:18]
+
+---
+
+## 24. Appendix A: Formal Definitions and Key Equations
+
+### 24.1 Core Lyapunov and residual definitions
+
+- Lyapunov potential \(V\):
+  - For a system state \(x_t\), the Lyapunov potential \(V(x_t)\) is a scalar measuring distance from an eco‑safe equilibrium; lower values are safer. [file:18]
+  - Residuals are recorded per workload in ledgers as:
+    - \(V_{\text{before}} = V(x_t)\), \(V_{\text{after}} = V(x_{t+1})\). [file:18]
+
+- Residual delta and window residual:
+  - Per workload:
+    - \(V_t = V_{\text{after}} - V_{\text{before}}\). [file:18]
+  - Over a window at node \(n\):
+    - \(\overline{V}_n = \frac{1}{N} \sum_{i=1}^{N} \left(V_{\text{after},i} - V_{\text{before},i}\right)\), constrained so \(\overline{V}_n \le 0\). [file:18]
+
+- KER window invariants:
+  - For each shard or asset and lane:
+    - \(K \ge K_{\min}^{\text{lane}}\), \(E \ge E_{\min}^{\text{lane}}\), \(R \le R_{\max}^{\text{lane}}\). [file:18]
+  - Lane guards require:
+    - RoH under its ceiling and \(\overline{V} \le 0\) for promotion. [file:18]
+
+### 24.2 Always‑improve score and harmful/beneficial normalization
+
+- Eco‑efficiency and risk components:
+  - From `vcyboworkloadnodewindow` and blastradius views:
+    - \(E_{\text{eff}, s} = \frac{\text{totalsurplusJ}}{\text{totalreqJ}}\). [file:18]
+    - \(C_{\text{risks}} = r_{\text{carbon}}\) (mean carbon risk coordinate). [file:18]
+    - \(B_{\text{risks}} = r_{\text{biodiv}}\) (mean biodiversity risk coordinate). [file:18]
+    - \(V_t = \overline{V} = \text{meanvtafter} - \text{meanvtbefore}\). [file:18]
+
+- Always‑improve score with constraints:
+  - The canonical always‑improve score per shard \(s\) is:
+    - \(S_{\text{AI}, s} = E_{\text{eff}, s} - C_{\text{risks}} - B_{\text{risks}} - V_t\), subject to:
+      - \(C_{\text{risks}} \le 0.13\). [file:18]
+      - \(V_t \le 0\). [file:18]
+      - No violations on non‑offsettable planes according to plane weights. [file:18]
+  - A shard is safetopromote only if:
+    - KER, RoH, Lyapunov constraints hold and \(S_{\text{AI}, s}\) is non‑decreasing across windows. [file:18]
+
+- Harmful/beneficial normalization:
+  - Normalized risk coordinates for plane \(p\):
+    - \(r_p \in [0, 1]\) with corridor variables specifying SAFE, GOLD, and HARD thresholds (e.g., for `maxcarbonradius`, `maxbiodivradius`, `deltavt`). [file:18]
+  - Normalization ensures:
+    - Harmful contributions push \(r_p\) toward 1, beneficial actions move \(r_p\) toward 0, with non‑offsettable planes weighted so they cannot be compensated by gains elsewhere. [file:18]
+
+### 24.3 Tree‑of‑Life residuals and biodiversity risk coordinates
+
+- Tree‑of‑Life residuals:
+  - ToL residual \(V_{\text{ToL}}\) generalizes Lyapunov to ecological state:
+    - Aggregating across species, trophic levels, and habitats as weighted sums or more complex potentials. [file:18]
+  - A future ToL channel would:
+    - Track \(V_{\text{ToL,before}}\), \(V_{\text{ToL,after}}\), and \(\Delta V_{\text{ToL}}\) per workload or design choice. [file:18]
+
+- Biodiversity risk coordinates:
+  - Biodiversity risk \(r_{\text{biodiv}}\) is:
+    - A normalized coordinate (\(0 \ldots 1\)) derived from ToL impacts, species loss risk, and habitat fragmentation metrics. [file:18]
+  - Corridor variables for `maxbiodivradius`:
+    - Define SAFE, GOLD, HARD bands and weights so even small increases near HARD thresholds heavily penalize always‑improve scores. [file:18]
+
+### 24.4 Notation and symbol table
+
+- Planes and lanes:
+  - Planes:
+    - HYDRAULIC, ENERGY, CARBON, BIODIVERSITY, MATERIAL, DATAQUALITY, plus future Tree‑of‑Life planes. [file:18]
+  - Lanes:
+    - RESEARCH, EXPPROD, PROD; each lane has KER/RoH thresholds and Lyapunov requirements. [file:18]
+
+- Corridors and hex shards:
+  - Corridors:
+    - Bounded regions in risk space defined by corridor variables (SAFE, GOLD, HARD, weights, mandatory flags). [file:18]
+  - Hex shards:
+    - ALN particles (e.g., `CyboquaticBlastRadiusShard2026v1`) hex‑stamped via `ALNSPECHASHHEX` and bound to Bostrom DIDs for provenance. [file:18]
+
+- Core symbols:
+  - \(K\): Knowledge factor (confidence, model fidelity, data richness). [file:18]
+  - \(E\): Eco‑impact or eco‑benefit score (e.g., energy‑per‑joule, restoration metrics). [file:18]
+  - \(R\): Residual risk‑of‑harm scalar per shard or asset. [file:18]
+  - RoH: Risk‑of‑Harm coordinate, often normalized and corridor‑bound. [file:18]
+  - \(V\): Lyapunov potential; \(V_t\) or \(\Delta V\) denotes residual change. [file:18]
+  - \(S_{\text{AI}}\): Always‑improve score combining eco‑efficiency, risks, and Lyapunov residual. [file:18]
+  - ToL / \(V_{\text{ToL}}\): Tree‑of‑Life potential, a future eco‑Lyapunov channel over biodiversity and life‑system health. [file:18]
