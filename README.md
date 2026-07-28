@@ -418,6 +418,324 @@ To understand how data flows through the system:
 
 For more details, see `CONTRIBUTING.md` and `docs/MAINTENANCE_SESSION.md`.
 
+---
+
+## Prometheus-Praxis: Eco-Governance Monorepo Overview
+
+Prometheus-Praxis is the consolidated, mono-repository for EcoFort-aligned, Phoenix-anchored ecological restoration research and governance tooling. It unifies prior EcoNet constellation work into a single, contract-driven codebase focused on non-actuating diagnostics, carbon-negative machinery planning, and Rust-anchored data sovereignty.
+
+### Core principles
+
+- Contract-first design using ALN v2 particles for all governance-relevant data structures.
+- Non-actuating numeric kernels (C++ and Rust) that never directly control hardware.
+- EcoFort/Phoenix governance semantics embedded into schemas, triggers, and proofs.
+- Bostrom DID and Phoenix hex anchors for authorship, provenance, and discoverability.
+- Carbon-negative orientation: workloads and diagnostics must align with restoration corridors.
+
+---
+
+## Repository structure and major bands
+
+### Root-level bands
+
+- `aln/`
+  - ALN v2 governance particles for cyboquatic workloads, drainage-decay, blast-radius, and energy/ecoperJoule restoration.
+  - JSON machine-readable contracts (e.g., `aln_particles_cyboquatic.json`) used as a single source of truth for codegen.
+- `src/cpp/`
+  - Non-actuating C++ numeric engines for cyboquatic domains.
+  - Generated headers in `src/cpp/generated/` derived from ALN contracts.
+- `crates/`
+  - Rust crates providing:
+    - ALN-driven code generation.
+    - Lyapunov/KER guard helpers and Kani proofs.
+    - Governance and ecosafety utilities.
+- `db/`
+  - SQLite schema files for daily progress, drainage-decay, blast-radius, and energy/ecoperJoule restoration indices.
+  - Generated DDL under `db/generated/` mirroring ALN particle structures.
+- `docs/`
+  - Governance, placement, and binding documentation:
+    - Engine placement and Phoenix anchors.
+    - ALN↔SQL bindings, AI-safe entrypoints, and governance validation.
+
+### Cyboquatic band (hydraulic/ecological diagnostics)
+
+Cyboquatic artifacts implement non-actuating diagnostics for hydraulic corridors, canal nodes, and eco-restoration workloads:
+
+- Workload energetics: energy, duty cycle, Lyapunov residuals, K,E,R triads.
+- Drainage-decay: BOD/TSS/CEC frames, corridor-normalized residuals.
+- Blast-radius: surcharge breach diagnostics, radius metrics, RoH, and KER planes.
+- Energy/ecoperJoule/restoration: explicit carbon-negative flags and eco-efficiency metrics.
+
+---
+
+## ALN v2 governance particles
+
+Prometheus-Praxis uses ALN v2 particles as canonical governance contracts. Key cyboquatic particles include:
+
+- `cyboquatic.workload.kernel`
+  - Domain: `CYBOQUATIC`
+  - Subdomain: `WORKLOADENERGYDV`
+  - Fields: node/window identifiers, `energyReqJ`, `dutyCycle`, `vtCurrent`, `vtNext`, `vtDelta`, `k`, `e`, `r`, `kerScore`, `lane`, `safeToPromote`, `evidenceHex`, `signingDid`.
+  - Invariants:
+    - \(0 \leq k,e,r \leq 1\).
+    - \(\text{kerScore} \approx k \cdot e - r\).
+    - \(\Delta V_t \leq 0\) (non-increasing Lyapunov residual).
+
+- `cyboquatic.drainagedecay.kernel`
+  - Domain: `HYDRO`
+  - Subdomain: `DRAINAGEDECAY`
+  - Fields: drainage frame IDs, canal node and ker profile IDs, `bodMgL`, `tssMgL`, `cecCmolPerKg`, `frameEnergyJ`, `deltaVtMps`, K,E,R triad, `kerScore`, FOG region/channel, governance/evidence hexes, DID.
+  - Invariants:
+    - Corridor bounds for BOD/TSS/CEC.
+    - K,E,R and KER score consistency.
+
+- `cyboquatic.blastradius.governance`
+  - Domain: `GOV`
+  - Subdomain: `CYBOQUATIC`
+  - Fields: blast index IDs, corridor and lane IDs, hydraulic metrics, radius metrics, K,E,R triads, residual KER, RoH coordinates, governance flags, provenance.
+  - Invariants:
+    - Normalized radius and RoH in `[0,1]`.
+    - Residual KER ≥ 0 and K,E,R bounds.
+
+- `cyboquatic.energy.ecoperjoule.restoration`
+  - Domain: `CYBOQUATIC`
+  - Subdomain: `ENERGYRESTORATION`
+  - Fields: energy requirements, ecoperJoule, restoration flags, carbon-negative status, K,E,R triad, KER score, evidence/DID.
+  - Invariants:
+    - ecoperJoule within defined eco-corridors.
+    - `carbonNegativeOk` must be true for admissible frames.
+
+These particles are the authority for field names, types, and core invariants, and drive all downstream struct and schema generation.
+
+---
+
+## Non-actuating numeric engines (C++)
+
+The `src/cpp` directory contains pure numeric kernels for cyboquatic diagnostics. Engines operate exclusively on data structures and do not interact with hardware, networks, or devices.
+
+### Workload engine
+
+- File: `src/cpp/cyboquatic_workload_engine.cpp`
+- Input:
+  - Workload telemetry (`energyReqJ`, `headM`, `throughputM3`, `dutyCycle`, uncertainty factors).
+  - Node and window identifiers.
+- Output:
+  - `cyboquatic_workload_kernel_struct` populated with:
+    - Normalized risk coordinates (`r_energy`, `r_hydraulics`, `r_uncertainty`).
+    - Lyapunov residuals (`vtCurrent`, `vtNext`, `vtDelta`).
+    - K,E,R triad and KER score.
+    - Governance lane and `safeToPromote`.
+    - Evidence hex and DID provenance.
+
+### Drainage-decay engine
+
+- File: `src/cpp/cyboquatic_drainagedecay_engine.cpp`
+- Input:
+  - Drainage frame telemetry (`bodMgL`, `tssMgL`, `cecCmolPerKg`, `deltaVtMps`).
+- Output:
+  - `cyboquatic_drainagedecay_kernel_struct` with:
+    - Normalized corridor coordinates.
+    - Lyapunov hints.
+    - K,E,R triad, KER score, FOG bindings.
+    - Governance and evidence hexes.
+
+### Blast-radius engine
+
+- File: `src/cpp/cyboquatic_blastradius_engine.cpp`
+- Input:
+  - Hydraulic and surcharge metrics (`surchargeLevelM`, `inflowM3s`, `durationS`, `hydraulicHeadM`).
+- Output:
+  - `cyboquatic_blastradius_governance_struct` expressing:
+    - Raw and normalized radius.
+    - K,E,R triad, KER score, residual KER, RoH coordinate.
+    - Corridor and lane flags for governance.
+    - Provenance fields.
+
+### Energy/ecoperJoule restoration tooling
+
+- Uses `cyboquatic_energy_ecoperjoule_restoration_struct` to:
+  - Bind workload energy frames to `ecoperJoule`.
+  - Track restoration and carbon-negative flags in tandem with K,E,R.
+
+All engines share the following properties:
+
+- No hardware or device APIs.
+- No network sockets or external IO beyond data struct handling.
+- Designed for FFI integration with Rust/Java governance crates.
+
+---
+
+## ALN-driven code generation pipeline
+
+Prometheus-Praxis includes a schema-driven codegen pipeline to prevent manual drift between ALN contracts and implementation artifacts.
+
+### Contract source
+
+- File: `aln/aln_particles_cyboquatic.json`
+  - Machine-readable representation of cyboquatic ALN particles.
+  - Captures `id`, `name`, `domain`, `subdomain`, and `fields` with `kind`.
+
+### Codegen crate
+
+- Crate: `crates/aln-cyboquatic-codegen`
+- Role:
+  - Parse JSON contracts.
+  - Emit C++ headers in `src/cpp/generated/`.
+  - Emit SQL DDL in `db/generated/`.
+
+### Generated artifacts
+
+- C++ headers:
+  - `src/cpp/generated/cyboquatic_workload_kernel_struct.hpp`
+  - `src/cpp/generated/cyboquatic_drainagedecay_kernel_struct.hpp`
+  - `src/cpp/generated/cyboquatic_blastradius_governance_struct.hpp`
+  - `src/cpp/generated/cyboquatic_energy_ecoperjoule_restoration_struct.hpp`
+
+- SQL DDL:
+  - `db/generated/cyboquatic_workload_kernel.sql`
+  - `db/generated/cyboquatic_drainagedecay_kernel.sql`
+  - `db/generated/cyboquatic_blastradius_governance.sql`
+  - `db/generated/cyboquatic_energy_ecoperjoule_restoration.sql`
+
+### Typical invocation
+
+From the repo root:
+
+```bash
+cargo run --manifest-path crates/aln-cyboquatic-codegen/Cargo.toml -- \
+  aln/aln_particles_cyboquatic.json \
+  src/cpp/generated \
+  db/generated
+```
+
+Developers modify ALN contracts (and export them to JSON), then regenerate structs and schemas. Hand-authored code and triggers build on these generated artifacts.
+
+---
+
+## SQLite governance schemas and triggers
+
+The `db/` directory provides governance-aligned SQLite schemas and triggers for cyboquatic indices.
+
+### Daily progress
+
+- File: `db/dbcyboquaticdailyprogress.sql`
+- Table: `cyboquatic_daily_progress`
+- Purpose:
+  - Consolidate per-day domain shards into a single daily progress index.
+  - Persist K,E,R triads and Lyapunov residuals per node and window.
+- Governance:
+  - CHECK constraints for K,E,R bounds.
+  - Trigger `trg_daily_progress_ker_lyapunov` to enforce:
+    - KER score consistency: \(|k \cdot e - r - \text{ker_score}| \leq 10^{-6}\).
+    - Non-increasing residual: `vt_delta <= 0`.
+
+### Drainage-decay index
+
+- File: `db/dbcyboquaticdrainagedecayindex.sql`
+- Table: `cyboquatic_drainagedecay_index`
+- Purpose:
+  - Long-lived index for BOD/TSS/CEC frames.
+  - Corridor-normalized windows with K,E,R, Vt, and evidence hex bindings.
+- Governance:
+  - Bounds for environmental parameters.
+  - Triggers enforcing positive KER scores and consistency with K,E,R.
+
+### Blast-radius index
+
+- File: `db/dbcyboquaticblastradiusindex.sql`
+- Table: `cyboquatic_blast_radius_index`
+- View: `v_cyboquatic_blast_radius_facade`
+- Purpose:
+  - Diagnostic blast-radius index for surcharge breaches.
+  - Non-actuating governance spines providing radius, K,E,R, RoH, and lane flags.
+- Governance:
+  - `radius_norm` and `roh_coordinate` bounded in `[0,1]`.
+  - `residual_ker` non-negative.
+  - KER consistency enforced via triggers.
+
+### Energy/ecoperJoule restoration
+
+- File: `db/dbcyboquaticenergyecoperjoulerestoration.sql`
+- Table: `cyboquatic_energy_ecoperjoule_restoration`
+- Purpose:
+  - Bind workload energy frames to ecoperJoule and restoration flags.
+  - Encode `carbonNegativeOk` as a hard governance requirement.
+- Governance:
+  - Trigger ensuring KER consistency.
+  - Trigger rejecting frames where `carbonNegativeOk = 0`.
+
+---
+
+## Lyapunov and KER guard crate (Rust)
+
+To further enforce and prove governance invariants, Prometheus-Praxis provides a Rust crate for Lyapunov and KER checks.
+
+### Crate: `prometheus-praxis-lyapunov-guard`
+
+- Functions:
+  - `lyapunov_non_increasing(vt_current: f64, vt_next: f64) -> bool`
+    - Ensures \(\Delta V_t = vt\_next - vt\_current \leq 0\) within epsilon.
+  - `ker_band_and_consistency(k: f64, e: f64, r: f64, ker_score: f64) -> bool`
+    - Validates \(0 \leq k,e,r \leq 1\) and \(|k \cdot e - r - \text{ker_score}| \leq 10^{-6}\).
+
+- Kani proofs (when built with `cfg(kani)`):
+  - Prove that `lyapunov_non_increasing` holds for all `vt_next <= vt_current`.
+  - Prove that `ker_band_and_consistency` holds when `ker_score` is defined as `k * e - r` and K,E,R are within `[0,1]`.
+
+Governance crates wrapping C++ kernels can use these helpers to verify outputs before persisting them.
+
+---
+
+## AI-safe entrypoints and diagnostics
+
+Prometheus-Praxis is designed to be friendly to AI-assisted research while maintaining strict safety boundaries.
+
+### AI-safe surfaces
+
+- ALN specs in `aln/`:
+  - Read-only contracts describing fields, bounds, and invariants.
+- DB schemas and views in `db/`:
+  - Read-only SQLite connections to inspect diagnostic frames and governance flags.
+- Generated JSON/CSV diagnostics:
+  - Produced by Java/Kotlin reporters purely for analysis (no actuation).
+
+### Guidelines for AI agents
+
+- Only read, never actuate:
+  - Reason over ALN, C++, Rust guards, and DB data.
+  - Do not propose or generate code that touches hardware APIs, pumps, or control systems.
+- Respect governance invariants:
+  - Preserve K,E,R bounds, Lyapunov non-increase, RoH ceilings, and carbon-negative requirements.
+- Maintain provenance:
+  - Carry `evidenceHex` and `signingDid` fields through transformations.
+  - Avoid modifying hex anchors or DIDs in ways that break auditability.
+
+Documentation such as `docs/CYBOQUATICAIENTRYPOINTS.md` enumerates recommended entrypoints and usage patterns.
+
+---
+
+## Extending Prometheus-Praxis
+
+Prometheus-Praxis is designed to be extensible for new eco-restoration bands and research topics.
+
+### Adding a new band
+
+1. Define ALN particle(s) for the band under `aln/`.
+2. Export the particle definitions to JSON and merge into `aln/aln_particles_cyboquatic.json` or a band-specific JSON file.
+3. Run the codegen pipeline to produce C++ structs and SQL schemas.
+4. Implement non-actuating C++ kernels and Rust guards that compute K,E,R and Lyapunov metrics.
+5. Add DB triggers, views, and documentation to align with EcoFort/Phoenix governance.
+
+### Research and upgrade pathways
+
+- Add cross-band views and triggers to enforce global invariants (e.g., linking workload, drainage, blast-radius, and energy/restoration data for a node).
+- Expand Kani proof suites to cover more complex Lyapunov models and corridor definitions.
+- Introduce new AI-facing diagnostics and documentation to support exploratory research while maintaining strict safety boundaries.
+
+Prometheus-Praxis is the foundational study and tooling space for making a real-world difference "just by researching it": every new diagnostic, contract, and proof is designed to advance ecological restoration, protect augmented citizens and data sovereignty, and strengthen governance of carbon-negative machinery.
+
+---
+
 ## Task ↔ EcoNet / eco_restoration_shard Mapping Table
 
 Below is a compact mapping table showing, for each task, which eco_restoration_shard / EcoNet artifacts it should bind to, and which K/E/R band it is primarily meant to improve.[file:2][file:22]
