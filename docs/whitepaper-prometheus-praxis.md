@@ -1096,3 +1096,86 @@ This governance spine turns the mathematical KER–Lyapunov framework into concr
     - Lets CI and agents treat tasks as governance‑bound objects with explicit KER targets instead of informal tickets. [file:18]
   - This supports:
     - Automated checks that a task is completed only when its KER, RoH, Lyapunov, and sovereignty acceptance criteria are met, keeping evolution monotone and ecosafety‑aligned. [file:18]
+
+## 21. Security, Monotone Evolution, and Attack Surfaces
+
+### 21.1 No‑downgrade doctrine and monotone KER/RoH
+
+- Under‑attack karma and no‑rollback:
+  - Prometheus‑Praxis enforces a monotone evolution doctrine: protection levels, RoH floors, and KER thresholds can only tighten over time, never loosen, even under attack or misconfiguration. [file:18]
+  - “Under‑attack karma” and OTA guardrails ensure any branch or migration that attempts to lower protections fails proofs and CI, preventing hostile downgrades of ecosafety or sovereignty constraints. [file:18]
+
+- Immutable plane weights and non‑offsettable planes:
+  - Certain planes (e.g., psychosocial, biodiversity, neurorights) are marked non‑offsettable and have immutable or strictly monotone plane weights stored in ALN shards such as `PlaneWeightsShard2026v1`. [file:18]
+  - Governance rules forbid trading improvements in offsettable planes (e.g., energy) against regressions in non‑offsettable planes; scoring functions and CI guards must respect these weights. [file:18]
+
+- Monotone KER/RoH ceilings:
+  - KER invariants require:
+    - \(K_{\text{new}} \ge K_{\text{old}}\), \(E_{\text{new}} \ge E_{\text{old}}\), \(R_{\text{new}} \le R_{\text{old}}\) for any shard upgrade, enforced by `KerUpgradeGuard`. [file:18]
+  - RoH ceilings and Lyapunov residuals are encoded as corridor variables; lane upgrades to `EXPPROD`/`PROD` require RoH under ceiling and non‑increasing Lyapunov according to `LaneGuard` and Kani‑verified kernels. [file:18]
+
+### 21.2 Attack surface reduction
+
+- Non‑actuating crates and sealed superpowers:
+  - Governance and diagnostic crates (EcoNet spine, Cyboquatic spines, always‑improve kernels) are strictly non‑actuating: they read logs, compute scores, emit JSON/ALN, and never send control signals. [file:18]
+  - Actuation kernels (Perkunos‑Nexus, MT6883 stacks, nanoswarm routing, HeatWaterTree, etc.) are sealed superpowers, not exposed in AI‑safe catalogs; only their diagnostic projections (KER, RoH, Vt, treaty IDs) appear in views and JSON. [file:18]
+
+- ALN‑backed policies and AI‑safe catalog:
+  - An AI‑safe catalog enforced via `vagentsafecatalog` and `econet.agentfunctioncatalog.v1.aln`:
+    - Lists only non‑actuating views/FFI functions, with `actuationcapability = NONE` and bounded blast‑radius classifications. [file:18]
+  - ALN shards define:
+    - Non‑Actuating Workload contracts, risk vectors, plane weights, and function catalog entries, giving a typed, cryptographically anchored policy layer for tools and metrics. [file:18]
+
+- CI guards and hidden surface controls:
+  - `SchemaVerifier` and DefinitionRegistry CI:
+    - Enforce that all governance artifacts (`.sql`, `.rs`, `.aln`) are registered (`no‑registry, no‑build`), preventing shadow schemas or hidden APIs. [file:18]
+  - Additional guards:
+    - `no‑blast‑radius, no‑build` for machinery shards without blast‑radius links; energy/carbon evidence guards for production workloads; and Cyboquatic proof harnesses that recompute metrics and fail CI on discrepancies. [file:18]
+  - Unsafe IO constraints:
+    - AIfacing functions are limited to reading from governance DBs and emitting logs/shards; they are forbidden from touching actuator queues, raw device IO, or unvetted network sinks. [file:18]
+
+---
+
+## 22. Implementation Patterns and Developer Workflow
+
+### 22.1 Coding workflow: Rust, ALN, and CI conventions
+
+- Rust & ALN conventions:
+  - All governance and diagnostic logic lives in Rust crates with:
+    - Edition 2024, `rust-version = "1.85"`, dual MIT/Apache‑2.0 licensing, explicit `#![forbid(unsafe_code)]` except at FFI boundaries. [file:18]
+  - Data contracts and governance grammars are defined in ALN shards:
+    - For metrics, KER corridors, plane weights, non‑actuating workloads, risk vectors, and agent function catalogs. [file:18]
+
+- Non‑actuation rules:
+  - Crates in the spine (EcoNet governance, Cyboquatic blastradius spines, always‑improve kernels):
+    - Are non‑actuating by design; they access SQLite via `rusqlite`, compute scores, and offer read‑only FFI and JSON APIs. [file:18]
+  - Any crate that might be used by AI chat:
+    - Must be tagged non‑actuating in repo manifests and AI catalogs, and is forbidden from linking to actuator‑side stacks. [file:18]
+
+- Python‑only CI helpers, no tool installation:
+  - CI helpers may use Python:
+    - To run schema verifiers, DefinitionRegistry scans, and proof harness orchestration, but not to implement core safety logic. [file:18]
+  - No ad‑hoc tool installation:
+    - CI is designed to run with in‑repo code and SQLite files only; external dependencies are minimized to prevent hidden surfaces or unverified tooling. [file:18]
+
+### 22.2 Example single‑session developer task pattern
+
+- Typical single‑session task flow:
+  - A developer picks a task from `PrometheusPraxisCodingTaskList2026v1.aln`:
+    - Each task specifies target repo, lane, execution plane (e.g., `SPINE_SQL`, `RUST_KER`, `MCP_AGENT`), and KER targets/acceptance criteria. [file:18]
+  - Within one session, they:
+    - Wire kernels, extend schemas, and update ALN shards while preserving invariants and keeping evolution monotone. [file:18]
+
+- Example: adding an always‑improve view and Rust kernel wiring:
+  - Steps:
+    - Extend schema: add or complete `vcyboquaticecoperjoule` and `vcyboquaticrestore` to compute `carbonnegativeok` and `restorationok`. [file:18]
+    - Implement Rust scoring: finalize `calculate_always_improve_score` and Kani harnesses enforcing KER, RoH, and Lyapunov invariants. [file:18]
+    - Update ALN: define or revise ALN shards describing new metrics and task acceptance criteria. [file:18]
+    - Wire AI‑safe catalog: expose new boolean flags and diagnostics via `vagentsafecatalog` and `econet.agentfunctioncatalog.v1.aln`, ensuring `actuationcapability = NONE`. [file:18]
+    - Run CI: verify `ExpectedSchema`, CI guards, and proof harnesses all pass before merging. [file:18]
+
+- Invariant‑preserving incremental expansion:
+  - Each session:
+    - May only add new diagnostics, tighten filters, or add stricter KER/RoH constraints; it may not remove guards or loosen ceilings. [file:18]
+  - This workflow:
+    - Ensures that functionality and AI‑chat surfaces expand over time, but security, ecosafety, and sovereignty constraints evolve monotonically in the protective direction. [file:18]
