@@ -1,0 +1,564 @@
+<!-- File: docs/whitepaper-prometheus-praxis.md -->
+
+# Prometheus‑Praxis: Non‑Actuating Governance Spine for EcoNet and Eco‑Fort
+
+## 1. Abstract
+
+Prometheus‑Praxis is the non‑actuating governance and execution spine for the EcoNet / Eco‑Fort constellation, implemented as a Rust‑first, ALN‑governed, SQLite‑backed monorepo band inside `Prometheus-Praxis` and the broader ecorestorationshard workspace.[file:18][file:21] Its sole mandate is to turn formally specified ecosafety grammar (ALN), KER particles, and Lyapunov residuals into verifiable metrics, decisions, and views that always tighten ecological safety corridors, never widen them, and never directly actuate physical machinery.[file:18][file:13]
+
+Prometheus‑Praxis treats all physical capabilities (pumps, nanoswarms, drainage machinery, AI datacenters, cyboquatic systems) as sealed superpowers living behind strict governance walls; it only hosts **diagnostic** and governance kernels that compute KER, RoH, Lyapunov, lane status, and always‑improve scores under monotone‑safety constraints.[file:18][file:13] All actuation remains in separate ENGINE repositories and TEE enclaves, where ecosafety, neurorights, and corridor invariants are enforced before any change can touch the real world.[file:13][file:18]
+
+The system is anchored by three mathematical primitives:  
+- A KER triad \((K, E, R)\) with conservative composition algebra and lane thresholds, encoded in ALN shards such as `KERComposition2026v1` and consumed by Rust crates like `prometheus-praxis-ai` and Lyapunov guard libraries.[file:18][file:13]  
+- A Lyapunov residual kernel \(V_{t+1} - V_t\) that must never increase beyond a narrow band for any allowed policy, encoded in ecosafety specs and enforced by Rust+Kani guards and SQLite triggers (no‑corridor, no‑build).[file:18][file:21]  
+- A monotone always‑improve score that ranks nodes and windows by how strongly they improve or at least do not degrade under KER and Lyapunov constraints, implemented in non‑actuating Rust (`alwaysimprove.rs`) and surfaced via AI‑safe catalog views.[file:18]
+
+Prometheus‑Praxis is also a sovereignty and neurorights engine: ALN shards like `AbsoluteDataSovereigntyPolicy2026v1.aln`, identity kernels, and `agentsafeconsentguard` tables ensure that all telemetry, KER evidence, and AI‑visible views are governed by explicit consent and neurorights corridors.[file:18][file:21] No raw neural data, identity‑sensitive health signals, or actuation parameters are ever exposed through AI‑safe catalogs; instead, only corridor‑bounded aggregates (e.g., daily KER, RoH, Tsafe, lane, consent flags) appear in diagnostic views.[file:18]
+
+At the repository level, Prometheus‑Praxis standardizes a pattern: non‑actuating Rust crates (`prometheus-praxis`, `prometheus-praxis-ai`, `prometheus-praxis-lyapunov-guard`, hex anchor and provenance crates), ALN grammars for corridors and functions (`ppx.function.meta.v1.aln`, ecosafety specs), and SQLite spines for lanes, blastradius, cyboquatic progress, and AI‑safe catalogs.[file:18][file:21] Tooling in Lua, Python, Java, Kotlin, and C/CPP provides reporting, ledger verification, and CI checks, but all follow the same rule: read from governed views, never bypass ecosafety triggers, and never actuate.[file:9][file:18]
+
+This whitepaper specifies the problem Prometheus‑Praxis addresses, the design goals and invariants it must preserve, its role within EcoNet / Eco‑Fort, the KER–Lyapunov mathematical spine, the governance and sovereignty layers, and concrete instantiations for Phoenix urban heat, drainage, cyboquatic machinery, and AI datacenter workloads.[file:18][file:13] It is written to be directly executable as architecture: every section corresponds to existing or planned ALN shards, Rust crates, SQL schemas, and tools in `github.com/mk-bluebird/Prometheus-Praxis`, with all assets hex‑anchored to the Bostrom identities `bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7` and related ALN DIDs.[file:18][file:21]
+
+---
+
+## 2. Problem Statement
+
+### 2.1 Ecological and urban‑infrastructure gaps
+
+- Phoenix and similar arid metros face coupled crises across:
+  - Urban heat islands (UHI) driven by impervious surfaces, low canopy cover, and high HVAC loads.
+  - Hydrology and drainage (MAR, canals, BOD/TSS/CEC decay) under climate‑stressed, aging infrastructure.
+  - Materials and microplastics in cyboquatic networks and industrial flows.
+  - Biodiversity corridors (pollinators, birds, aquatic life) fragmented by roads, canals, and development.[file:18][file:13]
+- Existing monitoring systems are typically:
+  - Fragmented across utilities, agencies, and vendors, each with bespoke metrics and dashboards.
+  - Lacking a shared Lyapunov/KER spine to guarantee that any policy or control change cannot increase ecological “energy” \(V\) or violate Risk‑of‑Harm ceilings.
+  - Poorly tied to identity, provenance, and eco‑wealth ledgers, making it hard to reward genuinely restorative actions or detect greenwashing.[file:18][file:21]
+
+### 2.2 Governance and AI‑safety gaps
+
+- Most smart‑city, IoT, and AI orchestration stacks:
+  - Allow direct actuation (pumps, valves, nanoswarms, HVAC, data centers) from loosely governed control loops, with limited or no formal guarantees on safety or ecological impact.[file:13][file:18]
+  - Do not encode “no corridor, no build”: there is no first‑class notion that if corridors, plane weights, or Lyapunov invariants are missing, deployment is automatically disallowed.[file:18][file:21]
+  - Treat AI agents and dashboards as first‑class operators without enforcing strict separation between diagnostics and superpowers; AI patterns can accidentally become covert control channels.[file:18]
+
+- AI‑centric ecosystems also:
+  - Lack an explicit, machine‑checkable neurorights and sovereignty layer: raw biosignals, neural traces, and identity‑linked metrics can leak into models and logs without enforceable constraints.[file:18][file:21]
+  - Have no standard way to encode host consent, telemetry families, and per‑field visibility into the same constitutional grammar that governs KER and corridor rules.[file:18]
+
+### 2.3 Formal‑methods and compositionality gaps
+
+- Without a shared KER and Lyapunov grammar:
+  - It is impossible to prove that a given change (new controller, new workload, new nanoswarm pattern) respects invariants such as \(V_{t+1} \le V_t\) up to a small band, or keeps Risk‑of‑Harm within corridor bounds.[file:18][file:13]
+  - Lane promotions (RESEARCH → PILOT → PRODUCTION) are ad‑hoc; there is no formal notion of “always‑improve” scoring, SafeStep gates, or monotone safety evolution across upgrades, fast‑track lanes, or emergency releases.[file:18][file:21]
+- Evidence and telemetry aggregation is often:
+  - Statistically sophisticated but governance‑weak; composition rules for risk and eco‑impact are implicit and can accidentally average down risk, violating “risk‑never‑underestimated” requirements.[file:13]
+  - Not encoded in a frozen grammar (ALN) with machine‑checkable invariants, so pipelines can silently drift away from the intended safety semantics over time.[file:13][file:21]
+
+### 2.4 Repository and ecosystem fragmentation
+
+- Within the broader Eco‑Fort / EcoNet constellation, prior work produced:
+  - Many high‑value ALN shards (ecosafety corridors, eco‑wealth, knowledge kernels, cyboquatic risk), Rust crates, SQL spines, and tools across multiple repos and languages.[file:18][file:21]
+  - Rich cyboquatic progress shards (workload, drainage decay, blastradius, daily KER windows) and TEE patterns for KER computation and signing.[file:9][file:13]
+- This constellation, before consolidation, suffered from:
+  - Difficult cross‑navigation: contributors and AI agents struggled to locate canonical engines, ALN specs, or DB schemas for a given eco‑plane or domain.
+  - Inconsistent enforcement: some shards had strong KER/Lyapunov triggers and invariants; others were still exploratory, with no single governance spine tying them together.[file:18][file:21]
+
+### 2.5 What Prometheus‑Praxis must solve
+
+- Provide a single, non‑actuating, well‑typed execution band that:
+  - Centralizes KER, Lyapunov, lane, and always‑improve logic in Rust crates with Kani proofs and ALN binding, not in ad‑hoc SQL or application code.[file:18]
+  - Encodes function meta, superpower boundaries, and governance flags in ALN (`ppx.function.meta.v1.aln`, ecosafety and identity specs), ensuring that any callable tool or diagnostic is classified and gated.[file:18]
+  - Standardizes SQLite governance spines (lane status, blastradius, cyboquatic indexes, AI‑safe catalog) with triggers that enforce non‑increase of Lyapunov residuals and corridor compliance at write time.[file:18][file:21]
+- Serve as the AI‑facing, eco‑restorative lens by:
+  - Exposing only AI‑safe views (`vagentsafecatalog`, cyboquatic facades, workload and drainage summaries) that surface KER, RoH, Lyapunov, and lane diagnostics, but never raw biosignals or actuation fields.[file:18][file:9]
+  - Binding every catalog entry, shard, and crate to Bostrom and ALN identities, with hex anchors and provenance tables, so contributions can be rewarded and audited without compromising sovereignty.[file:18][file:21]
+
+Prometheus‑Praxis exists because neither traditional SCADA nor generic AI stacks can deliver these properties alone; a dedicated, mathematically grounded, non‑actuating spine is required to make eco‑restorative, AI‑assisted infrastructure both safe and provable at city scale.[file:18][file:13]
+
+## 3. Research Objectives
+
+Prometheus‑Praxis is designed as a **research engine** that makes eco‑restoration progress “just by researching it,” by turning every diagnostic computation and governance check into a measurable, DID‑anchored contribution to ecological health.[file:18][file:21] The core objectives are intentionally narrow and non‑actuating, so they can safely sit at the center of EcoNet and Eco‑Fort without ever driving hardware directly.
+
+The primary objectives are:
+
+- Encode ecosafety and governance as executable grammar.  
+  - Formalize corridors, KER triads, Lyapunov kernels, plane weights, blast‑radius limits, and lane policies in ALN shards (e.g., ecosafety, Cyboquatic, EcoWealth, lane governance), so every Rust crate and SQL spine consumes a single, authoritative grammar.[file:18][file:21]  
+  - Prove and enforce invariants such as “no corridor widening,” “Lyapunov residuals non‑increasing,” and “R is never reduced by composition,” using ALN invariants, Rust logic, Kani harnesses, and SQLite triggers.[file:18][file:21]
+
+- Provide a non‑actuating governance spine for Cyboquatic and EcoNet machinery.  
+  - Standardize SQLite schemas and views for workloads, blast‑radius, microplastic risk, drainage‑decay, and KER windows (e.g., `dbcyboquaticdailyprogress.sql`, `dbcyboquaticblastradiusindex.sql`, `dbcyboquaticmicroplasticriskindex.sql`).[file:18][file:9]  
+  - Implement Rust crates (`prometheus-praxis`, `prometheus-praxis-ai`, `prometheus-praxis-lyapunov-guard`, cyboquatic spines) that only read from these views, compute diagnostics, and emit ALN/JSON shards; they never issue actuation commands.[file:18]
+
+- Make KER, RoH, Lyapunov, and lane decisions first‑class, verifiable metrics.  
+  - Surface internal rich views exposing full KER, RoH, Tsafe, Lyapunov residuals, lane status, corridor IDs, and treaty bindings for auditing, observability, and formal verification.[file:18]  
+  - Provide thin, AI‑friendly facades that expose only the minimal summary (e.g., eco‑per‑joule, residual bands, safetopromote flags) needed for reasoning, without leaking actuation‑adjacent details or identity‑sensitive telemetry.[file:18]
+
+- Implement an always‑improve kernel as verifiable, non‑actuating Rust.  
+  - Centralize always‑improve scoring in Rust (`crates/prometheus-praxis-ai/src/alwaysimprove.rs`), consuming KER outputs and Lyapunov snapshots from existing governance crates and returning a bounded scalar score plus safetopromote flag.[file:18]  
+  - Prove key properties with Kani, such as: if K and E are above lane minima, R is below lane max, RoH is under ceiling, and Lyapunov delta is within band, then the kernel never incorrectly blocks promotion; conversely, if Lyapunov increases or risk ceilings are breached, safetopromote is never true.[file:18]
+
+- Build an AI‑safe catalog and pattern layer that strictly enforces superpower and consent boundaries.  
+  - Define an `agentsafecatalog` / `agentsafediagnostics` schema and `vagentsafecatalog` view that list only non‑actuating tools, nodes, and windows, along with KER, RoH, Lyapunov, and always‑improve diagnostics, but no actuation fields or raw biosignals.[file:18]  
+  - Gate AI‑visible telemetry families (KER, RoH, Lyapunov, EcoHealth aggregates) through `agentsafeconsentguard`, so neurorights and sovereign consent envelopes determine what any agent can see, and nothing can bypass these ALN‑backed decisions.[file:18]
+
+- Turn cross‑repo eco‑machinery into a single, DID‑anchored research surface.  
+  - Bind all code files, SQL schemas, and shard definitions to Bostrom DIDs and hex anchors (e.g., via hexanchor crates and Phoenix hex registry tables), so every governance computation is attributable to the steward DID and ALN authority.[file:18][file:21]  
+  - Use Lua, Java, Kotlin, and C/CPP harnesses only as diagnostic clients (e.g., microplastic risk reports, blast‑radius simulations, data‑center KER monitors), never as actuators, and always backed by ALN specs and SQLite views.[file:9][file:18]
+
+These objectives define Prometheus‑Praxis as a verifiable, non‑actuating governance kernel that can safely coordinate Cyboquatic, EcoNet, and Eco‑Fort work while keeping all superpowers sealed and all ecological safety guarantees explicit and machine‑checkable.[file:18][file:21]
+
+---
+
+## 4. System Architecture Overview
+
+The Prometheus‑Praxis architecture is a layered, mono‑repo spine that connects ALN grammar, Rust governance crates, SQLite spines, and multi‑language diagnostic tools into a single, DID‑anchored ecosystem.[file:18][file:21] Every layer is designed to be non‑actuating, corridor‑tightening, and formally auditable.
+
+- Constitutional grammar layer (ALN).  
+  - Core ecosafety, identity, and governance are defined in ALN shards such as `alnPrometheusPraxisCore.v1.aln`, ecosafety risk vectors, lane governance topology, EcoWealth contracts, Cyboquatic ecosafety and microplastic risk, blast‑radius governance, and plane weights.[file:18][file:21]  
+  - ALN also specifies function metadata (`ppx.function.meta.v1.aln`), role bands (`prometheus-role-bands.v1.aln`), shard layouts, AIsafe catalogs, and telemetry kernels, giving Rust, SQL, and tooling a shared, frozen grammar to adhere to.[file:18][file:21]
+
+- Non‑actuating Rust crate band.  
+  - Governance and observability crates (`prometheus-praxis`, `prometheus-praxis-ai`, `prometheus-praxis-lyapunov-guard`, KER composition and residual crates, hex anchor and provenance crates) implement execution‑layer logic over KER, RoH, Lyapunov, lanes, eco‑wealth, and blast‑radius without ever issuing actuator commands.[file:18]  
+  - Crates are Rust 2024, `rust-version = "1.85"`, `!forbid(unsafe_code)` where shown, and use Kani 0.67 for proofs over Lyapunov guards and always‑improve scoring, turning safety invariants into machine‑checked properties.[file:18]
+
+- SQLite governance spines and views.  
+  - Workspaces under `workspacedb` host canonical schemas for cyboquatic machinery, ecosafety windows, EcoNet indexes, blastradius, microplastic risk, and AI‑safe catalogs; triggers enforce “no corridor, no build” and Lyapunov non‑increase.[file:18][file:9]  
+  - A two‑tier view architecture exposes internal rich views (full KER, RoH, Tsafe, Lyapunov, lane, treaties) for CI and auditors, and thin, AI‑friendly facades (e.g., `vcyboquaticmicroplasticriskfacade`, `vcyboworkloadnodewindow`, `vagentsafecatalog`) for chat agents and dashboards.[file:18][file:9]
+
+- Diagnostic toolchains (Lua, Python, Java, Kotlin, C/CPP).  
+  - Lua: governance tools validate ALN catalogs, generate shard layout diagrams, verify Merkle ledgers, sandbox agent functions, compute cyboquatic microplastic risk scores, and emit GitHub‑markdown reports for stewards.[file:9][file:18]  
+  - Python: diagnostics scripts traverse ALN specs, summarize repository changes, enforce docstring and ALN‑reference quality, and run maintenance sessions, all using native tooling without new dependencies.[file:18]  
+  - Java/Kotlin: JVM agents monitor AI datacenter KER, corridor blast‑radius simulations, and cyboquatic drainage summaries, reading from SQLite/JSON outputs and posting human‑readable HTML/JSON reports; they never alter lanes or actuators.[file:9][file:18]  
+  - C/CPP: numeric engines in `srccpp` compute non‑actuating workload, drainage‑decay, and blast‑radius metrics for Cyboquatic and hydrology planes, accessed via Rust FFI and never bound directly to devices.[file:18][file:21]
+
+- AI‑safe catalog and consent gates.  
+  - The `dbdbagentsafecatalog.sql` spine and `vagentsafecatalog` view define exactly which tools, nodes, and windows are visible to AI agents, along with KER, RoH, Lyapunov, always‑improve, and stability flags, but no actuation or raw biosignals.[file:18]  
+  - An `agentsafeconsentguard` table encodes per‑catalog entry, per‑telemetry‑family permissions, ensuring neurorights and sovereign consent engines decide which KER, RoH, Lyapunov, or health aggregates can be surfaced, and preventing any AI path from bypassing these ALN‑defined constraints.[file:18]
+
+- Provenance, hex anchoring, and cross‑repo wiring.  
+  - Hex anchor and provenance crates bind Rust, SQL, ALN, and tool files to Phoenix hex registries and Bostrom DIDs, so every governance artifact (e.g., KER shards, blastradius ledgers, eco‑wealth statements) is cryptographically attributed and auditable.[file:18][file:21]  
+  - The shard layout ALN (`prometheus-shard-layout.v1.aln`) plus PlantUML generators keep the global shard and trust‑band topology explicit in `ARCHITECTURE.md`, making cross‑shard dependencies inspectable for humans and CI alike.[file:18]
+
+In combination, these layers form a single, Eco‑Fort‑aligned governance lattice: ALN grammars define what is allowed, Rust crates implement verifiable kernels, SQLite enforces invariants and stores evidence, tools provide human‑ and AI‑readable reports, and the AI‑safe catalog plus consent guards ensure that no agent ever escapes the non‑actuating, corridor‑tightening envelope of Prometheus‑Praxis.[file:18][file:21]
+
+## 5. Mathematical Spine: KER–Lyapunov Framework
+
+Prometheus‑Praxis encodes risk as a small set of mathematically sharp primitives, so every governance decision can be traced to explicit coordinates, vectors, and residuals rather than opaque scores.[file:18]
+
+- RiskCoord and RiskVector.  
+  - A RiskCoord is a bounded scalar \(r_p \in [0,1]\) for a specific plane \(p\) (e.g., CARBON, HEAT, WATER, BIODIVERSITY, PSYCHRISK), representing normalized risk of harm along that dimension.[file:18]  
+  - A RiskVector is the tuple of all active coordinates \(R = (r_{\text{carbon}}, r_{\text{heat}}, r_{\text{water}}, \dots)\) for a node or window, accompanied by a KER triad \((K,E,R_\text{agg})\) where \(R_\text{agg}\) is a plane‑weighted aggregation of the individual coordinates.[file:18]
+
+- LyapunovWeights and Residual.  
+  - The Lyapunov function \(V_t\) is a scalar potential defined per node or shard that encodes the “distance” from an ecologically restorative equilibrium, with per‑plane weights drawn from ALN PlaneWeights shards (e.g., Tree‑of‑Life plane weights for biodiversity vs. hydrology).[file:18]  
+  - The Lyapunov residual over a window is \( \Delta V = V_{t+1} - V_t \), with constraints that \(\Delta V \le 0\) in restorative or allowed states, and stricter bands (\(\Delta V \le \varepsilon\)) for always‑improve windows; these bands are part of ecosafety ALN specs and enforced via Rust guards and SQL triggers.[file:18]
+
+- SafeStepGate and corridor grammar.  
+  - The SafeStepGate is a function that evaluates whether a proposed step (or a realized window) is admissible given K, E, R, RoH, and Lyapunov residual; a step is safe only if K and E exceed lane‑specific minima, R and RoH stay below lane ceilings, and \( \Delta V \) remains within its non‑increase band.[file:18]  
+  - Corridor grammar is expressed in ALN ecosafety and corridor shards as SAFE, GOLD, HARD bands for each corridor variable (e.g., \(\Delta V\), maxcarbonradius, maxbiodivradius, RoH), with weights and MANDATORY flags; the combination defines admissible corridors in the KER–Lyapunov space and is consumed directly by Rust crates and SQLite invariants.[file:18]
+
+- NonOffsettablePlanes and Tree‑of‑Life extensions.  
+  - Non‑offsettable planes (e.g., PSYCHRISK, critical AQUATIC BIODIVERSITY, neurorights‑linked NEUROBIOME) are marked in ALN so that improvements in other planes cannot compensate for violations; in practice, any violation in such a plane forces a Stop or Derate verdict regardless of K or E gains elsewhere.[file:18]  
+  - Tree‑of‑Life (ToL) PlaneWeights shards encode higher weights for biodiversity and long‑horizon regenerative dynamics, and the Lyapunov function is extended with “biodiversity‑boosted” residuals where genuine restoration (e.g., corridor species return, soil biota recovery) can tighten corridors and lower \(V\) even if short‑term energy metrics are flat.[file:18]
+
+- Windowed KER and always‑improve metrics.  
+  - Observability views and KER kernels compute windowed KER vectors, RoH, and Lyapunov deltas per node or shard window (e.g., vcyboworkloadnodewindow, cyboquatic microplastic risk windows), so the system reasons over finite windows rather than individual events.[file:18][file:9]  
+  - The always‑improve kernel in `crates/prometheus-praxis-ai/src/alwaysimprove.rs` takes lane, KER outputs, RoH snapshot, and Lyapunov residual snapshots and returns an AlwaysImproveScore: a bounded scalar \(s \in [0,1]\) plus a safetopromote flag, under rules such as “RoH below global ceiling, \(|\Delta V|\) below max band, K/E above lane minima, R below lane max; otherwise \(s=0\), safetopromote=false.”[file:18]
+
+These primitives make the KER–Lyapunov spine a compact but expressive grammar for risk and restoration, and they are implemented in non‑actuating Rust and SQL so they can be formally verified and audited.[file:18]
+
+---
+
+## 6. Governance Spine and Superpower Boundaries
+
+Prometheus‑Praxis uses the KER–Lyapunov spine to drive governance while treating all physical capabilities as sealed superpowers that are never exposed as tools.[file:18] Governance crates, ALN shards, and DB schemas together define how verdicts are computed, how lanes are managed, and how SafeStepGate is enforced.
+
+- Superpower model and PraxisGovernanceKernel.  
+  - Superpowers such as Heat/Water/Tree macro‑infrastructure, nanoswarm routing, psychrisk engines, and AI data‑center actuation live behind sealed, DID‑bound capability objects in other stacks; Prometheus‑Praxis never exports functions that can directly drive them.[file:18]  
+  - The PraxisGovernanceKernel and KER engines are pure Rust/ALN components that take observed KER, RoH, lane, and Lyapunov evidence and return Allow/Derate/Stop (and safetopromote) verdicts; they emit qpudatashards and lane verdicts but never send actuator commands.[file:18]
+
+- Governance artifacts: lanes, weights, status, and verdicts.  
+  - Lane thresholds and plane weights are defined in PlaneWeights and lane governance ALN shards, setting K/E minima, R and RoH ceilings, and per‑plane weights for each lane (RESEARCH, PILOT, PRODUCTION), including Tree‑of‑Life biases for biodiversity and non‑offsettable planes.[file:18]  
+  - SQLite tables such as `lanestatusshard`, `virtalaneverdict`, and `vlatestlanestatus` store per‑shard lane assignments, historical verdicts, and latest status, and are read by governance crates and AI‑safe catalogs to determine admissible operations and AI visibility.[file:18]
+
+- SafeStepGate in practice.  
+  - Every proposed state change (e.g., lane promotion, new workload profile, corridor adjustment) is evaluated by SafeStepGate, which checks KER and RoH against lane thresholds and corridor grammar, and enforces Lyapunov non‑increase bands; if any condition fails, the change is rejected or downgraded before it can influence any actuation queue.[file:18]  
+  - CI guards, DB triggers (e.g., no‑corridor, no‑build; Lyapunov non‑increase), and Kani proofs for KER/Lyapunov guards together ensure SafeStepGate is consistently applied at code, schema, and runtime layers, preventing accidental downgrades or corridor widening.[file:18]
+
+- Superpower boundaries in AI‑facing surfaces.  
+  - The AI‑safe catalog schema (`dbdbagentsafecatalog.sql`) and `vagentsafecatalog` view list only non‑actuating objects (views, patterns, FFI functions, node windows) annotated with KER, RoH, Lyapunov, always‑improve, and stability flags, and explicitly exclude any actuation fields or raw biosignals.[file:18]  
+  - `agentsafeconsentguard` rows enforce neurorights and consent envelopes per telemetry family (KER, RoH, LYAP, Eco‑Health), and superpower‑adjacent entries are only visible when ecosafetyrequired is set and governance tokens are present, never as general‑purpose chat tools.[file:18]
+
+- SafeStepGate and lane status integration.  
+  - The output of SafeStepGate is materialized into lane verdict tables and diagnostic views (e.g., `laneadmissibleok`, `safetopromoteok` flags in microplastic risk and workload windows), so agents and operators can see which nodes and shards are Always‑Improve and eligible for promotion.[file:18][file:9]  
+  - LaneGuard logic in governance crates requires that safetopromote, carbonnegativeok, restorationok, and Lyapunov/ToL constraints all hold before updating `lanestatusshard` to a higher lane; the reverse (downgrades) is allowed whenever safety is threatened, ensuring monotone tightening of protection over time.[file:18]
+
+This governance spine turns the mathematical KER–Lyapunov framework into concrete, DID‑anchored decisions, while superpower boundaries and SafeStepGate ensure that neither AI agents nor human operators can bypass ecosafety corridors or neurorights by going around Prometheus‑Praxis.[file:18][file:9]
+
+## 7. Data sovereignty, neurorights, and identity
+
+### 7.1 Sovereign‑consent architecture
+
+- Data surfaces are split into:
+  - Internal rich governance views (full K, E, R, RoH, Tsafe, Vt, lane, corridor, treaty IDs).
+  - Thin AI‑safe facades that only expose non‑actuating diagnostics needed for reasoning. [file:18]
+
+- The AI‑safe catalog is materialised as:
+  - `db/db_agent_safe_catalog.sql` with:
+    - `agentsafecatalog` (core registry of AI‑visible objects).
+    - `agentsafediagnostics` (always‑improve and KER diagnostics per catalog entry).
+    - `agentsafeconsentguard` (per‑catalog, per‑telemetry‑family gate). [file:18]
+  - The AI‑facing view:
+    - `CREATE VIEW IF NOT EXISTS vagentsafecatalog AS ...` joining catalog, diagnostics, and consent guard, and filtering:
+      - Only KER/ROH/LYAP families with `allowed = 1`.
+      - Superpower‑adjacent entries only when `ecosafetyrequired != 0`. [file:18]
+
+- Neurorights corridors are enforced by:
+  - A hard exclusion list for:
+    - Raw EEG, high‑frequency neural waveforms, fine‑grained biosignal traces tied to identity, and unaggregated lab values. [file:18]
+  - A positive‑list for neurally/biologically sensitive metrics only in aggregated, DP‑safe form (e.g., monthly microplastic burden index, daily detox stress, hourly LOW/MED/HIGH cognitive load bands, Eco‑phi DP vectors) and only when a positive `TelemetryVerdict` is present. [file:18]
+
+- Consent and sovereignty are encoded structurally via:
+  - `agentsafeconsentguard`:
+    - `catalogid`, `telemetryfamily` (`KER`, `ROH`, `LYAP`, `ECOHEALTHAGG`, etc.), `allowed`, `reason`, `updatedat`.
+    - Populated by sovereign‑consent engines so any AI‑safe view must join through it to surface those telemetry families. [file:18]
+  - Views such as `vagentsafecatalog` explicitly JOIN three consent rows for `KER`, `ROH`, `LYAP` before surfacing KER fields, so neurorights and host envelopes directly control visibility. [file:18]
+
+- Superpower boundaries are enforced by catalog rules:
+  - Objects classified as superpower‑adjacent (e.g., HeatWaterTree, nanoswarm routing, Neurobiome Mesh) are:
+    - Present in `agentsafecatalog` only as diagnostic surfaces.
+    - Always flagged `superpoweradjacent = 1`.
+    - Only visible to AI when `ecosafetyrequired != 0` (i.e., there is an explicit governance token or gate). [file:18]
+  - Actuation parameters, controller gains, or plans are never present in any AI‑facing view; only read‑only diagnostics such as RoH, Tsafe, Vt, guard verdicts, corridor IDs, and treaty IDs are allowed. [file:18]
+
+- “No corridor, no build” remains a hard invariant:
+  - Core ecosafety schemas and triggers reject writes that push risk coordinates beyond corridor bands or increase Lyapunov residuals.
+  - AI patterns are forced to query through vetted views (e.g., `vcyboworkloadnodewindow`, `vmachineblastradius`), not raw staging tables, so sovereign‑consent and corridor enforcement are never bypassed. [file:18]
+
+- Knowledge factor / eco‑impact / risk:
+  - Knowledge factor K: High, because the architecture reuses existing KER/Lyapunov tables and extends them with explicit AI‑safe catalog and consent guards, clarifying what agents can see. [file:18]
+  - Eco‑impact value E: High, because excluding raw neural and identity‑sensitive telemetry while allowing aggregated, DP‑safe metrics reduces exploitation risk while enabling restorative reasoning. [file:18]
+  - Risk‑of‑harm R: Moderate, mainly from mis‑classification of telemetry families or misconfigured consent rows, mitigated by CI checks ensuring no raw neural families are marked `allowed = 1`. [file:18]
+
+### 7.2 Contribution ledgers, ecocredit semantics, and ALN policy shards
+
+- Contribution and workload evidence:
+  - Cyboquatic machinery energy/carbon/restoration evidence is captured in:
+    - `cyboquaticworkloadledger` (in `db/db_cyboquatic_blastradius_spine.sql`): per‑workload `ereqj`, `esurplusj`, `rcarbon`, `rbiodiv`, `vtbefore`, `vtafter`, `decision`, `lane`, `region`, `evidencehex`, and `signingdid`. [file:18]
+  - Blast‑radius effects are captured in:
+    - `blastradiuslink`: `sourcetype`, `sourceid`, `targettype`, `targetid`, `impacttype`, `impactscore`, `vtsensitivity`, with unique constraints per (source, target, impacttype). [file:18]
+
+- Ecocredit semantics:
+  - Higher‑level views (e.g., `vmachineblastradius`, `vcyboworkloadnodewindow`) provide per‑machine/per‑node/per‑window summaries of:
+    - Energy usage, carbon risk, Lyapunov deltas, acceptance rates, and ecopenalty metrics, usable as a basis for ecocredit or eco‑penalty allocations per region or lane. [file:18]
+  - Planned `ecopenalty` metrics combine:
+    - Plane weights, impact scores, and normalized risk factors to rank worst offenders; these can drive corridor‑level ecocredit rules (e.g., more credits for nodes with low ecopenalty and `deltavt < 0`). [file:18]
+
+- ALN policy shards:
+  - Ecological blast‑radius shards:
+    - `qpudatashards/particles/CyboquaticBlastRadiusShard2026v1.aln`:
+      - Declares fields like `maxcarbonradius`, `maxbiodivradius`, `vtradiussum`, lane, region, and corridor‑level CORRIDORVAR thresholds for `deltavt` and `maxcarbonradius` with SAFE/GOLD/HARD bands. [file:18]
+      - Binds to Bostrom DID via `ALN_SPECHASH_HEX` and DID anchor. [file:18]
+  - Microplastic risk policy:
+    - `db/db_cyboquatic_microplastic_risk_index.sql`:
+      - Table `cyboquaticmicroplasticriskindex` includes `microplasticloadmgm3`, `ecoperjoule`, `restorationscore`, KER dimensions, Lyapunov residuals, RoH, and governance flags (`carbonnegativeok`, `restorationok`, `laneadmissibleok`, `safetopromoteok`). [file:18]
+      - A trigger `trg_microplastic_ker_invariants` ensures:
+        - `kerscore ≈ k + e − r`.
+        - Non‑negative microplastic load.
+        - `vtafter <= vtbefore`. [file:18]
+    - Facade view `vcyboquaticmicroplasticriskfacade` exposes only non‑actuating fields to AI. [file:18]
+
+- Contribution ledgers as ecocredit backbone:
+  - Each workload, shard blast‑radius, and microplastic risk row forms a ledger entry that can be transformed via ALN shards (e.g., `CyboquaticBlastRadiusShard2026v1`, microplastic ALN) into ecocredit transactions anchored to a DID and corridor. [file:18]
+  - This enables future `ecowealth`‑like tables and lanes where rewards are allocated based on sustained `alwaysimprove` flags and positive KER evolution per node/region. [file:18]
+
+- Knowledge factor / eco‑impact / risk:
+  - Knowledge factor K: High, because schemas and ALN specs provide a consistent numerical language for blast radius, workloads, and microplastics aligned with KER. [file:18]
+  - Eco‑impact value E: High, because the structure directly enables ecocredit scoring that favours carbon‑negative, restorative patterns per machine/node window. [file:18]
+  - Risk‑of‑harm R: Moderate, mostly from mis‑weighted ecocredit logic or misconfigured plane weights, mitigated by formal Kani harnesses on scoring kernels. [file:18]
+
+### 7.3 DID and ALN anchors for identity and rewards
+
+- Bostrom identity anchors:
+  - ALN shards explicitly embed:
+    - `Anchor bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7` or similar DID tag to bind specifications and shards to the brain‑bound Bostrom identity. [file:18]
+  - Examples:
+    - `NeuromorphicCorridorAlign2026v1.aln` under `Prometheus-Praxis/specs` anchors neuromorphic material–corridor rules to the DID and EcoFort grammar. [file:18]
+    - `CyboquaticBlastRadiusShard2026v1.aln` likewise carries a hex spechash bound to the DID. [file:18]
+
+- EcoFort grammar and corridor mapping:
+  - ALN specs define:
+    - Typed `materialprofile` or `plot` particles.
+    - `corridor` variants with power density, contact rules, and plane binding (e.g., `LOWENERGYBIOCOMPATIBLE`, `HIGHENERGYCONTAINED`). [file:18]
+    - Alignment blocks (`align NeuromorphicMaterialProfile -> EcosafetyCorridor as NeuromorphicCorridorMap`) formally map profiles to corridors with `risk` labels and eco‑notes. [file:18]
+  - Rust and Kotlin codegen sections turn these ALN mappings into:
+    - Rust enums in crates like `neuromorphiccorridoralign` with serde derives.
+    - Kotlin sealed hierarchies under `org.prometheuspraxis.neuromorphic`. [file:18]
+
+- Authorship and reward tracking:
+  - Contribution DIDs:
+    - Tables such as `cyboquaticworkloadledger` include `signingdid` to record which governance identity signed a decision. [file:18]
+    - Microplastic risk index rows can carry `didroot` corresponding to the ALN spec’s DID anchor. [file:18]
+  - Hex‑stamping:
+    - Repo index migrations (e.g., `db/db_repo_index_restoration_cyboquatic.sql`) register ALN and SQL files with `repofile` entries, enabling `DefinitionRegistry` and hex anchor manifests like `PHX_HEX_ANCHORS.md` to track authorship and version. [file:18]
+  - Eco‑rewards:
+    - KER and always‑improve flags in `agentsafediagnostics` and eco‑ledger tables can be aggregated into eco‑reward or ecowealth tables tied to contributor DID, corridor, and lane. [file:18]
+
+- Knowledge factor / eco‑impact / risk:
+  - Knowledge factor K: High, because DID and ALN anchoring provide a verifiable chain from spec to code to ledger, improving provenance. [file:18]
+  - Eco‑impact value E: High, because connecting KER and always‑improve flags to DID‑anchored shards allows reward systems that explicitly favour restorative work. [file:18]
+  - Risk‑of‑harm R: Low–moderate, mainly from mis‑binding of shards to wrong DIDs or corridor tags, mitigated by CI checks on `repoindex` bindings and ALN spec hashes. [file:18]
+
+---
+
+## 8. Repository architecture and planes
+
+### 8.1 Monorepo structure and Cargo workspace
+
+- Authoritative monorepo:
+  - Target: `github.com/mk-bluebird/Prometheus-Praxis`, formerly a constellation of Doctor0Evil eco repositories, now the single source of truth for EcoNet and Prometheus‑Praxis work. [file:18]
+  - Eco‑restoration focused subtree: `ecorestoration_shard` (now folded into the mono‑repo), holding SQLite schemas, ALN shards, and Cyboquatic machinery spines. [file:18]
+
+- Cargo workspace layout:
+  - Workspace root `Cargo.toml` lists crates such as:
+    - `crates/prometheuspraxis` – core governance and execution kernel. [file:18]
+    - `crates/prometheuspraxisai` – AI‑facing, non‑actuating ecosafety/always‑improve scoring crate, with FFI and CPP engine adapters. [file:18]
+    - `crates/prometheus-praxis-cyboquatic` – Cyboquatic coupling layer onto EcoNet governance. [file:18]
+    - `crates/prometheus-praxis-lyapunov-guard` – Lyapunov guard/invariant crate with Kani harnesses. [file:18]
+    - `crates/cyboquatic-ecosafety-core`, `crates/cyboquatic-core`, `crates/econet-governance-spine` – ecosafety, recognition/index, and governance spine crates. [file:18]
+  - Workspace‑level dependency pinning (e.g., `serde = 1.0.203`, `serde_json = 1.0.120`) ensures all crates use consistent versions required for formal verification and diagnostic tooling. [file:18]
+
+- Cross‑language adapters:
+  - C/CPP adapters:
+    - Under `prometheuspraxisai` (e.g., `src/engine.cpp`, FFI shims in `src/lib.rs`) and a dedicated `fog-heuristic-drainage` directory for a C microservice feeding a Rust hydrology plane via Unix sockets. [file:18]
+  - Kotlin/Java:
+    - `ai-datacenter-node-agent` Java code monitors `AiDatacenterNode2026v1` metrics and alerts via Discord, governed by Rust/ALN invariants fetched via a Unix socket bridge. [file:18]
+  - Lua tools:
+    - Located in `tools/` (e.g., `regionrepresentationshardvisualizer.lua`, `sunflowerbeecorridorledgerverifier.lua`, `cyboquaticmicroplasticrisk.lua`) providing CI‑friendly SVGs, ledger checks, and diagnostic summaries. [file:18]
+
+- Knowledge factor / eco‑impact / risk:
+  - Knowledge factor K: High, because the workspace structure is explicitly documented in repo notes, allowing precise crate‑role reasoning. [file:18]
+  - Eco‑impact value E: High, because consolidation into a single mono‑repo reduces drift and improves the ability to enforce eco‑invariants via shared CI and ALN. [file:18]
+  - Risk‑of‑harm R: Low, primarily from mis‑wiring crate dependencies, mitigated by `DefinitionRegistry` and CI checks over workspace members. [file:18]
+
+### 8.2 Planes and shards: diagnostic, governance, observability, agent
+
+- Planes and their main artefacts:
+
+  - Governance plane:
+    - Implemented primarily by:
+      - `crates/prometheuspraxis` (macroscale execution kernel returning `Allow/Derate/Stop`). [file:18]
+      - `crates/econet-governance-spine` (typed access to views like `vresidualkernel`, `vplaneweights`, `vshardblast`, `vlaneadmissibility`). [file:18]
+    - Relies on SQLite schemas:
+      - `db/db_ecosafety_workload_window.sql`, `db/db_econet_cyboquatic_index_2026v1.sql`, `db/db_blastradius_spine.sql`, and related ecosafety corridors. [file:18]
+
+  - Diagnostic plane:
+    - Backed by SQLite shards and rich internal views:
+      - `cyboquaticworkloadledger`, `blastradiuslink`, cyboquatic machinery registries, microplastic risk index, and derived diagnostics. [file:18]
+      - Views like `vmachineblastradius`, `vcyboworkloadnodewindow`, `vcyboquaticecoperjoule`, `vcyboquaticrestore`. [file:18]
+    - Exposed via non‑actuating Rust crates:
+      - `crates/cyboquatic-blastradius-spine` FFI returning JSON snapshots for tooling without exposing device APIs. [file:18]
+
+  - Observability plane:
+    - Rust crates (e.g., `prometheus-praxis-lyapunov-guard`, `cyboquatic-core` with `metrics` feature) emit:
+      - KER, RoH, Tsafe, Vt metrics as gauges/counters/histograms. [file:18]
+      - Snapshot APIs that compose these into JSON for dashboards and AI facades. [file:18]
+    - Lua visualisers (e.g., region coverage SVG, bee corridor Merkle checks) deliver CI/README‑grade observability artefacts. [file:18]
+
+  - Agent plane:
+    - SQL plus ALN:
+      - `agentsqlpattern` table defines curated, governance‑approved SQL templates with lane scopes, capability levels, and risk ceilings. [file:18]
+      - `vagentsafecatalog` view and its ALN mirror `econet.agent.function.catalog.v1.aln` define which views/FFI/patterns an AI may use, with KER and eco‑scores per object. [file:18]
+    - Rust/ALN:
+      - `prometheuspraxisai` provides `alwaysimprove` scoring kernels; outputs flow into `agentsafediagnostics` to rank tools and patterns. [file:18]
+    - Shell/Lua tooling:
+      - AI‑oriented scripts fetch `sqltext` from `agentsqlpattern` and map `objectid` from `vagentsafecatalog` to tools, ensuring agents only invoke pre‑vetted queries. [file:18]
+
+- Plane–artefact mapping table:
+
+  | Plane        | SQLite / ALN artefact                                                                 | Rust crate(s)                                           | AI/Tool surface                                            |
+  |-------------|----------------------------------------------------------------------------------------|---------------------------------------------------------|-----------------------------------------------------------|
+  | Governance  | `db_ecosafety_workload_window.sql`, ecosafety corridor ALN shards                      | `prometheuspraxis`, `econet-governance-spine`           | Lane guards, AlwaysImprove verdicts                       |
+  | Diagnostic  | `db_cyboquatic_blastradius_spine.sql`, `db_cyboquatic_machinery_spine.sql`, microplastic index | `cyboquatic-blastradius-spine`, `cyboquatic-ecosafety-core` | `vmachineblastradius`, `vcyboworkloadnodewindow`         |
+  | Observability | KER/Vt schemas, plane weights ALN                                                    | `prometheus-praxis-lyapunov-guard`, `cyboquatic-core`   | JSON snapshots, Prometheus‑style metrics                  |
+  | Agent       | `agentsafecatalog`, `agentsafediagnostics`, `agentsqlpattern`, `vagentsafecatalog`, `econet.agent.function.catalog.v1.aln` | `prometheuspraxisai` and EcoNet index crates           | Tool catalogs, safe SQL patterns, FFI handles             | [file:18]
+
+- Knowledge factor / eco‑impact / risk:
+  - Knowledge factor K: High, because the plane decomposition aligns explicitly with documented invariants and existing schemas/crates. [file:18]
+  - Eco‑impact value E: High, because agents operate strictly on diagnostic/observability surfaces, making it easier to measure and improve eco‑impact without risking actuation. [file:18]
+  - Risk‑of‑harm R: Low–moderate, mainly from mis‑classification of an object’s plane (e.g., accidentally registering an actuation‑adjacent tool as diagnostic), mitigated by `DefinitionRegistry`, `roleband`, `nonactuating_only` flags, and CI checks over `vagentsafecatalog`. [file:18]
+
+ ## 9. Non‑actuating Rust and ALN conventions
+
+### 9.1 Rust constraints and invariants
+
+- Core constraints for all Prometheus‑Praxis and EcoNet crates:
+  - `edition = "2024"` and `rust-version = "1.85"` must be set in `Cargo.toml` (workspace and member crates). [file:18]
+  - `#![forbid(unsafe_code)]` at crate root: all governance, ecosafety, and AI‑facing crates are strictly safe Rust; any low‑level bindings live in dedicated, tightly scoped adapter crates. [file:18]
+  - Clippy is run in “deny” mode for warnings on these crates (e.g., `-D warnings` in CI), so code must be warning‑free to merge. [file:18]
+
+- Kani requirements:
+  - `kani-verifier = "0.67"` is a mandatory dev‑dependency for all safety‑critical kernels (e.g., `prometheuspraxisai`, `prometheuspraxisker`, `prometheus-praxis-lyapunov-guard`). [file:18]
+  - At least three classes of properties are proven:
+    - Memory safety (no panics, no overflows, no UB) on core scoring and guard functions. [file:18]
+    - Lane invariants: if K, E, R are within lane thresholds and RoH and Lyapunov respect ceilings, governance must not return `Stop`. [file:18]
+    - Always‑improve monotonicity: outputs never lower safety floors, and `safetopromote` cannot be `true` when RoH, Vt, or corridor thresholds are violated. [file:18]
+
+- Non‑actuating spine:
+  - All Rust crates in the governance/diagnostic band (e.g., `econet-governance-spine`, `cyboquatic-blastradius-spine`, `prometheuspraxisai`) are read‑only over SQLite and ALN; they:
+    - Read logs, KER windows, Lyapunov residuals, blast‑radius, ecoper‑joule, etc. [file:18]
+    - Compute scores, flags, or KER‑derived summaries. [file:18]
+    - Emit JSON, ALN shards, or write back evidence rows only (never actuation commands). [file:18]
+  - Actuation (Perknos‑Nexus, nanoswarm routing, macro‑health logistics, etc.) is always outside this repo and never exposed as a Rust function callable from AI‑facing crates. [file:18]
+
+- Always‑improve kernel pattern:
+  - Implemented in `crates/prometheuspraxisai/src/alwaysimprove.rs` with:
+    - `AlwaysImproveScore { score, safetopromote }` as the core result type. [file:18]
+    - `AlwaysImproveConfig { vref, maxdeltav, wk, we, wr }` for weighting K/E/R residuals and Lyapunov deltas. [file:18]
+  - Main function:
+    - `pub fn compute_always_improve_score(lane: ActionLane, ker: KerOutput, roh: RohSnapshot, lyap: LyapunovResidualSnapshot, cfg: AlwaysImproveConfig, roh_ceiling_global, kmin_*, emin_*, rmax_*) -> AlwaysImproveScore` with:
+      - Hard early exits when RoH exceeds ceiling or Lyapunov delta exceeds `maxdeltav`. [file:18]
+      - Lane‑specific K/E/R minima/maxima enforced before `safetopromote` may be `true`. [file:18]
+
+- Rust configuration conventions:
+  - Governance crates expose config via:
+    - Workspace metadata or ALN (e.g., `workspace.metadata.ker.residuals`) instead of ad‑hoc constants, so Kani harnesses can reason about the same thresholds. [file:18]
+  - All AI‑facing FFI layers (C/CPP, Kotlin, Lua) are thin veneers over these Rust functions; they must:
+    - Never introduce actuation logic.
+    - Only serialize/deserialize evidence, KER summaries, and `AlwaysImproveScore`. [file:18]
+
+### 9.2 ALN patterns, function meta, and governance shards
+
+- ALN function metadata:
+  - Function‑level ALN shards (e.g., `ppx.function.meta.v1.aln`) encode:
+    - `functionid`, `domain` (`ecosafety`, `cyboquatic`, `governance`), `lane` (`RESEARCH`, `PILOT`, `PRODUCTION`). [file:18]
+    - `nonactuating = 1` for all AI‑exposed functions. [file:18]
+    - `ecosafetyrequired` flag when a function is near superpowers or corridors requiring extra gates. [file:18]
+  - These meta shards drive:
+    - `agentsafecatalog.ecosafetyrequired` and `superpoweradjacent` fields. [file:18]
+
+- Ecosafety policies:
+  - ALN shards such as:
+    - `ecosafety.nonactuatingworkload.v1.aln` describe workloads that are guaranteed non‑actuating and their expected metrics. [file:18]
+    - `ecosafety.riskvector.v2.aln` defines risk vector components (e.g., `rcarbon`, `rbiodiv`, topology risks) and how they map into corridors. [file:18]
+  - Policies enforce:
+    - Bounding of K/E/R, RoH, and Lyapunov residuals in \([0,1]\).
+    - Explicit corridor assignments (SAFE/GOLD/HARD bands) for each dimension. [file:18]
+
+- Task‑list ALN (`PrometheusPraxisCodingTaskList2026v1.aln`):
+  - Encodes coding tasks and governance work items as first‑class ALN particles:
+    - `taskid`, `category` (`SQL`, `RustKernel`, `ALNSpec`, `CIGuard`), `lanetarget`, `kerimpact`, `rohimpact`, `ecoscore`, `riskflag`. [file:18]
+  - Allows:
+    - Prioritisation of tasks by knowledge factor and eco‑impact.
+    - CI to enforce that high‑risk tasks (e.g., touching KER kernels) must carry Kani property proofs before merging. [file:18]
+
+- Governance flag shards:
+  - Shards that encode governance state and flags, for example:
+    - Lane rules (`vlanepromotionhistory`, `lanestatusshard`): how shards move from `RESEARCH` → `EXPPROD` → `PROD`. [file:18]
+    - KER upgrade guards (`KerUpgradeGuard` ALN) capturing `K_new ≥ K_old`, `E_new ≥ E_old`, `R_new ≤ R_old`. [file:18]
+    - Always‑improve meta (`alwaysimprove.policy.2026v1.aln`) tying score thresholds to lane promotions and eco‑rewards. [file:18]
+  - These are referenced by:
+    - Rust guard crates (`econet-governance-spine`, `prometheuspraxisai`) and CI harnesses that validate shards and workloads before lane changes. [file:18]
+
+---
+
+## 10. SQL and SQLite governance spines
+
+### 10.1 Core governance schemas
+
+- Plane weights:
+  - Plane‑weight shards and tables (e.g., `PlaneWeightsShard2026v1` and its SQL materialization) encode:
+    - Planes such as `ENERGY`, `CARBON`, `BIODIVERSITY`, `HYDRAULIC`, each with weights and risk coefficients. [file:18]
+  - Used to:
+    - Compute plane‑weighted blast‑radius \(B_\text{weighted} = \sum_p w_p \cdot \text{impactscore}_p\). [file:18]
+    - Derive ecopenalty metrics per machine or shard. [file:18]
+
+- Blast‑radius:
+  - `blastradiuslink` table (in `db/db_cyboquatic_blastradius_spine.sql`) with:
+    - `sourcetype` (e.g., `SHARD`, `MACHINE`), `sourceid`.
+    - `targettype` (e.g., `NODE`, `REGION`), `targetid`.
+    - `impacttype` (`CARBON`, `BIODIVERSITY`, etc.), `impactscore`, `vtsensitivity`. [file:18]
+  - Diagnostic views:
+    - `vshardblastradius` summarises blast‑radius per shard. [file:18]
+    - `vmachineblastradius` summarises per machine/node with governance filters:
+      - Excludes stale lanes (`expiresutc < now`).
+      - Drops non‑offsettable planes when any corridor violation exists. [file:18]
+
+- Event windows:
+  - Conceptualised via:
+    - Tables such as `windowgdbmetrics`, `evolutionepoch`, or a dedicated `workloadwindow` table. [file:18]
+    - Deterministic window assignment function (e.g., `windowid = floor((timestamp - t0)/windowsize)` per region), encoded in SQL and/or Rust. [file:18]
+  - Key view:
+    - `vcyboworkloadnodewindow` with columns:
+      - `nodeid`, `region`, `lane`, `windowstartutc`, `windowendutc`.
+      - `energyjtotal`, `carbonriskavg`, `vtbeforeavg`, `vtafteravg`, `deltavt`.
+      - `acceptedcount`, `rejectedcount`, `reroutedcount`.
+      - Flags like `carbonnegativeok`, `restorationok`, `alwaysimproveok`. [file:18]
+
+- Lane status and KER / Lyapunov windows:
+  - Lane views:
+    - `lanestatusshard`, `vlaneadmissibility`, `vlanepromotionhistory`:
+      - Encode current lane per shard, admissibility verdicts, TTL/staleness rules, and historical promotions. [file:18]
+  - KER and Lyapunov:
+    - Windows of K/E/R and Vt are held in:
+      - Residual snapshots and KER tables accessed via `vresidualkernel` and related views. [file:18]
+    - Used by:
+      - CI guards (`KerUpgradeGuard`, LaneGuard, `Mt6883Guard`) to enforce KER monotonicity and no corridor/no build. [file:18]
+
+### 10.2 AI‑safe catalog and tool surfacing
+
+- Core tables (from `db/db_agentsafecatalog.sql`):
+
+  - `agentsafecatalog`:
+    - Fields:
+      - `catalogid` (stable ID, e.g., `ASC-000001`).
+      - `kind` (`TOOL`, `NODE`, `WINDOW`, `VIEW`, `SQLPATTERN`).
+      - `name`, `description`, `domain` (ecosafety/cyboquatic/governance).
+      - `lane` (`RESEARCH`, `PILOT`, `PRODUCTION`).
+      - `corridorid`, `smartchainid`.
+      - `ecosafetyrequired` (mirrors ALN function meta).
+      - `superpoweradjacent` (1 if near sealed superpowers).
+      - `consentstreamid`, `mcptoolname`.
+      - `createdat`, `updatedat`. [file:18]
+
+  - `agentsafediagnostics`:
+    - Fields:
+      - `catalogid` (FK to `agentsafecatalog`).
+      - `kscore`, `escore`, `rscore` (normalized K/E/R 0..1).
+      - `rohscalar`, `vcurrent`, `vnext`, `lyapdelta`.
+      - `alwaysimprove` (0..1), `safetopromote` (0/1).
+      - `stableflag` (0/1), `marginclass` (`safe`, `tight`, `violated`).
+      - `lane`, `corridorid`, `updatedat`. [file:18]
+    - Populated only by Rust jobs (e.g., `prometheuspraxisai` batch): AI agents never write to this table. [file:18]
+
+  - `agentsafeconsentguard`:
+    - Fields:
+      - `catalogid` (FK).
+      - `telemetryfamily` (`KER`, `ROH`, `LYAP`, `ECOHEALTHAGG`, etc.).
+      - `allowed` (0/1).
+      - `reason`, `updatedat`. [file:18]
+    - Populated by sovereign‑consent engines; any row with `allowed = 0` blocks those telemetry families from AI views. [file:18]
+
+- View `vagentsafecatalog`:
+
+  - Combines:
+    - `agentsafecatalog` (identity, lane, domain, superpower adjacency).
+    - `agentsafediagnostics` (KER/Lyapunov/always‑improve metrics).
+    - `agentsafeconsentguard` (per‑family consent). [file:18]
+  - Filters:
+    - Only entries where required telemetry families (`KER`, `ROH`, `LYAP`) are `allowed = 1`. [file:18]
+    - Excludes raw biosignal families and neurorights‑sensitive telemetry (EEG, high‑frequency neural/biosignal traces). [file:18]
+    - Ensures any `superpoweradjacent = 1` entry is visible only when `ecosafetyrequired != 0` and lane is diagnostic (e.g., `RESEARCH`). [file:18]
+  - AI tooling usage:
+    - Treats each row as a safe tool/object:
+      - `objectid` = `VIEW/dbname/viewname` or `FFI/crate/symbol` or `SQLPATTERN/patternid`. [file:18]
+      - Includes KER and always‑improve fields so tools can filter to `safetopromote = 1`, `alwaysimprove ≥ threshold`, or low `rohscalar`. [file:18]
+
+- Relation to other governance views:
+  - `vcyboworkloadnodewindow` and `vmachineblastradius` are referenced by:
+    - SQL patterns in `agentsqlpattern` (e.g., “list nodes that improved Vt and reduced carbon last week”). [file:18]
+    - AI‑safe catalog entries whose diagnostics are derived from these views and then written into `agentsafediagnostics`. [file:18]
+  - This keeps AI agents:
+    - Operating purely on vetted, lane‑filtered snapshots.
+    - Never directly touching raw ledger tables or pre‑trigger staging data. [file:18]
