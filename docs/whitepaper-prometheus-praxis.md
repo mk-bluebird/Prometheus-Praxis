@@ -562,3 +562,117 @@ This governance spine turns the mathematical KER–Lyapunov framework into concr
   - This keeps AI agents:
     - Operating purely on vetted, lane‑filtered snapshots.
     - Never directly touching raw ledger tables or pre‑trigger staging data. [file:18]
+
+## 11. Always‑Improve kernel and scoring
+
+### 11.1 Rust scoring kernel
+
+- Kernel location and role:
+  - Implemented in `crates/prometheuspraxisai/src/alwaysimprove.rs` as a non‑actuating scoring kernel for diagnostic shards and node windows. [file:18]
+  - Consumes existing KER, RoH, and Lyapunov snapshots from governance crates (`prometheuspraxisker`, `prometheuspraxisgovernance`) rather than recomputing them. [file:18]
+
+- Core types:
+  - `AlwaysImproveScore`:
+    - Fields: `score` (bounded scalar in \([0,1]\)), `safetopromote: bool`. [file:18]
+    - Interpreted as “how strong is the evidence that this object/window is improving or at least not degrading under KER/Lyapunov.” [file:18]
+  - `AlwaysImproveConfig`:
+    - Fields: `vref`, `maxdeltav`, `wk`, `we`, `wr`. [file:18]
+    - Encodes Lyapunov reference value, maximum allowed Lyapunov increase, and weights for K, E, and R residuals. [file:18]
+    - Default values are tied to workspace metadata (`workspace.metadata.ker.residuals`) so changes propagate via ALN/metadata rather than hard‑coded constants. [file:18]
+
+- Residuals and scoring:
+  - Helper `ker_residuals_for_lane`:
+    - Takes `ActionLane`, `KerOutput`, and lane thresholds (`kmin_*`, `emin_*`, `rmax_*`) and returns residuals \((r_K, r_E, r_R)\) where:
+      - For K,E: residual is \(K_\text{target} - K\), clamped at 0 if \(K ≥ K_\text{target}\). [file:18]
+      - For R: residual is \(R - R_\text{target}\), clamped at 0 if \(R ≤ R_\text{target}\). [file:18]
+  - Helper `lyapunov_delta`:
+    - Computes \(ΔV = V_\text{next} - V_\text{current}\) from `LyapunovResidualSnapshot`, with inputs clamped into \([0,1]\). [file:18]
+  - Main function `compute_always_improve_score`:
+    - Inputs:
+      - `lane: ActionLane`, `ker: KerOutput`, `roh: RohSnapshot`, `lyap: LyapunovResidualSnapshot`.
+      - `cfg: AlwaysImproveConfig`.
+      - Global and lane thresholds: `roh_ceiling_global`, `kmin_*`, `emin_*`, `rmax_*`. [file:18]
+    - Steps:
+      - Clamp RoH; if `rohscalar > roh_ceiling_global`, return `score = 0`, `safetopromote = false`. [file:18]
+      - Compute `deltav = lyapunov_delta(lyap)`; if `deltav > maxdeltav`, return `score = 0`, `safetopromote = false`. [file:18]
+      - Compute residuals `(rK, rE, rR)` via `ker_residuals_for_lane`. [file:18]
+      - Combine: `combined = wk*rK + we*rE + wr*rR`, `score = clamp01(1 − combined)`. [file:18]
+      - Set `safetopromote = score ≥ 0.7` (or ALN‑driven threshold) and only if lane K/E minima and R maxima are satisfied. [file:18]
+
+- Kani harnesses and monotonicity:
+  - Kani proof modules (e.g., `kaniharnesses`) assert:
+    - If `K ≥ K_min(lane)`, `E ≥ E_min(lane)`, `R ≤ R_max(lane)`, `RoH ≤ roh_ceiling`, and `ΔV ≤ maxdeltav`, then `safetopromote` is never false. [file:18]
+    - If `ΔV > maxdeltav` or `carbonrisk > 0.13` or `RoH > roh_ceiling`, `safetopromote` is always false. [file:18]
+  - This formalises monotone evolution:
+    - Safety floors cannot be lowered, and always‑improve cannot “bless” a shard that violates KER/RoH/Lyapunov constraints. [file:18]
+
+### 11.2 Integration into diagnostics views
+
+- Diagnostics table surfacing:
+  - `agentsafediagnostics` table (in `db/db_agentsafecatalog.sql`) holds:
+    - `kscore`, `escore`, `rscore` (normalized K/E/R).
+    - `rohscalar`, `vcurrent`, `vnext`, `lyapdelta`.
+    - `alwaysimprove`, `safetopromote`.
+    - `stableflag` (0/1) and `marginclass` (`safe`, `tight`, `violated`). [file:18]
+  - Populated by Rust jobs:
+    - Batch tools read from rich views (e.g., `vrichcyboshardstate`, `vcyboworkloadnodewindow`), call `compute_always_improve_score`, then update/insert into `agentsafediagnostics`. [file:18]
+
+- AI‑safe catalog view:
+  - `vagentsafecatalog` joins:
+    - `agentsafecatalog` (what the object is).
+    - `agentsafediagnostics` (how safe/improving it is).
+    - `agentsafeconsentguard` (which telemetry families are allowed). [file:18]
+  - Fields surfaced to agents:
+    - `alwaysimprove`, `safetopromote`, `stableflag`, `marginclass`, along with K/E/R and Lyapunov scalars. [file:18]
+  - Usage patterns:
+    - Agents filter to `safetopromote = 1` and `marginclass = 'safe'` when searching for exemplar shards or nodes. [file:18]
+    - Governance CI uses the same table to require `safetopromote = 1` and `carbonnegativeok` and `restorationok` before lane upgrade to `PROD`. [file:18]
+
+---
+
+## 12. Function registry and CI enforcement
+
+### 12.1 Immutable function contracts (ppx.function.meta.v1.aln)
+
+- Canonical registry:
+  - `ppx.function.meta.v1.aln` is the authoritative ALN registry for callable functions across the Prometheus‑Praxis constellation. [file:18]
+  - Each entry includes:
+    - `functionid` (stable identifier).
+    - `domain` (`ecosafety`, `cyboquatic`, `governance`, etc.).
+    - `lane` (`RESEARCH`, `PILOT`, `PRODUCTION`). [file:18]
+    - `corridorid` / corridors touched.
+    - Capitals or planes touched (e.g., carbon, biodiversity, hydraulic). [file:18]
+    - `actuationflag` or `actuationcapability` (must be `NONE` for AI‑safe functions). [file:18]
+    - `superpoweradjacent` and `ecosafetyrequired` for functions near sealed kernels. [file:18]
+
+- Binding to runtime:
+  - Fields are mirrored into:
+    - `agentsafecatalog` (`ecosafetyrequired`, `superpoweradjacent`). [file:18]
+    - `agentsqlpattern` (`roleband`, `lanescope`, `actuationflag`). [file:18]
+  - Ensures:
+    - Any FFI symbol, SQL pattern, or CLI command exposed to AI has a corresponding immutable function contract in ALN. [file:18]
+
+### 12.2 CI guardrails and enforcement
+
+- `functionmetacicheck.py`:
+  - Python CI tool that:
+    - Scans the repo for governance artefacts (`.aln`, `.sql`, `.rs`) in configured directories. [file:18]
+    - Ensures each callable function or tool has a `functionid` row in `ppx.function.meta.v1.aln`. [file:18]
+    - Verifies consistency between ALN contracts and:
+      - `agentsafecatalog` entries (kind, domain, lane, actuation capability).
+      - `agentsqlpattern` entries (actuation flag must be 0 for AI‑safe patterns). [file:18]
+    - Fails CI with a clear list of unregistered or inconsistent functions (“no‑registry, no‑build”). [file:18]
+
+- Non‑actuation CI:
+  - Guards that ensure AI‑visible surfaces remain non‑actuating:
+    - Check `actuationflag = 0` for all entries referenced in `vagentsafecatalog` and `econet.agentfunctioncatalog.v1.aln`. [file:18]
+    - Confirm no function with `actuationcapability != NONE` is tagged as `AICHAT` or included in AI‑safe catalogs. [file:18]
+    - Validate that any `superpoweradjacent = 1` entry in `agentsafecatalog` has `ecosafetyrequired != 0`, meaning extra governance gating. [file:18]
+
+- Governance‑flag CI:
+  - Additional scripts enforce:
+    - Governance flags in ALN (e.g., KER upgrade guards, lane promotion rules) match lane behaviour in SQL views like `vlaneadmissibility`, `vlanepromotionhistory`. [file:18]
+    - `safetopromote`, `carbonnegativeok`, and `restorationok` flags are respected before CI allows lane upgrades or PROD tagging for shards. [file:18]
+  - Together these ensure:
+    - Functions cannot silently change domains, lanes, or actuation capabilities.
+    - All callable surfaces used by AI or automation are explicitly declared, non‑actuating, corridor‑bounded, and backed by ALN contracts and Rust/Kani invariants. [file:18]
