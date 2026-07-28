@@ -1014,3 +1014,85 @@ This governance spine turns the mathematical KER–Lyapunov framework into concr
   - This design:
     - Keeps AI‑exposed surfaces diagnostic‑only (KER, RoH, Lyapunov, stability flags) with no actuation or raw biosignals. [file:18]
     - Ensures AI agents only see what sovereign consent and neurorights envelopes permit, matching the “data‑as‑labor, neurorights‑first, no rollback” narrative. [file:18]
+
+## 19. Eco‑Impact, Knowledge Factor, and Risk Scoring
+
+### 19.1 KER scoring for views, functions, and planes
+
+- KER components:
+  - The governance spine exposes knowledge \(K\), eco‑impact \(E\), and residual risk \(R\) for shards, views, and machinery via `shardinstance`, `knowledgeecoscore`, and corridor bindings. [file:18]
+  - Internal rich views (e.g., `vrichcyboshardstate`, `vrichcyboassetwindow`) provide:
+    - `kmetric`, `emetric`, `rmetric`, Lyapunov residuals (`vtmax`, `meanvtbefore`, `meanvtafter`), and normalized RoH coordinates. [file:18]
+
+- KER‑aware diagnostic surfaces:
+  - A cross‑cutting `agentobjectscore` table (proposed) holds:
+    - `objectid` (view/FFI/function), `kscore`, `escore`, `rscore`, `rohscalar`, `lyapdelta`, and boolean flags like `safestepok`, `alwaysimproveok`. [file:18]
+  - `vagentsafecatalog` joins these scores so AI agents see:
+    - KER values and stability flags per tool or surface, not raw logs. [file:18]
+
+- How KER drives tool ranking:
+  - Tool ranking logic uses:
+    - High `kscore` and `escore` with low `rscore` to prioritise tools; `rscore` is derived from corridor risk vectors and plane weights. [file:18]
+  - Repo‑level risk can be estimated as:
+    - \(R_{\text{repo}, i} = \max_{s \in \text{shards}_i} R_s\), exposed as `repormax` in `veconetrepomanifestagent` to favour low‑risk repos for AI experimentation. [file:18]
+
+### 19.2 Eco‑penalty, eco‑credits, eco‑wealth, and blast‑radius metrics
+
+- Blast‑radius‑normalized impact and eco‑penalty:
+  - `vshardblastradius` and `vmachineblastradius` expose:
+    - `maxcarbonradius`, `maxbiodivradius`, `vtradiussum` per shard or machine. [file:18]
+  - A derived eco‑penalty per machine \(P_{\text{eco}, j}\) can be computed as:
+    - \(P_{\text{eco}, j} = \sum_p w_p \cdot \text{impactscore}_{p,j} \cdot R_{\text{corridor}, p}\), where \(w_p\) are plane weights and \(R_{\text{corridor}, p}\) is the corridor risk factor. [file:18]
+
+- Always‑improve score and KER constraints:
+  - Always‑improve scoring uses:
+    - Inputs from `vcyboworkloadnodewindow` and `vshardblastradius`. [file:18]
+  - Define:
+    - \(E_{\text{eff}, s} = \frac{\text{totalsurplusJ}}{\text{totalreqJ}}\), \(C_{\text{risks}} = r_{\text{carbon}}\), \(B_{\text{risks}} = r_{\text{biodiv}}\), \(V_t = \Delta V_t\). [file:18]
+  - Always‑improve score:
+    - \(S_{\text{AI}, s} = E_{\text{eff}, s} - C_{\text{risks}} - B_{\text{risks}} - V_t\), subject to:
+      - \(C_{\text{risks}} \le 0.13\), \(V_t \le 0\), and no violation of non‑offsettable planes. [file:18]
+
+- Eco‑credits and eco‑wealth kernels:
+  - EcoWealth logic links:
+    - EcoWealth increase to improvements in \(S_{\text{AI}, s}\) while KER constraints and lane admissibility hold; EcoWealth decays if \(S_{\text{AI}, s}\) stagnates or worsens. [file:18]
+  - Eco‑credits are minted or adjusted when:
+    - Windows satisfy `carbonnegativeok`, `restorationok`, and always‑improve constraints, using `vcyboworkloadnodewindow` and restoration views like `vcyboquaticecoperjoule` and `vcyboquaticrestore`. [file:18]
+
+---
+
+## 20. Roadmap and Task Shards
+
+### 20.1 Task ALN: canonical coding backlog
+
+- PrometheusPraxisCodingTaskList2026v1.aln:
+  - A task ALN shard (proposed) serves as:
+    - The canonical backlog for EcoNet spine wiring, ecosafety pipelines, AI‑safe catalogs, and cross‑domain integration. [file:18]
+  - Each task particle includes fields such as:
+    - `taskid`, `summary`, `repo`, `lane`, `kerk_target`, `kere_target`, `kerr_max`, `roh_ceiling`, `vt_target`, `aicapabilitylevel`, `superpoweradjacent`, and `acceptancecriteria`. [file:18]
+
+- Governance flags and sovereignty shards:
+  - Tasks can reference:
+    - Sovereignty and consent shards (e.g., host envelopes, data contribution specs) and MCP dev‑tunnel specifications. [file:18]
+  - Each task carries:
+    - Flags like `nonactuatingrequired`, `requiresconsentengine`, `multicorridor`, ensuring alignment with Prometheus‑Praxis superpower boundaries and neurorights. [file:18]
+
+### 20.2 Execution planes and encoding roadmap items
+
+- Execution planes in the roadmap:
+  - Roadmap items span:
+    - Ecosafety pipelines (richer RoH/KER/Lyapunov surfaces), MCP integration, and cross‑domain coupling (e.g., materials → Cyboquatics → EcoNet rewards). [file:18]
+  - Each task is tagged with:
+    - `executionplane` (e.g., `SPINE_SQL`, `RUST_KER`, `MCP_AGENT`, `SOVEREIGNTY`), mapping to the part of the stack it modifies. [file:18]
+
+- KER targets and acceptance criteria:
+  - For each coding task:
+    - KER targets specify expected changes in diagnostic surfaces (e.g., new `carbonnegativeok` and `restorationok` flags; exposure of `safestepok` in AI‑safe views). [file:18]
+  - Acceptance criteria include:
+    - Concrete invariants such as “no new tool in `econet.agentfunctioncatalog.v1.aln` has `actuationcapability != NONE`”, “all new views covered by ExpectedSchema and CI schema verifier”, and “Kani harness passes for new always‑improve formulas”. [file:18]
+
+- Roadmap as machine‑readable governance:
+  - Encoding the roadmap in ALN:
+    - Lets CI and agents treat tasks as governance‑bound objects with explicit KER targets instead of informal tickets. [file:18]
+  - This supports:
+    - Automated checks that a task is completed only when its KER, RoH, Lyapunov, and sovereignty acceptance criteria are met, keeping evolution monotone and ecosafety‑aligned. [file:18]
