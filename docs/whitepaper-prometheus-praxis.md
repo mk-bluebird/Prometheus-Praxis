@@ -676,3 +676,341 @@ This governance spine turns the mathematical KER–Lyapunov framework into concr
   - Together these ensure:
     - Functions cannot silently change domains, lanes, or actuation capabilities.
     - All callable surfaces used by AI or automation are explicitly declared, non‑actuating, corridor‑bounded, and backed by ALN contracts and Rust/Kani invariants. [file:18]
+
+## 13. Eco‑Credit kernel (output‑only reward semantics)
+
+### 13.1 EcoCredit kernel and minting rules
+
+- EcoCredit type:
+  - Represented as a ledger row and/or ALN particle bound to a steward, shard, and region, with fields like `ecocreditid`, `stewardid`, `shardid`, `region`, `amount`, `vwindow`, `rcarbon`, and evidence hex bound to your Bostrom DID. [file:18]
+  - Lives in the governance spine alongside EcoWealth/EcoUnit tables and is produced by non‑actuating Rust kernels over diagnostic views (workloads, blast‑radius, KER, restoration metrics). [file:18]
+
+- Inputs for minting:
+  - Lyapunov residuals:
+    - Use windowed metrics such as `meanvtbefore`, `meanvtafter`, and `deltavt` from `vcyboworkloadnodewindow` or analogous Phoenix views. [file:18]
+    - Require \(ΔV = \text{meanvtafter} - \text{meanvtbefore} ≤ 0\) over the reward window. [file:18]
+  - Carbon risk:
+    - Use `meanrcarbon` (0..1) or per‑workload `rcarbon`, with a hard ceiling (e.g., `meanrcarbon ≤ 0.13`) as already used for always‑improve gating. [file:18]
+  - Workload energy:
+    - Use energy and surplus metrics (`totalreqj`, `totalsurplusj`, `Eeff = totalsurplusj / totalreqj`) from workload window views. [file:18]
+
+- Minting formula (example pattern consistent with your grammar):
+  - Compute an eco‑credit score per shard/window:
+    - \(S_\text{eco} = f(E_\text{eff}) - g(r_\text{carbon}) - h(R_\text{planes})\) where:
+      - \(E_\text{eff}\) is energy efficiency from workload windows.
+      - \(r_\text{carbon}\) is mean carbon risk.
+      - \(R_\text{planes}\) is a combined blast‑radius risk from plane weights and `blastradiuslink`. [file:18]
+  - Only mint if:
+    - \(ΔV ≤ 0\), `meanrcarbon` under corridor, and no non‑offsettable plane exceeds its corridor band. [file:18]
+  - Map score to credits:
+    - `credits = max(0, floor(Scale * S_eco))`, with per‑lane caps enforced in Rust and encoded in ALN policy shards (e.g., `ecocredit.policy.phoenix.v1.aln`). [file:18]
+
+- Kernel properties:
+  - Implemented as a pure Rust function in a governance crate (e.g., `crates/prometheuspraxis-ecocredit`), which:
+    - Reads from views like `vcyboworkloadnodewindow`, `vmachineblastradius`, `vresidualkernel`. [file:18]
+    - Computes `EcoCreditMintReport` objects with `amount`, `window`, `evidencehex`, `safetomint` flag. [file:18]
+    - Optionally writes an output‑only `ecocreditledger` table but never touches machinery, controllers, or plane weights. [file:18]
+  - Kani harnesses:
+    - Prove that credits are zero whenever any hard constraint (Lyapunov, carbon ceiling, corridor) is violated. [file:18]
+    - Prove non‑negativity and monotonicity: if inputs improve (`ΔV` more negative, lower `rcarbon`), `S_eco` cannot decrease. [file:18]
+
+### 13.2 Non‑feedback constraint
+
+- No offsetting of physical risk:
+  - EcoCredits are strictly informational rewards; they:
+    - Do not appear in any controller input tables.
+    - Do not reduce `R` coordinates, RoH ceilings, or blast‑radius metrics. [file:18]
+  - KER, plane weights, and RiskCoords stay entirely governed by physical evidence tables (blastradius, workloads, ecocorridorvar) and Kani‑verified Rust kernels. [file:18]
+
+- No influence on plane weights or controllers:
+  - EcoCredits:
+    - Are not part of `planeweights`, `ecocorridorvar`, or any `Mt6883Guard` or LaneGuard input. [file:18]
+    - Cannot lower safety floors or widen corridors; CI checks enforce that no query, trigger, or guard uses `ecocreditledger` when computing K/E/R, RoH, or Lyapunov. [file:18]
+  - CI guard examples:
+    - Static analysis (SQL/AST and Rust) verifies that:
+      - Any function or view that writes to controller‑adjacent tables never reads from `ecocredit*` tables. [file:18]
+      - Lane promotion and KER update logic reference only physical metrics and governance ALN, not reward totals. [file:18]
+
+- Output‑only semantics:
+  - EcoCredits:
+    - Feed into EcoWealth/EcoUnit accounting and human/DAO‑level decisions, not real‑time control loops. [file:18]
+    - Are materialized as ALN shards and ledger rows for reporting, incentives, and long‑horizon planning, while the non‑actuating spine continues to veto unsafe actions irrespective of rewards. [file:18]
+
+---
+
+## 14. Phoenix infrastructure instantiations
+
+### 14.1 UHI hex shards (phoenix.uhi.hex.risk.v1)
+
+- Shard purpose:
+  - `phoenix.uhi.hex.risk.v1` encodes hex‑level Urban Heat Island risk for Phoenix, harmonized with your corridor grammar and Tree‑of‑Life residual. [file:18]
+  - Each shard row corresponds to a hex cell with temperature, canopy, albedo, and anthropogenic heat features folded into risk coordinates. [file:18]
+
+- Fields and risk coordinates:
+  - Core fields (example as aligned with your riskvector grammar):
+    - `hexid` (spatial index cell).
+    - `region = 'Phoenix-AZ'`.
+    - `rT` (thermal risk, e.g., normalized excess surface temperature or nighttime minima above baseline).
+    - `rC` (carbon/combustion risk, e.g., traffic density, fossil load).
+    - `rA` (air quality/atmospheric risk, including PM and ozone, mapped into 0..1). [file:18]
+    - Optional: `canopyfrac`, `imperviousfrac`, `popdensity`, evidence and signing hex. [file:18]
+  - Corridor binding:
+    - Each `rT`, `rC`, `rA` is declared as a `RISKCOORD` in an ALN shard (e.g., `phoenix.uhi.hex.risk.v1.aln`) with SAFE/GOLD/HARD bands and weights. [file:18]
+
+- Integration into Tree‑of‑Life residual:
+  - Tree‑of‑Life residual (ToL) aggregates:
+    - Hydrological, ecological, thermal, and biosignal risk traces into a scalar or vector residual per region. [file:18]
+  - For Phoenix:
+    - UHI risk is folded in via a weighted term:
+      - \(R_\text{UHI} = w_T r_T + w_C r_C + w_A r_A\) aggregated over hexes (mean or population‑weighted). [file:18]
+    - ToL residual includes `R_UHI` as a component alongside aquifer stress, restoration metrics, and Cyboquatic blast‑radius effects. [file:18]
+  - Usage:
+    - Guides where Cyboquatic cooling, shading, or water recovery machinery should be prioritized without directly controlling machines. [file:18]
+
+### 14.2 MAR corridors (phoenix.mar.corridor.v1)
+
+- Corridor purpose:
+  - `phoenix.mar.corridor.v1` defines Managed Aquifer Recharge corridors around Phoenix, including drawdown limits, recharge targets, and filtration capacities. [file:18]
+  - Encoded as corridor variables and region corridors consistent with `ecocorridorvar` and existing corridor grammar. [file:18]
+
+- Metrics and grammar:
+  - Core quantities per corridor or aquifer reach:
+    - `drawdownm` (allowed drawdown from baseline in meters).
+    - `rechargerate` (m³/day target or minimum recharge).
+    - `filtrationcapacity` (m³/day of water that can be safely processed through soil/engineered media).
+    - `salinity`, `contaminantload` metrics for water quality constraints. [file:18]
+  - ALN corridor grammar:
+    - `CORRIDORVAR drawdownm`, `SAFE/GOLD/HARD` bands and weights.
+    - `CORRIDORVAR rechargeratio` (actual/target), encouraging `≥ 1`.
+    - `CORRIDORVAR filtrationloadratio` (actual/allowed), constrained to ≤ 1. [file:18]
+  - These are referenced by:
+    - Non‑actuating Rust kernels that compute MAR residuals and flags (`marok`, `drawdownok`, `filtrationok`), which feed into lane guards and EcoCredit kernels but never actuate pumps. [file:18]
+
+### 14.3 Phased deployment: spine hardening, Phoenix scale‑out, sovereignty schedule
+
+- Phase 1 – Spine hardening:
+  - Objectives:
+    - Ensure SQLite schema coverage for Phoenix UHI/MAR tables and views in `ExpectedSchema`, including UHI hex risk, aquifer metrics, and corridor views. [file:18]
+    - Extend `SchemaVerifier` and CI guards to:
+      - Enforce presence of Phoenix UHI/MAR tables and their registration in `repofile` and `definitionregistry`. [file:18]
+      - Require evidence windows (e.g., recent UHI measurements and MAR telemetry) for any PROD‑lane Phoenix machinery shard (“no evidence, no build”). [file:18]
+  - Outputs:
+    - Stable, non‑actuating views that expose Phoenix risk metrics to always‑improve, EcoCredit, and Tree‑of‑Life kernels. [file:18]
+
+- Phase 2 – Phoenix scale‑out:
+  - Objectives:
+    - Bind UHI hex and MAR corridor shards to your Bostrom DID via restoration identity binding and hex stamping. [file:18]
+    - Extend `vagentsafecatalog` and `econet.agentfunctioncatalog.v1.aln` to include Phoenix‑specific diagnostics tools (e.g., “list hexes with highest UHI risk given safe MAR capacity”). [file:18]
+    - Integrate Cyboquatic machinery diagnostics (from blastradius/workload spines) with Phoenix UHI/MAR views to support planning queries like:
+      - “Which nodes reduce UHI and recharge aquifers within hard corridors?”. [file:18]
+  - Outputs:
+    - High‑yield, AI‑safe tools for Phoenix operators and researchers, still strictly non‑actuating, informed by KER and corridor invariants. [file:18]
+
+- Phase 3 – Multi‑decade sovereignty schedule:
+  - Objectives:
+    - Define a long‑horizon governance schedule in ALN (e.g., `phoenix.sovereignty.schedule.v1.aln`) that:
+      - Encodes milestones for corridor tightening (no widening, only stricter caps).
+      - Sets representation floors and education multipliers for affected communities via EcoWealth/EcoUnit coupling. [file:18]
+      - Establishes policies for when and how data and EcoCredits evolve, ensuring monotone evolution of protection. [file:18]
+    - Bind all Phoenix governance shards to your Bostrom DID so that:
+      - The city‑scale governance history is auditable across decades.
+      - Future kernel changes must satisfy “no corridor widening, no RoH ceiling increases” with Kani proofs. [file:18]
+  - Outputs:
+    - A durable eco‑sovereignty framework where Phoenix UHI/MAR and Cyboquatic interventions remain evidence‑first, non‑actuating, and aligned with Tree‑of‑Life restoration across multi‑decade horizons. [file:18]
+
+## 15. Cyboquatic and industrial eco‑machinery surfaces
+
+### 15.1 Cyboquatic workloads (canals, MAR, pumps, soft robots)
+
+- Core Cyboquatic workload spine:
+  - SQLite tables `cyboquaticworkloadledger`, `cybomachineryworkload`, and `cybomachineryblastradius` record:
+    - Per‑workload energy (`ereqj`, `eusedj`, `esurplusj`), carbon (`rcarbon`, `carbonkg`), biodiversity risk (`rbiodiv`, `pollutantmasskg`), Lyapunov residuals (`vtbefore`, `vtafter`), RoH (`rohscalar`), and governance decisions (`ACCEPT`, `DERATE`, `REJECT`, `REROUTE`). [file:18]
+    - Blast‑radius links from machines and shards to nodes, regions, aquifers, materials, and river reaches with `impacttype` and `impactscore`. [file:18]
+  - These tables are strictly non‑actuating, forming the evidence base for canals, MAR systems, pumps, and soft robots operating in Cyboquatic corridors. [file:18]
+
+- Blastradius diagnostics:
+  - Views `vshardblastradius`, `vmachineblastradius`, and `cybomachineryblastradius` expose:
+    - Per‑machine or per‑shard max blast‑radius by plane (`maxnoderadius`, `maxregionradius`, `maxenergyradius`, `maxcarbonradius`, `maxbiodivradius`) and aggregate Vt footprint (`vtradiussum`). [file:18]
+    - Region and lane, so auditors can see which machines in Phoenix canals or MAR corridors contribute the most hydraulic/carbon/biodiversity risk. [file:18]
+  - These diagnostics are used by Rust governance crates and AI‑safe tools, not controllers. [file:18]
+
+- Workload windows:
+  - View `vcyboworkloadnodewindow` aggregates workloads per `nodeid, region` into windows with:
+    - `totalreqj`, `totalsurplusj`, `meanvtbefore`, `meanvtafter`, `deltavt`, `meanrcarbon`, `meanrbiodiv`, counts of `accepts`, `rejects`, `reroutes`, and `acceptfraction`. [file:18]
+  - Future extensions add:
+    - Deterministic window IDs and `alwaysimproveok` flags (Lyapunov non‑increase, carbon within corridor) to support always‑improve scoring and EcoCredit minting for MAR, canal, and pump workloads. [file:18]
+
+- KER windows and corridors:
+  - Governance spine views (e.g., `vresidualkernel`, corridor views) and new machinery‑specific views link:
+    - Machine workloads and blast‑radius metrics to K/E/R residuals and RoH ceilings per lane and corridor. [file:18]
+  - For canals, MAR pumps, and soft robots:
+    - KER windows ensure upgrades or new variants respect Lyapunov and corridor constraints before promotion to `EXPPROD` or `PROD`. [file:18]
+
+### 15.2 Industrial governance surfaces (magnet separation, wastewater, conveyance)
+
+- Machinery registry and blast‑radius:
+  - `cybomachinery` registry table defines:
+    - `machineid`, `kind` (`PUMP`, `SCREEN`, `BLOWER`, `UFTRAIN`, `SOILWASH`, `MBR`, `ESS`, magnet separators, etc.), `region`, `lane`, `ecosafetyshard`, `rohlanemax`. [file:18]
+  - `cybomachineryblastradius` links:
+    - Each machine to `NODE`, `REGION`, `MATERIAL`, `AQUIFER`, or `RIVERREACH` with `impacttype` (`HYDRAULIC`, `ENERGY`, `CARBON`, `BIODIVERSITY`, `MATERIAL`, `DATAQUALITY`) and `impactscore`, `vtsensitivity`. [file:18]
+
+- Workload ledgers for industrial equipment:
+  - `cybomachineryworkload` table captures:
+    - Per‑run energy (`ereqj`, `eusedj`), waste/water channels (`channel` = `energy`, `carbon`, `water`, `waste`, `biota`), pollutant mass removed (`pollutantmasskg`), Lyapunov before/after, `rohscalar`, `decision`, `lane`, and evidence/signing fields. [file:18]
+  - Covers:
+    - Wastewater pumps and screens, magnet separation modules, conveyance systems, and other eco‑machinery as telemetry‑only surfaces. [file:18]
+
+- KER/RoH corridor exposure:
+  - Views tying machinery to KER/RoH:
+    - Internal rich views (e.g., `vrichcyboassetwindow`) join machinery identity, eco corridor bindings, workload windows, and blast‑radius links. [file:18]
+    - Facade views (e.g., `vcyboassetfacade`) expose:
+      - `assetid`, `assetkind`, `regioncode`, `maxcarbonradius`, `meanvtdelta`, `ecoperj`, `acceptfraction`, making KER/RoH effects visible for industrial modules. [file:18]
+  - All surfaces remain:
+    - Telemetry‑only (no duty cycles, valve positions, torque commands), while still exposing enough information to govern magnet trains, pumps, and waste conveyance through KER/RoH corridors. [file:18]
+
+---
+
+## 16. Non‑actuating C++ and FFI adapters
+
+### 16.1 Telemetry headers (wastewater and magnet)
+
+- Wastewater pump telemetry header:
+  - A C++ header `wastewaterpumptelemetry.hpp` defines POD structs for:
+    - Instantaneous and aggregated telemetry: flow rate, head, power, vibration bands, temperature, suction/discharge pressures. [file:18]
+    - Governance metrics: KER triads (`kerk`, `kere`, `kerr`), `rohscalar`, lane, and corridor IDs associated with the pump. [file:18]
+  - Intended use:
+    - Pump controllers emit these structs into log streams or IPC channels; Rust governance crates ingest them via FFI or file parsing, but never send control commands back. [file:18]
+
+- Magnet telemetry structs:
+  - A similar C++ header for magnet separation (e.g., `magnet_telemetry.hpp`) declares:
+    - Telemetry for magnetic field strength, throughput, particle load, reject stream quality, energy usage. [file:18]
+    - Governance overlays: KER triads, RoH ceilings, and blast‑radius IDs for effluent and solids streams. [file:18]
+  - Both headers:
+    - Exclude any actuator commands, setpoints, or control parameters, and are strictly for telemetry export into the non‑actuating spine. [file:18]
+
+### 16.2 FFI patterns (Rust cdylib, JSON, C‑ABI)
+
+- Rust `cdylib` snapshots:
+  - Non‑actuating crates (e.g., `cyboquaticblastradiusspine`) build as `cdylib` and expose:
+    - Read‑only functions to fetch JSON snapshots of blast‑radius and workload windows, such as:
+      - `cybospine_list_shard_blastradius_json(db_path: *const c_char) -> *mut c_char`
+      - `cybospine_summarize_workload_node_region_json(db_path: *const c_char, nodeid: *const c_char, region: *const c_char) -> *mut c_char` [file:18]
+  - Internal implementation:
+    - Uses `CyboSpine::open`, queries views like `vcyboworkloadnodewindow` and `vmachineblastradius`, serializes `ShardBlastRadius` or `WorkloadNodeWindow` structs via `serde_json`. [file:18]
+
+- JSON payloads and C‑ABI adapters:
+  - C‑ABI functions:
+    - Use `extern "C"` and raw C strings for maximum compatibility; they return heap‑allocated JSON strings for callers (Lua, C, Kotlin via JNI) to parse into telemetry dashboards or accountability logs. [file:18]
+  - Accountability log pattern:
+    - Loaders or adapters call these functions periodically and append returned JSON to append‑only logs (files or structured logging backends), preserving:
+      - Machine IDs, windows, KER triads, RoH ceilings, blast‑radius summaries, and decisions over time. [file:18]
+
+- Non‑actuation guarantees:
+  - FFI exports:
+    - Never expose actuating functions; no symbols to set pump speeds, magnet torques, or valve positions exist in these `cdylib`s. [file:18]
+    - Are registered in `agentsafecatalog` and `econet.agentfunctioncatalog.v1.aln` with `actuationcapability = NONE`, making them AI‑safe diagnostic tools only. [file:18]
+  - CI and catalog checks:
+    - Ensure every exported C‑ABI function is:
+      - Bound to a non‑actuating ALN function meta entry.
+      - Present in AI‑safe catalogs only if it reads from read‑only governance views and never from actuator configuration or control channels. [file:18]
+     
+    ## 17. AI‑facing views, patterns, and tool catalogs
+
+### 17.1 Diagnostic views
+
+- Agent‑safe catalog view:
+  - `vagentsafecatalog` is the primary AI‑facing catalog over `agentsafecatalog`, `agentsafediagnostics`, and `agentsafeconsentguard`. [file:18]
+  - It exposes, per catalog entry:
+    - Identity and governance: `catalogid`, `kind`, `name`, `description`, `domain`, `lane`, `corridorid`, `smartchainid`, `ecosafetyrequired`, `superpoweradjacent`. [file:18]
+    - Diagnostics: `kscore`, `escore`, `rscore`, `rohscalar`, `vcurrent`, `vnext`, `lyapdelta`, `alwaysimprove`, `safetopromote`, `stableflag`, `marginclass`, `diagnosticsupdatedat`. [file:18]
+  - It filters to entries where consent allows KER, RoH, Lyapunov telemetry and hides superpower‑adjacent entries unless `ecosafetyrequired != 0`. [file:18]
+
+- Blastradius node‑window views:
+  - Internal views (e.g., `vrichcyboshardstate`, `vrichcyboassetwindow`) and facades (`vmachineblastradius`) provide:
+    - Per node/machine: region, lane, KER scalars, normalized RoH, `vtmax` or `meandeltavt`, blast‑radius by plane (carbon, biodiversity, etc.), and corridor bindings. [file:18]
+  - These internal views prioritise diagnostic completeness and are consumed by Rust kernels and CI; AI‑facing facades expose only the scalar invariants and IDs needed for safe reasoning. [file:18]
+
+- Workload windows with K, E, R, RoH, Vt, safestep flags:
+  - `vcyboworkloadnodewindow` is the canonical node/window surface, exposing:
+    - `nodeid`, `region`, `lane`, `windowstartutc`, `windowendutc`. [file:18]
+    - Aggregates: `totalreqj`, `totalsurplusj`, `meanvtbefore`, `meanvtafter`, `deltavt`, `meanrcarbon`, `meanrbiodiv`, `acceptfraction`. [file:18]
+  - Rust always‑improve kernel computes:
+    - `alwaysimprove`, `safetopromote`, and stability/margin flags that are then written into `agentsafediagnostics` and surfaced via `vagentsafecatalog` to AI agents. [file:18]
+
+### 17.2 SQL pattern index (agentsqlpattern)
+
+- Pattern table:
+  - `agentsqlpattern` stores:
+    - `patternid`, `patternname`, `description`, `sqltext` (parameterized), `lanescope`, `roleband`, `riskceilingnote`, `actuationflag` (must be 0 for AI‑safe), and `blastradiusscore`. [file:18]
+  - Patterns are DefinitionRegistry‑bound and versioned under monotone evolution, so they can only get stricter, not more permissive. [file:18]
+
+- Parameter typing and AI capability levels:
+  - Patterns carry:
+    - Typed parameter hints (region, lane, nodeid, corridorid) and permitted value ranges or enumerations in ALN or metadata. [file:18]
+  - AI capability levels:
+    - Pattern metadata and repo manifest ALN (`econet.repomanifest.ai.v1.aln`) define `aicapabilitylevel` (e.g., `NONE`, `READONLYDOC`, `READONLYSPINE`, `PROTOAGENT`) and which patterns each level may use. [file:18]
+
+- Pattern risk scoring:
+  - A simple risk score `patternrisk` is computed from:
+    - Planes and corridors touched and plane risk weights; only patterns with `patternrisk` below an AI threshold are exposed for AI use. [file:18]
+  - Optional usage log table (`agentsqlpatternusage`) tracks anonymised pattern runs to tune or retire risky patterns. [file:18]
+
+### 17.3 Tool catalog and MCP bindings
+
+- Agent function catalog:
+  - `econet.agentfunctioncatalog.v1.aln` mirrors `vagentsafecatalog` and `agentsqlpattern`, with entries for each tool:
+    - `functionid`, `summary`, `inputschema`, `outputschema`, `backingvieworbin`, `lanescope`, `riskbands`, `actuationcapability` (must be `NONE` for AI‑safe). [file:18]
+  - Provides a typed tool list that LLM platforms can load once as their function schema. [file:18]
+
+- MCP tool bindings:
+  - For each MCP tool (Lua or other agent server):
+    - There must be a backing entry in `agentsqlpattern` and `econet.agentfunctioncatalog.v1.aln`, and a row in `vagentsafecatalog` for the underlying view/FFI. [file:18]
+  - MCP servers:
+    - Resolve tool calls exclusively via `vagentsafecatalog`; if the function is not in the catalog or fails consent checks, the tool is unavailable. [file:18]
+
+- CI enforcement:
+  - CI checks ensure:
+    - Every AI‑exposed tool has consistent entries across SQL, ALN, and function catalog. [file:18]
+    - No tool with `actuationcapability != NONE` or superpower internals appears in AI‑safe catalogs. [file:18]
+
+---
+
+## 18. Data sovereignty, consent, and health/biosignal surfaces
+
+### 18.1 Sovereign consent engines and TelemetryVerdict
+
+- Sovereign consent engine role:
+  - `sovereign-consent-engines` crate enforces:
+    - Host data envelopes, neurorights, and “Prometheus‑Praxis only, no commercial recipients, no raw neural export” constraints. [file:18]
+  - It is the authoritative decision‑maker for which telemetry families (KER, RoH, Lyapunov, eco‑health, BCI) may appear in AI‑facing views. [file:18]
+
+- TelemetryVerdict and stream‑level gating:
+  - Consent decisions are expressed per catalog entry and telemetry family in `agentsafeconsentguard`:
+    - `catalogid`, `telemetryfamily` (e.g., `KER`, `ROH`, `LYAP`, `ECOHEALTHAGG`, `BCIAGG`), `allowed` (0/1), `reason`, `updatedat`. [file:18]
+  - `vagentsafecatalog`:
+    - Joins `agentsafecatalog`, `agentsafediagnostics`, and `agentsafeconsentguard` and only returns rows where `allowed = 1` for required families (KER, RoH, Lyapunov). [file:18]
+  - Any health/BCI/eco‑health fields:
+    - Must additionally pass TelemetryVerdict in the consent engine before they can appear in AI‑safe views or function catalogs. [file:18]
+
+### 18.2 Exclusions and allowed aggregations
+
+- Explicit exclusions:
+  - Per Prometheus‑Praxis neurorights and host envelopes:
+    - Raw EEG and high‑frequency neural waveforms are forbidden in AI‑safe catalogs and views. [file:18]
+    - Unaggregated lab values and fine‑grained biosignal traces tied to an identifiable host are also excluded. [file:18]
+  - Catalog rules:
+    - Any field classified as raw neural or identity‑linked biosignal is blocked at schema and view level from `vagentsafecatalog`. [file:18]
+
+- Allowed aggregated, consented, DP‑safe metrics:
+  - Only aggregated, consented, and, where appropriate, differentially private (DP‑safe) health metrics may be surfaced, for example:
+    - Monthly normalized microplastic burden index. [file:18]
+    - Daily detox stress scalar. [file:18]
+    - Hourly BCI cognitive load in bands (`LOW`, `MED`, `HIGH`). [file:18]
+    - Eco‑phi vectors in DP‑safe vector form. [file:18]
+  - All such fields:
+    - Must be explicitly permitted in host ALN envelopes (`host.data.contribution.envelope.v1`) and carry a positive TelemetryVerdict through `agentsafeconsentguard`. [file:18]
+
+- Alignment with sovereignty and Prometheus‑Praxis:
+  - This design:
+    - Keeps AI‑exposed surfaces diagnostic‑only (KER, RoH, Lyapunov, stability flags) with no actuation or raw biosignals. [file:18]
+    - Ensures AI agents only see what sovereign consent and neurorights envelopes permit, matching the “data‑as‑labor, neurorights‑first, no rollback” narrative. [file:18]
