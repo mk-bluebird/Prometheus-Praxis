@@ -1308,141 +1308,279 @@ This governance spine turns the mathematical KER–Lyapunov framework into concr
 
 ## 25. Appendix B: Schema and Shard Index
 
-### 25.1 SQLite schema index: key tables and views
+### 25.1 SQLite schema index (governance core vs AI-safe facades)
 
-- Plane weights and KER context:
-  - `corridordefinition` and `ecocorridorvar`:
-    - Define corridors (SAFE/GOLD/HARD) and weights for KER coordinates and planes, including carbon, biodiversity, and Lyapunov channels. [file:18]
-  - `knowledgeecoscore`:
-    - Stores K, E, R factors and normalized RoH coordinates per shard, used by KER guards and always‑improve kernels. [file:18]
-  - `vplaneweights` and `vresidualkernel` (governance views):
-    - Expose plane weights and per‑shard KER residuals for auditors, Kani harnesses, and lane guards. [file:18]
+The schema below treats internal tables as **evidence kernels** and views as read-only, AI-safe projections. [file:18]
 
-- Blastradius and impact surfaces:
-  - `blastradiuslink`:
-    - Non‑actuating link table from source (REPO/SCHEMA/PARTICLE/SHARD/FILE/MACHINE) to targets (NODE/MATERIAL/REGION/etc.) with `impacttype` (HYDRAULIC, ENERGY, CARBON, BIODIVERSITY, MATERIAL, DATAQUALITY, GOVERNANCE), `impactscore`, and optional `vtsensitivity`. [file:18]
-  - `vshardblastradius`:
-    - Aggregates `blastradiuslink` for `sourcetype = SHARD` into `maxnoderadius`, `maxmaterialradius`, `maxcarbonradius`, `maxbiodivradius`, and `vtradiussum`. [file:18]
-  - `vmachineblastradius`:
-    - Aggregates `blastradiuslink` for `sourcetype = MACHINE` into machine‑level blast metrics and weighted Vt footprint. [file:18]
+#### Core governance and telemetry tables
 
-- Workload windows and energy/carbon ledgers:
-  - `cyboquaticworkloadledger`:
-    - Records Cyboquatic workloads with `ereqj`, `esurplusj`, `rcarbon`, `rbiodiv`, `vtbefore`, `vtafter`, decision (`ACCEPT/REJECT/REROUTE`), lane, region, timestamp, and evidence/signing DIDs. [file:18]
-  - `vcyboworkloadnodewindow`:
-    - Per‑node, per‑region windowed summary with `totalreqj`, `totalsurplusj`, mean Vt before/after, mean risk coordinates, and counts of accept/reject/reroute. [file:18]
-  - `cybomachineryworkload` and `cybomachineryblastradius` (machinery spine):
-    - Mirror the above at machinery granularity for pumps/screens/blowers etc., with workload energy, carbon, pollutant removal, and blast surfaces. [file:18]
+| Table name                          | Target domain           | Core columns (subset)                                                                                      | Primary invariant / role                                                                                       |
+|-------------------------------------|-------------------------|------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| `corridordefinition`                | Corridor grammar        | `corridorid`, `corridorname`, `lanescope`, `createdat`, `updatedat`                                       | Defines SAFE/GOLD/HARD band containers per lane; binds corridor IDs used across risk/KER snapshots. [file:18]  |
+| `ecocorridorvar`                    | Corridor variables      | `varname`, `plane`, `safe_max`, `gold_max`, `hard_max`, `weight`, `non_offsettable_flag`                  | Encodes per-plane corridor bounds and non‑offsettable flags for KER and RoH coordination. [file:18]            |
+| `knowledgeecoscore`                 | KER state               | `shardid`, `kmetric`, `emetric`, `rmetric`, `rohscalar`, `tsafe`, `updatedat`                             | Tracks K/E/R and normalized RoH per shard; lane guards reference these metrics for promotions. [file:18]       |
+| `blastradiuslink`                   | Impact topology         | `sourcetype`, `sourceid`, `targettype`, `targetid`, `impacttype`, `impactscore`, `vtsensitivity`          | Defines blast‑radius graph edges and Vt sensitivity across machines, shards, nodes, and regions. [file:18]     |
+| `cyboquaticworkloadledger`          | Cyboquatic workloads    | `workload_id`, `nodeid`, `lane`, `regioncode`, `ereqj`, `esurplusj`, `rcarbon`, `rbiodiv`, `vtbefore`, `vtafter`, `decision`, `signingdid` | Evidence ledger for cyboquatic jobs enforcing ΔV and risk bounds via triggers/guards. [file:18]                |
+| `cybomachinery`                     | Machine registry        | `machineid`, `kind`, `region`, `lane`, `ecosafetyshard`, `rohlanemax`                                     | Identifies telemetry‑only industrial units and ties them to ecosafety shards and RoH lane ceilings. [file:18]   |
+| `cybomachineryworkload`             | Industrial workloads    | `workload_id`, `machineid`, `channel`, `ereqj`, `eusedj`, `pollutantmasskg`, `vtbefore`, `vtafter`, `rohscalar`, `decision` | Workload evidence for industrial processes, no control fields. [file:18]                                       |
+| `cybomachineryblastradius`          | Industrial impact       | `machineid`, `targettype`, `targetid`, `impacttype`, `impactscore`, `vtsensitivity`                       | Normalized blast‑radius per machine across ecological planes. [file:18]                                        |
+| `lanestatusshard`                   | Lane governance         | `shardid`, `lane`, `assignedat`, `expiresutc`, `safetopromoteok`                                          | Tracks current lane and promotion readiness, enforcing TTL and monotone evolution. [file:18]                   |
+| `workloadledger`                    | General workloads       | `workload_id`, `nodeid`, `lane`, `vtbefore`, `vtafter`, `decision`, `ts_utc`                              | Canonical Lyapunov residual ledger for non‑cyboquatic workloads. [file:18]                                     |
+| `cyboquaticmicroplasticriskindex`   | Microplastic state      | `nodeid`, `microplasticloadmgm3`, `ecoperjoule`, `restorationscore`, `kmetric`, `emetric`, `rmetric`, `vtbefore`, `vtafter`, `rohscalar` | KER‑aware microplastic risk index; triggers enforce ΔV≤0 and corridor compliance. [file:18]                    |
+| `agentsafecatalog`                  | AI function registry    | `catalogid`, `kind`, `name`, `description`, `domain`, `lane`, `corridorid`, `ecosafetyrequired`, `superpoweradjacent` | Master index of AI‑visible tools; forbids superpower exposure. [file:18]                                       |
+| `agentsafediagnostics`              | AI diagnostics          | `catalogid`, `kscore`, `escore`, `rscore`, `rohscalar`, `vcurrent`, `vnext`, `lyapdelta`, `alwaysimprove`, `safetopromote`, `marginclass` | Stores offline S_AI and stability scores pushed by Rust batch jobs. [file:18]                                  |
+| `agentsafeconsentguard`             | Sovereign consent       | `catalogid`, `telemetryfamily`, `allowed`, `reason`, `updatedat`                                          | Per‑tool consent gate for KER, RoH, Lyapunov, and eco‑health metrics. [file:18]                                |
+| `agentsqlpattern`                   | SQL template index      | `patternid`, `patternname`, `description`, `sqltext`, `lanescope`, `roleband`, `actuationflag`, `blastradiusscore` | Pre‑vetted parameterized read‑only SQL templates for LLM agents. [file:18]                                     |
 
-- Lane status, governance, and accountability:
-  - `lanestatus` and views `vlaneadmissibility`, `vlanepromotionhistory`:
-    - Track shard lanes (RESEARCH/EXPPROD/PROD), expiries, admissibility flags, and promotion history, enforced by lane guards. [file:18]
-  - `workloadledger` (ecosafety side):
-    - General ledger for workloads beyond Cyboquatic, feeding Lyapunov and RoH monitors. [file:18]
-  - Accountability ledgers:
-    - `cyboquaticworkloadledger` and `cybomachineryworkload` act as accountability ledgers, capturing per‑workload decisions and evidence hex bound to Bostrom DIDs. [file:18]
+Internal triggers like `trg_microplastic_ker_invariants` conceptually enforce: [file:18]
 
-- AI‑safe catalog and pattern surfaces:
-  - `vagentsafecatalog`:
-    - View over `repofile`, `definitionregistry`, and repo manifest, exposing only non‑actuating views/FFI and prompts with role bands, lanes, and contracts, filtered by governance and consent rules. [file:18]
-  - `agentsqlpattern`:
-    - Stores curated parameterized SQL patterns for AI agents, versioned and DefinitionRegistry‑bound, ensuring only safe queries are used. [file:18]
+```sql
+CREATE TRIGGER trg_microplastic_ker_invariants
+BEFORE INSERT OR UPDATE ON cyboquaticmicroplasticriskindex
+FOR EACH ROW
+BEGIN
+  -- enforce Lyapunov non-increase
+  SELECT
+    CASE
+      WHEN NEW.vtafter - NEW.vtbefore > 0.0 THEN
+        RAISE(ABORT, 'Lyapunov residual violation: ΔV must be <= 0')
+    END;
+
+  -- enforce KER corridor bounds (example)
+  SELECT
+    CASE
+      WHEN NEW.kmetric < 0.0 OR NEW.emetric < 0.0 OR NEW.rmetric > 1.0 THEN
+        RAISE(ABORT, 'KER corridor violation')
+    END;
+END;
+```
+
+This keeps all Lyapunov/KER invariants at the storage engine boundary. [file:18]
+
+#### Diagnostic and AI-safe views
+
+```sql
+CREATE VIEW IF NOT EXISTS vagentsafecatalog AS
+SELECT 
+    c.catalogid,
+    c.kind,
+    c.name,
+    c.description,
+    c.domain,
+    c.lane,
+    c.corridorid,
+    c.smartchainid,
+    c.ecosafetyrequired,
+    c.superpoweradjacent,
+    d.kscore,
+    d.escore,
+    d.rscore,
+    d.rohscalar,
+    d.vcurrent,
+    d.vnext,
+    d.lyapdelta,
+    d.alwaysimprove,
+    d.safetopromote,
+    d.stableflag,
+    d.marginclass,
+    d.updatedat AS diagnosticsupdatedat
+FROM agentsafecatalog c
+JOIN agentsafediagnostics d ON c.catalogid = d.catalogid
+JOIN agentsafeconsentguard g_ker
+  ON c.catalogid = g_ker.catalogid AND g_ker.telemetryfamily = 'KER'
+JOIN agentsafeconsentguard g_roh
+  ON c.catalogid = g_roh.catalogid AND g_roh.telemetryfamily = 'ROH'
+JOIN agentsafeconsentguard g_lyap
+  ON c.catalogid = g_lyap.catalogid AND g_lyap.telemetryfamily = 'LYAP'
+WHERE g_ker.allowed = 1 
+  AND g_roh.allowed = 1 
+  AND g_lyap.allowed = 1
+  AND (c.superpoweradjacent = 0 OR c.ecosafetyrequired != 0);
+```
+[file:18]
+
+| View name                           | Exposure tier           | Underlying entities                                          | Primary functional target                                                                          |
+|-------------------------------------|-------------------------|--------------------------------------------------------------|----------------------------------------------------------------------------------------------------|
+| `vplaneweights`                     | Internal governance     | `ecocorridorvar`                                            | Surfaces plane weights and corridor bounds to Rust guard kernels. [file:18]                       |
+| `vresidualkernel`                   | Internal governance     | `knowledgeecoscore`, `shardinstance`                        | Aggregates per‑shard KER + residuals as a single diagnostic vector. [file:18]                     |
+| `vshardblastradius`                 | Internal governance     | `blastradiuslink`                                           | Computes per‑shard blast radii across CARBON/BIODIVERSITY/ENERGY. [file:18]                       |
+| `vmachineblastradius`              | Internal governance     | `blastradiuslink`, `cybomachinery`                         | Machine‑level blast footprints with expiry and lane filtering. [file:18]                          |
+| `vcyboworkloadnodewindow`          | Internal governance     | `cyboquaticworkloadledger`                                 | Windowed averages for energy, surplus, residuals, and risk. [file:18]                             |
+| `vcyboworkloadnodewindow_residual` | Internal diagnostics    | `vcyboworkloadnodewindow`                                  | Adds `meanvtafter - meanvtbefore` as `meandeltavt`. [file:18]                                     |
+| `vlaneadmissibility`                | Internal governance     | `shardinstance`, `knowledgeecoscore`, `ecocorridorvar`     | Computes `kerk_ok`, `kere_ok`, `kerr_ok` and eco flags for lane changes. [file:18]               |
+| `vlanepromotionhistory`            | Internal governance     | `lane_change_log`                                          | Historical lane transitions to detect downgrades. [file:18]                                       |
+| `vlatestlanestatus`                | Internal governance     | `lanestatusshard`                                          | Active, non‑expired lane per shard. [file:18]                                                     |
+| `virtalaneverdict`                 | Internal governance     | `lanestatusshard`, `vlaneadmissibility`                    | Computes “virtual” lane feasibility based on live corridors. [file:18]                            |
+| `vcyboquaticmicroplasticriskfacade`| AI‑facing facade        | `cyboquaticmicroplasticriskindex`                          | Read‑only microplastic and eco‑per‑joule facade with S_AI metrics. [file:18]                      |
+| `vagentsafecatalog`                | AI‑facing facade        | `agentsafecatalog`, `agentsafediagnostics`, `agentsafeconsentguard` | Consolidated, non‑actuating AI tool surface w/ KER and consent gating. [file:18]                 |
+
+These views are the only surfaces AI tools and external agents see; all writes and invariants live in the underlying tables and triggers. [file:18]
 
 ---
 
 ### 25.2 ALN shard catalog
 
-- Governance and policy shards:
-  - `econet.governance.kernel.*.aln` (implied family):
-    - Describe KER composition, guard contracts, and lane rules; bind governance logic to Bostrom identities with hex spechash. [file:18]
-  - `econet.agentfunctioncatalog.v1.aln`:
-    - ALN catalog mirroring `vagentsafecatalog`, providing typed metadata for views, FFI, and prompts (role band, lane scope, actuation capability = NONE, blast‑radius class). [file:18]
-  - Sovereign consent and neurorights shards:
-    - Define telemetry envelopes, TelemetryVerdict conditions, and neuroright constraints on biosignals and neural data. [file:18]
+ALN shards act as immutable specs for topology, corridors, policies, and function catalogs, all hex‑stamped and DID‑anchored. [file:18]
 
-- Corridor definitions and KER composition:
-  - Corridor ALN specs:
-    - Declare `CORRIDORVAR` entries for KER coordinates (e.g., K, E, R, RoH) and machinery‑specific variables like `deltavt`, `maxcarbonradius`, `maxbiodivradius` with SAFE/GOLD/HARD thresholds and weights. [file:18]
-  - KER composition shards:
-    - Bind KER windows, plane weights, and allowed ranges per lane and domain, supporting formal KER guards and always‑improve scoring. [file:18]
+| ALN shard identifier                         | Domain / scope            | Identity anchor                                  | Core objectives                                                                                         |
+|---------------------------------------------|---------------------------|--------------------------------------------------|----------------------------------------------------------------------------------------------------------|
+| `alnPrometheusPraxisCore.v1.aln`            | System topology           | `bostrom18sd2ujv24...`                          | Global execution boundaries, core invariants, plane vocabulary. [file:18]                               |
+| `ppx.function.meta.v1.aln`                  | Function metadata         | `bostrom18sd2ujv24...`                          | Canonical function registry (domain, lane, non‑actuating flag). [file:18]                               |
+| `PrometheusPraxisCodingTaskList2026v1.aln`  | Task backlog              | `bostrom18sd2ujv24...`                          | Machine‑readable dev tasks with KER targets and acceptance gates. [file:18]                             |
+| `econet.agentfunctioncatalog.v1.aln`        | Agent tooling             | `bostrom18sd2ujv24...`                          | ALN mirror of `vagentsafecatalog` for LLM/machine tool discovery. [file:18]                             |
+| `AbsoluteDataSovereigntyPolicy2026v1.aln`   | Sovereignty policy        | `bostrom18sd2ujv24...`                          | Zero raw biosignal export, host ownership, telemetry family rules. [file:18]                            |
+| `NeurorightsCorridor.aln`                   | Neurorights               | `bostrom18sd2ujv24...`                          | Differential privacy bounds and exclusion lists for neural metrics. [file:18]                           |
+| `PlaneWeightsShard2026v1.aln`               | Plane weights             | `bostrom18sd2ujv24...`                          | Plane weights, corridor limits, non‑offsettable flags for safety planes. [file:18]                      |
+| `ecosafety.nonactuatingworkload.v1.aln`     | Ecosafety policy          | `bostrom18sd2ujv24...`                          | Declares the traits a workload must satisfy to be “non‑actuating.” [file:18]                            |
+| `ecosafety.riskvector.v2.aln`               | Risk modeling             | `bostrom18sd2ujv24...`                          | Defines risk vector components (`rcarbon`, `rbiodiv`) and corridor mappings. [file:18]                  |
+| `CyboquaticBlastRadiusShard2026v1.aln`      | Cyboquatic safety         | `bostrom18sd2ujv24...`                          | Spatial and plane blast boundaries for cyboquatic nodes. [file:18]                                      |
+| `phoenix.uhi.hex.risk.v1.aln`               | Urban heat (Phoenix)      | `bostrom18sd2ujv24...`                          | Risk coordinates for urban heat hexes (thermal, carbon, atmospheric). [file:18]                         |
+| `phoenix.mar.corridor.v1.aln`               | Aquifer governance        | `bostrom18sd2ujv24...`                          | Drawdown/recharge/filtration corridors for Phoenix MAR systems. [file:18]                               |
+| `NeuromorphicCorridorAlign2026v1.aln`       | Material alignment        | `bostrom18sd2ujv24...`                          | Maps neuromorphic substrates to environmental compatibility corridors. [file:18]                        |
+| `prometheus-role-bands.v1.aln`              | Access control            | `bostrom18sd2ujv24...`                          | Role band hierarchy (SPINE, ENGINE, MATERIAL, GOV, APP) vs lanes. [file:18]                             |
+| `prometheus-shard-layout.v1.aln`            | Shard topology            | `bostrom18sd2ujv24...`                          | Parent/child shard relationships and trust‑band layouts. [file:18]                                      |
 
-- Eco‑wealth and eco‑penalty kernels:
-  - Eco‑wealth kernel shards:
-    - Describe EcoUnit/EcoWealth states per steward, including eco‑credits, eco‑penalties, and aggregation rules for blastradius‑normalized metrics. [file:18]
-  - Eco‑penalty per machine shards:
-    - Use plane weights and blast metrics to derive normalized ecopenalty per machine, forming the basis for eco‑wealth debits and routing priorities. [file:18]
-
-- Task lists and function metadata:
-  - `PrometheusPraxisCodingTaskList2026v1.aln`:
-    - Canonical backlog shard listing coding tasks, target planes (SPINE_SQL, RUST_KER, MCP_AGENT), KER targets, lanes, and acceptance criteria. [file:18]
-  - Function meta shards:
-    - ALN catalogs describing each governance function/FFI (inputs, outputs, invariants, blast radius, allowed lanes) for cross‑tool interoperability and AI‑safe registration. [file:18]
-
-- Cyboquatic and machinery diagnostics:
-  - `CyboquaticBlastRadiusShard2026v1.aln`:
-    - QPU data shard describing `shardid`, `machineid`, `nodeid`, `lane`, blast radii, Vt footprints, and workload window metrics with corridor variables. [file:18]
-  - Machinery spine shards:
-    - Shards binding `cybomachinery` registry entries to ecosafety corridors, RoH ceilings, and region/lane constraints. [file:18]
+Every shard concludes with `ALN.SPECHASHHEX` and DID fields, giving cryptographic provenance and ensuring that governance changes are versioned, auditable, and lane‑aware. [file:18]
 
 ---
 
 ## 26. Appendix C: Crate, Module, and FFI Inventory
 
-### 26.1 Rust crates (non‑actuating governance and tooling)
+### 26.1 Rust crates (non‑actuating governance spine)
 
-- `prometheuspraxisker`:
-  - Core KER and Lyapunov kernel:
-    - Implements always‑improve scoring, KER guards, RoH and Lyapunov invariants as pure Rust functions, with Kani harnesses proving monotonicity and safety properties. [file:18]
-  - Exposes:
-    - Typed APIs for computing K, E, R, RoH, and Vt‑based decisions over shard and workload diagnostics. [file:18]
+All crates use Rust 2024, `rust-version = "1.85"`, `#![forbid(unsafe_code)]` (except minimal FFI boundaries), and `kani-verifier = "0.67"` for formal proofs. [file:18]
 
-- `prometheuspraxisgovernance` (Praxis governance kernel):
-  - Macro‑scale execution kernel:
-    - Evaluates KER, RoH, Lyapunov residuals, treaties, and neurorights envelopes to return `Allow/Derate/Stop` verdicts without actuating hardware. [file:18]
-  - Enforces:
-    - No‑downgrade doctrine, monotone plane weights, sealed superpower boundaries, and treaty gates. [file:18]
+| Crate name                         | Workspace path                       | Primary technical responsibility                                                                                 | Proof / verification target                                                                                     |
+|------------------------------------|--------------------------------------|------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
+| `prometheuspraxis`                | `crates/prometheuspraxis`           | Macro‑kernel: evaluates system‑wide KER/RoH/Vt and emits `Allow/Derate/Stop` for abstract workloads. [file:18]  | Proves `Stop` is monotonically returned whenever a hard corridor is breached. [file:18]                          |
+| `prometheuspraxisai`              | `crates/prometheuspraxisai`         | S_AI always‑improve scoring, non‑offsettable plane guards, C/FFI shims for analytics engines. [file:18]         | Proves `safetopromote = false` when ΔV>0 or RoH exceeds ceiling. [file:18]                                      |
+| `prometheus-praxis-lyapunov-guard`| `crates/prometheus-praxis-lyapunov-guard` | Lyapunov residual types and invariants; computes windowed ΔV and consistency checks. [file:18]                  | Verifies that `meanvtafter > meanvtbefore` cannot be flagged as stable. [file:18]                                |
+| `econet-governance-spine`         | `crates/econet-governance-spine`    | Governance spine: typed SQLite accessors, `SchemaVerifier`, `KerUpgradeGuard`, `LaneGuard`, `Mt6883Guard`. [file:18] | Proves KER monotonicity across lane changes and schema integrity vs `ExpectedSchema`. [file:18]                  |
+| `cyboquatic-blastradius-spine`    | `crates/cyboquatic-blastradius-spine` | Read‑only diagnostics over cyboquatic blastradius/workloads, JSON FFI for external tools. [file:18]             | Guarantees no actuation APIs are exposed; only evidence and diagnostics. [file:18]                               |
+| `prometheus-praxis-cyboquatic`    | `crates/prometheus-praxis-cyboquatic` | Bridges Cyboquatic DB structures into EcoNet governance and KER kernels. [file:18]                              | Validates schema alignment and DID bindings for cyboquatic windows. [file:18]                                   |
+| `sovereign-consent-engines`       | `crates/sovereign-consent-engines`  | Evaluates host envelopes to produce `TelemetryVerdict` for KER/RoH/LYAP/ECOHEALTH telemetry. [file:18]          | Proves no raw neural/biosignal fields appear in outputs when not authorized. [file:18]                          |
+| `econet-index`                    | `crates/econet-index`               | Manages DB migrations, `ExpectedSchema` verification, and DefinitionRegistry indexing. [file:18]               | Asserts all required tables/views are present and no drift occurs. [file:18]                                     |
+| `cyboquatic-ecosafety-core`       | `crates/cyboquatic-ecosafety-core`  | Risk vector primitives, microplastic metrics, eco‑per‑joule calculations. [file:18]                             | Ensures risk vectors stay in [0,1] and ecoperjoule math is numerically safe. [file:18]                           |
+| `cyboquatic-core`                 | `crates/cyboquatic-core`            | Indexing, telemetry aggregation, and metrics export helpers. [file:18]                                          | Verifies memory safety and JSON serialization correctness. [file:18]                                             |
 
-- EcoNet governance spine crates:
-  - `econet-governance-spine`:
-    - Provides typed accessors over governance DB: KER residuals, plane weights, blastradius, lane status, EcoWealth, Cyboquatic metrics, and AI‑safe catalogs. [file:18]
-    - Contains `SchemaVerifier`, `KerUpgradeGuard`, `LaneGuard`, and specialized guards like `Mt6883Guard`. [file:18]
-  - `cyboquaticblastradiusspine`:
-    - Non‑actuating diagnostics over Cyboquatic blastradius/workloads:
-      - Structs `ShardBlastRadius`, `MachineBlastRadius`, `WorkloadNodeWindow` and a `CyboSpine` handle reading from the Cyboquatic SQLite spine. [file:18]
-    - Exposes JSON‑returning FFI functions for AI chat, Lua, C, and Kotlin clients. [file:18]
+#### Always-improve kernel snippet (crate: `prometheuspraxisai`)
 
-- Indexing and registry crates:
-  - `econet-index`:
-    - Applies schema migrations (including `dbdbcyboquaticblastradiusspine.sql`), wires DBs into a unified EcoNet index, and exposes repository/DefinitionRegistry views. [file:18]
-  - `lane-governance` / ecosafety crates:
-    - Implement lane logic, EcoWealth/EcoUnit coupling, and integration with KER guards for lane promotions and eco‑rewards. [file:18]
+```rust
+pub fn compute_always_improve_score(
+    lane: ActionLane,
+    ker: KerOutput,
+    roh: RohSnapshot,
+    lyap: LyapunovResidualSnapshot,
+    cfg: AlwaysImproveConfig,
+    roh_ceiling_global: Decimal,
+    kmin: Decimal,
+    emin: Decimal,
+    rmax: Decimal,
+) -> AlwaysImproveScore {
+    if roh.rohscalar > roh_ceiling_global {
+        return AlwaysImproveScore {
+            score: Decimal::ZERO,
+            safetopromote: false,
+        };
+    }
+
+    let deltav = lyap.v_next - lyap.v_current;
+    if deltav > cfg.maxdeltav {
+        return AlwaysImproveScore {
+            score: Decimal::ZERO,
+            safetopromote: false,
+        };
+    }
+
+    let r_k = if ker.kmetric >= kmin { Decimal::ZERO } else { kmin - ker.kmetric };
+    let r_e = if ker.emetric >= emin { Decimal::ZERO } else { emin - ker.emetric };
+    let r_r = if ker.rmetric <= rmax { Decimal::ZERO } else { ker.rmetric - rmax };
+
+    let combined_penalty = (cfg.wk * r_k) + (cfg.we * r_e) + (cfg.wr * r_r);
+    let raw_score = Decimal::ONE - combined_penalty;
+    let score = raw_score.clamp(Decimal::ZERO, Decimal::ONE);
+
+    let threshold_ok = ker.kmetric >= kmin && ker.emetric >= emin && ker.rmetric <= rmax;
+    let safetopromote = score >= Decimal::new(70, 2) && threshold_ok;
+
+    AlwaysImproveScore { score, safetopromote }
+}
+```
+[file:18]
+
+This keeps lane promotion bounded by KER thresholds, RoH ceilings, and ΔV constraints, independent of domain (water, heat, etc.). [file:18]
 
 ---
 
-### 26.2 C++ and FFI entrypoints
+### 26.2 C++ telemetry headers and FFI entrypoints
 
-- Magnet module FFI:
-  - Magnet diagnostics module:
-    - A C++ wrapper linked against governance `cdylib` crates, exposing functions to query:
-      - Local KER, RoH, plane weights, and blast radius for magnet‑based Cyboquatic machinery. [file:18]
-    - Entrypoints are read‑only:
-      - They accept identifiers, query the SQLite+Rust spine, and return JSON/structs without actuating magnets. [file:18]
+C++ and C‑ABI interfaces are telemetry‑only; they ingest evidence and expose diagnostics but never expose actuator control fields. [file:18]
 
-- Wastewater pump/screen modules:
-  - Pump module:
-    - C/C++ diagnostic adapter for pumps:
-      - Calls JSON FFI like `cybospine_list_machine_blastradius_json(machineid)` or workload window summaries to show energy/carbon/Vt trends. [file:18]
-    - Integrated into plant HMIs:
-      - Operators see eco impact and lane status, but the module cannot send torque or duty‑cycle commands. [file:18]
-  - Screen/blower modules:
-    - Similar adapters for mechanical screens and blowers, exposing blast radius and eco‑per‑joule metrics via FFI to supervisory systems. [file:18]
+#### Example: wastewater pump telemetry header
 
-- Deployment accountability adapters:
-  - Deployment accountability FFI:
-    - Bridges deployment systems to governance spine:
-      - On each deployment or lane change, it records workload evidence, updated KER values, and signed ALN shards into accountability ledgers. [file:18]
-    - Guards:
-      - Use governance FFI to check `safetopromote`, `carbonnegativeok`, and `restorationok` before allowing promotion to EXPPROD/PROD. [file:18]
+```cpp
+#ifndef WASTEWATER_PUMP_TELEMETRY_HPP
+#define WASTEWATER_PUMP_TELEMETRY_HPP
+
+#include <cstdint>
+
+namespace prometheus::telemetry {
+
+struct alignas(8) WastewaterPumpMetrics {
+    uint64_t timestamp_utc;
+    int64_t  machine_id;
+    double   flow_rate_m3h;
+    double   total_head_m;
+    double   power_consumption_kw;
+    double   vibration_rms_mms;
+    double   temperature_celsius;
+    double   suction_pressure_bar;
+    double   discharge_pressure_bar;
+
+    double   ker_k_metric;
+    double   ker_e_metric;
+    double   ker_r_metric;
+    double   roh_scalar;
+    uint32_t current_lane_code;
+    uint64_t corridor_id;
+};
+
+extern "C" {
+    int32_t ppx_ingest_pump_telemetry(const WastewaterPumpMetrics* metrics);
+}
+
+} // namespace prometheus::telemetry
+
+#endif // WASTEWATER_PUMP_TELEMETRY_HPP
+```
+[file:18]
+
+This header only defines observable state; no API exists for writing back control parameters to the pump. [file:18]
+
+#### Representative FFI symbols (cdylib exports)
+
+| Symbol / header                               | ABI / language | Domain                     | Payload / behavior                                                                                  | Sovereignty / governance gating                                                                    |
+|-----------------------------------------------|----------------|----------------------------|-----------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------|
+| `wastewaterpumptelemetry.hpp`                | C++17          | Pumps & screens            | `WastewaterPumpMetrics` struct and `ppx_ingest_pump_telemetry` ingestion function. [file:18]       | Rejects telemetry if RoH or corridors are violated; write‑only into evidence ledgers. [file:18]    |
+| `magnet_telemetry.hpp`                       | C++17          | Magnet separators          | `MagnetModuleMetrics` describing field intensity and throughput. [file:18]                          | Exposes only diagnostics; coil currents and actuator controls are out‑of‑scope. [file:18]         |
+| `cybospine_list_shard_blastradius_json`      | C‑ABI          | Shard diagnostics          | Inputs: `db_path: *const c_char`; output: JSON string of `ShardBlastRadius`. [file:18]             | Only lists blast radii for shards present in AI‑safe catalog; no actuation keys. [file:18]        |
+| `cybospine_summarize_workload_node_region_json` | C‑ABI      | Workload windows           | Inputs: `db_path`, `nodeid`, `region`; output: JSON `WorkloadNodeWindow`. [file:18]                | Returns aggregated windows, not raw events; respects consent & lane filters. [file:18]            |
+| `ppx_accountability_log_append`              | C‑ABI          | Deployment accountability  | Inputs: `shard_id`, `ker_snapshot_json`, `signing_did`; output: status code. [file:18]             | Append‑only log; enforces valid DID and lane admissibility before accepting entries. [file:18]    |
+
+#### Telemetry pipeline (unidirectional evidence flow)
+
+- Step 1:
+  - Hardware emits telemetry into C++ metric structs (e.g., `WastewaterPumpMetrics`). [file:18]
+- Step 2:
+  - C‑ABI ingress (`ppx_ingest_pump_telemetry`) forwards metrics into Rust governance crates (`econet-governance-spine`, `prometheuspraxisai`). [file:18]
+- Step 3:
+  - Governance logic evaluates KER, RoH, Lyapunov invariants and writes into SQLite ledgers (`cyboquaticworkloadledger`, `cybomachineryworkload`). [file:18]
+- Step 4:
+  - Batch jobs update `agentsafediagnostics`, recomputing S_AI, stability, and safetopromote flags. [file:18]
+- Step 5:
+  - AI‑safe views (`vagentsafecatalog`, `vcyboquaticmicroplasticriskfacade`) expose read‑only diagnostics to LLM tools and MCP servers. [file:18]
+
+At no point do AI‑facing or FFI layers expose actuator interfaces; all control stacks remain sealed in separate, non‑exposed kernels. [file:18]
   - Cross‑language harnesses:
     - Lua, Android/Kotlin, and C clients:
       - Consume the same JSON FFI surfaces to visualize EcoWealth, blast radius, workload windows, and lane states, while leaving all actuation in external, sealed stacks. [file:18]
