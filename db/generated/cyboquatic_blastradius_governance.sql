@@ -1,0 +1,37 @@
+-- filename: db/generated/cyboquatic_blastradius_governance.sql
+-- license: MIT OR Apache-2.0
+-- generated from ALN particle cyboquatic.blastradius.governance
+CREATE TABLE IF NOT EXISTS cyboquatic_blastradius_governance (
+    blastIndexId TEXT NOT NULL,
+    nodeId TEXT NOT NULL,
+    eventId TEXT NOT NULL,
+    corridorId TEXT NOT NULL,
+    laneId TEXT NOT NULL,
+    alnShardName TEXT NOT NULL,
+    alnVersion TEXT NOT NULL,
+    didRoot TEXT NOT NULL,
+    eventTimestampUtc TEXT NOT NULL,
+    windowStartUtc TEXT NOT NULL,
+    windowEndUtc TEXT NOT NULL,
+    surchargeLevelM REAL NOT NULL,
+    hydraulicHeadM REAL NOT NULL,
+    inflowM3s REAL NOT NULL,
+    durationS REAL NOT NULL,
+    radiusM REAL NOT NULL,
+    radiusNorm REAL NOT NULL,
+    k REAL NOT NULL,
+    e REAL NOT NULL,
+    r REAL NOT NULL,
+    kerScore REAL NOT NULL,
+    residualKer REAL NOT NULL,
+    rohCoordinate REAL NOT NULL,
+    radiusWithinLimit INTEGER NOT NULL CHECK (radiusWithinLimit IN (0, 1)),
+    kerWithinLimit INTEGER NOT NULL CHECK (kerWithinLimit IN (0, 1)),
+    laneAdmissibleOk INTEGER NOT NULL CHECK (laneAdmissibleOk IN (0, 1)),
+    safeToPromoteOk INTEGER NOT NULL CHECK (safeToPromoteOk IN (0, 1)),
+    sourceDbPath TEXT NOT NULL,
+    sourceViewName TEXT NOT NULL,
+    evidenceHex TEXT NOT NULL,
+    createdAtUtc TEXT NOT NULL,
+    lastUpdatedUtc TEXT NOT NULL
+);
