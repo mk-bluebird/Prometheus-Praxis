@@ -1,0 +1,128 @@
+# filename: aln/alnCyboquaticBlastRadiusGovernance2026v1.aln2
+# license: MIT OR Apache-20
+# role: Governance particle for cyboquatic blast-radius diagnostics.
+
+aln2-spec cyboquatic-blastradius-governance-2026v1
+version 2
+license MIT OR Apache-2.0
+
+did-root primary bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+alternate bostrom1ldgmtf20d6604a24ztr0jxht7xt7az4jhkmsrc
+
+particle cyboquatic.blastradius.governance
+  id cyboquatic.blastradius.governance.2026.v1
+  did bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+
+  domain GOV
+  subdomain CYBOQUATIC
+  phoenix-anchor PHXBLASTRADIUSCYBOQUATIC2026
+
+  ker-axis
+    knowledge k in 0.0, 1.0
+    ecoImpact e in 0.0, 1.0
+    risk r in 0.0, 1.0
+    kerScore k e - r
+
+  field
+    blastIndexId       hex256
+    nodeId             text
+    eventId            text
+    corridorId         text
+    laneId             text
+
+    alnShardName       text
+    alnVersion         text
+    didRoot            text
+
+    eventTimestampUtc  text
+    windowStartUtc     text
+    windowEndUtc       text
+
+    surchargeLevelM    float
+    hydraulicHeadM     float
+    inflowM3s          float
+    durationS          float
+
+    radiusM            float
+    radiusNorm         float      -- [0,1]
+
+    k                  float      -- [0,1]
+    e                  float      -- [0,1]
+    r                  float      -- [0,1]
+    kerScore           float
+
+    residualKer        float
+    rohCoordinate      float      -- [0,1]
+
+    radiusWithinLimit  bool
+    kerWithinLimit     bool
+    laneAdmissibleOk   bool
+    safeToPromoteOk    bool
+
+    sourceDbPath       text
+    sourceViewName     text
+    evidenceHex        hex256
+    createdAtUtc       text
+    lastUpdatedUtc     text
+
+rule blastradius.diagnostic.accept
+  input
+    blastIndexId       hex256
+    nodeId             text
+    eventId            text
+    corridorId         text
+    laneId             text
+    alnShardName       text
+    alnVersion         text
+    didRoot            text
+    eventTimestampUtc  text
+    windowStartUtc     text
+    windowEndUtc       text
+    surchargeLevelM    float
+    hydraulicHeadM     float
+    inflowM3s          float
+    durationS          float
+    radiusM            float
+    radiusNorm         float
+    k                  float
+    e                  float
+    r                  float
+    kerScore           float
+    residualKer        float
+    rohCoordinate      float
+    radiusWithinLimit  bool
+    kerWithinLimit     bool
+    laneAdmissibleOk   bool
+    safeToPromoteOk    bool
+    sourceDbPath       text
+    sourceViewName     text
+    evidenceHex        hex256
+    createdAtUtc       text
+    lastUpdatedUtc     text
+
+  require
+    radiusNorm 0.0 radiusNorm 1.0
+    k 0.0 k 1.0
+    e 0.0 e 1.0
+    r 0.0 r 1.0
+    rohCoordinate 0.0 rohCoordinate 1.0
+    kerScore k e - r 0.000001
+    residualKer 0.0 residualKer 1.0
+
+  effect
+    hexstamp
+      owner bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7
+      blastIndex blastIndexId
+      node nodeId
+      event eventId
+      corridor corridorId
+      lane laneId
+      radius radiusM radiusNorm
+      ker k k e e r r score kerScore residual residualKer
+      roh rohCoordinate
+      flags radiusWithinLimit kerWithinLimit laneAdmissibleOk safeToPromoteOk
+      sourceDb sourceDbPath
+      sourceView sourceViewName
+      evidence evidenceHex
+      created createdAtUtc
+      updated lastUpdatedUtc
