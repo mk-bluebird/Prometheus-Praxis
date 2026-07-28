@@ -3,23 +3,23 @@
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS cyboquatic_energy_ecoperjoule_restoration (
-    frameid           TEXT PRIMARY KEY,
-    nodeid            TEXT NOT NULL,
-    date_utc          TEXT NOT NULL,
-    window_start_utc  TEXT NOT NULL,
-    window_end_utc    TEXT NOT NULL,
-    energy_req_j      REAL NOT NULL CHECK (energy_req_j >= 0.0),
-    ecoperjoule       REAL NOT NULL CHECK (ecoperjoule >= 0.0 AND ecoperjoule <= 1000.0),
-    restoration_flag  INTEGER NOT NULL CHECK (restoration_flag IN (0, 1)),
-    carbon_negative_ok INTEGER NOT NULL CHECK (carbon_negative_ok IN (0, 1)),
-    k_knowledge       REAL NOT NULL CHECK (k_knowledge >= 0.0 AND k_knowledge <= 1.0),
-    e_ecoimpact       REAL NOT NULL CHECK (e_ecoimpact >= 0.0 AND e_ecoimpact <= 1.0),
-    r_risk            REAL NOT NULL CHECK (r_risk >= 0.0 AND r_risk <= 1.0),
-    ker_score         REAL NOT NULL,
-    evidence_hex      TEXT NOT NULL,
-    signing_did       TEXT NOT NULL,
-    created_at_utc    TEXT NOT NULL,
-    last_updated_utc  TEXT NOT NULL
+    frameid             TEXT PRIMARY KEY,
+    nodeid              TEXT NOT NULL,
+    date_utc            TEXT NOT NULL,
+    window_start_utc    TEXT NOT NULL,
+    window_end_utc      TEXT NOT NULL,
+    energy_req_j        REAL NOT NULL CHECK (energy_req_j >= 0.0),
+    ecoperjoule         REAL NOT NULL CHECK (ecoperjoule >= 0.0 AND ecoperjoule <= 1000.0),
+    restoration_flag    INTEGER NOT NULL CHECK (restoration_flag IN (0, 1)),
+    carbon_negative_ok  INTEGER NOT NULL CHECK (carbon_negative_ok IN (0, 1)),
+    k_knowledge         REAL NOT NULL CHECK (k_knowledge >= 0.0 AND k_knowledge <= 1.0),
+    e_ecoimpact         REAL NOT NULL CHECK (e_ecoimpact >= 0.0 AND e_ecoimpact <= 1.0),
+    r_risk              REAL NOT NULL CHECK (r_risk >= 0.0 AND r_risk <= 1.0),
+    ker_score           REAL NOT NULL,
+    evidence_hex        TEXT NOT NULL,
+    signing_did         TEXT NOT NULL,
+    created_at_utc      TEXT NOT NULL,
+    last_updated_utc    TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_energy_ecoper_node_date
