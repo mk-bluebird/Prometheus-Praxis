@@ -1,0 +1,67 @@
+{
+  "name": "SemanticCompletenessGuard",
+  "version": "0.1.0",
+  "promptSpace": {
+    "type": "string"
+  },
+  "responseSpace": {
+    "type": "string"
+  },
+  "goalExtraction": {
+    "description": "Maps prompt to finite set of answer obligations.",
+    "functionContract": {
+      "input": "string",
+      "output": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    }
+  },
+  "stateSpace": {
+    "states": [
+      "empty",
+      "partial",
+      "almost_complete",
+      "complete"
+    ]
+  },
+  "actions": [
+    "initial_prompt",
+    "continue",
+    "fill_missing_sections",
+    "finish_conclusion"
+  ],
+  "observations": {
+    "features": [
+      "length",
+      "section_count",
+      "has_conclusion",
+      "syntactic_completeness"
+    ]
+  },
+  "pomdp": {
+    "transitionKernel": "T(s_next | s_current, action)",
+    "observationKernel": "O(obs | state, action)",
+    "rewardFunction": "R(state, action)",
+    "discountFactor": 0.9
+  },
+  "entropyProcess": {
+    "variable": "conversation_entropy",
+    "drift": "mu(x, policy)",
+    "diffusion": "D(x)",
+    "fokkerPlanck": "∂_t p = -∂_x[mu p] + ∂_x^2[D p]"
+  },
+  "guardParameters": {
+    "maxRetries": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Upper bound on repair actions per prompt."
+    },
+    "stoppingThreshold": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Belief mass required on 'complete' to stop repairs."
+    }
+  }
+}
