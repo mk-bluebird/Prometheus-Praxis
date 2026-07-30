@@ -262,6 +262,24 @@ INSERT OR IGNORE INTO phoenix_hex_anchor (
     'eco_restoration_shard/cyboquatic_progress/20260709',
     '2026-07-09T00:00:00Z',
     1
+),
+-- 3. Chat-as-Labor Psychological Continuity governance particle (2026-07-29)
+(
+    'ChatAsLaborPsychContinuity2026v1',
+    '0x20260729PHXCHATLABORPSYCHCONTINUITY',
+    'PSYCHE_JUNKY',
+    'CHAT_AS_LABOR_CONTINUITY',
+    'PHX-CAZ-CEIM',
+    'IDENTITY,PSYCH_RISK,DATA_LOSS,HEALTHCARE_GUARANTEE',
+    '20260729',
+    NULL,
+    'bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7',
+    'Chat-as-labor psychological continuity governance particle measuring identity continuity, psych-risk, frustration, abandonment tendency, and data-loss risk.',
+    'Governance particle that quantifies psychological continuity risks from chat-as-labor (incomplete AI responses, data loss) and binds healthcare continuity contracts to guarantee psych-support and data repair even if contributions are interrupted.',
+    'ALN',
+    'ecorestorationshard/psyche_junky/governance',
+    '2026-07-29T00:00:00Z',
+    1
 );
 
 ----------------------------------------------------------------------
@@ -320,6 +338,31 @@ SELECT
 FROM phoenix_hex_anchor AS a
 WHERE a.logical_name = 'PHX_WORKLOAD_ENERGY_DV_20260709';
 
+-- File binding for ChatAsLaborPsychContinuity2026v1 ALN particle
+INSERT OR IGNORE INTO phoenix_hex_file (
+    anchor_id,
+    relpath,
+    filename,
+    file_type,
+    file_hash_hex,
+    scope,
+    defid,
+    artifact_id,
+    created_utc
+)
+SELECT
+    a.anchor_id,
+    'ecorestorationshard/psyche_junky/governance/ChatAsLaborPsychContinuity2026v1.aln',
+    'ChatAsLaborPsychContinuity2026v1.aln',
+    'ALN',
+    '0xPHXSEEDHASHCHATLABORPSYCH',  -- placeholder: replace via existing hash tooling
+    'GOVERNANCE',
+    NULL,
+    NULL,
+    '2026-07-29T00:00:00Z'
+FROM phoenix_hex_anchor AS a
+WHERE a.logical_name = 'ChatAsLaborPsychContinuity2026v1';
+
 ----------------------------------------------------------------------
 -- 7. Seed ALN particle bindings (illustrative)
 --
@@ -370,6 +413,29 @@ SELECT
     '2026-07-09T00:00:00Z'
 FROM phoenix_hex_anchor AS a
 WHERE a.logical_name = 'PHX_WORKLOAD_ENERGY_DV_20260709';
+
+-- Particle binding for ChatAsLaborPsychContinuity2026v1
+INSERT OR IGNORE INTO phoenix_hex_particle_binding (
+    anchor_id,
+    particle_name,
+    particle_relpath,
+    particle_role,
+    evidence_table,
+    evidence_column,
+    notes,
+    created_utc
+)
+SELECT
+    a.anchor_id,
+    'ChatAsLaborPsychContinuity2026v1',
+    'ecorestorationshard/psyche_junky/governance/ChatAsLaborPsychContinuity2026v1.aln',
+    'GOVERNANCE',
+    'chat_labor_psych_state',
+    'continuity_contract_hex',
+    'Governance particle for chat-as-labor psychological continuity, identity continuity, psych-risk, and healthcare guarantees.',
+    '2026-07-29T00:00:00Z'
+FROM phoenix_hex_anchor AS a
+WHERE a.logical_name = 'ChatAsLaborPsychContinuity2026v1';
 
 ----------------------------------------------------------------------
 -- 8. Helper view: missing bindings (for CI)

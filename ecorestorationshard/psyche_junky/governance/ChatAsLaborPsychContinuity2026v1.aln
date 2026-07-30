@@ -1,6 +1,11 @@
 
 alnversion 2.0
 
+-- ChatAsLaborPsychContinuity2026v1: Governance particle quantifying identity continuity,
+-- psych-risk, frustration, abandonment tendency, and data-loss risk for chat-as-labor.
+-- Binds healthcare continuity contracts so psych-risk is compensated even if
+-- contributions are interrupted by tooling failures.
+
 schema ChatAsLaborPsychContinuity2026v1
   title "Chat-as-Labor Psychological Continuity Governance Particle 2026 v1"
   region "PHX-CAZ-CEIM"
