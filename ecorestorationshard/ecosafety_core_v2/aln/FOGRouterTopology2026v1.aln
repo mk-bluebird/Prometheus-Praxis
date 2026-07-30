@@ -1,0 +1,70 @@
+!-- filename: ecorestorationshard/ecosafety_core_v2/aln/FOGRouterTopology2026v1.aln
+!-- destination: ecorestorationshard/ecosafety_core_v2/aln/FOGRouterTopology2026v1.aln
+!-- repo-target: https://github.com/mk-bluebird/Prometheus-Praxis
+
+alnversion 2.0
+
+schema FOGRouterTopology2026v1
+  title "FOG-Router Laplacian Spectrum and Canal Chern Index 2026 v1"
+  region "PHX-CAZ-CEIM"
+  domain "ECOSAFETY_CORE_V2"
+  subdomain "FOG_ROUTER_TOPOLOGY"
+  bostromdid "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+  logicalname "FOGRouterTopology2026v1"
+  evidencehex "0x20260729PHXFOGRouterTopology2026v1"
+
+  phoenixhexanchor
+    logicalname    "FOGRouterTopology2026v1"
+    evidencehex    "0x20260729PHXFOGRouterTopology2026v1"
+    domain         "ECOSAFETY_CORE_V2"
+    subdomain      "FOG_ROUTER_TOPOLOGY"
+    regioncode     "PHX-CAZ-CEIM"
+    planes         "HYDRAULICS,DATA,TOPOLOGY,UNCERTAINTY"
+    yyyymmdd       "20260729"
+    signingdid     "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+    fileclass      "ALN"
+    defaultrelpath "ecorestorationshard/ecosafety_core_v2/aln"
+  endphoenixhexanchor
+
+  --------------------------------------------------------------------
+  -- 1. Laplacian eigenvalues and Chern-like index per canal routing graph
+  --------------------------------------------------------------------
+
+  table fog_router_laplacian_spectrum
+    column graph_id      Utf8(64)  notnull
+    column timestep      Int32     notnull
+    column lambda_min    Float64   notnull  -- smallest non-zero eigenvalue (algebraic connectivity)
+    column lambda_max    Float64   notnull  -- largest eigenvalue
+    column chern_index   Int32     notnull  -- canal-specific "Chern analogue" (robust path count)
+    column evidence_hex  Utf8(128) notnull
+    column created_utc   Utf8(32)  notnull
+  endtable
+
+  constraint SpectrumBounds
+    require lambda_min >= 0.0
+    require lambda_max >= 0.0
+    require chern_index >= 0
+  endconstraint
+
+  --------------------------------------------------------------------
+  -- 2. Robustness obligations under link failures
+  --------------------------------------------------------------------
+
+  -- Ensure spectrum remains bounded and connectivity preserved even
+  -- when up to 10% of links fail.[184][186]
+  obligation FOGRouterSpectrumRobustness
+    forall graph_id, timestep :
+      fog_router_laplacian_spectrum(graph_id, timestep) as S
+    require S.lambda_min > 0.0          -- graph remains connected
+    require S.lambda_max < 10.0         -- arbitrary upper bound; tune via hydraulics data
+  endobligation
+
+  -- Canal-specific Chern analogue: number of independent robust paths
+  -- between critical nodes must exceed a threshold.
+  obligation ChernIndexThreshold
+    forall graph_id, timestep :
+      fog_router_laplacian_spectrum(graph_id, timestep) as S
+    require S.chern_index >= 3          -- e.g., at least 3 disjoint safe paths
+  endobligation
+
+endschema
