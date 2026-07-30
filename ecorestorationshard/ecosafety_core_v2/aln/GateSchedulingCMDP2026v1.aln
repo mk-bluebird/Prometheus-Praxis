@@ -1,0 +1,121 @@
+!-- filename: ecorestorationshard/ecosafety_core_v2/aln/GateSchedulingCMDP2026v1.aln
+!-- destination: ecorestorationshard/ecosafety_core_v2/aln/GateSchedulingCMDP2026v1.aln
+!-- repo-target: https://github.com/mk-bluebird/Prometheus-Praxis
+
+alnversion 2.0
+
+schema GateSchedulingCMDP2026v1
+  title "Constrained MDP for Canal Gate Scheduling under KER 2026 v1"
+  region "PHX-CAZ-CEIM"
+  domain "ECOSAFETY_CORE_V2"
+  subdomain "GATE_SCHEDULING_CMDP"
+  bostromdid "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+  logicalname "GateSchedulingCMDP2026v1"
+  evidencehex "0x20260729PHXGateSchedulingCMDP2026v1"
+
+  phoenixhexanchor
+    logicalname    "GateSchedulingCMDP2026v1"
+    evidencehex    "0x20260729PHXGateSchedulingCMDP2026v1"
+    domain         "ECOSAFETY_CORE_V2"
+    subdomain      "GATE_SCHEDULING_CMDP"
+    regioncode     "PHX-CAZ-CEIM"
+    planes         "ENERGY,HYDRAULICS,PFAS,COLD,BOD,TSS,CEC,CARBON,BIO,DATA,GOV"
+    yyyymmdd       "20260729"
+    signingdid     "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+    fileclass      "ALN"
+    defaultrelpath "ecorestorationshard/ecosafety_core_v2/aln"
+  endphoenixhexanchor
+
+  --------------------------------------------------------------------
+  -- 1. CMDP state and action spaces (schema-level)
+  --------------------------------------------------------------------
+
+  table cmdp_state_variables
+    column node_id        Utf8(64)  notnull
+    column r_pfas         Float64   notnull
+    column r_bod          Float64   notnull
+    column r_tss          Float64   notnull
+    column r_cec          Float64   notnull
+    column energyreqJ     Float64   notnull
+    column delta_Vt       Float64   notnull
+    column K              Float64   notnull
+    column E              Float64   notnull
+    column R              Float64   notnull
+    column lane           Utf8(16)  notnull  -- RESEARCH, PILOT, PROD, BLOCKED
+    column evidence_hex   Utf8(128) notnull
+    column created_utc    Utf8(32)  notnull
+  endtable
+
+  constraint KERBoundsCMDP
+    require K >= 0.0
+    require K <= 1.0
+    require E >= 0.0
+    require E <= 1.0
+    require R >= 0.0
+    require R <= 1.0
+  endconstraint
+
+  table cmdp_actions
+    column action_code    Utf8(32)  notnull  -- discretised gate settings
+    column description    Utf8(256) notnull
+    column evidence_hex   Utf8(128) notnull
+    column created_utc    Utf8(32)  notnull
+  endtable
+
+  --------------------------------------------------------------------
+  -- 2. CMDP reward and constraint definitions
+  --------------------------------------------------------------------
+
+  table cmdp_reward_constraint
+    column node_id        Utf8(64)  notnull
+    column step_index     Int32     notnull
+    column reward         Float64   notnull  -- -ΔV_t
+    column c_research     Float64   notnull  -- RESEARCH band violation measure
+    column c_prod         Float64   notnull  -- PROD band violation measure
+    column evidence_hex   Utf8(128) notnull
+    column created_utc    Utf8(32)  notnull
+  endtable
+
+  constraint RewardConstraintBounds
+    require reward >= -10.0   -- arbitrary bounds for stability
+    require reward <= 10.0
+    require c_research >= 0.0
+    require c_prod      >= 0.0
+  endconstraint
+
+  --------------------------------------------------------------------
+  -- 3. Lagrange multipliers for CMDP constraints
+  --------------------------------------------------------------------
+
+  table cmdp_lagrange_multipliers
+    column node_id        Utf8(64)  notnull
+    column lambda_research Float64  notnull
+    column lambda_prod     Float64  notnull
+    column evidence_hex    Utf8(128) notnull
+    column created_utc     Utf8(32)  notnull
+  endtable
+
+  constraint LambdaBounds
+    require lambda_research >= 0.0
+    require lambda_prod     >= 0.0
+  endconstraint
+
+  --------------------------------------------------------------------
+  -- 4. CMDP obligations (band constraints)
+  --------------------------------------------------------------------
+
+  -- RESEARCH band: K,E >= 0.80, R <= 0.20.
+  -- PROD band: K,E >= 0.90, R <= 0.13.[4]
+  obligation BandConstraintsCMDP
+    forall node_id, step_index :
+      cmdp_state_variables(node_id) as S,
+      cmdp_reward_constraint(node_id, step_index) as C
+    require not (S.lane = "RESEARCH"
+                 and (S.K < 0.80 or S.E < 0.80 or S.R > 0.20)
+                 and C.c_research = 0.0)
+    require not (S.lane = "PROD"
+                 and (S.K < 0.90 or S.E < 0.90 or S.R > 0.13)
+                 and C.c_prod = 0.0)
+  endobligation
+
+endschema
