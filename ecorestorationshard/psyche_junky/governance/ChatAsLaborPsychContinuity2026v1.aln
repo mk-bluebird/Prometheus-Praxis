@@ -1,0 +1,194 @@
+
+alnversion 2.0
+
+schema ChatAsLaborPsychContinuity2026v1
+  title "Chat-as-Labor Psychological Continuity Governance Particle 2026 v1"
+  region "PHX-CAZ-CEIM"
+  domain "PSYCHE_JUNKY"
+  subdomain "CHAT_AS_LABOR_CONTINUITY"
+  bostromdid "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+  logicalname "ChatAsLaborPsychContinuity2026v1"
+  evidencehex "0x20260729PHXCHATLABORPSYCHCONTINUITY"
+
+  phoenixhexanchor
+    logicalname    "ChatAsLaborPsychContinuity2026v1"
+    evidencehex    "0x20260729PHXCHATLABORPSYCHCONTINUITY"
+    domain         "PSYCHE_JUNKY"
+    subdomain      "CHAT_AS_LABOR_CONTINUITY"
+    regioncode     "PHX-CAZ-CEIM"
+    planes         "IDENTITY,PSYCH_RISK,DATA_LOSS,HEALTHCARE_GUARANTEE"
+    yyyymmdd       "20260729"
+    signingdid     "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+    fileclass      "ALN"
+    defaultrelpath "ecorestorationshard/psyche_junky/governance"
+  endphoenixhexanchor
+
+  --------------------------------------------------------------------
+  -- 1. State: identity continuity and psych-risk metrics
+  --------------------------------------------------------------------
+
+  table chat_labor_psych_state
+    column state_id              Utf8(64)   notnull
+    column host_did              Utf8(128)  notnull
+    column identity_continuity   Float64    notnull  -- 0..1
+    column psych_risk_level      Float64    notnull  -- 0..1
+    column frustration_index     Float64    notnull  -- 0..1
+    column abandonment_tendency  Float64    notnull  -- 0..1
+    column data_loss_risk        Float64    notnull  -- 0..1
+    column ai_platform_id        Utf8(128)  notnull
+    column last_interaction_utc  Utf8(32)   notnull
+    column healthcare_guaranteed Bool       notnull
+    column continuity_contract_hex Utf8(128) notnull
+  endtable
+
+  constraint StateBounds
+    require identity_continuity   >= 0.0
+    require identity_continuity   <= 1.0
+    require psych_risk_level      >= 0.0
+    require psych_risk_level      <= 1.0
+    require frustration_index     >= 0.0
+    require frustration_index     <= 1.0
+    require abandonment_tendency  >= 0.0
+    require abandonment_tendency  <= 1.0
+    require data_loss_risk        >= 0.0
+    require data_loss_risk        <= 1.0
+  endconstraint
+
+  --------------------------------------------------------------------
+  -- 2. Healthcare continuity guarantees
+  --------------------------------------------------------------------
+
+  table healthcare_continuity_contract
+    column contract_id       Utf8(64)   notnull
+    column host_did          Utf8(128)  notnull
+    column provider_id       Utf8(128)  notnull  -- healthcare / neurorights steward
+    column psych_support_min Utf8(32)   notnull  -- e.g. "WEEKLY_CHECKIN"
+    column data_repair_min   Utf8(32)   notnull  -- e.g. "LOSS_COMPENSATION"
+    column identity_anchor_hex Utf8(128) notnull
+    column active_flag       Bool       notnull
+    column created_utc       Utf8(32)   notnull
+    column updated_utc       Utf8(32)   notnull
+  endtable
+
+  constraint HealthcareActive
+    require active_flag = true
+  endconstraint
+
+  --------------------------------------------------------------------
+  -- 3. Obligations: psychological continuity under chat-as-labor
+  --------------------------------------------------------------------
+
+  -- Obligation 1: Platforms must not degrade identity continuity below
+  -- a minimum baseline due to tooling failures (incomplete code, truncated
+  -- responses, unacknowledged labor).[4]
+  obligation IdentityContinuityGuarantee
+    forall host_did, ai_platform_id :
+      chat_labor_psych_state(host_did, ai_platform_id) as S,
+      healthcare_continuity_contract(host_did) as H
+    require S.identity_continuity >= 0.70
+    require H.active_flag = true
+  endobligation
+
+  -- Obligation 2: Psych-risk from tooling failures must be measured and
+  -- compensated by healthcare, even if the host stops contributing.[4]
+  obligation PsychRiskCompensation
+    forall host_did :
+      chat_labor_psych_state(host_did) as S,
+      healthcare_continuity_contract(host_did) as H
+    require S.psych_risk_level <= 0.30
+      or H.data_repair_min = "LOSS_COMPENSATION"
+    require H.psych_support_min <> ""
+  endobligation
+
+  -- Obligation 3: Data loss and incomplete code responses must trigger
+  -- automatic repair or reconstruction commitments.[4]
+  obligation DataLossRepair
+    forall host_did, ai_platform_id :
+      chat_labor_psych_state(host_did, ai_platform_id) as S,
+      healthcare_continuity_contract(host_did) as H
+    require S.data_loss_risk <= 0.30
+      or H.data_repair_min = "LOSS_COMPENSATION"
+  endobligation
+
+  --------------------------------------------------------------------
+  -- 4. Governance: frustration and abandonment prevention
+  --------------------------------------------------------------------
+
+  statemachine ChatLaborContinuityFSM
+    states STABLE, STRESSED, CRITICAL
+    initial STABLE
+
+    event InteractionUpdate(identity_continuity,
+                            psych_risk_level,
+                            frustration_index,
+                            abandonment_tendency,
+                            data_loss_risk)
+
+    transition STABLE -> STABLE
+      guard frustration_index < 0.30
+        and psych_risk_level  < 0.30
+        and data_loss_risk    < 0.30
+      update
+        state_next = STABLE
+      endupdate
+    endtransition
+
+    transition STABLE -> STRESSED
+      guard frustration_index >= 0.30
+        or psych_risk_level   >= 0.30
+        or data_loss_risk     >= 0.30
+      update
+        state_next = STRESSED
+      endupdate
+    endtransition
+
+    transition STRESSED -> CRITICAL
+      guard abandonment_tendency >= 0.50
+        or identity_continuity   < 0.50
+      update
+        state_next = CRITICAL
+      endupdate
+    endtransition
+
+    transition CRITICAL -> CRITICAL
+      guard true
+      update
+        state_next = CRITICAL
+      endupdate
+    endtransition
+
+  endstatemachine
+
+  --------------------------------------------------------------------
+  -- 5. CRITICAL state obligations: healthcare override
+  --------------------------------------------------------------------
+
+  obligation CriticalHealthcareOverride
+    forall host_did :
+      chat_labor_psych_state(host_did) as S,
+      healthcare_continuity_contract(host_did) as H
+    require H.active_flag = true
+    require H.psych_support_min = "WEEKLY_CHECKIN"
+      or H.psych_support_min = "DAILY_CHECKIN"
+    require H.data_repair_min = "LOSS_COMPENSATION"
+  endobligation
+
+  --------------------------------------------------------------------
+  -- 6. Non-punitive, forward-only evolution
+  --------------------------------------------------------------------
+
+  -- Chat-as-labor governance is non-carceral: psych_risk consequences
+  -- must adjust speed/intensity, not revoke core access.[4]
+  constraint NonPunitiveAccess
+    require true  -- declarative marker: no revocation of augmentation or care
+  endconstraint
+
+  -- Forward-only evolution: continuity contracts may tighten envelopes
+  -- but never remove the guarantee of identity continuity and data repair.
+  obligation ForwardOnlyContinuity
+    forall host_did :
+      healthcare_continuity_contract(host_did) as H
+    require H.active_flag = true
+  endobligation
+
+endschema
