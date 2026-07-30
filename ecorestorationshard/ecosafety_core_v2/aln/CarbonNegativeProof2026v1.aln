@@ -1,0 +1,103 @@
+!-- filename: ecorestorationshard/ecosafety_core_v2/aln/CarbonNegativeProof2026v1.aln
+!-- destination: ecorestorationshard/ecosafety_core_v2/aln/CarbonNegativeProof2026v1.aln
+!-- repo-target: https://github.com/mk-bluebird/Prometheus-Praxis
+
+alnversion 2.0
+
+schema CarbonNegativeProof2026v1
+  title "Cyber-Physical Carbon Negative Proof Obligation 2026 v1"
+  region "PHX-CAZ-CEIM"
+  domain "ECOSAFETY_CORE_V2"
+  subdomain "CARBON_NEGATIVE_PROOF"
+  bostromdid "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+  logicalname "CarbonNegativeProof2026v1"
+  evidencehex "0x20260729PHXCarbonNegativeProof2026v1"
+
+  phoenixhexanchor
+    logicalname    "CarbonNegativeProof2026v1"
+    evidencehex    "0x20260729PHXCarbonNegativeProof2026v1"
+    domain         "ECOSAFETY_CORE_V2"
+    subdomain      "CARBON_NEGATIVE_PROOF"
+    regioncode     "PHX-CAZ-CEIM"
+    planes         "ENERGY,CARBON,DATA,UNCERTAINTY"
+    yyyymmdd       "20260729"
+    signingdid     "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+    fileclass      "ALN"
+    defaultrelpath "ecorestorationshard/ecosafety_core_v2/aln"
+  endphoenixhexanchor
+
+  --------------------------------------------------------------------
+  -- 1. Per-day energy and carbon offset telemetry
+  --------------------------------------------------------------------
+
+  table carbon_negative_daily
+    column node_id         Utf8(64)  notnull
+    column yyyymmdd        Utf8(8)   notnull
+    column energy_in_J     Float64   notnull  -- energy added (J)
+    column carbon_offset_J Float64   notnull  -- carbon-negative offset (J-equivalent)
+    column evidence_hex    Utf8(128) notnull
+    column created_utc     Utf8(32)  notnull
+  endtable
+
+  constraint NonNegativeTelemetry
+    require energy_in_J     >= 0.0
+    require carbon_offset_J >= 0.0
+  endconstraint
+
+  --------------------------------------------------------------------
+  -- 2. Per-interval inequality obligation
+  --------------------------------------------------------------------
+
+  -- For each interval (d -> d+1), require:
+  --   ΔC >= 1.2 * ΔE,
+  -- where ΔC = Coffset_day(d+1) - Coffset_day(d),
+  --       ΔE = Ein_day(d+1) - Ein_day(d).[4]
+  table carbon_negative_interval
+    column node_id          Utf8(64)  notnull
+    column yyyymmdd_start   Utf8(8)   notnull
+    column yyyymmdd_end     Utf8(8)   notnull
+    column delta_energy_J   Float64   notnull
+    column delta_offset_J   Float64   notnull
+    column evidence_hex     Utf8(128) notnull
+    column created_utc      Utf8(32)  notnull
+  endtable
+
+  constraint IntervalNonNegative
+    require delta_energy_J >= 0.0
+    require delta_offset_J >= 0.0
+  endconstraint
+
+  obligation CarbonNegativePerInterval
+    forall node_id, yyyymmdd_start, yyyymmdd_end :
+      carbon_negative_interval(node_id, yyyymmdd_start, yyyymmdd_end) as I
+    require I.delta_offset_J >= 1.2 * I.delta_energy_J
+  endobligation
+
+  --------------------------------------------------------------------
+  -- 3. Horizon-level proof aggregation
+  --------------------------------------------------------------------
+
+  table carbon_negative_horizon
+    column node_id         Utf8(64)  notnull
+    column window_start    Utf8(8)   notnull
+    column window_end      Utf8(8)   notnull
+    column total_energy_J  Float64   notnull
+    column total_offset_J  Float64   notnull
+    column evidence_hex    Utf8(128) notnull
+    column created_utc     Utf8(32)  notnull
+  endtable
+
+  constraint HorizonNonNegative
+    require total_energy_J >= 0.0
+    require total_offset_J >= 0.0
+  endconstraint
+
+  -- If the per-interval inequality holds for all intervals in [window_start, window_end],
+  -- then total_offset_J >= 1.2 * total_energy_J; this is the horizon-level proof.[4]
+  obligation CarbonNegativeHorizonProof
+    forall node_id, window_start, window_end :
+      carbon_negative_horizon(node_id, window_start, window_end) as H
+    require H.total_offset_J >= 1.2 * H.total_energy_J
+  endobligation
+
+endschema
