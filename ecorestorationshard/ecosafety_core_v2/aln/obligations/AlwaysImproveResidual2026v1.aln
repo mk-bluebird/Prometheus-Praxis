@@ -1,0 +1,92 @@
+
+alnversion 2.0
+
+schema AlwaysImproveResidual2026v1
+  title "Always-Improve Lyapunov Residual Obligation 2026 v1"
+  region "PHX-CAZ-CEIM"
+  domain "ECOSAFETY_CORE_V2"
+  bostromdid "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+  logicalname "AlwaysImproveResidual2026v1"
+  evidencehex "0xPHXALNAlwaysImproveResidual2026v1"
+
+  phoenixhexanchor
+    logicalname "AlwaysImproveResidual2026v1"
+    evidencehex "0xPHXALNAlwaysImproveResidual2026v1"
+    domain "ECOSAFETY_CORE_V2"
+    subdomain "OBLIGATION"
+    regioncode "PHX-CAZ-CEIM"
+    planes "ENERGY,HYDRAULICS,PFAS,COLD,BOD,TSS,CEC,CARBON,BIODIVERSITY,MATERIALS,NEURORIGHTS,TOPOLOGY,DATA,UNCERTAINTY"
+    yyyymmdd "20260729"
+    signingdid "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+    fileclass "ALN"
+    defaultrelpath "ecorestorationshard/ecosafety_core_v2"
+  endphoenixhexanchor
+
+  -- Obligation applies to any pair of windows (prev, current) with the same
+  -- segment and lane, linked by prior_hex.[4]
+  table ker_residual_obligation
+    column obligation_id Utf8(64) notnull
+    column prev_hex      Utf8(128) notnull
+    column current_hex   Utf8(128) notnull
+    column segment_id    Utf8(64)  notnull
+    column lane          Utf8(16)  notnull
+    column domain        Utf8(32)  notnull
+    column epsilon       Float64   notnull
+    column created_utc   Utf8(32)  notnull
+  endtable
+
+  constraint DomainLane
+    require inset(lane, "RESEARCH","PILOT","PROD")
+    require equals(domain, "CYBOQUATIC")
+  endconstraint
+
+  -- Formal obligation: residual must not increase and K,E,R must not regress.[4]
+  obligation AlwaysImprove
+    forall segment_id, lane, prev_hex, current_hex :
+      ker_residual_window(prev_hex, segment_id, lane) as Prev,
+      ker_residual_window(current_hex, segment_id, lane) as Curr
+    require Curr.vt_residual <= Prev.vt_residual + epsilon
+    require Curr.k_knowledge >= Prev.k_knowledge
+    require Curr.e_ecoimpact >= Prev.e_ecoimpact
+    require Curr.r_risk      <= Prev.r_risk
+  endobligation
+
+  -- Lane gating: only windows satisfying AlwaysImprove may promote lane.[4]
+  statemachine LanePromotion
+    states RESEARCH, PILOT, PROD, BLOCKED
+    initial RESEARCH
+
+    event WindowEvaluated(prev_hex, current_hex, vt_prev, vt_curr,
+                          k_prev, k_curr, e_prev, e_curr, r_prev, r_curr)
+
+    transition RESEARCH -> PILOT
+      guard vt_curr <= vt_prev + epsilon
+        and k_curr >= k_prev
+        and e_curr >= e_prev
+        and r_curr <= r_prev
+      update
+        lane_next = "PILOT"
+      endupdate
+    endtransition
+
+    transition PILOT -> PROD
+      guard vt_curr <= vt_prev + epsilon
+        and k_curr >= 0.90
+        and e_curr >= 0.90
+        and r_curr <= 0.13
+      update
+        lane_next = "PROD"
+      endupdate
+    endtransition
+
+    transition any -> BLOCKED
+      guard vt_curr > vt_prev + epsilon
+        or r_curr  > 0.50
+      update
+        lane_next = "BLOCKED"
+      endupdate
+    endtransition
+
+  endstatemachine
+
+endschema
