@@ -1,0 +1,178 @@
+!-- filename: ecorestorationshard/ecosafety_core_v2/aln/KERPathPromotion2026v1.aln
+!-- destination: ecorestorationshard/ecosafety_core_v2/aln/KERPathPromotion2026v1.aln
+!-- repo-target: https://github.com/mk-bluebird/Prometheus-Praxis
+
+alnversion 2.0
+
+schema KERPathPromotion2026v1
+  title "KER Path Promotion Monotone Trajectory Governance Particle 2026 v1"
+  region "PHX-CAZ-CEIM"
+  domain "ECOSAFETY_CORE_V2"
+  subdomain "KER_PATH_PROMOTION"
+  bostromdid "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+  logicalname "KERPathPromotion2026v1"
+  evidencehex "0x20260729PHXKERPathPromotion2026v1"
+
+  phoenixhexanchor
+    logicalname    "KERPathPromotion2026v1"
+    evidencehex    "0x20260729PHXKERPathPromotion2026v1"
+    domain         "ECOSAFETY_CORE_V2"
+    subdomain      "KER_PATH_PROMOTION"
+    regioncode     "PHX-CAZ-CEIM"
+    planes         "ENERGY,HYDRAULICS,PFAS,COLD,BOD,TSS,CEC,CARBON,BIODIVERSITY,MATERIALS,NEURORIGHTS,TOPOLOGY,DATA,UNCERTAINTY"
+    yyyymmdd       "20260729"
+    signingdid     "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+    fileclass      "ALN"
+    defaultrelpath "ecorestorationshard/ecosafety_core_v2/aln"
+  endphoenixhexanchor
+
+  --------------------------------------------------------------------
+  -- 1. KER path step table
+  --------------------------------------------------------------------
+
+  table ker_path_step
+    column path_id        Utf8(64)   notnull
+    column step_index     Int32      notnull
+    column lane_prev      Utf8(16)   notnull  -- RESEARCH, PILOT, PROD
+    column lane_next      Utf8(16)   notnull  -- RESEARCH, PILOT, PROD
+    column k_prev         Float64    notnull
+    column e_prev         Float64    notnull
+    column r_prev         Float64    notnull
+    column k_next         Float64    notnull
+    column e_next         Float64    notnull
+    column r_next         Float64    notnull
+    column residual_hex   Utf8(128)  notnull  -- links to ker_residual_window
+    column created_utc    Utf8(32)   notnull
+  endtable
+
+  constraint KERBounds
+    require k_prev >= 0.0
+    require k_prev <= 1.0
+    require e_prev >= 0.0
+    require e_prev <= 1.0
+    require r_prev >= 0.0
+    require r_prev <= 1.0
+    require k_next >= 0.0
+    require k_next <= 1.0
+    require e_next >= 0.0
+    require e_next <= 1.0
+    require r_next >= 0.0
+    require r_next <= 1.0
+  endconstraint
+
+  --------------------------------------------------------------------
+  -- 2. RESEARCH band constraint
+  --------------------------------------------------------------------
+
+  -- RESEARCH band B_RES: K,E >= 0.80, R <= 0.20.[4]
+  constraint ResearchBandPrev
+    require k_prev >= 0.80
+    require e_prev >= 0.80
+    require r_prev <= 0.20
+  endconstraint
+
+  constraint ResearchBandNext
+    require k_next >= 0.80
+    require e_next >= 0.80
+    require r_next <= 0.20
+  endconstraint
+
+  --------------------------------------------------------------------
+  -- 3. Monotone step directions inside B_RES
+  --------------------------------------------------------------------
+
+  -- Allowed step directions for shard promotions:
+  --   - K non-decreasing: k_next >= k_prev.
+  --   - E non-decreasing: e_next >= e_prev.
+  --   - R non-increasing: r_next <= r_prev.
+  -- This encodes that each promotion step is a monotone path segment
+  -- inside the RESEARCH band.[4]
+  obligation MonotoneStepDirections
+    forall path_id, step_index :
+      ker_path_step(path_id, step_index) as S
+    require S.k_next >= S.k_prev
+    require S.e_next >= S.e_prev
+    require S.r_next <= S.r_prev
+  endobligation
+
+  --------------------------------------------------------------------
+  -- 4. Lane promotion compatibility
+  --------------------------------------------------------------------
+
+  -- Lane transitions must respect KER thresholds:
+  --   RESEARCH: K,E>=0.80, R<=0.20
+  --   PILOT:    K,E>=0.80, R<=0.20 (same band, but different governance)
+  --   PROD:     K>=0.90, E>=0.90, R<=0.13.[4]
+  obligation LanePromotionCompatibility
+    forall path_id, step_index :
+      ker_path_step(path_id, step_index) as S
+    require inset(S.lane_prev, "RESEARCH","PILOT","PROD")
+    require inset(S.lane_next, "RESEARCH","PILOT","PROD")
+    -- RESEARCH -> RESEARCH or RESEARCH -> PILOT
+    require not (S.lane_prev = "RESEARCH" and S.lane_next = "PROD")
+    -- PROD band stricter thresholds
+    require not (S.lane_next = "PROD"
+                 and (S.k_next < 0.90 or S.e_next < 0.90 or S.r_next > 0.13))
+  endobligation
+
+  --------------------------------------------------------------------
+  -- 5. Path coherence: every path is a sequence of valid promotions
+  --------------------------------------------------------------------
+
+  table ker_path_summary
+    column path_id       Utf8(64)  notnull
+    column lane_start    Utf8(16)  notnull
+    column lane_end      Utf8(16)  notnull
+    column k_start       Float64   notnull
+    column e_start       Float64   notnull
+    column r_start       Float64   notnull
+    column k_end         Float64   notnull
+    column e_end         Float64   notnull
+    column r_end         Float64   notnull
+    column step_count    Int32     notnull
+    column created_utc   Utf8(32)  notnull
+  endtable
+
+  constraint SummaryBand
+    require k_start >= 0.80
+    require e_start >= 0.80
+    require r_start <= 0.20
+    require k_end   >= 0.80
+    require e_end   >= 0.80
+    require r_end   <= 0.20
+  endconstraint
+
+  -- Every path in B_RES must be representable as a sequence of monotone
+  -- shard promotions obeying LanePromotionCompatibility and
+  -- MonotoneStepDirections.[4]
+  obligation PathMonotoneInsideResearchBand
+    forall path_id :
+      ker_path_summary(path_id) as P
+    require P.step_count >= 1
+    -- Implicitly, each ker_path_step(path_id, step_index) must satisfy
+    -- MonotoneStepDirections and LanePromotionCompatibility.
+  endobligation
+
+  --------------------------------------------------------------------
+  -- 6. Non-regression coupling with Lyapunov residual
+  --------------------------------------------------------------------
+
+  -- Optional coupling: each step should also satisfy the non-regression
+  -- residual obligation (V_{t+1} <= V_t + epsilon).[4]
+  table ker_path_residual_link
+    column path_id        Utf8(64)   notnull
+    column step_index     Int32      notnull
+    column residual_prev_hex Utf8(128) notnull
+    column residual_next_hex Utf8(128) notnull
+  endtable
+
+  obligation NonRegressionPerStep
+    forall path_id, step_index :
+      ker_path_step(path_id, step_index) as S,
+      ker_path_residual_link(path_id, step_index) as L,
+      ker_residual_window(L.residual_prev_hex) as Wprev,
+      ker_residual_window(L.residual_next_hex) as Wnext
+    require Wnext.vt_residual <= Wprev.vt_residual + 0.000001
+  endobligation
+
+endschema
