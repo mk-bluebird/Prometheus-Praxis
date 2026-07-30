@@ -1,0 +1,82 @@
+!-- filename: ecorestorationshard/ecosafety_core_v2/aln/FederatedRLKER2026v1.aln
+!-- destination: ecorestorationshard/ecosafety_core_v2/aln/FederatedRLKER2026v1.aln
+!-- repo-target: https://github.com/mk-bluebird/Prometheus-Praxis
+
+alnversion 2.0
+
+schema FederatedRLKER2026v1
+  title "Federated RL Experience Sharing under KER and Non-Offsettable Constraints 2026 v1"
+  region "PHX-CAZ-CEIM"
+  domain "ECOSAFETY_CORE_V2"
+  subdomain "FEDERATED_RL_KER"
+  bostromdid "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+  logicalname "FederatedRLKER2026v1"
+  evidencehex "0x20260729PHXFederatedRLKER2026v1"
+
+  phoenixhexanchor
+    logicalname    "FederatedRLKER2026v1"
+    evidencehex    "0x20260729PHXFederatedRLKER2026v1"
+    domain         "ECOSAFETY_CORE_V2"
+    subdomain      "FEDERATED_RL_KER"
+    regioncode     "PHX-CAZ-CEIM"
+    planes         "ENERGY,HYDRAULICS,PFAS,COLD,BOD,TSS,CEC,CARBON,BIODIVERSITY,NEURORIGHTS,DATA,GOV"
+    yyyymmdd       "20260729"
+    signingdid     "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+    fileclass      "ALN"
+    defaultrelpath "ecorestorationshard/ecosafety_core_v2/aln"
+  endphoenixhexanchor
+
+  --------------------------------------------------------------------
+  -- 1. Local RL updates per governance particle
+  --------------------------------------------------------------------
+
+  table federated_rl_local_update
+    column particle_id     Utf8(64)  notnull
+    column update_id       Int32     notnull
+    column q_values_hash   Utf8(128) notnull  -- hash/commitment to local Q-values
+    column nonoffset_safe  Bool      notnull  -- true if non-offsettable planes respected
+    column evidence_hex    Utf8(128) notnull
+    column created_utc     Utf8(32)  notnull
+  endtable
+
+  constraint LocalUpdateBounds
+    require update_id >= 0
+  endconstraint
+
+  --------------------------------------------------------------------
+  -- 2. Federated aggregation snapshot
+  --------------------------------------------------------------------
+
+  table federated_rl_aggregate
+    column aggregate_id    Int32     notnull
+    column q_global_hash   Utf8(128) notnull  -- hash/commitment to aggregated Q-values
+    column sample_count    Int32     notnull  -- number of local updates included
+    column evidence_hex    Utf8(128) notnull
+    column created_utc     Utf8(32)  notnull
+  endtable
+
+  constraint AggregateBounds
+    require aggregate_id >= 0
+    require sample_count >= 0
+  endconstraint
+
+  --------------------------------------------------------------------
+  -- 3. Obligations: federated averaging preserves non-offsettable safety
+  --------------------------------------------------------------------
+
+  -- Only include local updates where non-offsettable planes were respected.
+  obligation FederatedRLNonOffsettableFilter
+    forall particle_id, update_id :
+      federated_rl_local_update(particle_id, update_id) as U
+    require U.nonoffset_safe = true
+  endobligation
+
+  -- Global aggregate must reflect the strongest penalties (not dilute them).
+  -- Conceptually: aggregated Q-values must not lower penalties on non-offsettable planes.
+  obligation FederatedRLPenaltyMonotonicity
+    forall aggregate_id :
+      federated_rl_aggregate(aggregate_id) as A
+    require A.sample_count >= 1
+  endobligation
+
+endschema
