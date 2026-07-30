@@ -1,0 +1,91 @@
+!-- filename: ecorestorationshard/ecosafety_core_v2/aln/BiodegradationBayes14851_2026v1.aln
+!-- destination: ecorestorationshard/ecosafety_core_v2/aln/BiodegradationBayes14851_2026v1.aln
+!-- repo-target: https://github.com/mk-bluebird/Prometheus-Praxis
+
+alnversion 2.0
+
+schema BiodegradationBayes14851_2026v1
+  title "Bayesian Hierarchical Biodegradation Model (ISO 14851) 2026 v1"
+  region "PHX-CAZ-CEIM"
+  domain "ECOSAFETY_CORE_V2"
+  subdomain "BIODEGRADATION_BAYES_14851"
+  bostromdid "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+  logicalname "BiodegradationBayes14851_2026v1"
+  evidencehex "0x20260729PHXBiodegradationBayes148512026v1"
+
+  phoenixhexanchor
+    logicalname    "BiodegradationBayes14851_2026v1"
+    evidencehex    "0x20260729PHXBiodegradationBayes148512026v1"
+    domain         "ECOSAFETY_CORE_V2"
+    subdomain      "BIODEGRADATION_BAYES_14851"
+    regioncode     "PHX-CAZ-CEIM"
+    planes         "PFAS,COLD,ENERGY,BIO,DATA,UNCERTAINTY"
+    yyyymmdd       "20260729"
+    signingdid     "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+    fileclass      "ALN"
+    defaultrelpath "ecorestorationshard/ecosafety_core_v2/aln"
+  endphoenixhexanchor
+
+  --------------------------------------------------------------------
+  -- 1. Hierarchical priors and segment-level parameters
+  --------------------------------------------------------------------
+
+  table bio14851_segment_params
+    column segment_id        Utf8(64)  notnull
+    column r_T               Float64   notnull  -- temperature risk coordinate
+    column log_k_deg_sample  Float64   notnull  -- posterior sample of log k_deg
+    column evidence_hex      Utf8(128) notnull
+    column created_utc       Utf8(32)  notnull
+  endtable
+
+  constraint TempRiskBounds
+    require r_T >= 0.0
+    require r_T <= 1.0
+  endconstraint
+
+  -- Hyperparameters (posterior samples) for μ and σ in LogNormal.
+  table bio14851_hyper_samples
+    column sample_id         Int32     notnull
+    column alpha_mu          Float64   notnull
+    column beta_mu           Float64   notnull
+    column sigma_log_k       Float64   notnull
+    column evidence_hex      Utf8(128) notnull
+    column created_utc       Utf8(32)  notnull
+  endtable
+
+  constraint HyperBounds
+    require sigma_log_k > 0.0
+  endconstraint
+
+  --------------------------------------------------------------------
+  -- 2. Winter vs summer posterior comparison
+  --------------------------------------------------------------------
+
+  table bio14851_winter_summer_prob
+    column segment_id        Utf8(64)  notnull
+    column r_T_winter        Float64   notnull
+    column r_T_summer        Float64   notnull
+    column prob_half_rate    Float64   notnull  -- P(k_winter < 0.5 k_summer)
+    column evidence_hex      Utf8(128) notnull
+    column created_utc       Utf8(32)  notnull
+  endtable
+
+  constraint WinterSummerTempBounds
+    require r_T_winter >= 0.0
+    require r_T_winter <= 1.0
+    require r_T_summer >= 0.0
+    require r_T_summer <= 1.0
+    require prob_half_rate >= 0.0
+    require prob_half_rate <= 1.0
+  endconstraint
+
+  -- Obligation: if prob_half_rate is high, winter corridors must be stricter.
+  obligation WinterRiskCorridorTightening
+    forall segment_id :
+      bio14851_winter_summer_prob(segment_id) as P
+    require not (P.prob_half_rate >= 0.8
+                 and P.r_T_winter > P.r_T_summer
+                 and P.evidence_hex = "")
+  endobligation
+
+endschema
