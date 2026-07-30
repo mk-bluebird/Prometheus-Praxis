@@ -1,0 +1,107 @@
+!-- filename: ecorestorationshard/ecosafety_core_v2/aln/PFASColdCryoLQR2026v1.aln
+!-- destination: ecorestorationshard/ecosafety_core_v2/aln/PFASColdCryoLQR2026v1.aln
+!-- repo-target: https://github.com/mk-bluebird/Prometheus-Praxis
+
+alnversion 2.0
+
+schema PFASColdCryoLQR2026v1
+  title "PFAS + Cold-Survival Cryoprotectant LQR Governance Particle 2026 v1"
+  region "PHX-CAZ-CEIM"
+  domain "ECOSAFETY_CORE_V2"
+  subdomain "PFAS_COLD_CRYO_LQR"
+  bostromdid "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+  logicalname "PFASColdCryoLQR2026v1"
+  evidencehex "0x20260729PHXPFASColdCryoLQR2026v1"
+
+  phoenixhexanchor
+    logicalname    "PFASColdCryoLQR2026v1"
+    evidencehex    "0x20260729PHXPFASColdCryoLQR2026v1"
+    domain         "ECOSAFETY_CORE_V2"
+    subdomain      "PFAS_COLD_CRYO_LQR"
+    regioncode     "PHX-CAZ-CEIM"
+    planes         "PFAS,COLD,ENERGY,DATA,UNCERTAINTY"
+    yyyymmdd       "20260729"
+    signingdid     "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+    fileclass      "ALN"
+    defaultrelpath "ecorestorationshard/ecosafety_core_v2/aln"
+  endphoenixhexanchor
+
+  --------------------------------------------------------------------
+  -- 1. Linearised PFAS + cold-survival state
+  --------------------------------------------------------------------
+
+  -- State x = [x_pf; x_cold] representing:
+  --   x_pf    ~ normalized PFAS risk coordinate r_pfas
+  --   x_cold  ~ cold-survival factor (higher -> slower degradation)[6]
+  table pfas_cold_state_linear
+    column segment_id   Utf8(64)  notnull
+    column a11          Float64   notnull
+    column a12          Float64   notnull
+    column a21          Float64   notnull
+    column a22          Float64   notnull
+    column b1           Float64   notnull
+    column b2           Float64   notnull
+    column evidence_hex Utf8(128) notnull
+    column created_utc  Utf8(32)  notnull
+  endtable
+
+  --------------------------------------------------------------------
+  -- 2. Quadratic cost weights (Q,R)
+  --------------------------------------------------------------------
+
+  table pfas_cold_cost_weights
+    column segment_id   Utf8(64)  notnull
+    column q_pf         Float64   notnull  -- weight on PFAS risk
+    column q_cold       Float64   notnull  -- weight on cold-survival deviation
+    column r_cryo       Float64   notnull  -- weight on cryoprotectant release
+    column evidence_hex Utf8(128) notnull
+    column created_utc  Utf8(32)  notnull
+  endtable
+
+  constraint CostBounds
+    require q_pf   > 0.0
+    require q_cold > 0.0
+    require r_cryo > 0.0
+  endconstraint
+
+  --------------------------------------------------------------------
+  -- 3. LQR value function structure
+  --------------------------------------------------------------------
+
+  -- For linear xdot = A x + B u and quadratic cost
+  --   J = ∫ (x^T Q x + u^T R u) dt,
+  -- the HJB reduces to an LQR problem with value function
+  --   V(x) = x^T P x,
+  -- where P solves the continuous-time algebraic Riccati equation.[256][265]
+  table pfas_cold_riccati_solution
+    column segment_id   Utf8(64)  notnull
+    column p11          Float64   notnull
+    column p12          Float64   notnull
+    column p21          Float64   notnull
+    column p22          Float64   notnull
+    column k1           Float64   notnull  -- feedback gain component
+    column k2           Float64   notnull
+    column evidence_hex Utf8(128) notnull
+    column created_utc  Utf8(32)  notnull
+  endtable
+
+  constraint ValueFunctionPositiveSemiDefinite
+    require p11 >= 0.0
+    require p22 >= 0.0
+  endconstraint
+
+  --------------------------------------------------------------------
+  -- 4. Optimal cryoprotectant release policy obligation
+  --------------------------------------------------------------------
+
+  -- Optimal control law u* = -R^{-1} B^T P x for LQR.[256][265]
+  obligation OptimalCryoPolicyStructure
+    forall segment_id :
+      pfas_cold_state_linear(segment_id) as S,
+      pfas_cold_cost_weights(segment_id) as W,
+      pfas_cold_riccati_solution(segment_id) as Rsol
+    require Rsol.k1 >= 0.0
+    require Rsol.k2 >= 0.0
+  endobligation
+
+endschema
