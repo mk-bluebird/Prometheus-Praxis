@@ -1,0 +1,116 @@
+!-- filename: ecorestorationshard/ecosafety_core_v2/aln/BioPHEcoController2026v1.aln
+!-- destination: ecorestorationshard/ecosafety_core_v2/aln/BioPHEcoController2026v1.aln
+!-- repo-target: https://github.com/mk-bluebird/Prometheus-Praxis
+
+alnversion 2.0
+
+schema BioPHEcoController2026v1
+  title "Bio-Cybernetic pH Eco-Controller (Algae) 2026 v1"
+  region "PHX-CAZ-CEIM"
+  domain "ECOSAFETY_CORE_V2"
+  subdomain "BIO_PH_ECO_CONTROLLER"
+  bostromdid "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+  logicalname "BioPHEcoController2026v1"
+  evidencehex "0x20260729PHXBioPHEcoController2026v1"
+
+  phoenixhexanchor
+    logicalname    "BioPHEcoController2026v1"
+    evidencehex    "0x20260729PHXBioPHEcoController2026v1"
+    domain         "ECOSAFETY_CORE_V2"
+    subdomain      "BIO_PH_ECO_CONTROLLER"
+    regioncode     "PHX-CAZ-CEIM"
+    planes         "PFAS,PH,ENERGY,BIO,DATA,UNCERTAINTY"
+    yyyymmdd       "20260729"
+    signingdid     "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+    fileclass      "ALN"
+    defaultrelpath "ecorestorationshard/ecosafety_core_v2/aln"
+  endphoenixhexanchor
+
+  --------------------------------------------------------------------
+  -- 1. Bio-controller static nonlinearity (algae response)
+  --------------------------------------------------------------------
+
+  -- Input: pH error or PFAS-derived signal e.
+  -- Output: algae "effort" u (e.g., biomass or metabolic activity).
+  table bio_ph_controller_static
+    column controller_id Utf8(64)  notnull
+    column k_gain        Float64   notnull  -- low-amplitude gain
+    column e_sat_pos     Float64   notnull  -- positive saturation threshold
+    column e_sat_neg     Float64   notnull  -- negative saturation threshold
+    column evidence_hex  Utf8(128) notnull
+    column created_utc   Utf8(32)  notnull
+  endtable
+
+  constraint StaticBounds
+    require k_gain    > 0.0
+    require e_sat_pos > 0.0
+    require e_sat_neg < 0.0
+  endconstraint
+
+  --------------------------------------------------------------------
+  -- 2. Describing function entries for amplitudes
+  --------------------------------------------------------------------
+
+  table bio_ph_describing_function
+    column controller_id Utf8(64)  notnull
+    column amplitude_A   Float64   notnull
+    column N_real        Float64   notnull  -- describing function gain
+    column N_imag        Float64   notnull  -- phase (for generality)
+    column evidence_hex  Utf8(128) notnull
+    column created_utc   Utf8(32)  notnull
+  endtable
+
+  constraint DFBounds
+    require amplitude_A >= 0.0
+  endconstraint
+
+  -- For quasi-static saturation-like nonlinearity, N_imag ~ 0 and
+  -- N_real decreases with A above saturation.[270][282]
+  obligation DescribingFunctionConsistency
+    forall controller_id, amplitude_A :
+      bio_ph_describing_function(controller_id, amplitude_A) as DF
+    require DF.N_real >= 0.0
+  endobligation
+
+  --------------------------------------------------------------------
+  -- 3. Plant pH dynamics (linear approximation)
+  --------------------------------------------------------------------
+
+  -- Canal reach pH dynamics G(s), approximated as first-order lag
+  -- with gain and time constant.
+  table canal_ph_plant
+    column reach_id      Utf8(64)  notnull
+    column gain_G        Float64   notnull
+    column tau_G         Float64   notnull  -- time constant (s)
+    column evidence_hex  Utf8(128) notnull
+    column created_utc   Utf8(32)  notnull
+  endtable
+
+  constraint PlantBounds
+    require gain_G > 0.0
+    require tau_G  > 0.0
+  endconstraint
+
+  --------------------------------------------------------------------
+  -- 4. Nyquist stability obligation (conceptual)
+  --------------------------------------------------------------------
+
+  -- Nyquist/DF condition: for amplitudes of interest, the point
+  -- -1/N(A) must not lead to unstable encirclements when combined
+  -- with G(jω).[280][272][276]
+  table bio_ph_stability_margin
+    column controller_id Utf8(64)  notnull
+    column reach_id      Utf8(64)  notnull
+    column amplitude_A   Float64   notnull
+    column margin_ok     Bool      notnull
+    column evidence_hex  Utf8(128) notnull
+    column created_utc   Utf8(32)  notnull
+  endtable
+
+  obligation NyquistStability
+    forall controller_id, reach_id, amplitude_A :
+      bio_ph_stability_margin(controller_id, reach_id, amplitude_A) as M
+    require M.margin_ok = true
+  endobligation
+
+endschema
