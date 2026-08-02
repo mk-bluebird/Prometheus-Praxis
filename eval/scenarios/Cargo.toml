@@ -1,0 +1,28 @@
+# Path: Prometheus-Praxis/eval/scenarios/Cargo.toml
+
+[package]
+name = "ppx-eval-scenarios"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+authors = ["Prometheus-Praxis <dev@prometheus-praxis.local>"]
+description = "Scenario-level evaluation crate for Prometheus-Praxis: arid city transferability configurations and research-object wiring."
+repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
+keywords = ["prometheus-praxis", "eval", "scenarios", "arid-city", "transferability", "phoenix"]
+
+[lib]
+name = "ppx_eval_scenarios"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[dependencies]
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
+
+# Internal dependencies wired consistently with eval/governance/cli.
+ppx-eval-rubric     = { path = "../../eval/rubric" }
+ppx-eval-components = { path = "../../eval/components" }
+
+[features]
+default = []
