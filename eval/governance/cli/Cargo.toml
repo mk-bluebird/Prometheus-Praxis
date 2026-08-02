@@ -2,18 +2,19 @@
 
 [package]
 name = "ppx-governance-cli"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
 authors = ["Prometheus-Praxis <dev@prometheus-praxis.local>"]
-description = "Governance CLI for Prometheus-Praxis: runs PhoenixStack evaluation, assembles SystemEvidence, and emits ALN for PhoenixEligibilityGate."
+description = "Governance CLI for Prometheus-Praxis: runs PhoenixStack evaluation, assembles SystemEvidence from config/flags, and emits ALN for PhoenixEligibilityGate."
 repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
 keywords = ["prometheus-praxis", "governance", "eligibility", "phoenix", "aln"]
 
 [dependencies]
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = { version = "1.0.120" }
+clap = { version = "4.5.4", features = ["derive"] }
 
 ppx-eval-rubric = { path = "../eval/rubric" }
 ppx-eval-components = { path = "../eval/components" }
