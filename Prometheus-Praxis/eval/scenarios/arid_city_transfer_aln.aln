@@ -1,0 +1,127 @@
+// Path: Prometheus-Praxis/eval/scenarios/arid_city_transfer_aln.aln
+// License: MIT OR Apache-2.0
+
+module AridCityTransferability {
+
+  dimension KnowledgeFactor;
+  dimension EcoImpact;
+  dimension RiskOfHarm;
+  dimension Robustness;
+  dimension Sovereignty;
+  dimension EnergyEfficiency;
+  dimension GovernanceAlignment;
+
+  city Phoenix {
+    archetype = "arid_urban_canyon";
+    monsoon_intensity_index = 0.85;
+    canyon_heat_gradient    = 0.90;
+    fog_channel_density      = 0.75;
+    industrial_waste_load    = 0.80;
+    sovereignty_weight       = 0.95;
+    energy_constraint        = 0.70;
+  }
+
+  city Tucson {
+    archetype = "arid_urban_canyon";
+    monsoon_intensity_index = 0.65;
+    canyon_heat_gradient    = 0.80;
+    fog_channel_density      = 0.60;
+    industrial_waste_load    = 0.55;
+    sovereignty_weight       = 0.90;
+    energy_constraint        = 0.65;
+  }
+
+  city LasVegas {
+    archetype = "hyper_arid_urban_basin";
+    monsoon_intensity_index = 0.40;
+    canyon_heat_gradient    = 0.95;
+    fog_channel_density      = 0.50;
+    industrial_waste_load    = 0.75;
+    sovereignty_weight       = 0.92;
+    energy_constraint        = 0.80;
+  }
+
+  city Albuquerque {
+    archetype = "semi_arid_plateau";
+    monsoon_intensity_index = 0.55;
+    canyon_heat_gradient    = 0.70;
+    fog_channel_density      = 0.65;
+    industrial_waste_load    = 0.60;
+    sovereignty_weight       = 0.93;
+    energy_constraint        = 0.60;
+  }
+
+  invariant CityAgnosticMechanisms {
+    holds_for = [
+      "PDE_advection_form",
+      "MARL_learning_rules",
+      "Streaming_abstractions"
+    ];
+    description = "Core dynamical and learning mechanisms are invariant across arid urban canyons with comparable heat and pollution profiles.";
+  }
+
+  invariant CityBoundParameters {
+    binds_to = [
+      "boundary_conditions",
+      "industrial_waste_streams",
+      "governance_parameters"
+    ];
+    description = "Deployment eligibility depends on city-specific boundary conditions and governance corridors.";
+  }
+
+  scenario PhoenixPrimary {
+    city = Phoenix;
+    role = "primary_deployment_evaluation";
+    scoring_dimensions = [
+      KnowledgeFactor,
+      EcoImpact,
+      RiskOfHarm,
+      Robustness,
+      Sovereignty,
+      EnergyEfficiency,
+      GovernanceAlignment
+    ];
+  }
+
+  scenario TucsonDiagnostic {
+    city = Tucson;
+    role = "transferability_diagnostic";
+    scoring_dimensions = [
+      KnowledgeFactor,
+      EcoImpact,
+      RiskOfHarm,
+      Robustness,
+      Sovereignty,
+      EnergyEfficiency,
+      GovernanceAlignment
+    ];
+  }
+
+  scenario LasVegasDiagnostic {
+    city = LasVegas;
+    role = "transferability_diagnostic";
+    scoring_dimensions = [
+      KnowledgeFactor,
+      EcoImpact,
+      RiskOfHarm,
+      Robustness,
+      Sovereignty,
+      EnergyEfficiency,
+      GovernanceAlignment
+    ];
+  }
+
+  scenario AlbuquerqueDiagnostic {
+    city = Albuquerque;
+    role = "transferability_diagnostic";
+    scoring_dimensions = [
+      KnowledgeFactor,
+      EcoImpact,
+      RiskOfHarm,
+      Robustness,
+      Sovereignty,
+      EnergyEfficiency,
+      GovernanceAlignment
+    ];
+  }
+}
