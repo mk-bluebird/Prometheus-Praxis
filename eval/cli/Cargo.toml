@@ -1,0 +1,23 @@
+# Path: Prometheus-Praxis/eval/cli/Cargo.toml
+
+[package]
+name = "ppx-eval-cli"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+authors = ["Prometheus-Praxis <dev@prometheus-praxis.local>"]
+description = "CLI tool for Prometheus-Praxis to print component evaluation matrices and Phoenix eligibility summaries."
+repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
+keywords = ["prometheus-praxis", "cli", "evaluation", "phoenix", "rubric"]
+
+[dependencies]
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
+
+ppx-eval-rubric = { path = "../rubric" }
+ppx-eval-components = { path = "../components" }
+
+[bin]
+name = "ppx-eval-cli"
+path = "src/main.rs"
