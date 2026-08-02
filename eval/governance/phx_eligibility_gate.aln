@@ -1,0 +1,198 @@
+// Path: Prometheus-Praxis/eval/governance/phx_eligibility_gate.aln
+// License: MIT OR Apache-2.0
+
+module PhoenixEligibilityGate {
+
+  dimension KnowledgeFactor;
+  dimension EcoImpact;
+  dimension RiskOfHarm;
+  dimension Robustness;
+  dimension Sovereignty;
+  dimension EnergyEfficiency;
+  dimension GovernanceAlignment;
+
+  status Eligible;
+  status NotEligible;
+  status Pilot;
+  status Experimental;
+
+  // ---------------------------------------------------------------------------
+  // Input projection from Rust side
+  // ---------------------------------------------------------------------------
+
+  // SystemProfile is a mirror of SevenDimProfile from ppx-eval-rubric.
+  record SystemProfile {
+    KnowledgeFactor     : float; // 0.0 .. 1.0
+    EcoImpact           : float;
+    RiskOfHarm          : float;
+    Robustness          : float;
+    Sovereignty         : float;
+    EnergyEfficiency    : float;
+    GovernanceAlignment : float;
+  }
+
+  // SystemEvidence bundles quantitative profile with qualitative governance metadata.
+  record SystemEvidence {
+    profile                  : SystemProfile;
+    domain_performance_ok    : bool;
+    safety_case_documented   : bool;
+    sovereignty_compliant    : bool;
+    energy_neutral_or_renew  : bool;
+    explainable_and_audited  : bool;
+  }
+
+  // Thresholds mirror PhoenixThresholds plus the five eligibility gates.
+  record PhoenixEligibilityThresholds {
+    component_min      : float;
+    system_min         : float;
+    max_risk_of_harm   : float;
+
+    // Gate 1: domain-specific performance for Phoenix.
+    require_domain_performance : bool;
+
+    // Gate 2: safety and reliability.
+    require_safety_case        : bool;
+
+    // Gate 3: data sovereignty and consent.
+    require_sovereignty_compliance : bool;
+
+    // Gate 4: energy neutrality / renewable-only.
+    require_energy_neutrality  : bool;
+
+    // Gate 5: transparency and explainability.
+    require_explainability     : bool;
+  }
+
+  thresholds PhoenixDefault {
+    component_min      = 0.75;
+    system_min         = 0.80;
+    max_risk_of_harm   = 0.25;
+
+    require_domain_performance     = true;
+    require_safety_case            = true;
+    require_sovereignty_compliance = true;
+    require_energy_neutrality      = true;
+    require_explainability         = true;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Invariants: five gates and seven-dimension minima
+  // ---------------------------------------------------------------------------
+
+  invariant Gate_PerDimensionMin(profile: SystemProfile, t: PhoenixEligibilityThresholds) {
+    holds when
+      profile.KnowledgeFactor     >= t.system_min &&
+      profile.EcoImpact           >= t.system_min &&
+      profile.RiskOfHarm          <= t.max_risk_of_harm &&
+      profile.Robustness          >= t.system_min &&
+      profile.Sovereignty         >= t.system_min &&
+      profile.EnergyEfficiency    >= t.system_min &&
+      profile.GovernanceAlignment >= t.system_min;
+    description = "All seven dimensions meet Phoenix system_min, and RiskOfHarm is <= max_risk_of_harm.";
+  }
+
+  invariant Gate_DomainPerformance(e: SystemEvidence, t: PhoenixEligibilityThresholds) {
+    holds when
+      (t.require_domain_performance == false) ||
+      (t.require_domain_performance == true && e.domain_performance_ok == true);
+    description = "Integrated system demonstrates statistically significant Phoenix-specific performance (DUSTIEAIM, pilot programs).";
+  }
+
+  invariant Gate_SafetyCase(e: SystemEvidence, t: PhoenixEligibilityThresholds) {
+    holds when
+      (t.require_safety_case == false) ||
+      (t.require_safety_case == true && e.safety_case_documented == true);
+    description = "Safety and reliability are documented via stress tests, adversarial scenarios, and an approved safety case.";
+  }
+
+  invariant Gate_Sovereignty(e: SystemEvidence, t: PhoenixEligibilityThresholds) {
+    holds when
+      (t.require_sovereignty_compliance == false) ||
+      (t.require_sovereignty_compliance == true && e.sovereignty_compliant == true);
+    description = "Architecture and operations comply with Arizona data sovereignty laws and Indigenous Data Sovereignty (e.g., Tohono O'odham Nation).";
+  }
+
+  invariant Gate_EnergyNeutrality(e: SystemEvidence, t: PhoenixEligibilityThresholds) {
+    holds when
+      (t.require_energy_neutrality == false) ||
+      (t.require_energy_neutrality == true && e.energy_neutral_or_renew == true);
+    description = "Total operational energy (compute + sensors) is offset by savings or fully powered by renewables, considering lifecycle where feasible.";
+  }
+
+  invariant Gate_Explainability(e: SystemEvidence, t: PhoenixEligibilityThresholds) {
+    holds when
+      (t.require_explainability == false) ||
+      (t.require_explainability == true && e.explainable_and_audited == true);
+    description = "MARL decision-making and system logic are explainable to governance bodies and public, aligned with NIST AI RMF and ISO 42001.";
+  }
+
+  // ---------------------------------------------------------------------------
+  // Eligibility decision logic
+  // ---------------------------------------------------------------------------
+
+  rule DecideStatus(e: SystemEvidence, t: PhoenixEligibilityThresholds) -> status {
+    when
+      Gate_PerDimensionMin(e.profile, t) &&
+      Gate_DomainPerformance(e, t) &&
+      Gate_SafetyCase(e, t) &&
+      Gate_Sovereignty(e, t) &&
+      Gate_EnergyNeutrality(e, t) &&
+      Gate_Explainability(e, t)
+    then Eligible;
+
+    else when
+      // If per-dimension minima fail, the stack is strictly NotEligible.
+      !Gate_PerDimensionMin(e.profile, t)
+    then NotEligible;
+
+    else when
+      // If some gates fail but the stack is under controlled, limited rollout,
+      // treat as Pilot or Experimental depending on governance decision.
+      Gate_PerDimensionMin(e.profile, t) &&
+      (
+        e.domain_performance_ok == false ||
+        e.safety_case_documented == false ||
+        e.sovereignty_compliant == false ||
+        e.energy_neutral_or_renew == false ||
+        e.explainable_and_audited == false
+      )
+    then Pilot;
+
+    else Experimental;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Current integrated system declaration (from the report)
+  // ---------------------------------------------------------------------------
+
+  // The report’s integrated assessment concludes the system is not yet Eligible.[130]
+  // We reflect that as an explicit, versioned declaration.
+
+  system PhoenixIntegratedV1 {
+    profile = SystemProfile {
+      // These placeholder values are conceptual; Rust will supply
+      // concrete numbers from SevenDimProfile at runtime.
+      KnowledgeFactor     = 0.85;
+      EcoImpact           = 0.82;
+      RiskOfHarm          = 0.40; // Above PhoenixDefault.max_risk_of_harm (0.25)
+      Robustness          = 0.80;
+      Sovereignty         = 0.78;
+      EnergyEfficiency    = 0.79;
+      GovernanceAlignment = 0.81;
+    };
+
+    evidence = SystemEvidence {
+      profile                  = profile;
+      domain_performance_ok    = false; // not yet verified against DUSTIEAIM and pilots.[130]
+      safety_case_documented   = false; // safety case not fully documented/reviewed.[130]
+      sovereignty_compliant    = false; // sovereignty compliance not yet formally proven.[130]
+      energy_neutral_or_renew  = false; // energy neutrality not yet demonstrated.[130]
+      explainable_and_audited  = false; // MARL explainability not yet fully established.[130]
+    };
+
+    thresholds = PhoenixDefault;
+
+    status = DecideStatus(evidence, thresholds); // yields NotEligible or Pilot depending on governance policy.
+  }
+
+}
