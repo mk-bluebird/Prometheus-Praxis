@@ -8,13 +8,14 @@ use ppx_eval_components::{
     AdvectionKernel, MarlArchitecture, PhoenixContext, PhoenixStack, StreamingPipeline,
     phoenix_component_matrix,
 };
-use ppx_eval_rubric::{profile_to_rows, ComponentEvaluable, Dimension, PhoenixThresholds};
+use ppx_eval_rubric::{
+    ComponentEvaluable, Dimension, PhoenixEligibilityThresholds, SevenDimProfile,
+    SystemEvidence, SystemEligibility, emit_aln_evidence, profile_to_rows,
+};
 
 fn main() {
-    // Phoenix context for this run.
     let ctx = PhoenixContext::phoenix_default();
 
-    // Instantiate the three components with reasonable placeholder metrics.
     let adv = AdvectionKernel {
         scheme_name: "upwind_cfl_safe".to_string(),
         cfl_safety_margin: 0.9,
@@ -42,10 +43,9 @@ fn main() {
         ctx,
     };
 
-    let thresholds = PhoenixThresholds::default();
+    let thresholds = PhoenixEligibilityThresholds::default();
     let stack = PhoenixStack::new(adv.clone(), marl.clone(), stream.clone(), thresholds);
 
-    // Phase A: comparative module matrix
     print_header();
     let matrix = phoenix_component_matrix(&adv, &marl, &stream);
     for (id, profile) in matrix.iter() {
@@ -53,7 +53,6 @@ fn main() {
     }
     print_footer();
 
-    // Phase B: integrated Phoenix eligibility
     let components: Vec<Box<dyn ComponentEvaluable>> =
         vec![Box::new(adv), Box::new(marl), Box::new(stream)];
 
@@ -70,6 +69,27 @@ fn main() {
     for (dim, value) in profile_to_rows(&eligibility.profile) {
         println!("  {:22} = {:.3}", dimension_name(dim), value);
     }
+
+    let system_id = "PhoenixIntegratedV1";
+    export_phoenix_stack_aln(system_id, &eligibility);
+}
+
+fn export_phoenix_stack_aln(system_id: &str, eligibility: &SystemEligibility) {
+    let thresholds = PhoenixEligibilityThresholds::default();
+
+    let evidence = SystemEvidence {
+        profile: eligibility.profile.clone(),
+        domain_performance_ok: false,
+        safety_case_documented: false,
+        sovereignty_compliant: false,
+        energy_neutral_or_renew: false,
+        explainable_and_audited: false,
+    };
+
+    let aln_text = emit_aln_evidence(system_id, &evidence, &thresholds);
+    println!();
+    println!("=== Phoenix Eligibility ALN Export ===");
+    println!("{}", aln_text);
 }
 
 fn print_header() {
@@ -89,7 +109,7 @@ fn print_header() {
     println!("{}", "-".repeat(20 + 3 + 8 * 3 + 10 + 12 + 10 + 20));
 }
 
-fn print_row(id: &str, profile: &ppx_eval_rubric::SevenDimProfile) {
+fn print_row(id: &str, profile: &SevenDimProfile) {
     println!(
         "{:<20} | {:>8.3} {:>8.3} {:>8.3} {:>10.3} {:>12.3} {:>10.3} {:>20.3}",
         id,
