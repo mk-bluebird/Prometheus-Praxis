@@ -7,13 +7,15 @@
 use serde::{Deserialize, Serialize};
 
 use ppx_eval_rubric::{
-    ComponentEvaluable, PhoenixThresholds, Score, SevenDimProfile, SystemEligibility,
+    ComponentEvaluable,
+    PhoenixEligibilityThresholds,
+    Score,
+    SevenDimProfile,
+    SystemEligibility,
     SystemEvaluable,
+    SystemEvidence,
 };
 
-/// Phoenix-specific configuration context used by all three components.
-/// This binds climatic, geometric, industrial, and governance parameters
-/// into a single structure so scenarios can be swapped in a controlled way.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PhoenixContext {
     pub monsoon_intensity_index: f32,
@@ -37,9 +39,6 @@ impl PhoenixContext {
     }
 }
 
-/// Advection kernel descriptor for Phoenix.
-/// Evaluated on numerical stability, physical fidelity, eco-restoration leverage,
-/// robustness, sovereignty, and energy efficiency.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AdvectionKernel {
     pub scheme_name: String,
@@ -56,43 +55,22 @@ impl ComponentEvaluable for AdvectionKernel {
     }
 
     fn evaluate_component(&self) -> SevenDimProfile {
-        let knowledge = Score(
-            0.5 + 0.5 * self.physical_fidelity_index.max(0.0).min(1.0),
-        );
+        let fidelity = self.physical_fidelity_index.max(0.0).min(1.0);
+        let cfl = self.cfl_safety_margin.max(0.0).min(1.0);
+        let restored = self.restored_flow_ratio.max(0.0).min(1.0);
+        let num_rob = self.numerical_robustness_index.max(0.0).min(1.0);
+        let fog = self.ctx.fog_channel_density.max(0.0).min(1.0);
+        let monsoon = self.ctx.monsoon_intensity_index.max(0.0).min(1.0);
+        let sov = self.ctx.sovereignty_weight.max(0.0).min(1.0);
+        let energy = self.ctx.energy_constraint.max(0.0).min(1.0);
 
-        let eco = Score(
-            (self.restored_flow_ratio.max(0.0).min(1.0) * 0.7
-                + self.ctx.fog_channel_density.max(0.0).min(1.0) * 0.3)
-                .min(1.0),
-        );
-
-        let risk = Score(
-            (1.0 - self.cfl_safety_margin.max(0.0).min(1.0)) * 0.5
-                + (1.0 - self.numerical_robustness_index.max(0.0).min(1.0)) * 0.5,
-        )
-        .clamp();
-
-        let robustness = Score(
-            0.5 * self.numerical_robustness_index.max(0.0).min(1.0)
-                + 0.5
-                    * (1.0
-                        - self.ctx.monsoon_intensity_index.max(0.0).min(1.0) * 0.2),
-        );
-
-        let sovereignty = Score(
-            0.8 * self.ctx.sovereignty_weight.max(0.0).min(1.0)
-                + 0.2 * self.physical_fidelity_index.max(0.0).min(1.0),
-        );
-
-        let energy_eff = Score(
-            (1.0 - self.ctx.energy_constraint.max(0.0).min(1.0)) * 0.7
-                + 0.3 * self.numerical_robustness_index.max(0.0).min(1.0),
-        );
-
-        let governance = Score(
-            0.7 * self.ctx.sovereignty_weight.max(0.0).min(1.0)
-                + 0.3 * self.physical_fidelity_index.max(0.0).min(1.0),
-        );
+        let knowledge = Score(0.5 + 0.5 * fidelity);
+        let eco = Score(restored * 0.7 + fog * 0.3);
+        let risk = Score((1.0 - cfl) * 0.5 + (1.0 - num_rob) * 0.5).clamp();
+        let robustness = Score(0.5 * num_rob + 0.5 * (1.0 - monsoon * 0.2));
+        let sovereignty = Score(0.8 * sov + 0.2 * fidelity);
+        let energy_eff = Score((1.0 - energy) * 0.7 + 0.3 * num_rob);
+        let governance = Score(0.7 * sov + 0.3 * fidelity);
 
         SevenDimProfile {
             knowledge_factor: knowledge.clamp(),
@@ -106,9 +84,6 @@ impl ComponentEvaluable for AdvectionKernel {
     }
 }
 
-/// MARL architecture descriptor for Phoenix.
-/// Evaluated on policy alignment, rogue-pattern resilience, multi-actor dynamics,
-/// consent corridors, sovereignty, and governance alignment.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MarlArchitecture {
     pub policy_alignment_index: f32,
@@ -125,41 +100,20 @@ impl ComponentEvaluable for MarlArchitecture {
     }
 
     fn evaluate_component(&self) -> SevenDimProfile {
-        let knowledge = Score(
-            0.5 * self.policy_alignment_index.max(0.0).min(1.0)
-                + 0.5 * self.multi_actor_scalability.max(0.0).min(1.0),
-        );
+        let policy = self.policy_alignment_index.max(0.0).min(1.0);
+        let rogue = self.rogue_pattern_resilience.max(0.0).min(1.0);
+        let multi = self.multi_actor_scalability.max(0.0).min(1.0);
+        let consent = self.consent_corridor_strength.max(0.0).min(1.0);
+        let core = self.cybercore_binding_strength.max(0.0).min(1.0);
+        let energy = self.ctx.energy_constraint.max(0.0).min(1.0);
 
-        let eco = Score(
-            0.6 * self.policy_alignment_index.max(0.0).min(1.0)
-                + 0.4 * self.rogue_pattern_resilience.max(0.0).min(1.0),
-        );
-
-        let risk = Score(
-            (1.0 - self.rogue_pattern_resilience.max(0.0).min(1.0)) * 0.6
-                + (1.0 - self.consent_corridor_strength.max(0.0).min(1.0)) * 0.4,
-        )
-        .clamp();
-
-        let robustness = Score(
-            0.5 * self.rogue_pattern_resilience.max(0.0).min(1.0)
-                + 0.5 * self.multi_actor_scalability.max(0.0).min(1.0),
-        );
-
-        let sovereignty = Score(
-            0.5 * self.consent_corridor_strength.max(0.0).min(1.0)
-                + 0.5 * self.cybercore_binding_strength.max(0.0).min(1.0),
-        );
-
-        let energy_eff = Score(
-            (1.0 - self.ctx.energy_constraint.max(0.0).min(1.0)) * 0.5
-                + 0.5 * self.multi_actor_scalability.max(0.0).min(1.0),
-        );
-
-        let governance = Score(
-            0.7 * self.cybercore_binding_strength.max(0.0).min(1.0)
-                + 0.3 * self.policy_alignment_index.max(0.0).min(1.0),
-        );
+        let knowledge = Score(0.5 * policy + 0.5 * multi);
+        let eco = Score(0.6 * policy + 0.4 * rogue);
+        let risk = Score((1.0 - rogue) * 0.6 + (1.0 - consent) * 0.4).clamp();
+        let robustness = Score(0.5 * rogue + 0.5 * multi);
+        let sovereignty = Score(0.5 * consent + 0.5 * core);
+        let energy_eff = Score((1.0 - energy) * 0.5 + 0.5 * multi);
+        let governance = Score(0.7 * core + 0.3 * policy);
 
         SevenDimProfile {
             knowledge_factor: knowledge.clamp(),
@@ -173,9 +127,6 @@ impl ComponentEvaluable for MarlArchitecture {
     }
 }
 
-/// Streaming pipeline descriptor for Phoenix.
-/// Evaluated on latency, failure handling, data sovereignty, biosignal integration,
-/// energy efficiency, robustness, and governance alignment.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StreamingPipeline {
     pub end_to_end_latency_ms: f32,
@@ -192,42 +143,21 @@ impl ComponentEvaluable for StreamingPipeline {
     }
 
     fn evaluate_component(&self) -> SevenDimProfile {
-        let latency_score = (1.0
-            - (self.end_to_end_latency_ms / 1000.0).max(0.0).min(1.0))
-            .max(0.0);
+        let latency_score =
+            (1.0 - (self.end_to_end_latency_ms / 1000.0).max(0.0).min(1.0)).max(0.0);
+        let failure = self.failure_recovery_index.max(0.0).min(1.0);
+        let data_sov = self.data_sovereignty_index.max(0.0).min(1.0);
+        let energy_cost = self.energy_cost_per_event.max(0.0).min(1.0);
+        let bio = self.biosignal_integration_index.max(0.0).min(1.0);
+        let energy = self.ctx.energy_constraint.max(0.0).min(1.0);
 
-        let knowledge = Score(
-            0.5 * latency_score
-                + 0.5 * self.biosignal_integration_index.max(0.0).min(1.0),
-        );
-
-        let eco = Score(
-            (1.0 - self.energy_cost_per_event.max(0.0).min(1.0)) * 0.6
-                + 0.4 * self.failure_recovery_index.max(0.0).min(1.0),
-        );
-
-        let risk = Score(
-            (1.0 - self.failure_recovery_index.max(0.0).min(1.0)) * 0.5
-                + (1.0 - self.data_sovereignty_index.max(0.0).min(1.0)) * 0.5,
-        )
-        .clamp();
-
-        let robustness = Score(
-            0.6 * self.failure_recovery_index.max(0.0).min(1.0)
-                + 0.4 * latency_score,
-        );
-
-        let sovereignty = Score(self.data_sovereignty_index.max(0.0).min(1.0));
-
-        let energy_eff = Score(
-            (1.0 - self.energy_cost_per_event.max(0.0).min(1.0)) * 0.8
-                + 0.2 * self.ctx.energy_constraint.max(0.0).min(1.0),
-        );
-
-        let governance = Score(
-            0.6 * self.data_sovereignty_index.max(0.0).min(1.0)
-                + 0.4 * self.failure_recovery_index.max(0.0).min(1.0),
-        );
+        let knowledge = Score(0.5 * latency_score + 0.5 * bio);
+        let eco = Score((1.0 - energy_cost) * 0.6 + 0.4 * failure);
+        let risk = Score((1.0 - failure) * 0.5 + (1.0 - data_sov) * 0.5).clamp();
+        let robustness = Score(0.6 * failure + 0.4 * latency_score);
+        let sovereignty = Score(data_sov);
+        let energy_eff = Score((1.0 - energy_cost) * 0.8 + 0.2 * energy);
+        let governance = Score(0.6 * data_sov + 0.4 * failure);
 
         SevenDimProfile {
             knowledge_factor: knowledge.clamp(),
@@ -241,15 +171,12 @@ impl ComponentEvaluable for StreamingPipeline {
     }
 }
 
-/// Integrated Phoenix stack tying together the three components.
-/// This struct is used for Phase B (system-level eligibility) on top of
-/// Phase A (per-component profiles).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PhoenixStack {
     pub advection: AdvectionKernel,
     pub marl: MarlArchitecture,
     pub streaming: StreamingPipeline,
-    pub thresholds: PhoenixThresholds,
+    pub thresholds: PhoenixEligibilityThresholds,
 }
 
 impl PhoenixStack {
@@ -257,7 +184,7 @@ impl PhoenixStack {
         advection: AdvectionKernel,
         marl: MarlArchitecture,
         streaming: StreamingPipeline,
-        thresholds: PhoenixThresholds,
+        thresholds: PhoenixEligibilityThresholds,
     ) -> Self {
         PhoenixStack {
             advection,
@@ -326,14 +253,33 @@ impl SystemEvaluable<Box<dyn ComponentEvaluable>> for PhoenixStack {
             ),
         };
 
+        // Governance flags should be set by higher-level tooling once evidence is available.
+        let evidence = SystemEvidence {
+            profile: aggregated.clone(),
+            domain_performance_ok: false,
+            safety_case_documented: false,
+            sovereignty_compliant: false,
+            energy_neutral_or_renew: false,
+            explainable_and_audited: false,
+        };
+
         let eligible = aggregated.satisfies_threshold(self.thresholds.system_min)
             && aggregated.risk_of_harm.0 <= self.thresholds.max_risk_of_harm
-            && notes.is_empty();
+            && notes.is_empty()
+            && evidence.domain_performance_ok
+            && evidence.safety_case_documented
+            && evidence.sovereignty_compliant
+            && evidence.energy_neutral_or_renew
+            && evidence.explainable_and_audited;
 
         if !eligible {
-            notes.push_str("Integrated stack failed Phoenix eligibility thresholds.\n");
+            notes.push_str(
+                "Integrated stack failed Phoenix eligibility thresholds and/or governance gates.\n",
+            );
         } else {
-            notes.push_str("Integrated stack passes Phoenix eligibility thresholds.\n");
+            notes.push_str(
+                "Integrated stack passes Phoenix eligibility thresholds and governance gates.\n",
+            );
         }
 
         SystemEligibility {
@@ -344,9 +290,6 @@ impl SystemEvaluable<Box<dyn ComponentEvaluable>> for PhoenixStack {
     }
 }
 
-/// Helper to build a comparative module matrix for Phoenix.
-/// Returns the three SevenDimProfile rows (advection, MARL, streaming)
-/// that you can render as a table in tooling.
 pub fn phoenix_component_matrix(
     advection: &AdvectionKernel,
     marl: &MarlArchitecture,
