@@ -1,0 +1,37 @@
+{
+  "city": "Phoenix-AZ",
+  "dataset": "LANDSAT/LC08/C02/T1_L2",
+  "season": "2020-Summer",
+  "hex_grid_ref": "city_os/phoenix/hex_grid/v1",
+  "regression_method": "ridge_UHI_vs_NDVI_NDBI_NDWI",
+  "parameters": {
+    "alpha": {
+      "estimate": -3.2,
+      "ci_low": -4.0,
+      "ci_high": -2.5,
+      "units": "degC_per_unit_NDVI"
+    },
+    "beta": {
+      "estimate": 2.1,
+      "ci_low": 1.5,
+      "ci_high": 2.8,
+      "units": "degC_per_unit_NDBI"
+    },
+    "gamma": {
+      "estimate": -1.4,
+      "ci_low": -2.0,
+      "ci_high": -0.8,
+      "units": "degC_per_unit_NDWI"
+    }
+  },
+  "model_metrics": {
+    "r2": 0.68,
+    "rmse_degC": 1.7,
+    "n_hex_train": 1200,
+    "n_hex_valid": 300
+  },
+  "rural_reference": {
+    "lst_c_median": 36.5,
+    "selection_rule": "NDBI < 0.0 AND NDVI between 0.1 and 0.3"
+  }
+}
