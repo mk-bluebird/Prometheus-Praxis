@@ -40,6 +40,7 @@ members = [
     "crates/aln-cyboquatic-codegen",
     "city_os/phoenix/heat_island",
     "src/urban_climate/evaluation",
+    "eval/components",
 
     # eco_wealth standalone crate
     "eco_wealth",
