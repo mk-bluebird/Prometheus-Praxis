@@ -3,7 +3,9 @@
 `ppx-governance-cli` is the governance command-line interface for Prometheus-Praxis. It couples the technical evaluation of the Phoenix environmental stack (advection kernel, MARL architecture, streaming pipeline) to the ALN governance module `PhoenixEligibilityGate` and emits an ALN evidence block that encodes both:
 
 - Seven-dimension system scores, and
-- Five governance gates required for Phoenix “Eligible” status.[130]
+- Five governance gates required for Phoenix "Eligible" status.[130]
+
+> **Note:** This crate is wired for governance logic and ALN emission. Do not run `cargo` commands or install new tools as part of this workflow; use existing tooling only.
 
 The tool is designed to keep the **official deployment status** of any stack aligned with:
 
@@ -94,18 +96,17 @@ to return one of: `Eligible`, `NotEligible`, `Pilot`, or `Experimental`.
 
 ## Usage
 
-From `Prometheus-Praxis/eval/governance/cli`:
+This crate is intended to be built and executed in an appropriate Rust environment. Example invocation patterns (conceptual):
 
-```bash
+```text
 # Initial run (no evidence, all gates default false).
-cargo run --bin ppx-governance-cli
+ppx-governance-cli
 
 # Run with a governance config file.
-cargo run --bin ppx-governance-cli -- --config phx_evidence.json
+ppx-governance-cli --config phx_evidence.json
 
 # Run with config plus overrides once specific gates are proven.
-cargo run --bin ppx-governance-cli \
-  -- \
+ppx-governance-cli \
   --config phx_evidence.json \
   --safety-ok \
   --sovereignty-ok \

@@ -16,8 +16,8 @@ serde = { version = "1.0.203", features = ["derive"] }
 serde_json = { version = "1.0.120" }
 clap = { version = "4.5.4", features = ["derive"] }
 
-ppx-eval-rubric = { path = "../eval/rubric" }
-ppx-eval-components = { path = "../eval/components" }
+ppx-eval-rubric = { path = "../../eval/rubric" }
+ppx-eval-components = { path = "../../eval/components" }
 
 [bin]
 name = "ppx-governance-cli"
