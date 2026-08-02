@@ -39,6 +39,7 @@ members = [
     "crates/prometheus_praxis_sdk",
     "crates/aln-cyboquatic-codegen",
     "city_os/phoenix/heat_island",
+    "src/urban_climate/evaluation",
 
     # eco_wealth standalone crate
     "eco_wealth",
