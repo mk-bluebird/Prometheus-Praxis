@@ -4,62 +4,162 @@ shard UrbanPhoenixEnvelopes2026v1 {
         context         = "PrometheusPraxisPhoenixAridUrbanHeatAirWater";
         created-at-utc  = "2026-08-02T00:00:00Z";
         author-did      = "bostaln18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7";
-        governance-ref  = "2b586028-a87b-4194-93b8-f5794c194e8a.md";   // Verifying the Verifiers.[8]
-        ecology-ref     = "e4ba68f5-edd6-438f-8dff-822a2527b867.md";   // Soil/Biodiversity corridor shard.[48]
+        governance-ref  = "2b586028-a87b-4194-93b8-f5794c194e8a.md";
+        ecology-ref     = "e4ba68f5-edd6-438f-8dff-822a2527b867.md";
     }
-
-    // --- 1. UrbanHeatEnvelopePhoenix2026v1.schema ---
 
     schema UrbanHeatEnvelopePhoenix2026v1 {
-        tile-id                : string;   // aligns with CorridorEnvelope.tile-id.[48]
-        sampled-at-utc         : datetime; // ISO-8601 UTC timestamp.
+        tile-id                       : string;
+        sampled-at-utc                : datetime;
 
-        // Physical heat metrics per tile
-        air-temp-c             : f32;      // canopy-layer air temperature (2 m) in °C.
-        mrt-c                  : f32;      // mean radiant temperature in °C.
-        lst-c                  : f32;      // land surface temperature in °C.
-        uhi-intensity-c        : f32;      // local Urban Heat Island intensity vs rural baseline.
+        air-temp-c                    : f32;
+        mrt-c                         : f32;
+        lst-c                         : f32;
+        uhi-intensity-c               : f32;
 
-        // Governance risk coordinates (Lyapunov/KER planes)
-        heat-risk-coordinate   : f32;      // r_heat \in [0,1], normalized heat risk plane.[8]
-        roh-contribution       : f32;      // contribution of heat to RoH scalar \in [0,1].[8]
-        ecoimpact-heat-score   : f32;      // EcoImpact component from heat (E plane).[8]
+        heat-risk-coordinate          : f32;
+        roh-contribution              : f32;
+        ecoimpact-heat-score          : f32;
 
-        // Corridor bindings (local constraints)
-        safe-heat-max-c        : f32;      // from LocalConstraintWindow.safe-heat-max-c.[48]
-        safe-heat-window-start-utc : datetime; // LocalConstraintWindow.safe-heat-window-start-utc.[48]
-        safe-heat-window-end-utc   : datetime; // LocalConstraintWindow.safe-heat-window-end-utc.[48]
+        safe-heat-max-c               : f32;
+        safe-heat-window-start-utc    : datetime;
+        safe-heat-window-end-utc      : datetime;
 
-        // Provenance and governance context
-        sensor-source          : string;   // MaRTy, weather station, satellite source ID.
-        eco-safety-envelope-id : string;   // reference to EcoSafetyEnvelopePhoenix2026v1 (governance spine).[8]
-        ker-envelope-id        : string;   // KEREnvelope binding.
-        roh-envelope-id        : string;   // RoHEnvelope binding.
+        sensor-source                 : string;
+        eco-safety-envelope-id        : string;
+        ker-envelope-id               : string;
+        roh-envelope-id               : string;
     }
 
-    invariant UrbanHeatSafetyInvariant {
+    invariant UrbanHeatSafetyInvariantPhoenix2026v1 {
         input : UrbanHeatEnvelopePhoenix2026v1;
 
-        // Heat corridor safety: enforce local physical bounds.
         require input.air-temp-c <= input.safe-heat-max-c;
-        require input.mrt-c      <= input.safe-heat-max-c + 5.0; // example margin, adjustable.
+        require input.mrt-c      <= input.safe-heat-max-c + 5.0;
 
-        // Heat risk coordinate must stay within [0,1].
         require 0.0 <= input.heat-risk-coordinate <= 1.0;
-
-        // RoH contribution from heat must not breach global RoH ceiling (e.g., 0.30).[8]
         require input.roh-contribution <= 0.30;
     }
 
     policy BindUrbanHeatToLyapunovPhoenix2026v1 {
         input  : UrbanHeatEnvelopePhoenix2026v1;
-        effect : LyapunovUpdate; // conceptual binding to LyapunovEnvelope.[8]
+        effect : LyapunovUpdate;
 
-        // Map heat risk coordinate into Lyapunov plane term V_heat = w_heat * r_heat^2.
         emit LyapunovUpdate {
-            plane-id    = "HEAT_PHOENIX_2026";
-            coordinate  = input.heat-risk-coordinate;
-            weight      = 1.0;   // weight tuning; see governance spine.[8]
+            plane-id   = "HEAT_PHOENIX_2026";
+            coordinate = input.heat-risk-coordinate;
+            weight     = 1.0;
         };
+    }
+
+    schema AirQualityPlanePhoenix2026v1 {
+        tile-id                 : string;
+        sampled-at-utc          : datetime;
+
+        ozone-ppb               : f32;
+        pm25-ug-per-m3          : f32;
+        pm10-ug-per-m3          : f32;
+        nox-ppb                 : f32;
+
+        air-risk-coordinate     : f32;
+        ecoimpact-air-score     : f32;
+        roh-contribution        : f32;
+
+        ozone-max-ppb           : f32;
+        pm25-max-ug-per-m3      : f32;
+        pm10-max-ug-per-m3      : f32;
+
+        sensor-source           : string;
+        eco-safety-envelope-id  : string;
+        ker-envelope-id         : string;
+        roh-envelope-id         : string;
+    }
+
+    invariant AirQualitySafetyInvariantPhoenix2026v1 {
+        input : AirQualityPlanePhoenix2026v1;
+
+        require input.ozone-ppb        <= input.ozone-max-ppb;
+        require input.pm25-ug-per-m3   <= input.pm25-max-ug-per-m3;
+        require input.pm10-ug-per-m3   <= input.pm10-max-ug-per-m3;
+
+        require 0.0 <= input.air-risk-coordinate <= 1.0;
+        require input.roh-contribution <= 0.30;
+    }
+
+    policy BindAirQualityToLyapunovPhoenix2026v1 {
+        input  : AirQualityPlanePhoenix2026v1;
+        effect : LyapunovUpdate;
+
+        emit LyapunovUpdate {
+            plane-id   = "AIR_QUALITY_PHOENIX_2026";
+            coordinate = input.air-risk-coordinate;
+            weight     = 1.0;
+        };
+    }
+
+    schema WaterFluxCoordinatePhoenix2026v1 {
+        tile-id                     : string;
+        sampled-at-utc              : datetime;
+
+        surface-water-flux-l-per-s  : f32;
+        infiltration-rate-mm-per-h  : f32;
+        cyboquatic-channel-state    : string;
+
+        soil-salinity-ds-per-m      : f32;
+        contaminants-index          : f32;
+        soil-moisture-pct           : f32;
+
+        water-risk-coordinate       : f32;
+        ecoimpact-water-score       : f32;
+        roh-contribution            : f32;
+
+        salinity-max-ds-per-m       : f32;
+        contaminants-max-index      : f32;
+        soilsync-run-id             : string;
+        soilsync-sla-breached       : bool;
+
+        sensor-source               : string;
+        eco-safety-envelope-id      : string;
+        ker-envelope-id             : string;
+        roh-envelope-id             : string;
+    }
+
+    invariant WaterFluxSafetyInvariantPhoenix2026v1 {
+        input : WaterFluxCoordinatePhoenix2026v1;
+
+        require input.soil-salinity-ds-per-m <= input.salinity-max-ds-per-m;
+        require input.contaminants-index     <= input.contaminants-max-index;
+
+        require (not input.soilsync-sla-breached) or (input.water-risk-coordinate >= 0.5);
+
+        require 0.0 <= input.water-risk-coordinate <= 1.0;
+        require input.roh-contribution <= 0.30;
+    }
+
+    policy BindWaterFluxToLyapunovPhoenix2026v1 {
+        input  : WaterFluxCoordinatePhoenix2026v1;
+        effect : LyapunovUpdate;
+
+        emit LyapunovUpdate {
+            plane-id   = "WATER_FOG_PHOENIX_2026";
+            coordinate = input.water-risk-coordinate;
+            weight     = 1.0;
+        };
+    }
+
+    policy BlockNewTasksOnWaterOutOfCorridorPhoenix2026v1 {
+        input  : WaterFluxCoordinatePhoenix2026v1;
+        effect : list<RestorationTaskUpdate>;
+
+        if input.contaminants-index > input.contaminants-max-index
+           or input.soil-salinity-ds-per-m > input.salinity-max-ds-per-m
+           or input.soilsync-sla-breached == true
+        {
+            emit RestorationTaskUpdate {
+                tile-id   = input.tile-id;
+                new-state = enum {Planned, Queued, PreflightRejected}.PreflightRejected;
+                reason    = "WaterOutOfCorridorOrSoilSLA";
+            };
+        }
     }
 }
