@@ -69,3 +69,47 @@ pub fn water_priority(params: &CalibrationParams, metrics: &HexMetrics) -> f64 {
         * params.gamma.estimate.abs()
         * metrics.hydrology_feasibility
 }
+
+#[cfg(kani)]
+mod verification {
+    use super::*;
+
+    #[kani::proof]
+    fn tree_priority_non_negative() {
+        let params = CalibrationParams {
+            alpha: ParameterEstimate {
+                estimate: -3.0,
+                ci_low: -4.0,
+                ci_high: -2.0,
+                units: "degC_per_unit_NDVI",
+            },
+            beta: ParameterEstimate {
+                estimate: 2.0,
+                ci_low: 1.0,
+                ci_high: 3.0,
+                units: "degC_per_unit_NDBI",
+            },
+            gamma: ParameterEstimate {
+                estimate: -1.5,
+                ci_low: -2.0,
+                ci_high: -1.0,
+                units: "degC_per_unit_NDWI",
+            },
+        };
+
+        let metrics = HexMetrics {
+            hex_id: String::from("hex-test"),
+            uhi: 5.0,
+            ndvi: 0.1,
+            ndbi: 0.3,
+            ndwi: 0.0,
+            roof_area_fraction: 0.5,
+            feasible_tree_factor: 0.8,
+            hydrology_feasibility: 0.6,
+        };
+
+        let ndvi_target_max = 0.4;
+        let score = tree_priority(&params, &metrics, ndvi_target_max);
+        kani::assert!(score >= 0.0);
+    }
+}
