@@ -41,6 +41,7 @@ members = [
     "city_os/phoenix/heat_island",
     "src/urban_climate/evaluation",
     "eval/components",
+    "eval/rubric",
 
     # eco_wealth standalone crate
     "eco_wealth",
