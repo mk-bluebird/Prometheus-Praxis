@@ -107,7 +107,7 @@ HexIndex hex_parent(const HexIndex& child, uint8_t levels_up) {
     return {idx_p};
 }
 
-int main_hex_index() {
+int run_hex_index_demo() {
     double utm_e = 410000.0;
     double utm_n = 3725000.0;
     uint8_t R = 6;
