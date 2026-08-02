@@ -43,6 +43,7 @@ members = [
     "eval/components",
     "eval/rubric",
     "eval/cli",
+    "eval/governance/cli",
 
     # eco_wealth standalone crate
     "eco_wealth",
