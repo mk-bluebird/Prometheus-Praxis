@@ -15,7 +15,7 @@ Prometheus‑Praxis exists to:
   - SQLite and SQL governance spines,
   - ALN governance and particle definitions,
   - CI/validation pipelines and MCP wiring.
-- Orchestrate **eco_restoration_shard** and satellite repos (Cyboquatics, Cybercore, Augmented‑Citizen, nanorobotics, Data_Lake, BLE‑Code) into a coherent city‑OS tree.
+- Orchestrate **eco_restoration_shard** and satellite repos (Cyboquatics, Cybercore, Augmented‑Citizen, Nano-Tree, Data_Lake, BLE‑Code) into a coherent city‑OS tree.
 - Provide **diagnostic and planning superpowers**, never unilateral control:
   - Ecosafety envelopes and Lyapunov residuals for water, heat, waste, and air.
   - Reward and KER scoring that remain non‑fungible and tied to public benefit.
