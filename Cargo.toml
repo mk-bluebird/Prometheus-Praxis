@@ -172,6 +172,7 @@ members = [
     "crates/eco-bee-corridor-envelope",
     "crates/beecorridor-ledger",
     "crates/eco-net-bee",
+    "crates/materials-eco-knowledge-labeller"
 ]
 
 resolver = "2"
