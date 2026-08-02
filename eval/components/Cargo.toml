@@ -21,7 +21,7 @@ serde = { version = "1.0.203", features = ["derive"] }
 serde_json = { version = "1.0.120" }
 
 # Internal dependency on the rubric crate that defines the seven-dimension scoring types.
-ppx-eval-rubric = { path = "../eval/rubric" }
+ppx-eval-rubric = { path = "../rubric" }
 
 [features]
 default = []
