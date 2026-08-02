@@ -4,6 +4,9 @@
 #include <vector>
 #include <iostream>
 #include <cmath>
+#include "../eco_restoration/hex_models.hpp"
+
+using namespace hex_analytics;
 
 /**
  * 41. Threshold-activated cooling assets on edge devices.
@@ -40,30 +43,46 @@
  * Rust WASM module would mirror.
  */
 
-struct HexMetrics {
-    std::string hex_id;
-    double UHI;         // current UHI_h
-    double alpha;       // cooling coefficient for vegetation
-    double beta;        // roof/built coefficient
-    double gamma;       // water coefficient
-    double delta;       // intercept
-    double dV_max;      // max feasible vegetation increment
-    double dB_opt;      // optimal cool-roof ΔB (negative)
-    double dW_max;      // max feasible water increment
+// Interface structs for Rust/WASM boundary simulation
+struct HexCoolingInput {
+    HexMetrics metrics;
+    double uhi_threshold;
+    double min_delta_T_action;
 };
 
-enum class CoolingActionType {
-    None,
-    ActivateMisting,
-    DeployShade,
-    TriggerCoolRoofRetrofit
+struct HexCoolingOutput {
+    CoolingCommand command;
 };
 
-struct CoolingCommand {
-    CoolingActionType action;
-    std::string hex_id;
-    double expected_delta_T; // predicted cooling from action
-};
+/**
+ * Run hex cooling decision - simulates the WASM module interface.
+ * 
+ * Expected JSON input shape (for WASM runtime):
+ * {
+ *   "hex_id": "hex_10_20",
+ *   "UHI": 7.5,
+ *   "alpha": -8.0,
+ *   "beta": 3.0,
+ *   "gamma": -5.0,
+ *   "delta": 0.5,
+ *   "dV_max": 0.10,
+ *   "dB_opt": -0.08,
+ *   "dW_max": 0.04,
+ *   "uhi_threshold": 7.0,
+ *   "min_delta_T_action": 1.0
+ * }
+ * 
+ * Expected JSON output shape:
+ * {
+ *   "action": 1,
+ *   "hex_id": "hex_10_20",
+ *   "expected_delta_T": -0.8
+ * }
+ */
+HexCoolingOutput run_hex_cooling_decision(const HexCoolingInput& in) {
+    CoolingCommand cmd = decide_cooling_action(in.metrics, in.uhi_threshold, in.min_delta_T_action);
+    return {cmd};
+}
 
 CoolingCommand decide_cooling_action(const HexMetrics& m,
                                      double uhi_threshold,
@@ -98,7 +117,7 @@ CoolingCommand decide_cooling_action(const HexMetrics& m,
     return {best_action, m.hex_id, best_cooling};
 }
 
-int main_edge() {
+int main_edge_hex_cooling() {
     HexMetrics m{
         "hex_10_20", 7.5,
         -8.0, 3.0, -5.0, 0.5,

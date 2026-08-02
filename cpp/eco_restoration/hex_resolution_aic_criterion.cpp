@@ -5,6 +5,9 @@
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
+#include "hex_models.hpp"
+
+using namespace hex_analytics;
 
 /**
  * 47. Optimal hex resolution for policy trade-offs using an AIC-based criterion.
@@ -154,7 +157,7 @@ double compute_ic(double AIC, double comp_penalty, double lambda) {
     return AIC + lambda * comp_penalty;
 }
 
-int main_hex_resolution_ic() {
+int main_hex_resolution_aic() {
     std::vector<HexRegressionSample> data_r1;
     for (int i = 0; i < 80; ++i) {
         double V = 0.30 + 0.001 * i;

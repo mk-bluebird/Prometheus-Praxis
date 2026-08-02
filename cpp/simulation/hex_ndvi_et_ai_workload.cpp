@@ -106,7 +106,7 @@ std::vector<double> forecast_delta_T_from_ndvi(const std::vector<double>& ndvi_p
     return delta_T;
 }
 
-int main_ndvi_ai() {
+int main_ndvi_et() {
     NDVISequenceSample s;
     s.hex_id = "hex_10_20";
     size_t T = 30;

@@ -4,6 +4,9 @@
 #include <string>
 #include <cmath>
 #include <iostream>
+#include "hex_models.hpp"
+
+using namespace hex_analytics;
 
 /**
  * 45. Long-term hex stability under climate change and stress testing.
@@ -122,7 +125,7 @@ OffsetCoeffs fit_offset_coeffs(const std::vector<HexScenarioSample>& data) {
     return {beta[0], beta[1], beta[2], beta[3]};
 }
 
-int main_stress() {
+int main_climate_stress() {
     // Baseline scenario (current climate).
     std::vector<HexScenarioSample> baseline;
     for (int i = 0; i < 50; ++i) {
