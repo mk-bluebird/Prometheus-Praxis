@@ -1,0 +1,18 @@
+# Prometheus-Praxis/rust/health/health_rubric_kernel/Cargo.toml
+[package]
+name = "health_rubric_kernel"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "Healthcare rubric enforcement kernel for Perknos-Nexus / MT6883"
+
+[dependencies]
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
+alncore = { path = "../../crates/alncore" } 
+kani = "0.67.0"                     # match project-wide Kani version
+
+[lib]
+name = "health_rubric_kernel"
+path = "src/lib.rs"
