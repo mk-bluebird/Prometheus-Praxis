@@ -1,0 +1,40 @@
+[
+  {
+    "hex_id": "PHX_000001",
+    "mean_lst_c": 42.3,
+    "median_lst_c": 42.0,
+    "stddev_lst_c": 1.2,
+    "mean_ndvi": 0.12,
+    "median_ndvi": 0.10,
+    "stddev_ndvi": 0.05,
+    "mean_ndbi": 0.28,
+    "median_ndbi": 0.27,
+    "stddev_ndbi": 0.03,
+    "mean_ndwi": -0.05,
+    "median_ndwi": -0.04,
+    "stddev_ndwi": 0.02,
+    "uhi": 5.8,
+    "roof_area_fraction": 0.55,
+    "feasible_tree_factor": 0.70,
+    "hydrology_feasibility": 0.40
+  },
+  {
+    "hex_id": "PHX_000002",
+    "mean_lst_c": 39.1,
+    "median_lst_c": 38.8,
+    "stddev_lst_c": 1.0,
+    "mean_ndvi": 0.24,
+    "median_ndvi": 0.23,
+    "stddev_ndvi": 0.06,
+    "mean_ndbi": 0.12,
+    "median_ndbi": 0.11,
+    "stddev_ndbi": 0.02,
+    "mean_ndwi": 0.02,
+    "median_ndwi": 0.02,
+    "stddev_ndwi": 0.01,
+    "uhi": 2.6,
+    "roof_area_fraction": 0.35,
+    "feasible_tree_factor": 0.85,
+    "hydrology_feasibility": 0.60
+  }
+]
