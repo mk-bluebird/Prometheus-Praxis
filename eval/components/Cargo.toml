@@ -1,0 +1,27 @@
+# Path: Prometheus-Praxis/eval/components/Cargo.toml
+
+[package]
+name = "ppx-eval-components"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+authors = ["Prometheus-Praxis <dev@prometheus-praxis.local>"]
+description = "Component-level evaluation crate for Prometheus-Praxis (advection kernel, MARL architecture, streaming pipeline) on seven scoring dimensions."
+repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
+keywords = ["prometheus-praxis", "eco-restoration", "evaluation", "phoenix", "sovereignty"]
+
+[lib]
+name = "ppx_eval_components"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[dependencies]
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
+
+# Internal dependency on the rubric crate that defines the seven-dimension scoring types.
+ppx-eval-rubric = { path = "../rubric" }
+
+[features]
+default = []
