@@ -42,6 +42,7 @@ members = [
     "src/urban_climate/evaluation",
     "eval/components",
     "eval/rubric",
+    "eval/cli",
 
     # eco_wealth standalone crate
     "eco_wealth",
