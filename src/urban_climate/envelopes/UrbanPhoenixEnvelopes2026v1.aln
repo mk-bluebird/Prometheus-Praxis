@@ -1,0 +1,65 @@
+shard UrbanPhoenixEnvelopes2026v1 {
+    meta {
+        shard-id        = "UrbanPhoenixEnvelopes2026v1";
+        context         = "PrometheusPraxisPhoenixAridUrbanHeatAirWater";
+        created-at-utc  = "2026-08-02T00:00:00Z";
+        author-did      = "bostaln18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7";
+        governance-ref  = "2b586028-a87b-4194-93b8-f5794c194e8a.md";   // Verifying the Verifiers.[8]
+        ecology-ref     = "e4ba68f5-edd6-438f-8dff-822a2527b867.md";   // Soil/Biodiversity corridor shard.[48]
+    }
+
+    // --- 1. UrbanHeatEnvelopePhoenix2026v1.schema ---
+
+    schema UrbanHeatEnvelopePhoenix2026v1 {
+        tile-id                : string;   // aligns with CorridorEnvelope.tile-id.[48]
+        sampled-at-utc         : datetime; // ISO-8601 UTC timestamp.
+
+        // Physical heat metrics per tile
+        air-temp-c             : f32;      // canopy-layer air temperature (2 m) in °C.
+        mrt-c                  : f32;      // mean radiant temperature in °C.
+        lst-c                  : f32;      // land surface temperature in °C.
+        uhi-intensity-c        : f32;      // local Urban Heat Island intensity vs rural baseline.
+
+        // Governance risk coordinates (Lyapunov/KER planes)
+        heat-risk-coordinate   : f32;      // r_heat \in [0,1], normalized heat risk plane.[8]
+        roh-contribution       : f32;      // contribution of heat to RoH scalar \in [0,1].[8]
+        ecoimpact-heat-score   : f32;      // EcoImpact component from heat (E plane).[8]
+
+        // Corridor bindings (local constraints)
+        safe-heat-max-c        : f32;      // from LocalConstraintWindow.safe-heat-max-c.[48]
+        safe-heat-window-start-utc : datetime; // LocalConstraintWindow.safe-heat-window-start-utc.[48]
+        safe-heat-window-end-utc   : datetime; // LocalConstraintWindow.safe-heat-window-end-utc.[48]
+
+        // Provenance and governance context
+        sensor-source          : string;   // MaRTy, weather station, satellite source ID.
+        eco-safety-envelope-id : string;   // reference to EcoSafetyEnvelopePhoenix2026v1 (governance spine).[8]
+        ker-envelope-id        : string;   // KEREnvelope binding.
+        roh-envelope-id        : string;   // RoHEnvelope binding.
+    }
+
+    invariant UrbanHeatSafetyInvariant {
+        input : UrbanHeatEnvelopePhoenix2026v1;
+
+        // Heat corridor safety: enforce local physical bounds.
+        require input.air-temp-c <= input.safe-heat-max-c;
+        require input.mrt-c      <= input.safe-heat-max-c + 5.0; // example margin, adjustable.
+
+        // Heat risk coordinate must stay within [0,1].
+        require 0.0 <= input.heat-risk-coordinate <= 1.0;
+
+        // RoH contribution from heat must not breach global RoH ceiling (e.g., 0.30).[8]
+        require input.roh-contribution <= 0.30;
+    }
+
+    policy BindUrbanHeatToLyapunovPhoenix2026v1 {
+        input  : UrbanHeatEnvelopePhoenix2026v1;
+        effect : LyapunovUpdate; // conceptual binding to LyapunovEnvelope.[8]
+
+        // Map heat risk coordinate into Lyapunov plane term V_heat = w_heat * r_heat^2.
+        emit LyapunovUpdate {
+            plane-id    = "HEAT_PHOENIX_2026";
+            coordinate  = input.heat-risk-coordinate;
+            weight      = 1.0;   // weight tuning; see governance spine.[8]
+        };
+    }
+}
