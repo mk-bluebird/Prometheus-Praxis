@@ -15,8 +15,8 @@ keywords = ["prometheus-praxis", "cli", "evaluation", "phoenix", "rubric"]
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = { version = "1.0.120" }
 
-ppx-eval-rubric = { path = "../rubric" }
-ppx-eval-components = { path = "../components" }
+ppx-eval-rubric = { path = "../eval/rubric" }
+ppx-eval-components = { path = "../eval/components" }
 
 [bin]
 name = "ppx-eval-cli"
