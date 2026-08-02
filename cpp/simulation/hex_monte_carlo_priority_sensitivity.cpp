@@ -6,6 +6,9 @@
 #include <algorithm>
 #include <iostream>
 #include <cmath>
+#include "../eco_restoration/hex_priority.hpp"
+
+using namespace hex_analytics;
 
 /**
  * 48. Hex-based Monte Carlo sensitivity analysis on α, β, γ and NDVI/NDBI/NDWI.
@@ -134,7 +137,7 @@ void run_monte_carlo(const std::vector<HexState>& hexes,
     }
 }
 
-int main_monte_carlo() {
+int main_monte_carlo_priority() {
     std::vector<HexState> hexes = {
         {"hex_10_20", 0.35, 0.50, 0.05, 0.02, 0.03, 0.01, 0.9, 1.0},
         {"hex_11_20", 0.40, 0.45, 0.08, 0.02, 0.02, 0.01, 0.8, 1.1},

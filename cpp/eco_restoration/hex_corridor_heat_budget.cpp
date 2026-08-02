@@ -4,6 +4,9 @@
 #include <string>
 #include <cmath>
 #include <iostream>
+#include "hex_models.hpp"
+
+using namespace hex_analytics;
 
 /**
  * 46. Hex-corridor heat budget using α, β, γ.
@@ -93,7 +96,22 @@ CorridorHeatBudget compute_corridor_budget(const std::vector<HexHeatBudgetState>
     return bud;
 }
 
-int main_heat_budget() {
+/**
+ * Compute mean delta T from flux balance using a simple proportionality constant.
+ * This provides a consistency check with the linear offset model.
+ */
+double compute_mean_delta_T_from_flux(const CorridorHeatBudget& bud, double area_total) {
+    if (area_total <= 0.0) {
+        throw std::invalid_argument("Invalid area_total for delta T computation.");
+    }
+    // Simple conversion: net flux imbalance to temperature change
+    // Using a proportionality constant (e.g., based on heat capacity and air density)
+    const double FLUX_TO_TEMP_FACTOR = 0.01; // °C per W/m^2 (simplified)
+    double net_flux = bud.sum_Q_star + bud.sum_QF - bud.sum_QH - bud.sum_QE;
+    return net_flux * FLUX_TO_TEMP_FACTOR / area_total;
+}
+
+int main_corridor_heat_budget() {
     std::vector<HexHeatBudgetState> corridor = {
         {"hex_10_20", 600.0, 50.0, 0.35, 0.50, 0.05},
         {"hex_11_20", 580.0, 45.0, 0.40, 0.45, 0.08},

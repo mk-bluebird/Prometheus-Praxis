@@ -4,6 +4,9 @@
 #include <string>
 #include <cmath>
 #include <iostream>
+#include "hex_models.hpp"
+
+using namespace hex_analytics;
 
 /**
  * 42. Hex-level convective heat flux index and refined offset model.
@@ -103,7 +106,7 @@ double compute_refined_delta_T(const HexUrbanMorphology& h,
     return delta_T_rad + delta_T_conv;
 }
 
-int main_convective() {
+int main_convective_index() {
     HexUrbanMorphology h{"hex_10_20", 12.0, 90.0, 0.35};
     ConvectiveParams cp;
     cp.w_H = 0.5;
