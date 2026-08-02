@@ -1,0 +1,17 @@
+schema UrbanClimateModelComponent {
+    id                      : string;
+    kind                    : enum {AdvectionKernel, MARLStack, StreamingPipeline};
+    description             : string;
+
+    ker-score               : f32;
+    roh-score               : f32;
+    biodiversity-score      : f32;
+    ecological-planes-score : f32;
+    urban-corridors-score   : f32;
+    streaming-sla-score     : f32;
+    neurorights-score       : f32;
+
+    governance-ref          : string; // "2b586028-a87b-4194-93b8-f5794c194e8a.md"
+    ecology-ref             : string; // "e4ba68f5-edd6-438f-8dff-822a2527b867.md"
+    notes                   : string;
+}
