@@ -1,0 +1,150 @@
+// File: cpp/tools/waste_stream_optimizer_pwa_bridge.cpp
+#include <iostream>
+#include <string>
+#include <vector>
+#include <unordered_map>
+#include <iomanip>
+
+// This file models the wiring pattern between a PWA, a WasteStreamOptimizer,
+// and community_recycling_scheduler in a smart-city stack.
+//
+// - PWA: residents log waste items by scanning barcodes (front-end).
+// - Backend: Rust Actix service with WebSockets.
+//   - Accepts waste item events.
+//   - Runs WasteStreamOptimizer to aggregate items into stream bins.
+//   - Computes updated recycling routes and pushes schedule notifications.
+// - This C++ module represents the optimisation layer and schedule computation,
+//   ready to be mirrored by Rust Actix handlers.
+
+namespace eco {
+
+struct WasteItem {
+    std::string barcode;
+    std::string material_stream; // e.g., "paper", "plastic", "metal", "organics"
+    double mass_kg;
+    std::string corridor_id;     // smart-city corridor / hex origin
+};
+
+struct StreamAggregate {
+    std::string material_stream;
+    double total_mass_kg;
+};
+
+class WasteStreamOptimizer {
+public:
+    void ingest_item(const WasteItem& item) {
+        auto& agg = aggregates_[item.material_stream];
+        agg.material_stream = item.material_stream;
+        agg.total_mass_kg  += item.mass_kg;
+    }
+
+    std::vector<StreamAggregate> snapshot_streams() const {
+        std::vector<StreamAggregate> out;
+        out.reserve(aggregates_.size());
+        for (const auto& kv : aggregates_) {
+            out.push_back(kv.second);
+        }
+        return out;
+    }
+
+private:
+    std::unordered_map<std::string, StreamAggregate> aggregates_;
+};
+
+struct RecyclingRoute {
+    std::string route_id;
+    std::string material_stream;
+    double mass_recycled_kg;
+    double distance_to_facility_km;
+    double fuel_used_liters;
+    double vehicle_capacity_kg;
+};
+
+double compute_route_efficiency(const RecyclingRoute& r) {
+    if (r.fuel_used_liters <= 0.0 || r.vehicle_capacity_kg <= 0.0) {
+        return std::numeric_limits<double>::infinity();
+    }
+    double numerator   = r.mass_recycled_kg * r.distance_to_facility_km;
+    double denominator = r.fuel_used_liters * r.vehicle_capacity_kg;
+    return numerator / denominator;
+}
+
+class CommunityRecyclingScheduler {
+public:
+    void set_routes(const std::vector<RecyclingRoute>& routes) {
+        routes_ = routes;
+    }
+
+    // Compute updated schedule based on current routes, minimising η_route per stream.
+    std::vector<RecyclingRoute> compute_schedule() const {
+        // For simplicity, pick best route per material_stream.
+        std::unordered_map<std::string, RecyclingRoute> best_per_stream;
+        for (const auto& r : routes_) {
+            double eta = compute_route_efficiency(r);
+            auto it = best_per_stream.find(r.material_stream);
+            if (it == best_per_stream.end() ||
+                eta < compute_route_efficiency(it->second)) {
+                best_per_stream[r.material_stream] = r;
+            }
+        }
+
+        std::vector<RecyclingRoute> schedule;
+        schedule.reserve(best_per_stream.size());
+        for (const auto& kv : best_per_stream) {
+            schedule.push_back(kv.second);
+        }
+        return schedule;
+    }
+
+    static void push_schedule_notification(const std::vector<RecyclingRoute>& schedule) {
+        std::cout << std::fixed << std::setprecision(3);
+        std::cout << "Real-time community recycling schedule:\n";
+        for (const auto& r : schedule) {
+            double eta = compute_route_efficiency(r);
+            // In a real system, this payload would be serialized (JSON) and sent
+            // over WebSockets from the Rust Actix backend to the PWA clients.
+            std::cout << "  Route " << r.route_id
+                      << " stream=" << r.material_stream
+                      << " mass=" << r.mass_recycled_kg << " kg"
+                      << " dist=" << r.distance_to_facility_km << " km"
+                      << " eta_route=" << eta
+                      << " [notification]\n";
+        }
+    }
+
+private:
+    std::vector<RecyclingRoute> routes_;
+};
+
+} // namespace eco
+
+int main() {
+    using namespace eco;
+
+    // Simulate PWA barcode scans feeding WasteStreamOptimizer.
+    WasteStreamOptimizer optimizer;
+    optimizer.ingest_item(WasteItem{"0123456789", "paper",   1.2, "PHX-HEX-001"});
+    optimizer.ingest_item(WasteItem{"9876543210", "plastic", 0.8, "PHX-HEX-002"});
+    optimizer.ingest_item(WasteItem{"5555555555", "paper",   0.5, "PHX-HEX-003"});
+
+    auto streams = optimizer.snapshot_streams();
+    std::cout << std::fixed << std::setprecision(3);
+    std::cout << "Aggregated waste streams:\n";
+    for (const auto& s : streams) {
+        std::cout << "  " << s.material_stream << " total_mass=" << s.total_mass_kg << " kg\n";
+    }
+
+    // Define candidate routes (could be generated by Rust Actix backend using real GIS).
+    std::vector<RecyclingRoute> routes;
+    routes.push_back(RecyclingRoute{"PHX-R-PAPER-1", "paper",   500.0, 7.0, 30.0, 3000.0});
+    routes.push_back(RecyclingRoute{"PHX-R-PAPER-2", "paper",   650.0, 10.0, 35.0, 3200.0});
+    routes.push_back(RecyclingRoute{"PHX-R-PLAST-1", "plastic", 400.0, 9.0, 28.0, 2800.0});
+
+    CommunityRecyclingScheduler scheduler;
+    scheduler.set_routes(routes);
+
+    auto schedule = scheduler.compute_schedule();
+    CommunityRecyclingScheduler::push_schedule_notification(schedule);
+
+    return 0;
+}
