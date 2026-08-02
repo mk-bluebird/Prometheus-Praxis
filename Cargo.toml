@@ -45,6 +45,7 @@ members = [
     "eval/cli",
     "eval/governance/cli",
     "eval/scenarios",
+    "health/health_rubric_kernel",
 
     # eco_wealth standalone crate
     "eco_wealth",
