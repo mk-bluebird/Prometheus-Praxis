@@ -1,5 +1,3 @@
-// File: docs/cyboquatic/system_workload_mcp_tools.md
-/*
 # Cyboquatic System Workload MCP Tools
 
 This document defines the Model Context Protocol (MCP) tools for interacting with the cyboquatic system-level workload optimization and telemetry core. All tools are read-only and operate on the SQLite schema defined in sql/system_workload_core_schema.sql.
@@ -104,4 +102,3 @@ Query backing:
   - Proposed workload distribution plans and their energy/carbon profiles.
 
 These tools pre-wire the system for AI-assisted analysis and reporting, while keeping actuation and control logic in separate, governed stacks.
-*/
