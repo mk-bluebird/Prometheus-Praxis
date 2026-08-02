@@ -1,0 +1,24 @@
+# Path: Prometheus-Praxis/eval/rubric/Cargo.toml
+
+[package]
+name = "ppx-eval-rubric"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+authors = ["Prometheus-Praxis <dev@prometheus-praxis.local>"]
+description = "Seven-dimension scoring rubric and eligibility traits for Prometheus-Praxis eco-restoration and sovereignty-aware deployments."
+repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
+keywords = ["prometheus-praxis", "rubric", "sovereignty", "eco-restoration", "evaluation"]
+
+[lib]
+name = "ppx_eval_rubric"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[dependencies]
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = { version = "1.0.120" }
+
+[features]
+default = []
