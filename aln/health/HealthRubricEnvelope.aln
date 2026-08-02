@@ -1,0 +1,80 @@
+
+SHARD HealthRubricEnvelope2026v1 {
+    schema HealthRubricEnvelope {
+        id: string;
+        host-did: string;
+        mt6883-window-id: string;
+        risk-plane-coordinates-id: string;
+        hestia-continuity-proof-id: string?;
+
+        // Seven-dimensional rubric coordinates (healthcare projection)
+        k_score: f32;           // Knowledge integrity
+        eco_score: f32;         // Eco/physio impact
+        roh_score: f32;         // Risk-of-Harm scalar, 0..1
+        neurorights_ok: bool;   // Neuro-rights compliance (N)
+        continuity_grade: string; // "A".."E"
+        consent_ok: bool;       // Sovereign consent integrity (S)
+        governance_ok: bool;    // Governance/auditability (G)
+
+        // Non-offsettable healthcare coordinates
+        rohscalarnorm: f32;          // normalized RoH, mapped to global ceiling 0.30
+        thermalburdennorm: f32;      // 0..1 thermal burden
+        nanoswarmburdennorm: f32;    // 0..1 nanoswarm burden
+        psychcontinuitypressure: f32;// 0..1 continuity pressure
+        immune-status: string;       // "Green" | "Amber" | "Red"
+
+        created-at-utc: datetime;
+    }
+
+    invariant HealthRubricNonOffsettableCeilings {
+        // RoH global ceiling
+        require rohscalarnorm <= 0.30;
+
+        // Thermal burden ceiling for non-emergency sessions
+        require thermalburdennorm <= 0.30;
+
+        // Immune corridor must be Green
+        require immune-status == "Green";
+
+        // Psych continuity pressure must be within safe band
+        require psychcontinuitypressure <= 0.40;
+    }
+
+    invariant HealthRubricNeuroRightsAndConsent {
+        // Neuro-rights must be respected; no hidden panels, no coercion
+        require neurorights_ok == true;
+
+        // Consent must be valid, revocable, and bound to host DID
+        require consent_ok == true;
+    }
+
+    invariant HealthRubricGovernanceAudit {
+        // Governance and auditability must be proven; no opaque episodes
+        require governance_ok == true;
+    }
+
+    binding HealthRubricFromMT6883 {
+        input MT6883CourseWindow.id;
+        input HealthcareRiskPlaneCoordinates.id;
+        input HestiaContinuityProof.id;
+
+        // Conceptual binding: map MT6883 and HealthcareRiskPlane into rubric coordinates
+        map rohscalarnorm        = MT6883CourseWindow.rohscalarnorm;
+        map thermalburdennorm    = MT6883CourseWindow.thermalburdennorm;
+        map nanoswarmburdennorm  = MT6883CourseWindow.nanoswarmburdennorm;
+        map psychcontinuitypressure = MT6883CourseWindow.psychcontinuitypressure;
+        map immune-status        = MT6883CourseWindow.immune-status;
+        map continuity_grade     = MT6883CourseWindow.continuity_grade;
+
+        // Rubric coordinates:
+        map roh_score            = rohscalarnorm;
+        map eco_score            = nanoswarmburdennorm; // plus thermal/immune aggregated downstream
+        map k_score              = /* derived from data completeness / model residuals */ KEREnvelope.k_score;
+        map neurorights_ok       = HestiaContinuityProof.neurorights-flags.mental_privacy_ok
+                                   && HestiaContinuityProof.neurorights-flags.cognitive_liberty_ok
+                                   && HestiaContinuityProof.neurorights-flags.no_hidden_control_panels
+                                   && HestiaContinuityProof.neurorights-flags.no_coercion;
+        map consent_ok           = /* bound to AugFingerprintConsent2026v1 */ ConsentEnvelope.state == "Active";
+        map governance_ok        = /* presence of Kani proof + Veritas anchor */ GovernanceAuditEnvelope.healthcare_harness_verified == true;
+    }
+}
