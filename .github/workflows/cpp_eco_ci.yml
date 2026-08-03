@@ -1,0 +1,40 @@
+# File: .github/workflows/cpp_eco_ci.yml
+name: C++ Eco-Restoration CI
+
+on:
+  push:
+    paths:
+      - "cpp/**"
+      - "sql/**"
+      - "scripts/build_cpp_eco.sh"
+  pull_request:
+    paths:
+      - "cpp/**"
+      - "sql/**"
+      - "scripts/build_cpp_eco.sh"
+
+jobs:
+  cpp-eco-ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up build directories
+        run: |
+          mkdir -p bin
+
+      - name: Run C++ eco build and smoke tests
+        run: |
+          chmod +x scripts/build_cpp_eco.sh
+          ./scripts/build_cpp_eco.sh
+
+      - name: Log eco metrics (multiplane risk summary)
+        run: |
+          if [ -f multiplane_risk_summary.csv ]; then
+            echo "=== Multiplane Risk Summary (first 10 lines) ==="
+            head -n 10 multiplane_risk_summary.csv
+          else
+            echo "multiplane_risk_summary.csv not found; ensure cpp/simulation/multiplane_risk_harness.cpp runs in CI."
+          fi
