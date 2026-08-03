@@ -1,0 +1,40 @@
+spec PhoenixWaterRights {
+
+    entity WaterRight {
+        field right_id         : Text;   // e.g., SRP share ID
+        field owner_id         : Text;   // city, district, or utility
+        field max_allocation_m3_per_day : Real;  // max water volume per day
+        field priority_class   : Text;   // 'HIGH','MEDIUM','LOW'
+    }
+
+    entity HexWaterRightBinding {
+        field hex_id    : Text;
+        field right_id  : Text;
+    }
+
+    entity HexWaterUsage {
+        field hex_id          : Text;
+        field right_id        : Text;
+        field timestamp_utc   : Text;
+        field water_used_m3   : Real;   // daily or hourly aggregated usage
+    }
+
+    invariant WaterRightBounds(WaterRight w) {
+        w.max_allocation_m3_per_day >= 0.0
+    }
+
+    invariant HexWaterUsageBounds(HexWaterUsage u) {
+        u.water_used_m3 >= 0.0
+    }
+
+    // Governance invariant:
+    // For each (hex,right), cumulative water usage over a day must not exceed
+    // the water-right allocation.
+    invariant HexWaterRightCorridor(WaterRight w, HexWaterRightBinding b, HexWaterUsage u) {
+        b.right_id = w.right_id and
+        u.right_id = w.right_id and
+        u.hex_id   = b.hex_id;
+        // Conceptually: sum_{timestamp in day} water_used_m3 <= max_allocation_m3_per_day.
+        // Implemented via SQL aggregation and triggers.
+    }
+}
