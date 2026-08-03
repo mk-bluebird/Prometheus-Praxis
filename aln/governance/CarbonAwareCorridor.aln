@@ -1,0 +1,72 @@
+spec CarbonAwareCorridor {
+
+    entity SynapseEndpoint {
+        field producer_relpath : Text;
+        field consumer_relpath : Text;
+        field synapse_class    : Text;   // 'ANALYTIC_BRIDGE','ACTUATION_GATE','PURE_GOVERNANCE'
+        field lane_default     : Text;   // 'RESEARCH','EXPPROD','PROD'
+        field ker_k            : Real;   // 0..1
+        field ker_e            : Real;   // 0..1
+        field ker_r            : Real;   // 0..1
+        field ker_s            : Real;   // scalar = k*e - r
+        field carbon_band_allowed : Text; // 'GREEN','NEUTRAL','RED'
+        field max_carbon_for_lane : Real; // gCO2eq/kWh threshold for this lane
+    }
+
+    invariant SynapseKerBounds(SynapseEndpoint s) {
+        s.ker_k >= 0.0 and s.ker_k <= 1.0 and
+        s.ker_e >= 0.0 and s.ker_e <= 1.0 and
+        s.ker_r >= 0.0 and s.ker_r <= 1.0
+    }
+
+    invariant SynapseKerScalarConsistency(SynapseEndpoint s) {
+        s.ker_s = s.ker_k * s.ker_e - s.ker_r
+    }
+
+    invariant CarbonBandAllowedBounds(SynapseEndpoint s) {
+        s.carbon_band_allowed = "GREEN" or
+        s.carbon_band_allowed = "NEUTRAL" or
+        s.carbon_band_allowed = "RED"
+    }
+
+    invariant MaxCarbonForLaneBounds(SynapseEndpoint s) {
+        s.max_carbon_for_lane >= 0.0
+    }
+
+    // Core governance invariant:
+    // For each synapse, lane and KER determine allowed carbon bands and maximum
+    // carbon intensity at which workloads may pass through this synapse.
+    invariant CarbonAwareLaneGovernance(SynapseEndpoint s) {
+        if s.lane_default = "PROD" then
+            // PROD: only allow GREEN/NEUTRAL bands, enforce strict max_carbon_for_lane.
+            (s.carbon_band_allowed = "GREEN" or s.carbon_band_allowed = "NEUTRAL") and
+            s.max_carbon_for_lane <= 400.0 and
+            s.ker_s > 0.2 and s.ker_e >= 0.7 and s.ker_r <= 0.5
+        else if s.lane_default = "EXPPROD" then
+            // EXPPROD: may allow RED band if KER corridor strong.
+            s.max_carbon_for_lane <= 600.0 and
+            s.ker_s > 0.1 and s.ker_e >= 0.6 and s.ker_r <= 0.6
+        else
+            // RESEARCH: carbon bands unconstrained, but KER may be low.
+            true
+    }
+
+    // Runtime corridor invariant (conceptual; evaluated via SQL triggers):
+    // If the current carbon band for a workload exceeds max_carbon_for_lane,
+    // workloads must not be routed through this synapse.
+    entity SynapseRuntimeState {
+        field synapse_relpath   : Text;
+        field carbon_band       : Text;  // 'GREEN','NEUTRAL','RED'
+        field carbon_intensity  : Real;  // gCO2eq/kWh
+    }
+
+    invariant SynapseRuntimeCarbonCorridor(SynapseEndpoint s, SynapseRuntimeState r) {
+        s.producer_relpath = r.synapse_relpath or
+        s.consumer_relpath = r.synapse_relpath;
+        if r.carbon_intensity > s.max_carbon_for_lane then
+            // No workload should be routed; the SQL trigger will enforce this.
+            false
+        else
+            true
+    }
+}
