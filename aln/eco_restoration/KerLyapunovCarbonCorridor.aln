@@ -1,0 +1,58 @@
+spec KerLyapunovCarbonCorridor {
+
+    entity HexLyapunovState {
+        field hex_id                     : Text;
+        field ker_k                      : Real;   // 0..1
+        field ker_e                      : Real;   // 0..1
+        field ker_r                      : Real;   // 0..1
+        field ker_s                      : Real;   // scalar = k*e - r
+        field delta_v_t_step             : Real;   // ΔVt for current step
+        field delta_v_t_cumulative       : Real;   // cumulative residual
+        field carbon_intensity_gco2_kwh  : Real;   // current carbon intensity
+        field carbon_intensity_max       : Real;   // Imax > 0
+        field gamma                      : Real;   // coupling coefficient
+        field eta                        : Real;   // carbon coupling coefficient
+    }
+
+    invariant KerBounds(HexLyapunovState h) {
+        h.ker_k >= 0.0 and h.ker_k <= 1.0 and
+        h.ker_e >= 0.0 and h.ker_e <= 1.0 and
+        h.ker_r >= 0.0 and h.ker_r <= 1.0
+    }
+
+    invariant KerScalarConsistency(HexLyapunovState h) {
+        h.ker_s = h.ker_k * h.ker_e - h.ker_r
+    }
+
+    invariant CarbonBounds(HexLyapunovState h) {
+        h.carbon_intensity_gco2_kwh >= 0.0 and
+        h.carbon_intensity_max > 0.0 and
+        h.carbon_intensity_gco2_kwh <= h.carbon_intensity_max
+    }
+
+    invariant CouplingCoefficientsBounds(HexLyapunovState h) {
+        h.gamma > 0.0 and h.eta > 0.0
+    }
+
+    // Joint corridor condition:
+    // ΔVt ≤ min(γ·s, η·(1 − carbon_intensity/Imax))
+    invariant KerLyapunovCarbonCorridorInvariant(HexLyapunovState h) {
+        let ker_term    = h.gamma * h.ker_s;
+        let carbon_term = h.eta * (1.0 - (h.carbon_intensity_gco2_kwh / h.carbon_intensity_max));
+        let corridor_bound =
+            if ker_term <= carbon_term then ker_term else carbon_term;
+        h.delta_v_t_step <= corridor_bound
+    }
+
+    // Per-hex cumulative bound: cumulative residual remains finite.
+    // Example: delta_v_t_cumulative ≤ V_corridor_hex.
+    entity HexLyapunovCorridor {
+        field hex_id          : Text;
+        field v_corridor_max  : Real;   // global residual corridor per hex
+    }
+
+    invariant HexResidualBound(HexLyapunovState h, HexLyapunovCorridor c) {
+        h.hex_id = c.hex_id and
+        h.delta_v_t_cumulative <= c.v_corridor_max
+    }
+}
