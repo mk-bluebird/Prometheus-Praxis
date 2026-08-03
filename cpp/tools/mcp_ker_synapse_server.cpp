@@ -11,30 +11,10 @@
 /*
  * MCP-style KER + Synapse Governance Server (STDIO JSON)
  *
- * This C++ program acts as a minimal MCP-like server over STDIO:
+ * Non-actuating, read-only analytics bridge:
  *  - Reads JSON requests from stdin (one per line).
  *  - Executes governance views against a SQLite DB.
- *  - Returns JSON responses to stdout.
- *
- * It exposes read-only tools:
- *  - ker_overview: query v_ker_overview_modules_and_tools
- *  - ker_high_risk_tools: query v_ker_high_risk_tools
- *  - ker_high_risk_modules: query v_ker_high_risk_modules
- *  - synapse_safe_for_eco: query v_synapse_safe_for_eco
- *  - neuro_nonactuating: query v_neuro_nonactuating_modules and v_neuro_nonactuating_tools
- *
- * This is designed as a non-actuating MCP governance bridge:
- *  - Tools are read-only analytics.
- *  - The DB spine enforces KER, lanes, neurorights, and synapse roles.
- *
- * Request format (one line, no whitespace control beyond spaces):
- *  { "tool": "ker_overview", "limit": 50 }
- *
- * Response format:
- *  { "ok": true, "rows": [ { "col0": "...", "col1": "..." }, ... ] }
- *
- * For simplicity, this uses minimal JSON parsing/serialization; it is
- * not a full JSON implementation but sufficient for MCP-style use.
+ *  - Returns JSON responses to stdout for AI-Chat and tooling.
  */
 
 struct Row {
@@ -94,8 +74,6 @@ private:
     sqlite3* db_;
 };
 
-// Very small, tolerant JSON parser for tool + limit.
-// This is NOT a general JSON parser; it assumes flat objects with string/int fields.
 struct Request {
     std::string tool;
     int limit;
@@ -116,13 +94,13 @@ static std::string trim(const std::string& s) {
 static Request parse_request(const std::string& line) {
     Request req;
     req.tool = "";
-    req.limit = 50; // default
+    req.limit = 50;
 
     std::string s = trim(line);
     if (s.empty() || s.front() != '{' || s.back() != '}') {
         return req;
     }
-    s = s.substr(1, s.size() - 2); // strip braces
+    s = s.substr(1, s.size() - 2);
 
     std::istringstream iss(s);
     std::string part;
@@ -135,7 +113,6 @@ static Request parse_request(const std::string& line) {
         std::string key = trim(kv.substr(0, colon_pos));
         std::string val = trim(kv.substr(colon_pos + 1));
 
-        // strip quotes from key
         if (!key.empty() && key.front() == '"') {
             key = key.substr(1);
         }
@@ -219,8 +196,17 @@ static std::string make_sql_for_tool(const Request& req) {
                "FROM v_neuro_nonactuating_tools "
                "ORDER BY lanedefault, toolname "
                "LIMIT " << limit << ";";
+    } else if (req.tool == "hex_stability") {
+        int hex_limit = req.limit > 0 ? req.limit : 100;
+        oss << "SELECT "
+               "hex_id, region_name, topology_band, primary_plane, "
+               "workload_count, total_delta_v_t, avg_delta_v_t, max_delta_v_t, "
+               "avg_ker_k, avg_ker_e, avg_ker_r, avg_ker_s, "
+               "violations_dvt_global, violations_ker_nonpositive, violations_joint_ker_dvt "
+               "FROM v_hex_stability_ker_dvt "
+               "ORDER BY total_delta_v_t DESC "
+               "LIMIT " << hex_limit << ";";
     } else {
-        // Unknown tool
         return "";
     }
 
@@ -262,33 +248,38 @@ int main(int argc, char** argv) {
 
     const std::string db_path = argv[1];
 
-    SqliteClient client(db_path);
+    try {
+        SqliteClient client(db_path);
 
-    std::string line;
-    while (std::getline(std::cin, line)) {
-        line = trim(line);
-        if (line.empty()) {
-            continue;
-        }
+        std::string line;
+        while (std::getline(std::cin, line)) {
+            line = trim(line);
+            if (line.empty()) {
+                continue;
+            }
 
-        Request req = parse_request(line);
-        if (req.tool.empty()) {
-            std::cout << make_error_response("Missing or invalid 'tool' field") << std::endl;
-            continue;
-        }
+            Request req = parse_request(line);
+            if (req.tool.empty()) {
+                std::cout << make_error_response("Missing or invalid 'tool' field") << std::endl;
+                continue;
+            }
 
-        std::string sql = make_sql_for_tool(req);
-        if (sql.empty()) {
-            std::cout << make_error_response("Unknown tool: " + req.tool) << std::endl;
-            continue;
-        }
+            std::string sql = make_sql_for_tool(req);
+            if (sql.empty()) {
+                std::cout << make_error_response("Unknown tool: " + req.tool) << std::endl;
+                continue;
+            }
 
-        try {
-            std::vector<Row> rows = client.query(sql);
-            std::cout << make_rows_response(rows) << std::endl;
-        } catch (const std::exception& ex) {
-            std::cout << make_error_response(ex.what()) << std::endl;
+            try {
+                std::vector<Row> rows = client.query(sql);
+                std::cout << make_rows_response(rows) << std::endl;
+            } catch (const std::exception& ex) {
+                std::cout << make_error_response(ex.what()) << std::endl;
+            }
         }
+    } catch (const std::exception& ex) {
+        std::cerr << "Fatal error: " << ex.what() << "\n";
+        return 1;
     }
 
     return 0;
