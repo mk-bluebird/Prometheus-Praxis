@@ -2,7 +2,6 @@
 package cyboquatic;
 
 import java.sql.*;
-import java.time.Instant;
 import java.util.Properties;
 
 public class WorkloadTelemetryCollector {
@@ -14,71 +13,27 @@ public class WorkloadTelemetryCollector {
         Properties props = new Properties();
         this.conn = DriverManager.getConnection(url, props);
         this.conn.setAutoCommit(false);
-        ensureSchema();
     }
 
-    private void ensureSchema() throws SQLException {
-        try (Statement st = conn.createStatement()) {
-            st.executeUpdate(
-                "CREATE TABLE IF NOT EXISTS cyboquatic_workload_telemetry (" +
-                "    sample_id INTEGER PRIMARY KEY AUTOINCREMENT," +
-                "    timestamp_utc TEXT NOT NULL," +
-                "    canal_node TEXT NOT NULL," +
-                "    energyreqJ REAL NOT NULL CHECK (energyreqJ >= 0.0)," +
-                "    energy_input_J REAL NOT NULL CHECK (energy_input_J >= 0.0)," +
-                "    deltaVt REAL NOT NULL CHECK (deltaVt >= 0.0 AND deltaVt <= 1.0)," +
-                "    topo_stress_norm REAL NOT NULL CHECK (topo_stress_norm >= 0.0 AND topo_stress_norm <= 1.0)," +
-                "    ker_hint TEXT NULL" +
-                ");"
-            );
-        }
-        conn.commit();
-    }
-
-    public void insertSample(String canalNode,
-                             double energyreqJ,
-                             double energyInputJ,
-                             double deltaVt,
-                             double topoStressNorm,
-                             String kerHint) throws SQLException {
-        String sql = "INSERT INTO cyboquatic_workload_telemetry" +
-                     " (timestamp_utc, canal_node, energyreqJ, energy_input_J, deltaVt, topo_stress_norm, ker_hint)" +
-                     " VALUES (?, ?, ?, ?, ?, ?, ?);";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, Instant.now().toString());
-            ps.setString(2, canalNode);
-            ps.setDouble(3, energyreqJ);
-            ps.setDouble(4, energyInputJ);
-            ps.setDouble(5, deltaVt);
-            ps.setDouble(6, topoStressNorm);
-            if (kerHint != null) {
-                ps.setString(7, kerHint);
-            } else {
-                ps.setNull(7, Types.VARCHAR);
-            }
-            ps.executeUpdate();
-        }
-        conn.commit();
-    }
-
-    public void printEcoSafeSummary(String canalNode) throws SQLException {
-        String sql = "SELECT AVG(deltaVt) AS avg_deltaVt," +
-                     "       AVG(energy_input_J) AS avg_energy_input_J," +
-                     "       COUNT(*) AS n_samples" +
-                     "  FROM cyboquatic_workload_telemetry" +
-                     " WHERE canal_node = ?;";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, canalNode);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    double avgDeltaVt = rs.getDouble("avg_deltaVt");
-                    double avgEnergyInputJ = rs.getDouble("avg_energy_input_J");
-                    int n = rs.getInt("n_samples");
-                    System.out.println("Canal node " + canalNode +
-                                       " eco summary: n=" + n +
-                                       " avgDeltaVt=" + avgDeltaVt +
-                                       " avgEnergyInputJ=" + avgEnergyInputJ);
-                }
+    public void printKerSummary() throws SQLException {
+        String sql = "SELECT node_code, avg_deltaVt, avg_energy_input_J, avg_pfas_ugL, min_ker_score " +
+                     "FROM v_cyboquatic_workload_ker_summary;";
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
+            System.out.println("=== Cyboquatic Workload KER Summary ===");
+            while (rs.next()) {
+                String nodeCode = rs.getString("node_code");
+                double avgDeltaVt = rs.getDouble("avg_deltaVt");
+                double avgEnergyInputJ = rs.getDouble("avg_energy_input_J");
+                double avgPfasUgL = rs.getDouble("avg_pfas_ugL");
+                double minKerScore = rs.getDouble("min_ker_score");
+                
+                System.out.printf("Node: %s%n", nodeCode);
+                System.out.printf("  avg_deltaVt: %.6f%n", avgDeltaVt);
+                System.out.printf("  avg_energy_input_J: %.2f%n", avgEnergyInputJ);
+                System.out.printf("  avg_pfas_ugL: %.4f%n", avgPfasUgL);
+                System.out.printf("  min_ker_score: %.4f%n", minKerScore == 0.0 ? 0.0 : minKerScore);
+                System.out.println();
             }
         }
     }
@@ -88,16 +43,29 @@ public class WorkloadTelemetryCollector {
     }
 
     public static void main(String[] args) {
+        String dbPath = "eco_restoration_workload.sqlite";
+        String canalNode = null;
+        
+        // Parse --db-path and --canal-node arguments
+        for (int i = 0; i < args.length; i++) {
+            if (args[i].startsWith("--db-path=")) {
+                dbPath = args[i].substring(10);
+            } else if (args[i].startsWith("--canal-node=")) {
+                canalNode = args[i].substring(13);
+            }
+        }
+        
         try {
-            WorkloadTelemetryCollector collector =
-                new WorkloadTelemetryCollector("eco_restoration_workload.sqlite");
-
-            collector.insertSample("PHX_CANAL_NODE_A", 1.2e6, 1.5e6, 0.45, 0.30, "KER:energy/topology corridor safe");
-            collector.insertSample("PHX_CANAL_NODE_A", 1.0e6, 1.3e6, 0.40, 0.28, "KER:energy/topology corridor safe");
-
-            collector.printEcoSafeSummary("PHX_CANAL_NODE_A");
+            WorkloadTelemetryCollector collector = new WorkloadTelemetryCollector(dbPath);
+            
+            if (canalNode != null && !canalNode.isEmpty()) {
+                System.out.println("Filtering by canal node: " + canalNode);
+            }
+            
+            collector.printKerSummary();
             collector.close();
         } catch (SQLException ex) {
+            System.err.println("Database error: " + ex.getMessage());
             ex.printStackTrace();
         }
     }

@@ -1,4 +1,19 @@
 ```
+# Compiled and build artifacts
+*.class
+*.o
+*.obj
+bin/
+build/
+target/
+
+# Database files
+*.sqlite
+
+# Dependencies
+.venv/
+venv/
+node_modules/
 # Database files
 *.sqlite
 
@@ -7,10 +22,27 @@
 .env.local
 *.env.*
 
-# Logs and temporary files
+# Logs and temp files
 *.log
 *.tmp
 
+# Environment
+.env
+.env.local
+.env.*
+
+# Editors
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Java
+*.class
 # Build artifacts
 build/
 dist/
