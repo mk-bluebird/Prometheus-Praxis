@@ -1,6 +1,9 @@
 // File: kotlin/cyboquatic/FogRouterPredicates.kt
 package cyboquatic
 
+import java.sql.DriverManager
+import java.util.Properties
+
 data class MediaSample(
     val mediumType: String,      // e.g. "sediment", "water", "foam"
     val temperatureC: Double,
@@ -34,17 +37,79 @@ object FogRouterPredicates {
                 "FOG:NEEDS_DIAGNOSTIC"
         }
     }
+    
+    /**
+     * Query latest telemetry row from SQLite and convert to MediaSample for routing.
+     * Uses JDBC with the Xerial SQLite driver (no extra libraries needed).
+     */
+    fun decideRouteFromSqlite(nodeCode: String, dbPath: String): String {
+        val url = "jdbc:sqlite:$dbPath"
+        val props = Properties()
+        
+        return DriverManager.getConnection(url, props).use { conn ->
+            val sql = """
+                SELECT deltaVt, topo_stress_norm, canal_temperature_C, 
+                       pfas_concentration_ugL, fog_route
+                FROM cyboquatic_workload_telemetry ct
+                JOIN canal_node cn ON cn.node_id = ct.node_id
+                WHERE cn.node_code = ?
+                ORDER BY ct.timestamp_utc DESC
+                LIMIT 1
+            """.trimIndent()
+            
+            conn.prepareStatement(sql).use { ps ->
+                ps.setString(1, nodeCode)
+                ps.executeQuery().use { rs ->
+                    if (rs.next()) {
+                        val deltaVt = rs.getDouble("deltaVt")
+                        val topoStress = rs.getDouble("topo_stress_norm")
+                        val tempC = rs.getDouble("canal_temperature_C")
+                        val pfasUgL = rs.getDouble("pfas_concentration_ugL")
+                        
+                        // Approximate dissolved O2 and turbidity from available telemetry
+                        // Higher deltaVt -> lower O2; higher topo stress -> higher turbidity
+                        val approxDO2 = 8.0 - deltaVt * 5.0  // baseline 8 mg/L, decreases with workload
+                        val approxTurbidity = 20.0 + topoStress * 60.0  // baseline 20 NTU
+                        
+                        val media = MediaSample(
+                            mediumType = "water",
+                            temperatureC = tempC,
+                            pfasConcentrationUgL = pfasUgL,
+                            dissolvedO2MgL = maxOf(0.0, approxDO2),
+                            turbidityNTU = approxTurbidity
+                        )
+                        
+                        route(media)
+                    } else {
+                        "FOG:NEEDS_DIAGNOSTIC"  // No data found
+                    }
+                }
+            }
+        }
+    }
 }
 
-fun main() {
-    val sample = MediaSample(
-        mediumType = "water",
-        temperatureC = 10.0,
-        pfasConcentrationUgL = 0.2,
-        dissolvedO2MgL = 6.0,
-        turbidityNTU = 30.0
-    )
-
-    val route = FogRouterPredicates.route(sample)
-    println("Media route: $route")
+fun main(args: Array<String>) {
+    var dbPath = "eco_restoration_workload.sqlite"
+    var node = "PHX_CANAL_NODE_A"
+    
+    // Parse --db-path and --node arguments
+    for (arg in args) {
+        when {
+            arg.startsWith("--db-path=") -> dbPath = arg.substringAfter("=")
+            arg.startsWith("--node=") -> node = arg.substringAfter("=")
+        }
+    }
+    
+    println("Kotlin FOG Router Predicates")
+    println("DB Path: $dbPath")
+    println("Node: $node")
+    
+    try {
+        val route = FogRouterPredicates.decideRouteFromSqlite(node, dbPath)
+        println("Decided FOG route: $route")
+    } catch (e: Exception) {
+        System.err.println("Error deciding route: ${e.message}")
+        e.printStackTrace()
+    }
 }

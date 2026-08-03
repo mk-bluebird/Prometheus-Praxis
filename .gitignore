@@ -1,34 +1,40 @@
 ```
-# Rust/Cargo specific ignores
+# Compiled and build artifacts
+*.class
+*.o
+*.obj
+bin/
+build/
 target/
-Cargo.lock
-**/*.rs.bk
+
+# Database files
+*.sqlite
 
 # Dependencies
-**/node_modules/
-**/.venv/
-**/venv/
+.venv/
+venv/
+node_modules/
 
-# Build artifacts
-**/dist/
-**/build/
-**/target/
-
-# Logs and temporary files
+# Logs and temp files
 *.log
 *.tmp
 *.swp
 
-# Environment files
+# Environment
 .env
 .env.local
-*.env.*
+.env.*
 
-# Editors/IDE
+# Editors
 .vscode/
 .idea/
-**/__pycache__/
-**/.pytest_cache/
-**/.mypy_cache/
-**/.ruff_cache/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Java
+*.class
 ```
