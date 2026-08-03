@@ -86,11 +86,11 @@ A typical layout inside this repo looks like:
 
 Prometheus‑Praxis assumes the following sibling/related repos are present and aligned:
 
-- `mk-bluebird/eco_restoration_shard`
+- `mk-bluebird/Prometheus-Praxis`
 - `mk-bluebird/Cyboquatics`
 - `mk-bluebird/Cybercore`
 - `mk-bluebird/Augmented-Citizen`
-- `mk-bluebird/nanorobotics`
+- `mk-bluebird/Nano-Tree`
 - `mk-bluebird/Data_Lake`
 - `mk-bluebird/BLE-Code`
 
