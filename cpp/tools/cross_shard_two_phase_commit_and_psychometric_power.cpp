@@ -2,6 +2,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <unordered_map>
 #include <iomanip>
 #include <cmath>
 
@@ -14,39 +15,151 @@ double clamp01(double x) {
     return x;
 }
 
-// ----------------------------------------------------------
-// 41. Cross-shard synchronization: two-phase commit respecting ALN invariants
-// ----------------------------------------------------------
-//
-// We model a two-phase commit between:
-//   - labor psych continuity shard (S_lab)
-//   - eco-restoration shard (S_eco)
-//
-// Shared state includes:
-//   - RoH_corridor (must satisfy RoH <= 0.30)
-//   - labor_contract terms influenced by HII or corridors.
-//
-// Two-phase commit protocol:
-//
-// Phase 1 (prepare):
-//   1) Coordinator sends PREPARE to S_lab and S_eco with proposed update U_lab, U_eco.
-//   2) Each shard validates its invariants locally under the proposed update:
-//        I_lab(U_lab) and I_eco(U_eco) and combined RoH(U_lab, U_eco) <= 0.30.
-//      Each replies with VOTE_COMMIT or VOTE_ABORT.
-//
-// Phase 2 (commit):
-//   3) If all votes are COMMIT, coordinator sends COMMIT to both shards;
-//      otherwise, sends ABORT.
-//   4) Shards apply or discard updates atomically.
-//
-// Deadlock avoidance:
-//   - Coordinator drives the protocol; shards only respond to requests.
-//   - No circular waits: shards do not lock resources indefinitely; they
-//     time out or reply ABORT under contention.
-//
-// Safety (RoH invariant):
-//   - Commit occurs only if both shards report invariants satisfied and
-//     combined RoH <= 0.30 in PREPARE; thus committed state preserves RoH bound.
+// -----------------------------
+// Cross-shard two-phase commit (KER governance)
+// -----------------------------
+
+namespace eco {
+
+enum class ShardVote {
+    PREPARED,
+    ABORT
+};
+
+enum class GlobalDecision {
+    COMMIT,
+    ABORT
+};
+
+struct KerUpdate {
+    std::string shard_id;
+    std::string module_id;
+    double k_new;
+    double e_new;
+    double r_new;
+};
+
+struct ShardPrepareResult {
+    std::string shard_id;
+    ShardVote vote;
+    std::string reason;
+};
+
+struct TwoPhaseCommitResult {
+    GlobalDecision decision;
+    std::vector<ShardPrepareResult> shard_results;
+};
+
+struct ShardGovernanceConfig {
+    double s_min_non_research;
+    double s_max;
+};
+
+double ker_scalar(double k, double e, double r) {
+    k = clamp01(k);
+    e = clamp01(e);
+    r = clamp01(r);
+    return k * e - r;
+}
+
+ShardPrepareResult shard_prepare(const KerUpdate& upd,
+                                 const ShardGovernanceConfig& cfg) {
+    ShardPrepareResult res{};
+    res.shard_id = upd.shard_id;
+    double s = ker_scalar(upd.k_new, upd.e_new, upd.r_new);
+
+    if (s < cfg.s_min_non_research) {
+        res.vote = ShardVote::ABORT;
+        res.reason = "KER scalar below s_min_non_research";
+        return res;
+    }
+    if (s > cfg.s_max) {
+        res.vote = ShardVote::ABORT;
+        res.reason = "KER scalar above s_max corridor";
+        return res;
+    }
+
+    res.vote = ShardVote::PREPARED;
+    res.reason = "KER update satisfies shard governance constraints";
+    return res;
+}
+
+TwoPhaseCommitResult run_two_phase_commit(
+        const std::vector<KerUpdate>& updates,
+        const std::unordered_map<std::string, ShardGovernanceConfig>& configs) {
+
+    TwoPhaseCommitResult result{};
+    result.decision = GlobalDecision::ABORT;
+
+    bool all_prepared = true;
+    for (const auto& upd : updates) {
+        auto it = configs.find(upd.shard_id);
+        ShardPrepareResult res{};
+        if (it == configs.end()) {
+            res.shard_id = upd.shard_id;
+            res.vote = ShardVote::ABORT;
+            res.reason = "No governance config for shard";
+            all_prepared = false;
+        } else {
+            res = shard_prepare(upd, it->second);
+            if (res.vote == ShardVote::ABORT) {
+                all_prepared = false;
+            }
+        }
+        result.shard_results.push_back(res);
+    }
+
+    result.decision = all_prepared ? GlobalDecision::COMMIT : GlobalDecision::ABORT;
+    return result;
+}
+
+void emit_two_phase_sql(const std::vector<KerUpdate>& updates,
+                        const TwoPhaseCommitResult& res) {
+    std::cout << "-- Phase 1: PREPARE KER updates\n";
+    for (const auto& upd : updates) {
+        std::cout << "/* shard " << upd.shard_id << " */ "
+                  << "INSERT INTO ker_update_staging "
+                  << "(shard_id, module_id, k_new, e_new, r_new) VALUES ('"
+                  << upd.shard_id << "', '"
+                  << upd.module_id << "', "
+                  << upd.k_new << ", "
+                  << upd.e_new << ", "
+                  << upd.r_new << ");\n";
+    }
+
+    std::cout << "\n-- Shard votes\n";
+    for (const auto& sr : res.shard_results) {
+        std::cout << "/* shard " << sr.shard_id << " vote="
+                  << (sr.vote == ShardVote::PREPARED ? "PREPARED" : "ABORT")
+                  << " reason=" << sr.reason << " */\n";
+    }
+
+    std::cout << "\n-- Phase 2: GLOBAL "
+              << (res.decision == GlobalDecision::COMMIT ? "COMMIT" : "ABORT")
+              << "\n";
+
+    if (res.decision == GlobalDecision::COMMIT) {
+        for (const auto& upd : updates) {
+            std::cout << "/* shard " << upd.shard_id << " */ "
+                      << "UPDATE module_ker_profile SET "
+                      << "ker_k = " << upd.k_new << ", "
+                      << "ker_e = " << upd.e_new << ", "
+                      << "ker_r = " << upd.r_new << ", "
+                      << "ker_s = " << ker_scalar(upd.k_new, upd.e_new, upd.r_new)
+                      << " WHERE module_id = '" << upd.module_id << "';\n";
+        }
+        std::cout << "DELETE FROM ker_update_staging;\n";
+    } else {
+        std::cout << "DELETE FROM ker_update_staging;\n";
+        std::cout << "-- All staged updates rolled back due to ABORT decision.\n";
+    }
+}
+
+} // namespace eco
+
+// -----------------------------
+// Labor / eco cross-shard RoH corridor 2PC
+// -----------------------------
 
 enum class Vote {
     COMMIT,
@@ -55,28 +168,28 @@ enum class Vote {
 
 struct ShardState {
     double RoH_corridor;
-    bool   labor_safe;
-    bool   eco_safe;
+    bool labor_safe;
+    bool eco_safe;
 };
 
 struct ProposedUpdate {
     double delta_RoH_lab;
     double delta_RoH_eco;
-    bool   labor_change_safe;
-    bool   eco_change_safe;
+    bool labor_change_safe;
+    bool eco_change_safe;
 };
 
 bool invariants_lab_hold(const ShardState& s, const ProposedUpdate& u) {
     double RoH_new = s.RoH_corridor + u.delta_RoH_lab;
-    bool roh_ok    = RoH_new <= 0.30;
-    bool labor_ok  = s.labor_safe && u.labor_change_safe;
+    bool roh_ok = RoH_new <= 0.30;
+    bool labor_ok = s.labor_safe && u.labor_change_safe;
     return roh_ok && labor_ok;
 }
 
 bool invariants_eco_hold(const ShardState& s, const ProposedUpdate& u) {
     double RoH_new = s.RoH_corridor + u.delta_RoH_eco;
-    bool roh_ok    = RoH_new <= 0.30;
-    bool eco_ok    = s.eco_safe && u.eco_change_safe;
+    bool roh_ok = RoH_new <= 0.30;
+    bool eco_ok = s.eco_safe && u.eco_change_safe;
     return roh_ok && eco_ok;
 }
 
@@ -94,13 +207,10 @@ bool coordinator_two_phase_commit(const ShardState& lab_state,
                                   const ProposedUpdate& u_eco,
                                   ShardState& lab_state_out,
                                   ShardState& eco_state_out) {
-    // Phase 1: PREPARE
     Vote v_lab = prepare_lab(lab_state, u_lab);
     Vote v_eco = prepare_eco(eco_state, u_eco);
 
-    // Phase 2: COMMIT / ABORT
     if (v_lab == Vote::COMMIT && v_eco == Vote::COMMIT) {
-        // Commit: apply updates atomically.
         lab_state_out = lab_state;
         eco_state_out = eco_state;
         lab_state_out.RoH_corridor += u_lab.delta_RoH_lab;
@@ -109,64 +219,35 @@ bool coordinator_two_phase_commit(const ShardState& lab_state,
         eco_state_out.eco_safe   = eco_state.eco_safe   && u_eco.eco_change_safe;
         return true;
     } else {
-        // Abort: states unchanged.
         lab_state_out = lab_state;
         eco_state_out = eco_state;
         return false;
     }
 }
 
-// Rust+Kani soundness/completeness sketch:
-//
-// Soundness:
-//   For any proposed update (U_lab, U_eco) that would violate RoH <= 0.30
-//   or shard invariants, prepare_lab or prepare_eco returns ABORT, so
-//   coordinator never commits an unsafe update.
-//
-// Completeness:
-//   For any update that preserves invariants and combined RoH <= 0.30,
-//   both prepare_* return COMMIT and coordinator commits, so all safe
-//   updates pass.
-//
-// Deadlock-free:
-//   Coordinator does not wait indefinitely; shards do not hold locks,
-//   so the protocol reduces to a simple request/response pattern without
-//   circular dependencies.
-
-// ----------------------------------------------------------
-// 42. Psychometric validation in augmented environments (power analysis)
-// ----------------------------------------------------------
-//
-// We design an experiment to validate that psych-risk score r_t correlates
-// with NASA-TLX workload scores under varying thermal loads in a Phoenix
-// outdoor testbed.
-//
-// Outcome:
-//   - Psych-risk band shift (e.g., NORMAL vs MODERATE/HIGH) or a continuous
-//     correlation between r_t and NASA-TLX.
-//
-// Hypothesis:
-//   H0: ρ = 0 (no correlation).
-//   H1: ρ ≠ 0 (non-zero correlation).
-//
-// At 5% significance (α = 0.05), required sample size N to detect correlation
-// ρ_target with power 1-β can be approximated by:
-//
-//   N ≈ (Z_{1-α/2} + Z_{1-β})^2 / (0.5 * ln((1+ρ_target)/(1-ρ_target)))^2
-//
-// where Z_{·} are standard normal quantiles.
+// -----------------------------
+// Psychometric power analysis
+// -----------------------------
 
 struct PowerParams {
-    double alpha;        // significance level (e.g., 0.05)
-    double power;        // desired power (e.g., 0.8)
-    double rho_target;   // correlation to detect (e.g., 0.3)
+    double alpha;
+    double power;
+    double rho_target;
 };
 
+double erfinv_series(double x) {
+    double pi_over_4 = 3.14159265358979323846 / 4.0;
+    double a = pi_over_4 * (x);
+    double x3 = x * x * x;
+    double x5 = x3 * x * x;
+    return a + (pi_over_4 * pi_over_4 * a * x3) / 3.0 +
+           (7.0 * std::pow(pi_over_4, 3) * a * x5) / 30.0;
+}
+
 double z_quantile(double p) {
-    // Approximate inverse CDF of standard normal using a simple approximation.
-    // For demonstration only; production would use a precise library.
-    // Here we use a rough approximation based on inverse error function.
-    return std::sqrt(2.0) * std::erfinv(2.0 * p - 1.0);
+    double t = 2.0 * p - 1.0;
+    double inv_erf = erfinv_series(t);
+    return std::sqrt(2.0) * inv_erf;
 }
 
 double required_sample_size_for_correlation(const PowerParams& pp) {
@@ -181,31 +262,36 @@ double required_sample_size_for_correlation(const PowerParams& pp) {
     return num / denom;
 }
 
-// For psych-risk band shift as outcome, we may dichotomize NASA-TLX and r_t
-// into band categories and use logistic regression or chi-square tests.
-// The power computation is similar, but here we present the correlation-based
-// approximation as a simple scalar estimate.
-
-// ----------------------------------------------------------
-// Demonstration main
-// ----------------------------------------------------------
-
 int main() {
+    using namespace eco;
     std::cout << std::fixed << std::setprecision(4);
 
-    // 41. Cross-shard two-phase commit demo.
+    std::unordered_map<std::string, ShardGovernanceConfig> configs;
+    configs["shard_A"] = {0.05, 0.9};
+    configs["shard_B"] = {0.05, 0.9};
+
+    std::vector<KerUpdate> updates = {
+        {"shard_A", "module_A1", 0.8, 0.75, 0.3},
+        {"shard_B", "module_B2", 0.7, 0.65, 0.4}
+    };
+
+    TwoPhaseCommitResult res = run_two_phase_commit(updates, configs);
+
+    std::cout << "Cross-shard two-phase commit decision: "
+              << (res.decision == GlobalDecision::COMMIT ? "COMMIT" : "ABORT") << "\n\n";
+    emit_two_phase_sql(updates, res);
+    std::cout << "\n";
+
     ShardState lab_state{0.28, true, false};
     ShardState eco_state{0.28, false, true};
-
-    ProposedUpdate u_lab{0.01, 0.0, true, false}; // small RoH increase from labor side
-    ProposedUpdate u_eco{0.01, 0.0, false, true}; // small RoH increase from eco side
-
+    ProposedUpdate u_lab{0.01, 0.0, true, false};
+    ProposedUpdate u_eco{0.01, 0.0, false, true};
     ShardState lab_out{}, eco_out{};
     bool committed = coordinator_two_phase_commit(lab_state, eco_state,
                                                   u_lab, u_eco,
                                                   lab_out, eco_out);
 
-    std::cout << "Cross-shard two-phase commit:\n";
+    std::cout << "Labor/Eco RoH two-phase commit:\n";
     std::cout << "  Commit decision: " << (committed ? "COMMIT" : "ABORT") << "\n";
     std::cout << "  Lab RoH after: " << lab_out.RoH_corridor
               << ", Eco RoH after: " << eco_out.RoH_corridor << "\n";
@@ -213,23 +299,14 @@ int main() {
               << ((lab_out.RoH_corridor <= 0.30 && eco_out.RoH_corridor <= 0.30)
                   ? "YES" : "NO") << "\n\n";
 
-    // 42. Psychometric validation power demo.
-    PowerParams pp{
-        0.05, // alpha
-        0.80, // power
-        0.30  // rho_target (moderate correlation)
-    };
-
+    PowerParams pp{0.05, 0.80, 0.30};
     double N_required = required_sample_size_for_correlation(pp);
 
     std::cout << "Psychometric validation power analysis (NASA-TLX vs psych-risk):\n";
-    std::cout << "  Target correlation ρ=" << pp.rho_target
+    std::cout << "  Target correlation rho=" << pp.rho_target
               << ", alpha=" << pp.alpha
               << ", power=" << pp.power << "\n";
     std::cout << "  Approximate sample size required N≈" << std::ceil(N_required) << "\n";
-    std::cout << "  This guides the Phoenix outdoor testbed design: number of participants "
-                 "and sessions needed to reliably reject H0 of no correlation between "
-                 "psych-risk bands and NASA-TLX under varying thermal loads.\n";
 
     return 0;
 }
