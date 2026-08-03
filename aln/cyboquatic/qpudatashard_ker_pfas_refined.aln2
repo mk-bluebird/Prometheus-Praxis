@@ -1,0 +1,48 @@
+
+GOVERNANCE_PARTICLE qpudatashard_ker_pfas_refined {
+    DID_OWNER = "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7";
+
+    STATE pfas_corridor_state {
+        mass_kg              : [0.0, 1e3];
+        sorbed_fraction      : [0.0, 1.0];
+        cold_survival_factor : [0.0, 10.0];
+        step_index           : integer;
+    }
+
+    INVARIANT pfas_mass_non_increase_under_cold_survival {
+        FOR ALL t:
+            IF cold_survival_factor(t) >= 1.0 THEN
+                mass_kg(t+1) <= mass_kg(t);
+    }
+
+    INVARIANT sorbed_fraction_bounded {
+        FOR ALL t:
+            sorbed_fraction(t) >= 0.0 AND sorbed_fraction(t) <= 1.0;
+    }
+
+    INVARIANT cold_survival_factor_non_negative {
+        FOR ALL t:
+            cold_survival_factor(t) >= 0.0;
+    }
+
+    TRANSITION step_from_sql_recursive {
+        INPUT sql_row {
+            node_id : integer;
+            step    : integer;
+            mass_kg : real;
+            sorbed_fraction : real;
+            cold_survival_factor : real;
+        }
+
+        PRECONDITION {
+            step = step_index + 1;
+        }
+
+        EFFECT {
+            mass_kg'              = mass_kg;
+            sorbed_fraction'      = sorbed_fraction;
+            cold_survival_factor' = cold_survival_factor;
+            step_index'           = step;
+        }
+    }
+}
