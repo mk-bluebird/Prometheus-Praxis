@@ -7,8 +7,56 @@
 #include <limits>
 #include <cmath>
 #include <chrono>
+#include <sqlite3.h>
 
 namespace eco_restoration {
+
+// Hex residual state for Lyapunov corridor checking
+struct HexResidualState {
+    double total_delta_v_t;
+    double v_corridor_max;
+    
+    HexResidualState() : total_delta_v_t(0.0), v_corridor_max(0.0) {}
+};
+
+// Load hex residual from SQLite stability view
+static HexResidualState loadHexResidualFromSQLite(sqlite3* db, const std::string& hex_id) {
+    HexResidualState state;
+    
+    const char* sql = R"(
+        SELECT total_delta_v_t, v_corridor_max 
+        FROM v_hex_stability_ker_dvt_carbon 
+        WHERE hex_id = ?
+    )";
+    
+    sqlite3_stmt* stmt = nullptr;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
+    if (rc != SQLITE_OK) {
+        return state;  // Return default on error
+    }
+    
+    sqlite3_bind_text(stmt, 1, hex_id.c_str(), -1, SQLITE_STATIC);
+    
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        state.total_delta_v_t = sqlite3_column_double(stmt, 0);
+        const unsigned char* vtmax = sqlite3_column_text(stmt, 1);
+        if (vtmax) {
+            state.v_corridor_max = std::stod(reinterpret_cast<const char*>(vtmax));
+        } else {
+            state.v_corridor_max = 0.1;  // Default corridor
+        }
+    }
+    
+    sqlite3_finalize(stmt);
+    return state;
+}
+
+// Corridor safety check for LQR control
+static bool corridor_safe(double dvt_pred, const HexResidualState& state, 
+                          double net_margin = 0.01, double hex_margin = 0.05) {
+    double vt_after = state.total_delta_v_t + dvt_pred;
+    return vt_after <= state.v_corridor_max + hex_margin && dvt_pred <= net_margin;
+}
 
 // Simple KER triad and derived score.
 struct KerProfile {
@@ -312,11 +360,88 @@ private:
 // ACTUATION_GATE synapse: applies governance + Lyapunov + KER + carbon-aware corridor.
 class ActuationGateSynapse {
 public:
-    ActuationGateSynapse()
-        : governance_(),
+    ActuationGateSynapse(sqlite3* db = nullptr)
+        : db_(db),
+          governance_(),
           workload_model_(0.5, 1e-6, 0.05),
           current_v_t_(0.0),
           max_v_t_increase_(0.05) {}
+
+    // Hybrid LQR/Lyapunov control with corridor check
+    // Returns safe control command (either LQR or fallback)
+    struct ActuationCommand {
+        double gate_position;  // 0..1 normalized
+        bool is_safe_mode;
+    };
+    
+    ActuationCommand computeHybridControl(const std::string& hex_id, 
+                                          const std::vector<double>& x_state,
+                                          const ActuationCommand& u_lqr) {
+        const double NET_DVT_MARGIN = 0.01;
+        const double HEX_VT_MARGIN = 0.05;
+        
+        // Estimate ΔVt for the LQR command
+        double dvt_pred = estimateDeltaVForControl(x_state, u_lqr);
+        
+        // Load hex residual state from SQLite
+        HexResidualState hex_state;
+        if (db_) {
+            hex_state = loadHexResidualFromSQLite(db_, hex_id);
+        }
+        
+        // Check corridor safety
+        bool safe = corridor_safe(dvt_pred, hex_state, NET_DVT_MARGIN, HEX_VT_MARGIN);
+        
+        ActuationCommand u_final;
+        if (!safe) {
+            // Fallback to safe control (hold current position)
+            u_final = safeControl(x_state);
+            u_final.is_safe_mode = true;
+            
+            // Log violation attempt to actuation_request table
+            logActuationRequest(hex_id, dvt_pred, hex_state.total_delta_v_t, 
+                               hex_state.total_delta_v_t, false);
+        } else {
+            u_final = u_lqr;
+            u_final.is_safe_mode = false;
+            
+            // Log successful actuation request
+            double vt_after = hex_state.total_delta_v_t + dvt_pred;
+            logActuationRequest(hex_id, dvt_pred, hex_state.total_delta_v_t, 
+                               vt_after, true);
+        }
+        
+        return u_final;
+    }
+    
+    // Log actuation request to SQLite (will fail trigger if corridor violated)
+    void logActuationRequest(const std::string& hex_id, double dvt_pred, 
+                            double vt_before, double vt_after, bool corridor_ok) {
+        if (!db_) return;
+        
+        const char* sql = R"(
+            INSERT INTO actuation_request (hex_id, dvt_pred, vt_before, vt_after, corridor_ok)
+            VALUES (?, ?, ?, ?, ?)
+        )";
+        
+        sqlite3_stmt* stmt = nullptr;
+        int rc = sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr);
+        if (rc != SQLITE_OK) return;
+        
+        sqlite3_bind_text(stmt, 1, hex_id.c_str(), -1, SQLITE_STATIC);
+        sqlite3_bind_double(stmt, 2, dvt_pred);
+        sqlite3_bind_double(stmt, 3, vt_before);
+        sqlite3_bind_double(stmt, 4, vt_after);
+        sqlite3_bind_int(stmt, 5, corridor_ok ? 1 : 0);
+        
+        rc = sqlite3_step(stmt);
+        if (rc != SQLITE_DONE && corridor_ok) {
+            // Trigger aborted the insert - corridor violation
+            std::cerr << "Actuation blocked by Lyapunov-KER corridor trigger\n";
+        }
+        
+        sqlite3_finalize(stmt);
+    }
 
     ActuationDecision evaluate_series(const std::vector<CanalNodeTelemetry> &series) {
         ActuationDecision decision{};
@@ -387,10 +512,33 @@ public:
     }
 
 private:
+    sqlite3* db_;
     SynapseEndpointGovernance governance_;
     CyboquaticWorkloadModel workload_model_;
     double current_v_t_;
     double max_v_t_increase_;
+    
+    // Estimate ΔVt for a given control command (simplified model)
+    double estimateDeltaVForControl(const std::vector<double>& x_state, 
+                                    const ActuationCommand& u) {
+        // Simplified: ΔVt proportional to control magnitude and state deviation
+        if (x_state.empty()) return 0.0;
+        double state_norm = 0.0;
+        for (double x : x_state) state_norm += x * x;
+        state_norm = std::sqrt(state_norm);
+        
+        // ΔVt = beta * |u| * ||x||
+        double beta = 1e-6;
+        return beta * std::abs(u.gate_position) * state_norm;
+    }
+    
+    // Safe fallback control (hold position or minimal movement)
+    ActuationCommand safeControl(const std::vector<double>& x_state) {
+        ActuationCommand cmd;
+        cmd.gate_position = 0.0;  // Hold at zero / current position
+        cmd.is_safe_mode = true;
+        return cmd;
+    }
 };
 
 // CLI interface: read telemetry CSV, evaluate actuation gate, print CSV result.
