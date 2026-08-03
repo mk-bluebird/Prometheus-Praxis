@@ -1,0 +1,96 @@
+
+spec SynapsePattern {
+
+    // Core synapse endpoint linking a "producer" (e.g. C++) and "consumer" (e.g. Java).
+    entity SynapseEndpoint {
+        field producer_lang     : Text;   // "CPP", "JAVA", "LUA", "KOTLIN", "SQL"
+        field producer_relpath  : Text;   // e.g. "cpp/tools/eco_synapse_cpp_bridge.cpp"
+        field consumer_lang     : Text;   // e.g. "JAVA"
+        field consumer_relpath  : Text;   // e.g. "java/eco/EcoSynapseCliClient.java"
+
+        field synapse_class     : Text;   // "ANALYTIC_BRIDGE" | "ACTUATION_GATE" | "PURE_GOVERNANCE"
+        field transport_kind    : Text;   // "CLI_CSV" | "CLI_JSONL" | "JNI" | "LUA_FFI" | "KOTLIN_PROCESS"
+
+        field lane_default      : Text;   // "RESEARCH" | "EXPPROD" | "PROD"
+        field primary_plane     : Text;   // e.g. "CARBON", "HYDRAULICS", "NEURO"
+        field non_actuating     : Bool;   // synapse never sends direct actuator commands
+
+        // KER triad assigned to the synapse itself (not just modules).
+        field ker_k             : Real;
+        field ker_e             : Real;
+        field ker_r             : Real;
+        field ker_s             : Real;
+
+        // Flags indicating allowed actions.
+        field allows_readonly   : Bool;   // true if synapse only carries metrics/state
+        field allows_actuation  : Bool;   // true if synapse can trigger actuators (rare)
+        field neuro_flag        : Bool;   // true if synapse carries neuro/brain-adjacent data
+    }
+
+    invariant SynapseKerBounds(SynapseEndpoint s) {
+        0.0 <= s.ker_k and s.ker_k <= 1.0 and
+        0.0 <= s.ker_e and s.ker_e <= 1.0 and
+        0.0 <= s.ker_r and s.ker_r <= 1.0
+    }
+
+    invariant SynapseKerScalarConsistency(SynapseEndpoint s) {
+        s.ker_s = s.ker_k * s.ker_e - s.ker_r
+    }
+
+    // Analytics-only synapses must be non-actuating and readonly.
+    invariant AnalyticsBridgeIsNonActuating(SynapseEndpoint s) {
+        s.synapse_class = "ANALYTIC_BRIDGE" implies (
+            s.non_actuating = true and
+            s.allows_readonly = true and
+            s.allows_actuation = false
+        )
+    }
+
+    // Transport governance: CLI-based transports stay non-actuating.
+    invariant CliTransportNonActuating(SynapseEndpoint s) {
+        (s.transport_kind = "CLI_CSV" or s.transport_kind = "CLI_JSONL") implies (
+            s.non_actuating = true and
+            s.allows_actuation = false
+        )
+    }
+
+    // JNI and FFI-based paths require stricter KER thresholds.
+    invariant JniAndFfiKerThresholds(SynapseEndpoint s) {
+        (s.transport_kind = "JNI" or s.transport_kind = "LUA_FFI" or s.transport_kind = "KOTLIN_PROCESS") implies (
+            s.ker_s > 0.1 and
+            s.ker_e >= 0.6 and
+            s.ker_r <= 0.4
+        )
+    }
+
+    // Lane semantics: PROD synapses must satisfy stronger eco and risk constraints.
+    invariant SynapseProdLaneConstraints(SynapseEndpoint s) {
+        s.lane_default != "PROD" or (
+            s.synapse_class != "ACTUATION_GATE" and
+            s.non_actuating = true and
+            s.ker_s > 0.2 and
+            s.ker_e >= 0.7 and
+            s.ker_r <= 0.5
+        )
+    }
+
+    // Neurorights: neuro-adjacent synapses must never be actuation gates.
+    invariant NeuroSynapseNonActuating(SynapseEndpoint s) {
+        s.neuro_flag = false or (
+            s.synapse_class != "ACTUATION_GATE" and
+            s.non_actuating = true and
+            s.allows_actuation = false
+        )
+    }
+
+    // View that asserts a synapse is safe for deployment in eco-restoration.
+    view SynapseSafeForEco(SynapseEndpoint s) {
+        SynapseKerBounds(s) and
+        SynapseKerScalarConsistency(s) and
+        AnalyticsBridgeIsNonActuating(s) and
+        CliTransportNonActuating(s) and
+        JniAndFfiKerThresholds(s) and
+        SynapseProdLaneConstraints(s) and
+        NeuroSynapseNonActuating(s)
+    }
+}
