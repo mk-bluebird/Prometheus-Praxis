@@ -1,0 +1,116 @@
+# File: .github/workflows/aln_sql_conformance.yml
+name: ALN-to-SQL Conformance Verification
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  aln_sql_conformance:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install basic tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sqlite3 g++
+
+      - name: Build ALN conformance checker
+        run: |
+          g++ -std=c++20 -O2 -o aln_conformance_checker \
+            cpp/tools/aln_conformance_checker.cpp
+
+      - name: Generate test SQLite schema
+        run: |
+          sqlite3 prometheus_praxis.db "PRAGMA journal_mode=WAL;"
+          # Load schemas for entities with ALN specs (examples: CarbonAwareCorridor, WaterRights, NeuroConsentCorridor)
+          # CarbonAwareCorridor hex_stability_carbon table
+          sqlite3 prometheus_praxis.db "\
+            CREATE TABLE IF NOT EXISTS hex_stability_carbon (\
+              hex_id TEXT PRIMARY KEY,\
+              band TEXT,\
+              ker_k REAL,\
+              ker_e REAL,\
+              ker_r REAL,\
+              carbon_intensity REAL,\
+              max_carbon REAL,\
+              ker_s REAL,\
+              carbon_corridor REAL,\
+              v_residual REAL,\
+              delta_v_t REAL\
+            );\
+          "
+          # WaterRights tables
+          sqlite3 prometheus_praxis.db "\
+            CREATE TABLE IF NOT EXISTS water_rights (\
+              right_id TEXT PRIMARY KEY,\
+              holder_id TEXT NOT NULL,\
+              source_id TEXT NOT NULL,\
+              daily_limit_m3 REAL NOT NULL DEFAULT 0.0,\
+              seasonal_limit_m3 REAL NOT NULL DEFAULT 0.0,\
+              priority_class INTEGER NOT NULL,\
+              is_exempt INTEGER NOT NULL DEFAULT 0,\
+              allocated_today_m3 REAL NOT NULL DEFAULT 0.0,\
+              allocated_season_m3 REAL NOT NULL DEFAULT 0.0\
+            );\
+            CREATE TABLE IF NOT EXISTS water_rights_log (\
+              log_id INTEGER PRIMARY KEY AUTOINCREMENT,\
+              right_id TEXT NOT NULL,\
+              quantity_m3 REAL NOT NULL,\
+              ts TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP\
+            );\
+          "
+          # NeuroConsentCorridor and synapse_endpoint tables
+          sqlite3 prometheus_praxis.db "\
+            CREATE TABLE IF NOT EXISTS neuro_consent_corridor (\
+              consent_id TEXT PRIMARY KEY,\
+              module_id TEXT NOT NULL,\
+              subject_id TEXT NOT NULL,\
+              consent_level INTEGER NOT NULL,\
+              consent_state TEXT NOT NULL,\
+              consent_scope TEXT NOT NULL,\
+              ts_granted TEXT,\
+              ts_revoked TEXT\
+            );\
+            CREATE TABLE IF NOT EXISTS synapse_endpoint (\
+              synapse_id TEXT PRIMARY KEY,\
+              source_module TEXT NOT NULL,\
+              target_module TEXT NOT NULL,\
+              lane TEXT NOT NULL,\
+              neuro_flagged INTEGER NOT NULL DEFAULT 0,\
+              consent_id TEXT\
+            );\
+          "
+
+      - name: Run ALN-to-SQL conformance check
+        run: |
+          # Example ALN spec snippet combining key invariants
+          cat > aln_spec.txt << 'EOF'
+INVARIANT CarbonAwareCorridor.delta_v_bound: ΔV_t <= min(0.05, γ*s, δ*c) :: column=delta_v_t
+INVARIANT CarbonAwareCorridor.ker_positive: s = k*e - r >= 0 :: column=ker_s
+INVARIANT WaterRights.daily_limit: allocated_today_m3 <= daily_limit_m3 OR is_exempt :: column=allocated_today_m3
+INVARIANT WaterRights.seasonal_limit: allocated_season_m3 <= seasonal_limit_m3 OR is_exempt :: column=allocated_season_m3
+INVARIANT NeuroConsentCorridor.level3_active: consent_level = 3 -> consent_state = 'ACTIVE' :: column=consent_level
+EOF
+
+          # Trigger metadata stub: in a real setup, generate from sqlite3 .schema output.
+          cat > trigger_meta.txt << 'EOF'
+tr_hex_telemetry_delta_v_t hex_telemetry delta_v_t ker_s carbon_corridor
+tr_water_rights_daily_allocation water_rights allocated_today_m3
+tr_water_rights_seasonal_allocation water_rights allocated_season_m3
+tr_neuro_consent_before_ins neuro_consent_corridor consent_level consent_state
+EOF
+
+          # Run the C++ ALN conformance checker over the stub data.
+          ./aln_conformance_checker << 'EOF'
+INVARIANT CarbonAwareCorridor.delta_v_bound: ΔV_t <= min(0.05, γ*s, δ*c) :: column=delta_v_t
+INVARIANT CarbonAwareCorridor.ker_positive: s = k*e - r >= 0 :: column=ker_s
+INVARIANT WaterRights.daily_limit: allocated_today_m3 <= daily_limit_m3 OR is_exempt :: column=allocated_today_m3
+INVARIANT WaterRights.seasonal_limit: allocated_season_m3 <= seasonal_limit_m3 OR is_exempt :: column=allocated_season_m3
+INVARIANT NeuroConsentCorridor.level3_active: consent_level = 3 -> consent_state = 'ACTIVE' :: column=consent_level
+EOF
