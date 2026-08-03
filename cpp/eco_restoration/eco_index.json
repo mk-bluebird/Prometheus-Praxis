@@ -1,0 +1,145 @@
+{
+  "version": "1.0",
+  "repo": "mk-bluebird/Prometheus-Praxis",
+  "namespace": "eco_restoration_shard",
+  "modules": [
+    {
+      "name": "material_eco_impact",
+      "path": "cpp/eco_restoration/material_eco_impact.cpp",
+      "language": "C++",
+      "endpoints": [
+        {
+          "type": "C_API",
+          "symbol": "compute_material_eco_impact",
+          "inputs": [
+            "MaterialTestParamsC { oxygen_depletion_percent: f64, co2_evolution_percent: f64, bod_removal_percent: f64, doc_removal_percent: f64, days_to_pass_window: f64, toxicity_score: f64, pfas_presence: f64 }"
+          ],
+          "outputs": [
+            "MaterialEcoImpactC { k_safe_fraction: f64, e_eco_benefit_band: f64, r_risk_max: f64, ker_score: f64, biodegradability_score: f64 }"
+          ],
+          "semantics": "Computes KER and biodegradability scores from ISO 14851/14855 and OECD 301-style metrics; inputs and outputs normalized to [0,1] where applicable."
+        }
+      ],
+      "planes": ["HYDRAULICS", "ENERGY", "TOPOLOGY", "BIODIVERSITY"],
+      "ker_coupled": true
+    },
+    {
+      "name": "pfas_fate_corridor",
+      "path": "cpp/eco_restoration/pfas_fate_corridor.cpp",
+      "language": "C++",
+      "endpoints": [
+        {
+          "type": "C++",
+          "symbol": "PFASCorridor::step",
+          "inputs": [
+            "PFASState { mass_kg: f64, sorbed_fraction: f64, cold_survival_factor: f64 }",
+            "PFASStepParams { base_degradation_rate: f64, cold_temp_C: f64, current_temp_C: f64, sorption_increment: f64 }"
+          ],
+          "outputs": [
+            "PFASStepResult { next_state: PFASState, lyapunov_residual_Vt: f64, corridor_breach: bool }"
+          ],
+          "semantics": "Discrete-time PFAS fate update under cold-survival corridor; ensures mass non-increase when cold_survival_factor >= 1 and computes Lyapunov residual over PFAS state."
+        }
+      ],
+      "planes": ["HYDRAULICS", "ENERGY", "TOPOLOGY"],
+      "ker_coupled": true
+    },
+    {
+      "name": "phoenix_canal_blast_radius",
+      "path": "cpp/simulation/phoenix_canal_blast_radius.cpp",
+      "language": "C++",
+      "endpoints": [
+        {
+          "type": "CLI",
+          "symbol": "phoenix_canal_blast_radius",
+          "inputs": [
+            "GridPoint[] from SQLite phoenix_blast_grid",
+            "BlastParams { dt_s: f64, dx_m: f64, dy_m: f64, source_energy: f64 }"
+          ],
+          "outputs": [
+            "BlastRisk { r_hydraulics: f64, r_energy: f64, r_topology: f64 } per timestep"
+          ],
+          "semantics": "Nonlinear diffusion/advection/update of surcharge energy around Phoenix canal nodes; risk coordinates normalized to [0,1] for KER/Lyapunov vectors."
+        }
+      ],
+      "planes": ["HYDRAULICS", "ENERGY", "TOPOLOGY"],
+      "ker_coupled": true
+    },
+    {
+      "name": "ker_lyapunov_utils",
+      "path": "cpp/tools/ker_lyapunov_utils.cpp",
+      "language": "C++",
+      "endpoints": [
+        {
+          "type": "C++",
+          "symbol": "eco_tools::ker_score",
+          "inputs": ["k: f64 in [0,1]", "e: f64 in [0,1]", "r: f64 in [0,1]"],
+          "outputs": ["s: f64 (ker_score)"],
+          "semantics": "KER composite s = k * e - r; positive s implies negative Lyapunov drift under corridor design."
+        },
+        {
+          "type": "C++",
+          "symbol": "eco_tools::lyapunov_residual",
+          "inputs": ["w: f64[] (weights, w_j >= 0)", "r: f64[] (risk coords, r_j >= 0)"],
+          "outputs": ["Vt: f64"],
+          "semantics": "Quadratic residual V_t = sum_j w_j r_j^2 over risk planes."
+        }
+      ],
+      "planes": ["HYDRAULICS", "ENERGY", "TOPOLOGY", "BIODIVERSITY"],
+      "ker_coupled": true
+    },
+    {
+      "name": "phoenix_hex_registry_client",
+      "path": "cpp/tools/phoenix_hex_registry_client.cpp",
+      "language": "C++",
+      "endpoints": [
+        {
+          "type": "CLI",
+          "symbol": "phoenix_hex_registry_client",
+          "inputs": ["sqlite-db-path (Phoenix hex registry)"],
+          "outputs": ["HexRisk rows { hex_id, r_hydraulics, r_energy, r_topology, r_biodiversity, Vt }"],
+          "semantics": "Reads hex-level risk coordinates and weights from phoenix_hex_registry and computes Lyapunov residual Vt per hex."
+        }
+      ],
+      "planes": ["HYDRAULICS", "ENERGY", "TOPOLOGY", "BIODIVERSITY"],
+      "ker_coupled": true
+    },
+    {
+      "name": "eco_restoration_cli",
+      "path": "cpp/tools/eco_restoration_cli.cpp",
+      "language": "C++",
+      "endpoints": [
+        {
+          "type": "CLI",
+          "symbol": "eco_restoration_cli material-score",
+          "inputs": ["O2%, CO2%, BOD%, DOC%, days, toxicity, pfas"],
+          "outputs": ["Text report of KER and biodegradability scores"],
+          "semantics": "Front-end into material eco-impact engine."
+        },
+        {
+          "type": "CLI",
+          "symbol": "eco_restoration_cli pfas-corridor-step",
+          "inputs": ["sqlite-db-path", "node_id"],
+          "outputs": ["Updated PFAS state; printed mass, sorbed_fraction, cold_survival_factor"],
+          "semantics": "In-place PFAS corridor step against pfas_corridor_state."
+        },
+        {
+          "type": "CLI",
+          "symbol": "eco_restoration_cli blast-radius",
+          "inputs": ["sqlite-db-path"],
+          "outputs": ["Blast-radius risk coordinates r_hydraulics, r_topology, r_energy"],
+          "semantics": "Single-step blast-radius risk evaluation using phoenix_blast_grid."
+        },
+        {
+          "type": "CLI",
+          "symbol": "eco_restoration_cli ker-summary",
+          "inputs": ["sqlite-db-path"],
+          "outputs": ["Hex-level Vt and KER scores"],
+          "semantics": "Summarizes KER and Lyapunov residuals over Phoenix hex anchors."
+        }
+      ],
+      "planes": ["HYDRAULICS", "ENERGY", "TOPOLOGY", "BIODIVERSITY"],
+      "ker_coupled": true
+    }
+  ]
+}
