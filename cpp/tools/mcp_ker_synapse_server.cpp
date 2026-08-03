@@ -7,9 +7,21 @@
 #include <stdexcept>
 #include <sstream>
 #include <sqlite3.h>
+#include <ctime>
+#include <iomanip>
 
 struct Row {
     std::vector<std::string> cols;
+};
+
+// Tool metadata structure for KER and neurorights info
+struct ToolMetadata {
+    double ker_k;
+    double ker_e;
+    double ker_r;
+    double ker_s;
+    int neuro_flag;
+    std::string lane_default;
 };
 
 class SqliteClient {
@@ -20,12 +32,56 @@ public:
         if (rc != SQLITE_OK) {
             throw std::runtime_error("Failed to open SQLite database: " + std::string(sqlite3_errmsg(db_)));
         }
+        // Initialize audit table and views
+        initGovernanceAudit();
     }
 
     ~SqliteClient() {
         if (db_) {
             sqlite3_close(db_);
         }
+    }
+
+    sqlite3* getDb() const { return db_; }
+
+    void exec(const std::string& sql) {
+        char* errMsg = nullptr;
+        int rc = sqlite3_exec(db_, sql.c_str(), nullptr, nullptr, &errMsg);
+        if (rc != SQLITE_OK) {
+            std::string err = errMsg ? errMsg : "Unknown error";
+            sqlite3_free(errMsg);
+            throw std::runtime_error("SQL execution failed: " + err);
+        }
+    }
+
+    void initGovernanceAudit() {
+        // Create governance_query_audit table and view
+        exec(R"(
+            CREATE TABLE IF NOT EXISTS governance_query_audit (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp_utc   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+                tool_name       TEXT NOT NULL,
+                caller_id       TEXT,
+                ker_k           REAL,
+                ker_e           REAL,
+                ker_r           REAL,
+                ker_s           REAL,
+                neuro_flag      INTEGER DEFAULT 0,
+                lane_default    TEXT,
+                query_payload   TEXT
+            )
+        )");
+
+        exec(R"(
+            CREATE VIEW IF NOT EXISTS v_neurorights_query_stats AS
+            SELECT
+                date(timestamp_utc) AS day,
+                COUNT(*) AS total_queries,
+                SUM(CASE WHEN neuro_flag = 1 THEN 1 ELSE 0 END) AS neuro_queries,
+                SUM(CASE WHEN lane_default = 'PROD' AND neuro_flag = 1 THEN 1 ELSE 0 END) AS neuro_prod_queries
+            FROM governance_query_audit
+            GROUP BY date(timestamp_utc)
+        )");
     }
 
     std::vector<Row> query(const std::string& sql) {
@@ -252,6 +308,83 @@ static std::string make_sql_for_tool(const Request& req) {
     return oss.str();
 }
 
+// Log governance query to audit table
+static void log_governance_query(sqlite3* db, const Request& req, const ToolMetadata& meta, const std::string& raw_payload) {
+    const char* sql = R"(
+        INSERT INTO governance_query_audit (tool_name, caller_id, ker_k, ker_e, ker_r, ker_s, neuro_flag, lane_default, query_payload)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    )";
+    
+    sqlite3_stmt* stmt = nullptr;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
+    if (rc != SQLITE_OK) {
+        // Silently ignore logging failures to avoid disrupting main functionality
+        return;
+    }
+    
+    sqlite3_bind_text(stmt, 1, req.tool.c_str(), -1, SQLITE_STATIC);
+    
+    // Use empty string for caller_id if not available
+    std::string caller_id = "";  // Could be extended to extract from request
+    sqlite3_bind_text(stmt, 2, caller_id.c_str(), -1, SQLITE_STATIC);
+    
+    sqlite3_bind_double(stmt, 3, meta.ker_k);
+    sqlite3_bind_double(stmt, 4, meta.ker_e);
+    sqlite3_bind_double(stmt, 5, meta.ker_r);
+    sqlite3_bind_double(stmt, 6, meta.ker_s);
+    sqlite3_bind_int(stmt, 7, meta.neuro_flag);
+    sqlite3_bind_text(stmt, 8, meta.lane_default.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 9, raw_payload.c_str(), -1, SQLITE_STATIC);
+    
+    rc = sqlite3_step(stmt);
+    if (rc != SQLITE_DONE) {
+        // Silently ignore logging failures
+    }
+    
+    sqlite3_finalize(stmt);
+}
+
+// Get tool metadata from database for a given tool
+static ToolMetadata get_tool_metadata(SqliteClient& client, const std::string& tool_name) {
+    ToolMetadata meta{0.0, 0.0, 0.0, 0.0, 0, "RESEARCH"};
+    
+    // Query module_ker_profile or mcp_tool for KER values based on tool name
+    try {
+        std::ostringstream oss;
+        oss << "SELECT ker_k, ker_e, ker_r, ker_s, neuro_flag, lane_default FROM module_ker_profile WHERE relpath LIKE '%" 
+            << tool_name << "%' LIMIT 1";
+        auto rows = client.query(oss.str());
+        
+        if (!rows.empty() && rows[0].cols.size() >= 6) {
+            meta.ker_k = std::stod(rows[0].cols[0]);
+            meta.ker_e = std::stod(rows[0].cols[1]);
+            meta.ker_r = std::stod(rows[0].cols[2]);
+            meta.ker_s = std::stod(rows[0].cols[3]);
+            meta.neuro_flag = std::stoi(rows[0].cols[4]);
+            meta.lane_default = rows[0].cols[5];
+        } else {
+            // Try mcp_tool table as fallback
+            oss.str("");
+            oss << "SELECT ker_k, ker_e, ker_r, ker_s, neuro_flag, lane_default FROM mcp_tool WHERE toolname = '" 
+                << tool_name << "' LIMIT 1";
+            rows = client.query(oss.str());
+            
+            if (!rows.empty() && rows[0].cols.size() >= 6) {
+                meta.ker_k = std::stod(rows[0].cols[0]);
+                meta.ker_e = std::stod(rows[0].cols[1]);
+                meta.ker_r = std::stod(rows[0].cols[2]);
+                meta.ker_s = std::stod(rows[0].cols[3]);
+                meta.neuro_flag = std::stoi(rows[0].cols[4]);
+                meta.lane_default = rows[0].cols[5];
+            }
+        }
+    } catch (...) {
+        // Return default metadata on error
+    }
+    
+    return meta;
+}
+
 static std::string make_error_response(const std::string& message) {
     std::ostringstream oss;
     oss << "{ \"ok\": false, \"error\": \"" << json_escape(message) << "\" }";
@@ -426,6 +559,10 @@ int main(int argc, char** argv) {
                 std::cout << make_error_response("Unknown tool: " + req.tool) << std::endl;
                 continue;
             }
+
+            // Get tool metadata and log governance query before executing
+            ToolMetadata meta = get_tool_metadata(client, req.tool);
+            log_governance_query(client.getDb(), req, meta, line);
 
             try {
                 std::vector<Row> rows = client.query(sql);
