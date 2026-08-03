@@ -8,15 +8,6 @@
 #include <sstream>
 #include <sqlite3.h>
 
-/*
- * MCP-style KER + Synapse Governance Server (STDIO JSON)
- *
- * Non-actuating, read-only analytics bridge:
- *  - Reads JSON requests from stdin (one per line).
- *  - Executes governance views against a SQLite DB.
- *  - Returns JSON responses to stdout for AI-Chat and tooling.
- */
-
 struct Row {
     std::vector<std::string> cols;
 };
@@ -205,6 +196,20 @@ static std::string make_sql_for_tool(const Request& req) {
                "violations_dvt_global, violations_ker_nonpositive, violations_joint_ker_dvt "
                "FROM v_hex_stability_ker_dvt "
                "ORDER BY total_delta_v_t DESC "
+               "LIMIT " << hex_limit << ";";
+    } else if (req.tool == "hex_stability_carbon") {
+        int hex_limit = req.limit > 0 ? req.limit : 100;
+        oss << "SELECT "
+               "hex_id, region_name, topology_band, primary_plane, "
+               "workload_count, total_delta_v_t, avg_delta_v_t, max_delta_v_t, "
+               "avg_ker_k, avg_ker_e, avg_ker_r, avg_ker_s, "
+               "avg_carbon_intensity_gco2_kwh, "
+               "count_green_band, count_neutral_band, count_red_band, "
+               "violations_dvt_global, violations_ker_nonpositive, "
+               "violations_joint_ker_dvt, "
+               "violations_red_band_ker, violations_prod_red_band "
+               "FROM v_hex_stability_ker_dvt_carbon "
+               "ORDER BY total_delta_v_t DESC, avg_carbon_intensity_gco2_kwh DESC "
                "LIMIT " << hex_limit << ";";
     } else {
         return "";
