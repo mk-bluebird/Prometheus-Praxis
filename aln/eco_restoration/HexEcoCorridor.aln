@@ -1,0 +1,103 @@
+spec HexEcoCorridor {
+
+    // Real-time heat-stress and KER profile per hex.
+    entity HexHeatStressProfile {
+        field hex_id                : Text;
+        field air_temp_c            : Real;   // near-surface air temperature
+        field surface_temp_c        : Real;   // land/surface temperature
+        field rel_humidity          : Real;   // relative humidity (0..100)
+        field tree_canopy_fraction  : Real;   // 0..1
+        field heat_stress_index     : Real;   // 0..1, composite stress
+        field ker_k_base            : Real;   // base knowledge factor 0..1
+        field ker_e_base            : Real;   // base eco-impact 0..1
+        field ker_r_base            : Real;   // base risk-of-harm 0..1
+        field ker_e_effective       : Real;   // heat-adjusted eco-impact 0..1
+    }
+
+    // Forecasted carbon intensity and workload window per hex and horizon.
+    entity HexCarbonForecast {
+        field hex_id                      : Text;
+        field timestamp_utc               : Text;  // ISO-8601 time for horizon
+        field forecast_horizon_hours      : Real;  // e.g., 1..24
+        field carbon_intensity_gco2_kwh   : Real;  // forecast marginal intensity
+        field workload_window             : Text;  // 'GREEN_BAND','NEUTRAL','RED_BAND'
+    }
+
+    // Combined eco-corridor view for multi-criteria scheduling.
+    entity HexEcoCorridorState {
+        field hex_id                      : Text;
+        field timestamp_utc               : Text;
+        field heat_stress_index           : Real;   // 0..1
+        field carbon_intensity_gco2_kwh   : Real;
+        field workload_window             : Text;   // band at this horizon
+        field ker_k_effective             : Real;   // 0..1
+        field ker_e_effective             : Real;   // 0..1
+        field ker_r_effective             : Real;   // 0..1
+        field ker_s_effective             : Real;   // scalar corridor = k*e - r
+        field eco_corridor_score          : Real;   // 0..1, composite scheduling score
+    }
+
+    // Bounds and consistency invariants on heat-stress profile.
+    invariant HeatStressProfileBounds(HexHeatStressProfile h) {
+        h.heat_stress_index >= 0.0 and h.heat_stress_index <= 1.0 and
+        h.tree_canopy_fraction >= 0.0 and h.tree_canopy_fraction <= 1.0 and
+        h.ker_k_base >= 0.0 and h.ker_k_base <= 1.0 and
+        h.ker_e_base >= 0.0 and h.ker_e_base <= 1.0 and
+        h.ker_r_base >= 0.0 and h.ker_r_base <= 1.0 and
+        h.ker_e_effective >= 0.0 and h.ker_e_effective <= 1.0
+    }
+
+    // Bounds on carbon forecast and workload windows.
+    invariant CarbonForecastBounds(HexCarbonForecast f) {
+        f.carbon_intensity_gco2_kwh >= 0.0 and
+        (f.workload_window = "GREEN_BAND" or
+         f.workload_window = "NEUTRAL"    or
+         f.workload_window = "RED_BAND")
+    }
+
+    // KER scalar consistency on the combined state.
+    invariant HexEcoCorridorKerConsistency(HexEcoCorridorState c) {
+        c.ker_k_effective >= 0.0 and c.ker_k_effective <= 1.0 and
+        c.ker_e_effective >= 0.0 and c.ker_e_effective <= 1.0 and
+        c.ker_r_effective >= 0.0 and c.ker_r_effective <= 1.0 and
+        c.ker_s_effective = c.ker_k_effective * c.ker_e_effective - c.ker_r_effective
+    }
+
+    // Coupling: effective KER values inherit from heat-stress and base KER.
+    invariant HexEcoCorridorKerCoupling(HexHeatStressProfile h, HexEcoCorridorState c) {
+        h.hex_id = c.hex_id and
+        // Knowledge and risk are inherited directly for now; eco-impact is adjusted by heat-stress.
+        c.ker_k_effective = h.ker_k_base and
+        c.ker_r_effective = h.ker_r_base and
+        c.ker_e_effective = h.ker_e_effective
+    }
+
+    // Multi-criteria eco-corridor score:
+    // Lower heat-stress and lower carbon intensity improve eco_corridor_score;
+    // higher ker_s_effective improves score as well.
+    invariant HexEcoCorridorScore(HexEcoCorridorState c) {
+        let heat_term   = 1.0 - c.heat_stress_index;
+        let carbon_term = 1.0 / (1.0 + c.carbon_intensity_gco2_kwh / 1000.0);  // normalize gCO2/kWh
+        let ker_term    = max(0.0, c.ker_s_effective);                         // positive corridor only
+        let w_heat      = 0.4;
+        let w_carbon    = 0.3;
+        let w_ker       = 0.3;
+        c.eco_corridor_score =
+            w_heat   * heat_term +
+            w_carbon * carbon_term +
+            w_ker    * ker_term
+    }
+
+    // Lane-like scheduling constraints derived from workload_window and eco_corridor_score.
+    // Example:
+    //  - GREEN_BAND: require eco_corridor_score >= 0.5 for heavy workloads.
+    //  - RED_BAND: disallow heavy workloads unless eco_corridor_score >= 0.8.
+    invariant HexEcoCorridorSchedulingConstraints(HexEcoCorridorState c) {
+        if c.workload_window = "GREEN_BAND" then
+            c.eco_corridor_score >= 0.5
+        else if c.workload_window = "RED_BAND" then
+            c.eco_corridor_score >= 0.8
+        else
+            true
+    }
+}
