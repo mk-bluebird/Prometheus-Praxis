@@ -13,9 +13,9 @@ particle cyboquatic.workload.ker {
     plane hydraulics {
         coordinate = "risk_h";
         corridor {
-            gold   = [0.0, 0.4];
-            amber  = [0.4, 0.7];
-            red    = [0.7, 1.0];
+            gold            = [0.0, 0.4];
+            amber           = [0.4, 0.7];
+            red             = [0.7, 1.0];
             non_offsettable = true;
         }
     }
@@ -23,9 +23,9 @@ particle cyboquatic.workload.ker {
     plane energy {
         coordinate = "risk_e";
         corridor {
-            gold   = [0.0, 0.4];
-            amber  = [0.4, 0.7];
-            red    = [0.7, 1.0];
+            gold            = [0.0, 0.4];
+            amber           = [0.4, 0.7];
+            red             = [0.7, 1.0];
             non_offsettable = false;
         }
     }
@@ -33,9 +33,9 @@ particle cyboquatic.workload.ker {
     plane topology {
         coordinate = "risk_t";
         corridor {
-            gold   = [0.0, 0.5];
-            amber  = [0.5, 0.8];
-            red    = [0.8, 1.0];
+            gold            = [0.0, 0.5];
+            amber           = [0.5, 0.8];
+            red             = [0.8, 1.0];
             non_offsettable = false;
         }
     }
@@ -43,9 +43,9 @@ particle cyboquatic.workload.ker {
     plane biodiversity {
         coordinate = "risk_b";
         corridor {
-            gold   = [0.0, 0.3];
-            amber  = [0.3, 0.6];
-            red    = [0.6, 1.0];
+            gold            = [0.0, 0.3];
+            amber           = [0.3, 0.6];
+            red             = [0.6, 1.0];
             non_offsettable = true;
         }
     }
@@ -78,5 +78,69 @@ particle cyboquatic.workload.ker {
         sql {
             table = "ker_window";
         }
+    }
+}
+
+spec CyboquaticWorkloadKER {
+
+    entity CanalNodeTelemetry {
+        field node_id            : Text;
+        field hex_id             : Text;
+        field canal_node_id      : Text;
+        field flow_rate_m3s      : Real;
+        field head_loss_m        : Real;
+        field pump_power_kw      : Real;
+        field lift_height_m      : Real;
+        field water_density_kgm3 : Real;
+        field gravity_ms2        : Real;
+        field eco_efficiency     : Real;
+        field timestamp_seconds  : Real;
+    }
+
+    entity WorkloadResult {
+        field energyreq_j        : Real;
+        field eco_energy_j       : Real;
+        field delta_v_t          : Real;
+        field ker_k              : Real;
+        field ker_e              : Real;
+        field ker_r              : Real;
+        field risk_h             : Real;
+        field risk_e             : Real;
+        field risk_t             : Real;
+        field risk_b             : Real;
+    }
+
+    invariant NonNegativeEnergy(WorkloadResult r) {
+        r.energyreq_j >= 0.0 and
+        r.eco_energy_j >= 0.0
+    }
+
+    invariant KERBounds(WorkloadResult r) {
+        0.0 <= r.ker_k and r.ker_k <= 1.0 and
+        0.0 <= r.ker_e and r.ker_e <= 1.0 and
+        0.0 <= r.ker_r and r.ker_r <= 1.0
+    }
+
+    invariant PositiveCorridorScore(WorkloadResult r) {
+        r.ker_k * r.ker_e - r.ker_r > 0.0
+    }
+
+    invariant LyapunovCorridor(WorkloadResult r) {
+        r.delta_v_t >= 0.0 and r.delta_v_t <= 0.05
+    }
+
+    invariant PlaneCorridors(WorkloadResult r) {
+        0.0 <= r.risk_h and r.risk_h <= 1.0 and
+        0.0 <= r.risk_e and r.risk_e <= 1.0 and
+        0.0 <= r.risk_t and r.risk_t <= 1.0 and
+        0.0 <= r.risk_b and r.risk_b <= 1.0
+    }
+
+    view CanalNodeToWorkload(CanalNodeTelemetry t, WorkloadResult r) {
+        NonNegativeEnergy(r) and
+        KERBounds(r) and
+        PositiveCorridorScore(r) and
+        LyapunovCorridor(r) and
+        PlaneCorridors(r)
     }
 }
