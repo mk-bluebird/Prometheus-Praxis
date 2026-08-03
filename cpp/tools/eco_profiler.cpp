@@ -5,6 +5,8 @@
 #include <vector>
 #include <fstream>
 #include <stdexcept>
+#include <cmath>
+#include <ctime>
 
 #if defined(__linux__) || defined(__APPLE__)
 #include <sys/resource.h>
@@ -78,8 +80,7 @@ int main() {
         acc += std::sin(double(i) * 1e-6);
     }
 
-    eco_profiler::RunProfile p = eco_profiler::profiler::RunProfile{};
-    p = prof.finish();
+    eco_profiler::RunProfile p = prof.finish();
 
     eco_profiler::log_profile(p, "eco_profiler.log");
 

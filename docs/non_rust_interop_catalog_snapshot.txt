@@ -1,0 +1,46 @@
+Prometheus‑Praxis Non‑Rust Interop Pattern Catalog
+
+1. C++ <-> Kotlin JNI Shared Library Pattern
+   - Build C++ eco modules (PFAS corridor, blast‑radius PDE, workload energy)
+     as a shared library (e.g., libeco_restoration.so / .dll).
+   - Export C‑style functions with extern "C" for stable ABI:
+       double eco_pfas_step(const PfasState* state, const PfasParams* params);
+   - Use Kotlin/Java JNI to load the library and call these functions from
+     cyboquatic workload and governance CLIs.
+   - Keep all actuation out of C++; JNI calls are non‑actuating analytics only.
+
+2. C++ <-> Java CLI + CSV Pattern
+   - Use C++ tools to read scenarios (see eco_scenario_library_spec) and
+     emit eco metrics (KER triads, Lyapunov residuals, PFAS/material scores)
+     as CSV/JSONL via eco_serialization.cpp.
+   - Java tools (e.g., KerReportGenerator, EcoSchemaValidator) consume CSV
+     using standard libraries and render dashboards or reports.
+   - This pattern avoids tight ABI coupling and keeps evidence in files.
+
+3. C++ <-> Lua Predicate Embedding
+   - C++ computes physical predicates (k, e, r, s, deltaVt, blastRisk) for
+     each path or scenario frame.
+   - Kotlin marshals these into a Lua environment and runs FOG scripts
+     that decide lane and rejection based on ecosafety rules.
+   - Lua never calls C++ directly; C++ stays a pure analytics engine.
+
+4. C++ <-> ALN v2 Corridor Conformance
+   - ALN shards define corridor families (PFAS fate, hydraulic blast‑radius,
+     material eco‑impact, hex governance) as machine‑checkable invariants.
+   - C++ tools (aln_conformance_checker) read corridor parameters and
+     simulate states, verifying that actions respect KER and Lyapunov
+     constraints (V_{t+1} - V_t <= -alpha s_t when s_t>0).
+   - Results are written back as evidence rows in SQLite and referenced by ALN.
+
+5. MCP‑Indexed CLI Tools for Multi‑Language Use
+   - All C++, Kotlin, Java, and Lua tools are registered in mcp_file and
+     mcp_tool with filekind ('CPP','KOTLIN','LUA','JAVA') and toolkind
+     ('COMMAND','SQL_QUERY').
+   - mcp_endpoint rows bind CLIs and shared libraries as endpoint_type 'CLI'
+     or 'RUST_FN' style for non‑Rust languages.
+   - AI agents use MCP to discover these tools, respect lanedefault and
+     planebands, and call only non‑actuating endpoints in RESEARCH lanes.
+
+These patterns are templates: future C++ eco modules should reuse them
+for interop, avoiding new crates and keeping all governance and KER
+constraints encoded in SQLite and ALN rather than ad‑hoc glue.
