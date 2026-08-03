@@ -1,0 +1,20 @@
+# File: docker/docker-compose.yml
+version: "3.9"
+
+services:
+  governance-stack:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: prometheus_praxis_governance
+    working_dir: /app
+    volumes:
+      - ../cpp:/app/cpp:ro
+      - ../lua:/app/lua:ro
+    command: >
+      sh -c "
+        echo 'hex_stability_carbon_snapshot' | ./mcp_stdio_governance_bridge;
+        lua5.3 lua/fog/fog_router.lua
+      "
+    stdin_open: true
+    tty: true
