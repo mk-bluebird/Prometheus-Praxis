@@ -22,6 +22,9 @@ struct WorkloadSample {
     double green_fraction;
     double energyreqJ;
     double deltaVt_m_s;
+    double ker_k;
+    double ker_e;
+    double ker_r;
 };
 
 class CyboquaticWorkloadModel {
@@ -30,14 +33,16 @@ public:
                             double gravity_m_s2 = 9.80665,
                             double ndvi_min = 0.1,
                             double ndvi_max = 0.7,
-                            double alpha = 0.04,
-                            double beta = 0.8)
+                            double alpha_deltaVt = 0.04,
+                            double beta_deltaVt = 0.8,
+                            double alpha_ker_e = 1e-6)
         : rho_(water_density_kg_m3),
           g_(gravity_m_s2),
           ndvi_min_(ndvi_min),
           ndvi_max_(ndvi_max),
-          alpha_(alpha),
-          beta_(beta)
+          alpha_deltaVt_(alpha_deltaVt),
+          beta_deltaVt_(beta_deltaVt),
+          alpha_ker_e_(alpha_ker_e)
     {}
 
     WorkloadSample compute_sample(const std::string& basin_id,
@@ -47,7 +52,9 @@ public:
                                   double head_m,
                                   double motor_efficiency,
                                   double aeration_factor,
-                                  double ndvi) const
+                                  double ndvi,
+                                  double ker_k,
+                                  double ker_r) const
     {
         WorkloadSample s{};
         s.basin_id = basin_id;
@@ -59,17 +66,20 @@ public:
         s.aeration_factor = clamp(aeration_factor, 0.0, 1.0);
         s.ndvi = ndvi;
         s.green_fraction = ndvi_to_green_fraction(ndvi);
+        s.ker_k = clamp(ker_k, 0.0, 1.0);
+        s.ker_r = clamp(ker_r, 0.0, 1.0);
 
-        double power_W = rho_ * g_ * flow_rate_m3_s * head_m / s.motor_efficiency;
+        double power_W = rho_ * g_ * s.flow_rate_m3_s * s.head_m / s.motor_efficiency;
         double energy_J = power_W;
 
         double aeration_multiplier = 1.0 + 0.5 * s.aeration_factor;
         s.energyreqJ = energy_J * aeration_multiplier;
 
         double gf = s.green_fraction > 0.0 ? s.green_fraction : 0.0;
-        double head_clamped = head_m > 0.0 ? head_m : 0.0;
-        s.deltaVt_m_s = alpha_ * std::pow(gf, beta_) * std::sqrt(head_clamped);
+        double head_clamped = s.head_m > 0.0 ? s.head_m : 0.0;
+        s.deltaVt_m_s = alpha_deltaVt_ * std::pow(gf, beta_deltaVt_) * std::sqrt(head_clamped);
 
+        s.ker_e = -alpha_ker_e_ * s.energyreqJ;
         return s;
     }
 
@@ -82,6 +92,8 @@ public:
                                                     double motor_efficiency,
                                                     double aeration_factor,
                                                     double ndvi,
+                                                    double ker_k,
+                                                    double ker_r,
                                                     double sampling_interval_s) const
     {
         std::vector<WorkloadSample> series;
@@ -112,7 +124,9 @@ public:
                 head,
                 motor_efficiency,
                 aeration_factor,
-                ndvi
+                ndvi,
+                ker_k,
+                ker_r
             );
             series.push_back(s);
             current_time += sampling_interval_s;
@@ -124,7 +138,7 @@ public:
         std::ostringstream oss;
         oss << "basin_id,h3_hex_id,timestamp_s,flow_rate_m3_s,head_m,"
                "motor_efficiency,aeration_factor,ndvi,green_fraction,"
-               "energyreqJ,deltaVt_m_s\n";
+               "energyreqJ,deltaVt_m_s,ker_k,ker_e,ker_r\n";
         oss << std::fixed << std::setprecision(6);
         for (const auto& s : series) {
             oss << s.basin_id << ","
@@ -137,7 +151,10 @@ public:
                 << s.ndvi << ","
                 << s.green_fraction << ","
                 << s.energyreqJ << ","
-                << s.deltaVt_m_s << "\n";
+                << s.deltaVt_m_s << ","
+                << s.ker_k << ","
+                << s.ker_e << ","
+                << s.ker_r << "\n";
         }
         return oss.str();
     }
@@ -147,8 +164,9 @@ private:
     double g_;
     double ndvi_min_;
     double ndvi_max_;
-    double alpha_;
-    double beta_;
+    double alpha_deltaVt_;
+    double beta_deltaVt_;
+    double alpha_ker_e_;
 
     static double clamp(double v, double lo, double hi) {
         if (v < lo) return lo;
@@ -175,12 +193,13 @@ int main() {
         3600.0,
         0.15,
         4.0,
-        0.75,
+        0.80,
         0.6,
         0.45,
+        0.9,
+        0.2,
         60.0
     );
-
     std::cout << cyboquatic::CyboquaticWorkloadModel::to_csv(series);
     return 0;
 }
