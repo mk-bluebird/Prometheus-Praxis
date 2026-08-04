@@ -1,0 +1,97 @@
+// File: aln_v2/ker_e_stochastic_process.aln
+// ALN v2 shard describing stochastic evolution of ker_e under variable flow.
+
+/*
+We model ker_e(t) as a cumulative sum of net carbon flux per telemetry sample:
+
+    ker_e_n = ker_e_{n-1} + f_n,
+
+where f_n is the net carbon flux at sample n (kg CO2-eq), possibly negative (carbon-negative).
+
+Assume flow rates Q_n follow a log-normal distribution over a season:
+
+    ln Q_n ~ Normal(mu_Q, sigma_Q^2),
+
+with Q_n > 0, and f_n depends on Q_n and operational choices.
+
+We treat ker_e_n as a stochastic process:
+
+    ker_e_n = ker_e_0 + sum_{i=1}^{n} f_i.
+
+Under mild assumptions (f_i independent or weakly dependent with finite variance),
+ker_e_n behaves as a random walk with drift:
+
+    E[f_i] = m_f, Var(f_i) = s_f^2,
+    ker_e_n ≈ ker_e_0 + n m_f + sqrt(n) s_f * W,
+
+where W is a standard normal variable.
+
+Thus, ker_e_n is well-approximated by a discrete-time Brownian motion with drift
+(or equivalently, a random-walk process), modulated by log-normal flow variability
+through f_i(Q_i).
+
+ALN v2 entities:
+
+entity TelemetrySample {
+    field sample_id : int;
+    field timestamp_s : float;
+    field flow_m3_s : float;
+    field net_carbon_flux_kg : float; // f_n
+}
+
+entity KerEProcess {
+    field sample_id : int;
+    field ker_e_value : float;
+}
+
+invariant KerERecurrence {
+    for s in TelemetrySample {
+        exists k_prev in KerEProcess where k_prev.sample_id == s.sample_id - 1;
+        exists k_curr in KerEProcess where k_curr.sample_id == s.sample_id;
+        assert k_curr.ker_e_value == k_prev.ker_e_value + s.net_carbon_flux_kg;
+    }
+}
+
+We use a CUSUM control-chart to trigger governance intervention.
+
+Define:
+
+    S_0 = 0,
+    S_n = max(0, S_{n-1} + (f_n - k_threshold)),
+
+where k_threshold is a reference flux (e.g., expected mean net carbon flux under
+carbon-neutral operation, m_f_ref).
+
+Governance intervention is triggered when:
+
+    S_n >= h_cusum,
+
+for some decision threshold h_cusum > 0.
+
+ALN invariants:
+
+constant k_threshold = /* reference net carbon flux per sample */;
+constant h_cusum     = /* CUSUM threshold */;
+
+entity CUSUMState {
+    field sample_id : int;
+    field S_value : float;
+}
+
+invariant CUSUMRecurrence {
+    for s in TelemetrySample {
+        exists c_prev in CUSUMState where c_prev.sample_id == s.sample_id - 1;
+        exists c_curr in CUSUMState where c_curr.sample_id == s.sample_id;
+        assert c_curr.S_value == max(0.0, c_prev.S_value + (s.net_carbon_flux_kg - k_threshold));
+    }
+}
+
+invariant GovernanceInterventionTrigger {
+    for c in CUSUMState {
+        if c.S_value >= h_cusum {
+            // Governance action required: ker_e process is drifting away from carbon-negative regime.
+            assert true; // This would be bound to an external governance mechanism.
+        }
+    }
+}
+*/
