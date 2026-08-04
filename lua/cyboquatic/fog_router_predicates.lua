@@ -35,7 +35,7 @@ end
 
 function FogRouter.predicate_score(viscosity_cP, turbidity_NTU, organic_fraction)
     local v_score = math.max(0, 1 - (viscosity_cP / 100))
-    local t_score = math.max(0, 1 - (turbidity_NTU / 500))
+    local t_score = math.max(0, 1 - (turbidityNTU / 500))
     local o_score = math.max(0, math.min(organic_fraction, 1))
     return (v_score + t_score + o_score) / 3
 end
@@ -51,12 +51,12 @@ function FogRouter.suggest_route(predicate_score, canal_capacity_m3_s)
 end
 
 function FogRouter.route_from_row(row)
-    local deltaVt = row.deltaVt or 0
-    local topoStress = row.topo_stress_norm or 0
-    local tempC = row.canal_temperature_C or 15
-    local pfasUgL = row.pfas_concentration_ugL or 0
+    local deltaVt = row.deltaVt or 0.0
+    local topoStress = row.topo_stress_norm or 0.0
+    local tempC = row.canal_temperature_C or 15.0
+    local pfasUgL = row.pfas_concentration_ugL or 0.0
 
-    local approxDO2 = math.max(0, 8.0 - deltaVt * 5.0)
+    local approxDO2 = math.max(0.0, 8.0 - deltaVt * 5.0)
     local approxTurbidity = 20.0 + topoStress * 60.0
 
     local sample = {
@@ -87,10 +87,10 @@ local function run_cli(nodeCode, dbPath)
     dbPath = dbPath or "eco_restoration_workload.sqlite"
 
     local query = string.format(
-        "sqlite3 '%s' \"SELECT deltaVt, topo_stress_norm, canal_temperature_C, pfas_concentration_ugL " ..
+        "sqlite3 '%s' \"SELECT delta_vt_m_s, topo_stress_norm, canal_temperature_C, pfas_concentration_ugL " ..
         "FROM cyboquatic_workload_telemetry ct " ..
         "JOIN canal_node cn ON cn.node_id = ct.node_id " ..
-        "WHERE cn.node_code = '%s' ORDER BY ct.timestamp_utc DESC LIMIT 1;\"",
+        "WHERE cn.node_code = '%s' ORDER BY ct.timestamp_s DESC LIMIT 1;\"",
         dbPath, nodeCode
     )
 
