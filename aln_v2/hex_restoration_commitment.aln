@@ -1,0 +1,84 @@
+// File: aln_v2/hex_restoration_commitment.aln
+// ALN v2 entity for "Hex Restoration Commitment" binding hex-cells to
+// cyboquatic interventions and carbon-negative targets, linked to DID
+// and hex_thermal_recovery telemetry.
+
+/*
+Entity definition:
+
+HexRestorationCommitment binds:
+  - h3_index: hex-cell identifier.
+  - did: governance DID (e.g., bostrom...).
+  - interventions: cyboquatic interventions applied/planned.
+  - target_ker_e: carbon-negative eco-impact target.
+  - target_lst_drop_k: target LST reduction (K).
+  - start_date_utc, end_date_utc: commitment period.
+*/
+
+entity HexRestorationCommitment {
+    field h3_index : string;
+    field did : string;
+    field interventions : string;      // e.g., "canopy+cool_pavement+cybo_aeration"
+    field target_ker_e : float;        // ≤ 0 for carbon-negative
+    field target_lst_drop_k : float;   // target LST reduction in Kelvin
+    field start_date_utc : string;     // ISO-8601 date
+    field end_date_utc : string;       // ISO-8601 date
+}
+
+/*
+Invariants:
+
+1. DID binding to governance particle.
+2. Carbon-negative target (target_ker_e ≤ 0).
+3. Hex linkage to hex_thermal_recovery telemetry.
+*/
+
+invariant HexRestorationDIDBinding {
+    for hr in HexRestorationCommitment {
+        assert hr.did == "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7";
+    }
+}
+
+invariant HexRestorationCarbonNegativeTarget {
+    for hr in HexRestorationCommitment {
+        assert hr.target_ker_e <= 0.0;
+    }
+}
+
+entity HexThermalRecoveryTelemetry {
+    field h3_index : string;
+    field date_utc : string;
+    field morning_lst_k : float;
+    field afternoon_lst_k : float;
+    field cooling_degree_hours : float;
+}
+
+/*
+Progress linkage:
+
+For each HexRestorationCommitment, hex_thermal_recovery telemetry over the
+commitment period should show average LST reduction meeting or exceeding
+target_lst_drop_k.
+
+We express a high-level invariant:
+
+    avg_LST_drop(h3, period) ≥ target_lst_drop_k
+
+where avg_LST_drop is derived from baseline vs. current afternoon LST.
+*/
+
+invariant HexRestorationProgress {
+    for hr in HexRestorationCommitment {
+        // Abstract condition to be checked via SQL:
+        //   For all telemetry records h with matching h3_index and date in [start_date_utc, end_date_utc],
+        //   the average afternoon LST reduction vs. baseline is ≥ target_lst_drop_k.
+        assert true; // external verification via SQL query.
+    }
+}
+
+/*
+SQL serialization:
+
+We map HexRestorationCommitment to a table hex_restoration_commitment and
+link to hex_thermal_recovery via h3_index and dates.
+*/
