@@ -23,8 +23,6 @@ function FogRouter.route(sample)
     end
 end
 
--- Classifies media type based on observed parameters.
--- Returns a routing decision: "SAFE", "CAUTION", or "BLOCK".
 function FogRouter.classify_media(viscosity_cP, turbidity_NTU, organic_fraction)
     if viscosity_cP < 5 and turbidity_NTU < 50 and organic_fraction > 0.7 then
         return "SAFE"
@@ -35,7 +33,6 @@ function FogRouter.classify_media(viscosity_cP, turbidity_NTU, organic_fraction)
     end
 end
 
--- Calculates a FOG predicate score (0..1) for routing.
 function FogRouter.predicate_score(viscosity_cP, turbidity_NTU, organic_fraction)
     local v_score = math.max(0, 1 - (viscosity_cP / 100))
     local t_score = math.max(0, 1 - (turbidity_NTU / 500))
@@ -43,7 +40,6 @@ function FogRouter.predicate_score(viscosity_cP, turbidity_NTU, organic_fraction
     return (v_score + t_score + o_score) / 3
 end
 
--- Suggests routing based on predicate score and canal capacity.
 function FogRouter.suggest_route(predicate_score, canal_capacity_m3_s)
     if predicate_score >= 0.8 and canal_capacity_m3_s >= 0.1 then
         return "PRIMARY_CANAL"
@@ -54,15 +50,12 @@ function FogRouter.suggest_route(predicate_score, canal_capacity_m3_s)
     end
 end
 
--- Route from a telemetry row table (as fetched from SQLite).
--- row is expected to have: deltaVt, topo_stress_norm, canal_temperature_C, pfas_concentration_ugL
 function FogRouter.route_from_row(row)
     local deltaVt = row.deltaVt or 0
     local topoStress = row.topo_stress_norm or 0
     local tempC = row.canal_temperature_C or 15
     local pfasUgL = row.pfas_concentration_ugL or 0
 
-    -- Approximate dissolved O2 and turbidity from available telemetry.
     local approxDO2 = math.max(0, 8.0 - deltaVt * 5.0)
     local approxTurbidity = 20.0 + topoStress * 60.0
 
@@ -89,7 +82,6 @@ local function demo()
     print("Lua FOG route: " .. route)
 end
 
--- CLI snippet: fetch latest telemetry from SQLite via io.popen and route.
 local function run_cli(nodeCode, dbPath)
     nodeCode = nodeCode or "PHX_CANAL_NODE_A"
     dbPath = dbPath or "eco_restoration_workload.sqlite"
