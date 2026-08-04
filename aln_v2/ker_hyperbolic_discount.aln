@@ -1,0 +1,129 @@
+// File: aln_v2/ker_hyperbolic_discount.aln
+// ALN v2 invariant for temporally consistent KER eco-impact with hyperbolic discount.
+
+/*
+We define KER eco-impact ker_e as a temporally discounted sum of past emissions:
+
+    ker_e_discounted(t) = Σ_{n=0}^{N} d(n) * e_n,
+
+where:
+  - e_n is net carbon flux (kg CO2-eq) at sample index n (possibly negative).
+  - d(n) is a hyperbolic discount factor at lag n.
+
+Hyperbolic discount function:
+
+    d(n) = 1 / (1 + a * n),
+
+with a > 0 controlling discount strength (units: per sample).
+This function decreases with n, giving more weight to recent emissions
+and less to distant past, while decaying slower than exponential.
+
+ALN entities:
+*/
+
+entity TelemetrySample {
+    field node_id : string;
+    field sample_index : int;       // n
+    field timestamp_s : float;
+    field net_carbon_flux_kg : float; // e_n
+}
+
+entity KerEDiscountedState {
+    field node_id : string;
+    field sample_index : int;
+    field ker_e_discounted : float;   // Σ_{i=0}^n d(i) * e_i
+}
+
+constant discount_a = 0.001; // example hyperbolic discount parameter, tuned per system.
+
+/*
+Discount recurrence:
+
+We can implement ker_e_discounted recursively:
+
+    ker_e_discounted_n = ker_e_discounted_{n-1} + d(n) * e_n,
+
+with ker_e_discounted_0 = d(0) * e_0 = e_0.
+
+ALN invariants:
+*/
+
+invariant KerEDiscountedRecurrence {
+    for k in KerEDiscountedState {
+        if k.sample_index == 0 {
+            exists s0 in TelemetrySample where
+                s0.node_id == k.node_id &&
+                s0.sample_index == 0;
+            let d0 = 1.0 / (1.0 + discount_a * 0.0);
+            assert k.ker_e_discounted == d0 * s0.net_carbon_flux_kg;
+        } else {
+            exists k_prev in KerEDiscountedState where
+                k_prev.node_id == k.node_id &&
+                k_prev.sample_index == k.sample_index - 1;
+            exists s in TelemetrySample where
+                s.node_id == k.node_id &&
+                s.sample_index == k.sample_index;
+            let d_n = 1.0 / (1.0 + discount_a * k.sample_index);
+            assert k.ker_e_discounted == k_prev.ker_e_discounted + d_n * s.net_carbon_flux_kg;
+        }
+    }
+}
+
+/*
+Carbon-negative hyperbolic invariant:
+
+We require that the discounted sum remains ≤ 0 for all sample indices,
+ensuring temporally consistent carbon-negative eco-impact:
+
+    ∀n: ker_e_discounted_n ≤ 0.
+
+ALN invariant:
+*/
+
+invariant KerEDiscountedCarbonNegative {
+    for k in KerEDiscountedState {
+        assert k.ker_e_discounted <= 0.0;
+    }
+}
+
+/*
+SQL implementation using recursive CTE:
+
+Assume SQLite tables:
+
+    TelemetrySample: (node_id, sample_index, timestamp_s, net_carbon_flux_kg)
+    We compute ker_e_discounted via:
+
+WITH RECURSIVE ker_e_discounted_cte AS (
+    SELECT
+        node_id,
+        sample_index,
+        timestamp_s,
+        net_carbon_flux_kg,
+        net_carbon_flux_kg AS ker_e_discounted
+    FROM TelemetrySample
+    WHERE sample_index = 0
+
+    UNION ALL
+
+    SELECT
+        t.node_id,
+        t.sample_index,
+        t.timestamp_s,
+        t.net_carbon_flux_kg,
+        k.ker_e_discounted + (1.0 / (1.0 + discount_a * t.sample_index)) * t.net_carbon_flux_kg
+            AS ker_e_discounted
+    FROM TelemetrySample t
+    JOIN ker_e_discounted_cte k
+      ON t.node_id = k.node_id
+     AND t.sample_index = k.sample_index + 1
+)
+
+SELECT *
+FROM ker_e_discounted_cte
+WHERE ker_e_discounted > 0.0;
+
+If this query returns any rows, the KerEDiscountedCarbonNegative invariant
+is violated. In practice, this CTE can be used in triggers or periodic
+checks to enforce discounted carbon-negative compliance.
+*/
