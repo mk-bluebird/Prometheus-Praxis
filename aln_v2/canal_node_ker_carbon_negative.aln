@@ -1,0 +1,147 @@
+// File: aln_v2/canal_node_ker_carbon_negative.aln
+// Minimal ALN v2 parameter set for canal_node to guarantee KER-valid telemetry
+// remains carbon-negative for at least one year under stochastic inflow.
+
+/*
+We model a canal_node as an entity with the minimal parameters needed to state
+and verify a long-horizon carbon-negative invariant for KER-valid telemetry
+sequences, using a probabilistic model checker over stochastic inflow.
+
+Key idea: ker_e is the cumulative net carbon flux over telemetry samples, where
+negative ker_e indicates carbon-negative operation. We require that, with high
+probability, ker_e remains ≤ 0 over a one-year horizon for any KER-valid
+telemetry sequence consistent with the canal_node parameters and inflow model.
+*/
+
+entity CanalNode {
+    field node_id : string;
+    field capacity_m3_s : float;          // hydraulic capacity (m3/s)
+    field baseline_flow_m3_s : float;     // typical flow rate (m3/s)
+    field inflow_ln_mu : float;          // mean of ln(flow) for log-normal inflow
+    field inflow_ln_sigma : float;       // std dev of ln(flow) for log-normal inflow
+    field carbon_flux_mean_kg : float;   // expected net carbon flux per sample (kg CO2-eq)
+    field carbon_flux_std_kg : float;    // std dev of net carbon flux per sample (kg CO2-eq)
+    field sample_interval_s : float;     // telemetry sampling interval (s)
+    field horizon_s : float;             // verification horizon (s), e.g. one year
+    field ker_e_initial : float;         // initial eco-impact value (kg CO2-eq)
+    field ker_negative_confidence : float; // required confidence (0..1) for carbon-negative guarantee
+}
+
+/*
+Minimal parameter set rationale:
+- capacity_m3_s, baseline_flow_m3_s: bound hydraulic regime.
+- inflow_ln_mu, inflow_ln_sigma: define stochastic inflow distribution (log-normal).
+- carbon_flux_mean_kg, carbon_flux_std_kg: characterize net carbon flux per sample.
+- sample_interval_s, horizon_s: define number of samples over one year.
+- ker_e_initial: initial eco-impact baseline.
+- ker_negative_confidence: target probability threshold (e.g., 0.95) for remaining carbon-negative.
+
+Telemetry and KER process:
+*/
+
+entity TelemetrySample {
+    field node_id : string;
+    field sample_index : int;
+    field timestamp_s : float;
+    field flow_m3_s : float;
+    field net_carbon_flux_kg : float; // f_n
+}
+
+entity KerEState {
+    field node_id : string;
+    field sample_index : int;
+    field ker_e_value : float;        // cumulative eco-impact
+}
+
+/*
+KER-valid telemetry sequence:
+- Each sample respects hydraulic bounds and the stochastic inflow model.
+- ker_e_state evolves as a recurrence: ker_e_n = ker_e_{n-1} + f_n.
+*/
+
+invariant KERValidTelemetry {
+    for s in TelemetrySample {
+        exists cn in CanalNode where cn.node_id == s.node_id;
+        // Hydraulic bounds: flow is positive and does not exceed capacity.
+        assert s.flow_m3_s > 0.0;
+        assert s.flow_m3_s <= cn.capacity_m3_s;
+        // Stochastic inflow consistency: ln(flow) is within a confidence band.
+        // This band can be used by a probabilistic model checker to constrain transitions.
+        let ln_flow = ln(s.flow_m3_s);
+        assert ln_flow >= cn.inflow_ln_mu - 3.0 * cn.inflow_ln_sigma;
+        assert ln_flow <= cn.inflow_ln_mu + 3.0 * cn.inflow_ln_sigma;
+
+        // Net carbon flux per sample is bounded by mean ± 3 sigma.
+        assert s.net_carbon_flux_kg >= cn.carbon_flux_mean_kg - 3.0 * cn.carbon_flux_std_kg;
+        assert s.net_carbon_flux_kg <= cn.carbon_flux_mean_kg + 3.0 * cn.carbon_flux_std_kg;
+    }
+}
+
+invariant KerERecurrence {
+    for k in KerEState {
+        if k.sample_index == 0 {
+            exists cn in CanalNode where cn.node_id == k.node_id;
+            assert k.ker_e_value == cn.ker_e_initial;
+        } else {
+            exists k_prev in KerEState where
+                k_prev.node_id == k.node_id &&
+                k_prev.sample_index == k.sample_index - 1;
+            exists s in TelemetrySample where
+                s.node_id == k.node_id &&
+                s.sample_index == k.sample_index;
+            assert k.ker_e_value == k_prev.ker_e_value + s.net_carbon_flux_kg;
+        }
+    }
+}
+
+/*
+Probabilistic carbon-negative invariant over one-year horizon:
+
+Let N = horizon_s / sample_interval_s be the number of samples per year.
+We want to guarantee that for any KER-valid telemetry sequence, the probability
+that ker_e_N <= 0 is at least ker_negative_confidence.
+
+This is posed as a property for a probabilistic model checker:
+
+    P >= ker_negative_confidence [ ker_e_N <= 0 ]
+
+under the stochastic transition model defined by inflow_ln_mu, inflow_ln_sigma,
+carbon_flux_mean_kg, carbon_flux_std_kg.
+
+We express this as an ALN v2 invariant with parametric bounds, to be discharged
+by an external probabilistic model checker (e.g., PRISM).
+
+*/
+
+invariant CarbonNegativeOneYear {
+    for cn in CanalNode {
+        // Derived sample count for one-year horizon.
+        let N = cn.horizon_s / cn.sample_interval_s;
+
+        // Abstract probabilistic property:
+        // For all sequences of TelemetrySample and KerEState consistent with
+        // KERValidTelemetry and KerERecurrence over N samples, the probability
+        // that ker_e_value at sample_index == N is <= 0 must be >= ker_negative_confidence.
+
+        // This is expressed informally here; a probabilistic model checker will
+        // interpret the stochastic parameters and verify:
+
+        //   P >= cn.ker_negative_confidence [ KerEState(node_id=cn.node_id, sample_index=N).ker_e_value <= 0 ]
+
+        assert true; // Marker: external probabilistic proof obligation.
+    }
+}
+
+/*
+Verification workflow:
+
+1. Instantiate CanalNode parameters for each physical canal node.
+2. Generate a stochastic transition model for TelemetrySample and KerEState using
+   inflow_ln_mu, inflow_ln_sigma, carbon_flux_mean_kg, carbon_flux_std_kg.
+3. Use a probabilistic model checker to evaluate:
+
+       P >= ker_negative_confidence [ ker_e_N <= 0 ]
+
+   and confirm that, under the specified stochastic inflow, any KER-valid telemetry
+   sequence maintains carbon-negative eco-impact for at least one year.
+*/
