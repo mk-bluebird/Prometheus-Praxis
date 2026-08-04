@@ -3,31 +3,57 @@
 
 PRAGMA foreign_keys = ON;
 
-CREATE TABLE IF NOT EXISTS cyboquatic_workload_telemetry (
-    workload_id        INTEGER PRIMARY KEY AUTOINCREMENT,
-    node_id            TEXT NOT NULL,
-    timestamputc       TEXT NOT NULL,
-    flow_rate_m3s      REAL NOT NULL CHECK (flow_rate_m3s >= 0.0),
-    head_loss_m        REAL NOT NULL CHECK (head_loss_m >= 0.0),
-    pump_power_kw      REAL NOT NULL CHECK (pump_power_kw >= 0.0),
-    lift_height_m      REAL NOT NULL CHECK (lift_height_m >= 0.0),
-    water_density_kgm3 REAL NOT NULL CHECK (water_density_kgm3 > 0.0),
-    gravity_ms2        REAL NOT NULL CHECK (gravity_ms2 > 0.0),
-    eco_efficiency     REAL NOT NULL CHECK (eco_efficiency >= 0.0 AND eco_efficiency <= 1.0),
-    energyreq_j        REAL NOT NULL CHECK (energyreq_j >= 0.0),
-    eco_energy_j       REAL NOT NULL CHECK (eco_energy_j >= 0.0),
-    delta_v_t          REAL NOT NULL CHECK (delta_v_t >= 0.0),
-    ker_k              REAL NOT NULL CHECK (ker_k >= 0.0 AND ker_k <= 1.0),
-    ker_e              REAL NOT NULL CHECK (ker_e >= 0.0 AND ker_e <= 1.0),
-    ker_r              REAL NOT NULL CHECK (ker_r >= 0.0 AND ker_r <= 1.0),
-    canal_plane        TEXT NOT NULL CHECK (canal_plane IN ('HYDRAULICS', 'ENERGY', 'TOPOLOGY', 'BIODIVERSITY')),
-    fog_lane           TEXT NOT NULL CHECK (fog_lane IN ('RESEARCH', 'EXPPROD', 'PROD')),
-    canal_node_class   TEXT NOT NULL CHECK (canal_node_class IN ('INTAKE', 'LIFT', 'DISTRIBUTION', 'DRAIN')),
-    phoenix_hex        TEXT NOT NULL,
-    subtask_id         TEXT NOT NULL,
-    domain             TEXT NOT NULL,
-    createdutc         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+CREATE TABLE IF NOT EXISTS cyboquatic_node (
+    node_id             TEXT PRIMARY KEY,
+    ker_k               REAL NOT NULL,  -- Knowledge factor (0..1)
+    ker_e               REAL NOT NULL,  -- Eco-impact score (<= 0 preferred for carbon-negative)
+    ker_r               REAL NOT NULL,  -- Risk coefficient (0..1, lower is safer)
+    fog_depth           REAL NOT NULL,  -- FOG-routing depth (0..100)
+    fog_confidence      REAL NOT NULL,  -- FOG predicate confidence (0..1)
+    canal_segment       TEXT NOT NULL,  -- Canal segment identifier
+    canal_capacity_m3s  REAL NOT NULL,  -- Designed capacity (m^3/s)
+    CHECK (ker_k >= 0.0 AND ker_k <= 1.0),
+    CHECK (ker_r >= 0.0 AND ker_r <= 1.0),
+    CHECK (fog_confidence >= 0.0 AND fog_confidence <= 1.0),
+    CHECK (canal_capacity_m3s >= 0.0)
 );
+
+CREATE TABLE IF NOT EXISTS cyboquatic_workload_telemetry (
+    workload_id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_id             TEXT NOT NULL,
+    basin_id            TEXT NOT NULL,
+    timestamputc        TEXT NOT NULL,  -- ISO-8601 UTC string
+    flow_rate_m3s       REAL NOT NULL CHECK (flow_rate_m3s >= 0.0),
+    head_loss_m         REAL NOT NULL CHECK (head_loss_m >= 0.0),
+    pump_power_kw       REAL NOT NULL CHECK (pump_power_kw >= 0.0),
+    lift_height_m       REAL NOT NULL CHECK (lift_height_m >= 0.0),
+    water_density_kgm3  REAL NOT NULL CHECK (water_density_kgm3 > 0.0),
+    gravity_ms2         REAL NOT NULL CHECK (gravity_ms2 > 0.0),
+    eco_efficiency      REAL NOT NULL CHECK (eco_efficiency >= 0.0 AND eco_efficiency <= 1.0),
+    energyreq_j         REAL NOT NULL CHECK (energyreq_j >= 0.0),
+    eco_energy_j        REAL NOT NULL CHECK (eco_energy_j >= 0.0),
+    delta_v_t           REAL NOT NULL CHECK (delta_v_t >= 0.0),
+    ker_k               REAL NOT NULL CHECK (ker_k >= 0.0 AND ker_k <= 1.0),
+    ker_e               REAL NOT NULL CHECK (ker_e >= 0.0 AND ker_e <= 1.0),
+    ker_r               REAL NOT NULL CHECK (ker_r >= 0.0 AND ker_r <= 1.0),
+    canal_plane         TEXT NOT NULL CHECK (canal_plane IN ('HYDRAULICS', 'ENERGY', 'TOPOLOGY', 'BIODIVERSITY')),
+    fog_lane            TEXT NOT NULL CHECK (fog_lane IN ('RESEARCH', 'EXPPROD', 'PROD')),
+    canal_node_class    TEXT NOT NULL CHECK (canal_node_class IN ('INTAKE', 'LIFT', 'DISTRIBUTION', 'DRAIN')),
+    phoenix_hex         TEXT NOT NULL,
+    subtask_id          TEXT NOT NULL,
+    domain              TEXT NOT NULL,
+    createdutc          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+    fog_depth           REAL NOT NULL,
+    fog_confidence      REAL NOT NULL,
+    canal_segment       TEXT NOT NULL,
+    canal_capacity_m3s  REAL NOT NULL,
+    FOREIGN KEY(node_id) REFERENCES cyboquatic_node(node_id),
+    CHECK (fog_confidence >= 0.0 AND fog_confidence <= 1.0),
+    CHECK (canal_capacity_m3s >= 0.0)
+);
+
+CREATE INDEX IF NOT EXISTS idx_cybo_workload_basin_time
+    ON cyboquatic_workload_telemetry (basin_id, timestamputc);
 
 CREATE INDEX IF NOT EXISTS idx_cybo_workload_node_time
     ON cyboquatic_workload_telemetry (node_id, timestamputc);
@@ -58,7 +84,6 @@ BEGIN
             RAISE(ABORT, 'Production lane requires eco_efficiency >= 0.7')
     END;
 END;
-
 
 CREATE TABLE IF NOT EXISTS workload_daily_progress (
     progress_id       INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -98,7 +123,6 @@ CREATE INDEX IF NOT EXISTS idx_workload_daily_domain_subtask
 CREATE INDEX IF NOT EXISTS idx_workload_daily_hex
     ON workload_daily_progress (phoenix_hex, node_id);
 
-
 CREATE VIEW IF NOT EXISTS workload_daily_summary AS
 SELECT
     yyyymmdd,
@@ -120,7 +144,6 @@ SELECT
     AVG(r_factor)                 AS avg_r_factor
 FROM workload_daily_progress
 GROUP BY yyyymmdd, domain, subtask_id;
-
 
 CREATE VIEW IF NOT EXISTS workload_high_risk_samples AS
 SELECT
