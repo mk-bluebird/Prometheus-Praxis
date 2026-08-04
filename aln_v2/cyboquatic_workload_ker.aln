@@ -1,0 +1,44 @@
+// File: aln_v2/cyboquatic_workload_ker.aln
+// ALN v2 specification shard for cyboquatic workload KER invariants bound to cyboquatic_node.
+
+/*
+ALN v2 pseudo-syntax:
+
+entity CyboquaticNode {
+    field node_id : string;
+    field ker_k : float;  // knowledge factor 0..1
+    field ker_e : float;  // eco-impact score (negative is carbon-negative)
+    field ker_r : float;  // risk factor 0..1
+}
+
+invariant NodeKERBounds {
+    for n in CyboquaticNode {
+        assert n.ker_k >= 0.0 && n.ker_k <= 1.0;
+        assert n.ker_r >= 0.0 && n.ker_r <= 1.0;
+    }
+}
+
+entity WorkloadTelemetry {
+    field node_id : string;
+    field timestamp_s : float;
+    field energyreq_j : float;
+    field ker_k : float;
+    field ker_e : float;
+    field ker_r : float;
+}
+
+invariant CarbonNegativeTarget {
+    for w in WorkloadTelemetry {
+        // Eco-impact should be <= 0 for sustained operation.
+        assert w.ker_e <= 0.0;
+    }
+}
+
+invariant KnowledgeRiskCoupling {
+    for w in WorkloadTelemetry {
+        // Higher knowledge factor should correlate with lower risk.
+        assert (w.ker_k >= 0.8) implies (w.ker_r <= 0.3);
+    }
+}
+
+*/
