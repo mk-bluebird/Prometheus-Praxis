@@ -1,4 +1,4 @@
-# filename: crates/aln-cyboquatic-codegen/Cargo.toml
+# File: crates/aln-cyboquatic-codegen/Cargo.toml
 
 [package]
 name = "aln-cyboquatic-codegen"
@@ -16,8 +16,6 @@ categories = ["command-line-utilities", "science"]
 [dependencies]
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = { version = "1.0.120" }
-
-# Kani is mandatory; kept in dependencies so it is always available.
 kani = "0.67.0"
 
 [lib]
@@ -28,6 +26,14 @@ crate-type = ["rlib"]
 [[bin]]
 name = "aln-cyboquatic-codegen"
 path = "src/bin/aln_codegen_main.rs"
+
+[[bin]]
+name = "generate-kotlin"
+path = "src/bin/generate_kotlin.rs"
+
+[[bin]]
+name = "generate-lua-validator"
+path = "src/bin/generate_lua_validator.rs"
 
 [profile.dev]
 opt-level = 1
