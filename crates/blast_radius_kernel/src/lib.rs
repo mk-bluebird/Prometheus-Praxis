@@ -6,6 +6,12 @@ pub mod ffi;
 pub mod lambda_compute;
 pub mod model;
 
+use jni::{
+    objects::{JClass, JValue},
+    sys::{jdouble, jobject},
+    JNIEnv,
+};
+
 pub use crate::ffi::{
     eco_blast_radius_free_cstring, eco_lambda_for_region_json, eco_lambda_for_segment_json,
 };
@@ -114,13 +120,63 @@ pub unsafe extern "C" fn compute_ecological_blast_radius(
         return 1;
     }
 
-    let input = unsafe { *input };
+    let input = unsafe { input.read() };
     match assess(input) {
         Ok(result) => {
             unsafe { output.write(result) };
             0
         }
         Err(_) => 2,
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_org_prometheuspraxis_cyboquatic_BlastRadius_nativeAssess(
+    mut env: JNIEnv,
+    _: JClass,
+    energy_j: jdouble,
+    energy_corridor_j: jdouble,
+    attenuation_m_inv: jdouble,
+    base_radius_m: jdouble,
+    biodiversity_risk: jdouble,
+) -> jobject {
+    let input = BlastRadiusInput {
+        energy_j,
+        energy_corridor_j,
+        attenuation_m_inv,
+        base_radius_m,
+        biodiversity_risk,
+    };
+
+    let result = match assess(input) {
+        Ok(result) => result,
+        Err(_) => {
+            let _ = env.throw_new(
+                "java/lang/IllegalArgumentException",
+                "Invalid ecological blast-radius input",
+            );
+            return std::ptr::null_mut();
+        }
+    };
+
+    match env.new_object(
+        "org/prometheuspraxis/cyboquatic/BlastRadius$Assessment",
+        "(DDDZ)V",
+        &[
+            JValue::Double(result.radius_m),
+            JValue::Double(result.normalized_energy_risk),
+            JValue::Double(result.eco_impact_value),
+            JValue::Bool(result.within_corridor),
+        ],
+    ) {
+        Ok(object) => object.into_raw(),
+        Err(_) => {
+            let _ = env.throw_new(
+                "java/lang/IllegalStateException",
+                "Cannot allocate BlastRadius.Assessment",
+            );
+            std::ptr::null_mut()
+        }
     }
 }
 
@@ -146,7 +202,7 @@ mod tests {
     }
 
     #[test]
-    fn excessive_energy_is_reported_outside_the_corridor() {
+    fn excessive_energy_is_outside_the_corridor() {
         let result = assess(BlastRadiusInput {
             energy_j: 300_000.0,
             energy_corridor_j: 250_000.0,
