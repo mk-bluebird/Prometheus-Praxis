@@ -1,36 +1,50 @@
-use std::ffi::{CStr, CString};
-use std::os::raw::{c_char, c_float, c_int};
+// File: crates/ker-composition/src/lib.rs
+#![forbid(unsafe_code)]
 
-use rlua::Lua;
+pub mod workload_proof;
+
+pub use workload_proof::{
+    ker_margin, prove_accepted_frame, prove_all_accepted, KerProofError, WorkloadKerFrame,
+};
+
+use rlua::{Function, Lua, Table};
+use std::{
+    ffi::{CStr, CString, NulError},
+    os::raw::{c_char, c_float, c_int},
+};
+
+const LUA_VALIDATOR_SOURCE: &str =
+    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/lua/ker_composition_validator.lua"));
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct KerParticle2026v1 {
     pub particle_id: *const c_char,
     pub topic_id: *const c_char,
     pub lane: *const c_char,
-    pub K: c_float,
-    pub E: c_float,
-    pub R: c_float,
+    pub k: c_float,
+    pub e: c_float,
+    pub r: c_float,
     pub evidencehex: *const c_char,
     pub signinghex: *const c_char,
 }
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct KerComposition2026v1 {
     pub left_particle_id: *const c_char,
     pub right_particle_id: *const c_char,
     pub combined_id: *const c_char,
-    pub K_combined: c_float,
-    pub E_combined: c_float,
-    pub R_combined: c_float,
+    pub k_combined: c_float,
+    pub e_combined: c_float,
+    pub r_combined: c_float,
     pub members: *const c_char,
     pub rule_id: *const c_char,
     pub evidencehex: *const c_char,
     pub signinghex: *const c_char,
 }
 
-#[link(name = "ker_oplus_geom_min_max")]
-extern "C" {
+unsafe extern "C" {
     fn ker_oplus_geom_min_max(
         left: *const KerParticle2026v1,
         right: *const KerParticle2026v1,
@@ -38,7 +52,7 @@ extern "C" {
     ) -> c_int;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RustKerParticle {
     pub particle_id: String,
     pub topic_id: String,
@@ -50,7 +64,7 @@ pub struct RustKerParticle {
     pub signinghex: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RustKerComposition {
     pub left_particle_id: String,
     pub right_particle_id: String,
@@ -64,7 +78,7 @@ pub struct RustKerComposition {
     pub signinghex: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RustKerCompositionRow {
     pub left: RustKerParticle,
     pub right: RustKerParticle,
@@ -73,96 +87,148 @@ pub struct RustKerCompositionRow {
     pub e_combined: f32,
     pub r_combined: f32,
     pub members: String,
-    pub ruleid: String,
+    pub rule_id: String,
     pub evidencehex: Option<String>,
 }
 
-fn to_c_string(s: &str) -> CString {
-    CString::new(s).expect("string contains interior NUL")
+#[derive(Debug)]
+pub enum KerCompositionError {
+    InvalidParticle,
+    InteriorNul(NulError),
+    NativeFailure(c_int),
+    MissingNativeField(&'static str),
+    InvalidNativeUtf8(&'static str),
+    InvalidNativeScore,
 }
 
-fn from_c_str(ptr: *const c_char) -> String {
-    if ptr.is_null() {
-        return String::new();
+impl From<NulError> for KerCompositionError {
+    fn from(error: NulError) -> Self {
+        Self::InteriorNul(error)
     }
-    unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() }
+}
+
+impl RustKerParticle {
+    fn validate(&self) -> Result<(), KerCompositionError> {
+        let text_fields = [
+            self.particle_id.as_str(),
+            self.topic_id.as_str(),
+            self.lane.as_str(),
+            self.evidencehex.as_str(),
+            self.signinghex.as_str(),
+        ];
+        if text_fields.iter().any(|value| value.trim().is_empty())
+            || [self.k, self.e, self.r]
+                .iter()
+                .any(|value| !value.is_finite() || !(0.0..=1.0).contains(value))
+        {
+            return Err(KerCompositionError::InvalidParticle);
+        }
+        Ok(())
+    }
+}
+
+fn required_c_string(
+    ptr: *const c_char,
+    field: &'static str,
+) -> Result<String, KerCompositionError> {
+    if ptr.is_null() {
+        return Err(KerCompositionError::MissingNativeField(field));
+    }
+    let value = unsafe { CStr::from_ptr(ptr) }
+        .to_str()
+        .map_err(|_| KerCompositionError::InvalidNativeUtf8(field))?;
+    if value.is_empty() {
+        return Err(KerCompositionError::MissingNativeField(field));
+    }
+    Ok(value.into())
+}
+
+fn optional_c_string(
+    ptr: *const c_char,
+    field: &'static str,
+) -> Result<Option<String>, KerCompositionError> {
+    if ptr.is_null() {
+        return Ok(None);
+    }
+    let value = unsafe { CStr::from_ptr(ptr) }
+        .to_str()
+        .map_err(|_| KerCompositionError::InvalidNativeUtf8(field))?;
+    Ok((!value.is_empty()).then(|| value.into()))
 }
 
 pub fn ker_oplus_geom_min_max_rust(
     left: &RustKerParticle,
     right: &RustKerParticle,
-) -> Result<RustKerComposition, i32> {
-    let c_left_id = to_c_string(&left.particle_id);
-    let c_left_topic = to_c_string(&left.topic_id);
-    let c_left_lane = to_c_string(&left.lane);
-    let c_left_evidence = to_c_string(&left.evidencehex);
-    let c_left_signing = to_c_string(&left.signinghex);
+) -> Result<RustKerComposition, KerCompositionError> {
+    left.validate()?;
+    right.validate()?;
 
-    let c_right_id = to_c_string(&right.particle_id);
-    let c_right_topic = to_c_string(&right.topic_id);
-    let c_right_lane = to_c_string(&right.lane);
-    let c_right_evidence = to_c_string(&right.evidencehex);
-    let c_right_signing = to_c_string(&right.signinghex);
+    let left_id = CString::new(left.particle_id.as_str())?;
+    let left_topic = CString::new(left.topic_id.as_str())?;
+    let left_lane = CString::new(left.lane.as_str())?;
+    let left_evidence = CString::new(left.evidencehex.as_str())?;
+    let left_signing = CString::new(left.signinghex.as_str())?;
+    let right_id = CString::new(right.particle_id.as_str())?;
+    let right_topic = CString::new(right.topic_id.as_str())?;
+    let right_lane = CString::new(right.lane.as_str())?;
+    let right_evidence = CString::new(right.evidencehex.as_str())?;
+    let right_signing = CString::new(right.signinghex.as_str())?;
 
-    let c_left = KerParticle2026v1 {
-        particle_id: c_left_id.as_ptr(),
-        topic_id: c_left_topic.as_ptr(),
-        lane: c_left_lane.as_ptr(),
-        K: left.k,
-        E: left.e,
-        R: left.r,
-        evidencehex: c_left_evidence.as_ptr(),
-        signinghex: c_left_signing.as_ptr(),
+    let native_left = KerParticle2026v1 {
+        particle_id: left_id.as_ptr(),
+        topic_id: left_topic.as_ptr(),
+        lane: left_lane.as_ptr(),
+        k: left.k,
+        e: left.e,
+        r: left.r,
+        evidencehex: left_evidence.as_ptr(),
+        signinghex: left_signing.as_ptr(),
     };
-
-    let c_right = KerParticle2026v1 {
-        particle_id: c_right_id.as_ptr(),
-        topic_id: c_right_topic.as_ptr(),
-        lane: c_right_lane.as_ptr(),
-        K: right.k,
-        E: right.e,
-        R: right.r,
-        evidencehex: c_right_evidence.as_ptr(),
-        signinghex: c_right_signing.as_ptr(),
+    let native_right = KerParticle2026v1 {
+        particle_id: right_id.as_ptr(),
+        topic_id: right_topic.as_ptr(),
+        lane: right_lane.as_ptr(),
+        k: right.k,
+        e: right.e,
+        r: right.r,
+        evidencehex: right_evidence.as_ptr(),
+        signinghex: right_signing.as_ptr(),
     };
-
-    let mut out = KerComposition2026v1 {
+    let mut output = KerComposition2026v1 {
         left_particle_id: std::ptr::null(),
         right_particle_id: std::ptr::null(),
         combined_id: std::ptr::null(),
-        K_combined: 0.0,
-        E_combined: 0.0,
-        R_combined: 0.0,
+        k_combined: 0.0,
+        e_combined: 0.0,
+        r_combined: 0.0,
         members: std::ptr::null(),
         rule_id: std::ptr::null(),
         evidencehex: std::ptr::null(),
         signinghex: std::ptr::null(),
     };
 
-    let status = unsafe { ker_oplus_geom_min_max(&c_left, &c_right, &mut out) };
+    let status = unsafe { ker_oplus_geom_min_max(&native_left, &native_right, &mut output) };
     if status != 0 {
-        return Err(status);
+        return Err(KerCompositionError::NativeFailure(status));
+    }
+    if [output.k_combined, output.e_combined, output.r_combined]
+        .iter()
+        .any(|value| !value.is_finite() || !(0.0..=1.0).contains(value))
+    {
+        return Err(KerCompositionError::InvalidNativeScore);
     }
 
     Ok(RustKerComposition {
-        left_particle_id: from_c_str(out.left_particle_id),
-        right_particle_id: from_c_str(out.right_particle_id),
-        combined_id: from_c_str(out.combined_id),
-        k_combined: out.K_combined,
-        e_combined: out.E_combined,
-        r_combined: out.R_combined,
-        members: from_c_str(out.members),
-        rule_id: from_c_str(out.rule_id),
-        evidencehex: if out.evidencehex.is_null() {
-            None
-        } else {
-            Some(from_c_str(out.evidencehex))
-        },
-        signinghex: if out.signinghex.is_null() {
-            None
-        } else {
-            Some(from_c_str(out.signinghex))
-        },
+        left_particle_id: required_c_string(output.left_particle_id, "left_particle_id")?,
+        right_particle_id: required_c_string(output.right_particle_id, "right_particle_id")?,
+        combined_id: required_c_string(output.combined_id, "combined_id")?,
+        k_combined: output.k_combined,
+        e_combined: output.e_combined,
+        r_combined: output.r_combined,
+        members: required_c_string(output.members, "members")?,
+        rule_id: required_c_string(output.rule_id, "rule_id")?,
+        evidencehex: optional_c_string(output.evidencehex, "evidencehex")?,
+        signinghex: optional_c_string(output.signinghex, "signinghex")?,
     })
 }
 
@@ -170,44 +236,35 @@ pub fn validate_composition_with_lua(
     row: &RustKerCompositionRow,
 ) -> Result<bool, rlua::Error> {
     let lua = Lua::new();
-    lua.context(|ctx| {
-        let validator_src = std::fs::read_to_string(
-            "rust/ker-composition/lua/ker_composition_validator.lua",
-        )
-        .expect("ker_composition_validator.lua not found");
+    lua.context(|context| {
+        let module: Table = context.load(LUA_VALIDATOR_SOURCE).eval()?;
+        let validate: Function = module.get("validate")?;
 
-        let module: rlua::Table = ctx.load(&validator_src).eval()?;
-        let validate: rlua::Function = module.get("validate")?;
+        let left = context.create_table()?;
+        left.set("k", row.left.k)?;
+        left.set("e", row.left.e)?;
+        left.set("r", row.left.r)?;
+        left.set("lane", row.left.lane.as_str())?;
 
-        let left_tbl = ctx.create_table()?;
-        left_tbl.set("K", row.left.k)?;
-        left_tbl.set("E", row.left.e)?;
-        left_tbl.set("R", row.left.r)?;
-        left_tbl.set("lane", row.left.lane.as_str())?;
+        let right = context.create_table()?;
+        right.set("k", row.right.k)?;
+        right.set("e", row.right.e)?;
+        right.set("r", row.right.r)?;
+        right.set("lane", row.right.lane.as_str())?;
 
-        let right_tbl = ctx.create_table()?;
-        right_tbl.set("K", row.right.k)?;
-        right_tbl.set("E", row.right.e)?;
-        right_tbl.set("R", row.right.r)?;
-        right_tbl.set("lane", row.right.lane.as_str())?;
+        let composition = context.create_table()?;
+        composition.set("k_combined", row.k_combined)?;
+        composition.set("e_combined", row.e_combined)?;
+        composition.set("r_combined", row.r_combined)?;
+        composition.set("members", row.members.as_str())?;
+        composition.set("rule_id", row.rule_id.as_str())?;
+        composition.set("lane", row.comp_lane.as_str())?;
+        composition.set("evidencehex", row.evidencehex.as_deref().unwrap_or(""))?;
 
-        let comp_tbl = ctx.create_table()?;
-        comp_tbl.set("Kcombined", row.k_combined)?;
-        comp_tbl.set("Ecombined", row.e_combined)?;
-        comp_tbl.set("Rcombined", row.r_combined)?;
-        comp_tbl.set("members", row.members.as_str())?;
-        comp_tbl.set("ruleid", row.ruleid.as_str())?;
-        comp_tbl.set("lane", row.comp_lane.as_str())?;
-        if let Some(ehx) = &row.evidencehex {
-            comp_tbl.set("evidencehex", ehx.as_str())?;
-        }
-
-        let row_tbl = ctx.create_table()?;
-        row_tbl.set("left", left_tbl)?;
-        row_tbl.set("right", right_tbl)?;
-        row_tbl.set("comp", comp_tbl)?;
-
-        let result: bool = validate.call(row_tbl)?;
-        Ok(result)
+        let payload = context.create_table()?;
+        payload.set("left", left)?;
+        payload.set("right", right)?;
+        payload.set("composition", composition)?;
+        validate.call(payload)
     })
 }
