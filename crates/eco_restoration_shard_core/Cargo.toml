@@ -1,17 +1,42 @@
-# Filename: crates/eco_restoration_shard_core/Cargo.toml
+# File: crates/eco_restoration_shard_core/Cargo.toml
 
 [package]
 name = "eco_restoration_shard_core"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+authors = ["bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"]
+description = "Rust governance spine client for the eco_restoration_shard Phoenix governance DB"
+repository = "https://github.com/mk-bluebird/eco_restoration_shard"
+readme = "README.md"
+publish = false
+
+[lib]
+name = "eco_restoration_shard_core"
+path = "src/lib.rs"
+
+[[bin]]
+name = "restorationindextool"
+path = "src/bin/restorationindextool.rs"
+
+[features]
+default = ["sqlite"]
+sqlite = []
 
 [dependencies]
 serde = { version = "1.0.203", features = ["derive"] }
-serde_json = { version = "1.0.120" }
+serde_json = "1.0.120"
+thiserror = "1.0"
 tokio = { version = "1.38.0", features = ["rt-multi-thread", "macros"] }
 hyper = { version = "1.7.0", features = ["server", "http1", "http2"] }
-rusqlite = { version = "0.30.0", features = ["bundled"] }
+rusqlite = { version = "0.32.0", features = ["bundled"] }
+clap = { version = "4.5.0", features = ["derive"] }
+time = "0.3.36"
 
 [dev-dependencies]
-kani = "0.67.0"
+kani-verifier = "0.67.0"
+
+[package.metadata.kani]
+enabled = true
+version = "0.67.0"
