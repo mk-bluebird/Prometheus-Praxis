@@ -2,6 +2,7 @@
 name = "ersilogger"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
 description = "Non-actuating ERSI token/compute/KER logger aligned with kerresidual and EcoFort SQLite spine."
 
 [dependencies]
