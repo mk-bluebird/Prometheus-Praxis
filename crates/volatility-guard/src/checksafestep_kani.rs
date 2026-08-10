@@ -1,25 +1,22 @@
-// crates/volatility-guard/src/checksafestep_kani.rs
-// Compile only under Kani.
+// File: crates/volatility-guard/src/checksafestep_kani.rs
 #![cfg(kani)]
-use super::*;
+
+use crate::{EcoPlane, NonOffsettablePlane, SafeStepContext, SafeStepVerdict};
 use kani::any;
 
-/// Simple stub plane for Kani exploration.
 struct StubPlane {
-    coord: f32,
+    coordinate: f64,
     hard_breach: bool,
-    never_comp: bool,
+    uncompensated_worsening: bool,
 }
 
 impl EcoPlane for StubPlane {
-    fn coordinate(&self) -> f32 {
-        self.coord
+    fn coordinate(&self) -> f64 {
+        self.coordinate
     }
 
-    fn strictly_degrades(&self, _other: &dyn EcoPlane) -> bool {
-        // For the proof we can over‑approximate: degradation is modeled
-        // by this flag being true whenever hard_breach is true.
-        self.hard_breach
+    fn strictly_degrades(&self, _: &dyn EcoPlane) -> bool {
+        self.uncompensated_worsening
     }
 }
 
@@ -28,51 +25,35 @@ impl NonOffsettablePlane for StubPlane {
         self.hard_breach
     }
 
-    fn never_compensated_by(&self, _other: &dyn EcoPlane) -> bool {
-        self.never_comp
+    fn never_compensated_by(&self, _: &dyn EcoPlane) -> bool {
+        self.uncompensated_worsening
     }
 }
 
 #[kani::proof]
-fn no_allow_on_nonoffsettable_breach() {
-    // Non‑deterministic inputs for Kani (bounded domain).
-    let hard_breach_any: bool = any();
-    let never_comp_any: bool = any();
-    let coord: f32 = any();
-
-    // Current verdict may be anything; Kani explores all three.
-    let verdict_choice: u8 = any();
-    kani::assume(verdict_choice < 3);
-    let current_verdict = match verdict_choice {
+fn hard_breach_never_allows_step() {
+    let hard_breach: bool = any();
+    let worsening: bool = any();
+    let current = match any::<u8>() % 3 {
         0 => SafeStepVerdict::Allow,
-        1 => SafeStepVerdict::Degrade,
+        1 => SafeStepVerdict::Restricted,
         _ => SafeStepVerdict::Stop,
     };
-
     let plane = StubPlane {
-        coord,
-        hard_breach: hard_breach_any,
-        never_comp: never_comp_any,
+        coordinate: 0.5,
+        hard_breach,
+        uncompensated_worsening: worsening,
     };
-
-    let ctx = SafeStepContext {
+    let context = SafeStepContext {
         non_offsettable_planes: vec![&plane],
-        all_planes: vec![&plane as &dyn EcoPlane],
+        all_planes: vec![&plane],
     };
+    let result = context.checksafestep(current);
 
-    let out = ctx.checksafestep(current_verdict);
-
-    // Property: if any non‑offsettable plane reports a hard breach,
-    // checksafestep must not return Allow.
-    if hard_breach_any {
-        assert!(out != SafeStepVerdict::Allow);
+    if hard_breach {
+        assert_eq!(result, SafeStepVerdict::Stop);
     }
-
-    // Property: if a non‑offsettable plane degrades and cannot be compensated,
-    // and we started at Allow, we must not end at Allow.
-    if !hard_breach_any && plane.strictly_degrades(&plane) && plane.never_compensated_by(&plane) {
-        if matches!(current_verdict, SafeStepVerdict::Allow) {
-            assert!(out != SafeStepVerdict::Allow);
-        }
+    if !hard_breach && worsening && current == SafeStepVerdict::Allow {
+        assert_eq!(result, SafeStepVerdict::Restricted);
     }
 }
