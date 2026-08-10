@@ -1,0 +1,73 @@
+// File: crates/eco_restoration_core/aln/eco_station_mcp.aln
+module eco_station_mcp
+
+particle fetch_shard_request {
+  type: "FetchShard"
+  node_id: text
+}
+
+particle fetch_shard_response {
+  node_id: text
+  window_start_ts: text
+  window_end_ts: text
+  ker_k: real [0, 1]
+  ker_e: real [0, 1]
+  ker_r: real [0, 1]
+  vt: real [0, inf)
+  corridor_status: text
+  evidencehex: text
+}
+
+particle maintenance_event_request {
+  type: "MaintenanceEvent"
+  node_id: text
+  event_ts: text
+  engineer_id: text
+  event_type: text
+  notes: text
+  photo_uri: text
+  local_evidencehex: text
+  device_id: text
+}
+
+particle ker_impact {
+  delta_k: real [-0.10, 0.10]
+  delta_e: real [-0.10, 0.10]
+  delta_r: real [-0.10, 0.10]
+}
+
+particle maintenance_event_response {
+  status: text
+  core_evidencehex: text
+  ker_impact: ker_impact
+}
+
+invariant fetch_shard_admissible(response: fetch_shard_response) {
+  response.node_id != ""
+  response.window_start_ts != ""
+  response.window_end_ts != ""
+  response.corridor_status != ""
+  response.evidencehex != ""
+  response.ker_k * response.ker_e > response.ker_r
+  response.vt >= 0
+}
+
+invariant maintenance_event_complete(request: maintenance_event_request) {
+  request.node_id != ""
+  request.event_ts != ""
+  request.engineer_id != ""
+  request.event_type != ""
+  request.local_evidencehex != ""
+  request.device_id != ""
+}
+
+invariant maintenance_response_complete(response: maintenance_event_response) {
+  response.status == "ok"
+  response.core_evidencehex != ""
+  response.ker_impact.delta_k >= -0.10
+  response.ker_impact.delta_k <= 0.10
+  response.ker_impact.delta_e >= -0.10
+  response.ker_impact.delta_e <= 0.10
+  response.ker_impact.delta_r >= -0.10
+  response.ker_impact.delta_r <= 0.10
+}
