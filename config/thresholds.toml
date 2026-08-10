@@ -1,0 +1,5 @@
+# File: config/thresholds.toml
+delta_vt_max = 0.35
+fog_min_confidence = 0.75
+eco_impact_min = 0.60
+knowledge_factor_min = 0.75
