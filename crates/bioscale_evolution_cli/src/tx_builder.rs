@@ -1,74 +1,37 @@
-// filename: crates/bioscale_evolution_cli/src/tx_builder.rs
-// destination: ecorestorationshard/crates/bioscale_evolution_cli/src/tx_builder.rs
-
-use super::HealthcareUpgrade;
-use cosmos_sdk_proto::cosmos::bank::v1beta1::MsgSend as MsgTransfer;
-use cosmos_sdk_proto::Any;
-
-const ECO_DAO_ADDRESS: &str = "bostrom1ldgmtf20d6604a24ztr0jxht7xt7az4jhkmsrc";
-const MAX_R_CAP: f64 = 1.0;
-
-pub struct TxBatch {
-    pub msgs: Vec<Any>,
+// File: crates/bioscale_evolution_cli/src/tx_builder.rs
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct EcoContributionPlan {
+    pub estimated_boot: u64,
+    pub eco_multiplier: f64,
+    pub risk_ratio: f64,
 }
 
-impl TxBatch {
-    pub fn new() -> Self {
-        Self { msgs: Vec::new() }
-    }
-
-    pub fn push(&mut self, msg: Any) {
-        self.msgs.push(msg);
-    }
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ContributionError {
+    InvalidInput,
+    AmountOverflow,
 }
 
-pub fn append_upgrade_msgs(
-    batch: &mut TxBatch,
-    upgrade: &HealthcareUpgrade,
-    eco_mult_base: f64,
-    r_today: f64,
-) -> Result<(), Box<dyn std::error::Error>> {
-    // Always add the core upgrade message.
-    batch.push(upgrade.msg_any.clone());
-
-    // Only apply eco multiplier for healthcare eco_domain tags.
-    if !upgrade.eco_domain.eq_ignore_ascii_case("healthcare") {
-        return Ok(());
+pub fn build_eco_contribution_plan(
+    gas_cost: u64,
+    eco_multiplier_base: f64,
+    r_axis: f64,
+) -> Result<Option<EcoContributionPlan>, ContributionError> {
+    if !eco_multiplier_base.is_finite() || !r_axis.is_finite() || r_axis < 0.0 || r_axis > 1.0 {
+        return Err(ContributionError::InvalidInput);
+    }
+    if gas_cost == 0 || eco_multiplier_base <= 0.0 || r_axis <= 0.0 {
+        return Ok(None);
     }
 
-    if eco_mult_base <= 0.0 || r_today <= 0.0 {
-        return Ok(());
+    let estimate = (gas_cost as f64) * eco_multiplier_base * r_axis;
+    if !estimate.is_finite() || estimate < 0.0 || estimate > u64::MAX as f64 {
+        return Err(ContributionError::AmountOverflow);
     }
 
-    let gas_cost = upgrade.gas_cost as f64;
-    let eco_multiplier = eco_mult_base;
-    let r_ratio = (r_today / MAX_R_CAP).clamp(0.0, 1.0);
-
-    let eco_contribution_boot = gas_cost * eco_multiplier * r_ratio;
-
-    if eco_contribution_boot <= 0.0 {
-        return Ok(());
-    }
-
-    let amount_str = format!("{:.0}", eco_contribution_boot.round());
-
-    let msg_transfer = MsgTransfer {
-        from_address: String::new(), // filled by signer from host address context
-        to_address: ECO_DAO_ADDRESS.to_string(),
-        amount: vec![cosmos_sdk_proto::cosmos::base::v1beta1::Coin {
-            denom: "boot".to_string(),
-            amount: amount_str,
-        }],
-    };
-
-    let mut value = Vec::new();
-    msg_transfer.encode(&mut value)?;
-
-    let any = Any {
-        type_url: "/cosmos.bank.v1beta1.MsgSend".to_string(),
-        value,
-    };
-
-    batch.push(any);
-    Ok(())
+    Ok(Some(EcoContributionPlan {
+        estimated_boot: estimate.round() as u64,
+        eco_multiplier: eco_multiplier_base,
+        risk_ratio: r_axis,
+    }))
 }
