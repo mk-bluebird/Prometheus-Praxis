@@ -28,6 +28,7 @@ int32_t assess_workload(
 ]]
 
 local M = {}
+local OWNER_DID = "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
 
 local function finite_number(value)
   return type(value) == "number"
@@ -44,21 +45,47 @@ local function source_directory()
   return source:sub(2):match("^(.*[/\\])")
 end
 
-local function load_core()
+local function load_corridor_validator(directory)
+  local ok, module_or_error = pcall(
+    require, "cyboquatic.generated.workload_corridor_validator")
+  if ok then
+    return module_or_error
+  end
+
+  if directory then
+    local loader, load_error = loadfile(
+      directory .. "generated/workload_corridor_validator.lua")
+    if loader then
+      local module = loader()
+      if type(module) == "table"
+          and type(module.validate_workload_frame) == "function" then
+        return module
+      end
+      return nil, "generated validator does not export validate_workload_frame"
+    end
+    return nil, tostring(load_error)
+  end
+
+  return nil, tostring(module_or_error)
+end
+
+local function load_core(directory)
   local candidates = {}
   local configured = os.getenv("CYBOQUATIC_CORE_LIBRARY")
+
   if configured and configured ~= "" then
-    table.insert(candidates, configured)
+    candidates[#candidates + 1] = configured
   end
-
-  local directory = source_directory()
   if directory then
-    table.insert(candidates, directory .. "../../cyboquatic-core/target/release/libcyboquatic_core.so")
-    table.insert(candidates, directory .. "../../cyboquatic-core/target/release/libcyboquatic_core.dylib")
-    table.insert(candidates, directory .. "../../cyboquatic-core/target/release/cyboquatic_core.dll")
+    local root = directory .. "../../"
+    candidates[#candidates + 1] =
+      root .. "cyboquatic-core/target/release/libcyboquatic_core.so"
+    candidates[#candidates + 1] =
+      root .. "cyboquatic-core/target/release/libcyboquatic_core.dylib"
+    candidates[#candidates + 1] =
+      root .. "cyboquatic-core/target/release/cyboquatic_core.dll"
   end
-
-  table.insert(candidates, "cyboquatic_core")
+  candidates[#candidates + 1] = "cyboquatic_core"
 
   local failures = {}
   for _, candidate in ipairs(candidates) do
@@ -66,13 +93,10 @@ local function load_core()
     if ok then
       return library_or_error
     end
-    table.insert(failures, candidate .. ": " .. tostring(library_or_error))
+    failures[#failures + 1] = candidate .. ": " .. tostring(library_or_error)
   end
-
   return nil, table.concat(failures, " | ")
 end
-
-local core, core_load_error = load_core()
 
 local function input_value(sample, snake_name, camel_name)
   local value = sample[snake_name]
@@ -81,6 +105,10 @@ local function input_value(sample, snake_name, camel_name)
   end
   return value
 end
+
+local directory = source_directory()
+local corridor, corridor_load_error = load_corridor_validator(directory)
+local core, core_load_error = load_core(directory)
 
 function M.evaluate(sample)
   if not core then
@@ -91,7 +119,14 @@ function M.evaluate(sample)
       detail = core_load_error
     }
   end
-
+  if not corridor then
+    return {
+      accepted = false,
+      route = "human-review",
+      reason = "ALN workload validator unavailable",
+      detail = corridor_load_error
+    }
+  end
   if type(sample) ~= "table" then
     return {
       accepted = false,
@@ -100,8 +135,10 @@ function M.evaluate(sample)
     }
   end
 
-  local node_id = sample.node_id or sample.nodeId
-  if type(node_id) ~= "string" or #node_id == 0 then
+  local node_id = input_value(sample, "node_id", "nodeId")
+  local canal_node = input_value(sample, "canal_node", "canalNode") or node_id
+  local owner_did = input_value(sample, "owner_did", "ownerDid") or OWNER_DID
+  if type(node_id) ~= "string" or node_id == "" then
     return {
       accepted = false,
       route = "human-review",
@@ -119,6 +156,9 @@ function M.evaluate(sample)
     embodied_carbon_g_per_j = input_value(
       sample, "embodied_carbon_g_per_j", "embodiedCarbonGPerJ"),
     biodiversity_risk = input_value(sample, "biodiversity_risk", "biodiversityRisk"),
+    K = sample.K,
+    E = sample.E,
+    R = sample.R,
     fog_confidence = input_value(sample, "fog_confidence", "fogConfidence")
   }
 
@@ -130,14 +170,6 @@ function M.evaluate(sample)
         reason = "missing or non-finite field: " .. field
       }
     end
-  end
-
-  if values.fog_confidence < 0.0 or values.fog_confidence > 1.0 then
-    return {
-      accepted = false,
-      route = "human-review",
-      reason = "fogConfidence must be within [0, 1]"
-    }
   end
 
   local input = ffi.new("WorkloadInput")
@@ -161,23 +193,32 @@ function M.evaluate(sample)
     }
   end
 
-  local core_accepted = assessment.accepted ~= 0
-  local fog_accepted = values.fog_confidence >= 0.75
-  local accepted = core_accepted and fog_accepted
+  local frame = {
+    owner_did = owner_did,
+    canal_node = canal_node,
+    energyreqJ = tonumber(assessment.energyreq_j),
+    deltaVt = tonumber(assessment.delta_vt),
+    K = values.K,
+    E = values.E,
+    R = values.R,
+    fog_confidence = values.fog_confidence,
+    eco_impact_value = tonumber(assessment.eco_impact_value)
+  }
+
+  local corridor_valid, reason = corridor.validate_workload_frame(frame)
+  local accepted = assessment.accepted ~= 0 and corridor_valid
 
   return {
     accepted = accepted,
     route = accepted and "canal-restoration" or "human-review",
-    reason = accepted and "" or (
-      core_accepted and "fogConfidence below operational corridor"
-      or "cyboquatic-core workload corridor not satisfied"
-    ),
+    reason = accepted and "" or reason or "cyboquatic-core workload corridor not satisfied",
     nodeId = node_id,
-    energyreqJ = tonumber(assessment.energyreq_j),
-    deltaVt = tonumber(assessment.delta_vt),
+    energyreqJ = frame.energyreqJ,
+    deltaVt = frame.deltaVt,
     knowledgeFactor = tonumber(assessment.knowledge_factor),
-    ecoImpactValue = tonumber(assessment.eco_impact_value),
-    fogConfidence = values.fog_confidence
+    ecoImpactValue = frame.eco_impact_value,
+    fogConfidence = frame.fog_confidence,
+    frame = frame
   }
 end
 
