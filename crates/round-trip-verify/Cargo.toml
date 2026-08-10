@@ -1,0 +1,5 @@
+# File: round-trip-verify/Cargo.toml
+[package]
+name = "round-trip-verify"
+version = "0.1.0"
+edition = "2024"
