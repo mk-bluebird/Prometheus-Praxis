@@ -1,17 +1,14 @@
 // File: cpp/simulation/cyboquatic_workload_2026_08_09.cpp
-#include <algorithm>
 #include <cmath>
 #include <iomanip>
 #include <iostream>
-#include <limits>
-#include <sstream>
+#include <stdexcept>
 #include <string>
-#include <vector>
+#include <type_traits>
 
-namespace cyboquatic {
+extern "C" {
 
-struct Telemetry {
-    std::string node_id;
+struct WorkloadInput {
     double flow_m3_s;
     double lift_m;
     double efficiency;
@@ -22,97 +19,109 @@ struct Telemetry {
     double biodiversity_risk;
 };
 
-struct Assessment {
+struct WorkloadAssessment {
     double energyreq_j;
     double delta_vt;
     double knowledge_factor;
     double eco_impact_value;
-    bool accepted;
+    unsigned char accepted;
 };
 
-Assessment assess(const Telemetry& t) {
-    const bool valid =
-        !t.node_id.empty() && t.flow_m3_s >= 0.0 && t.lift_m >= 0.0 &&
-        t.efficiency > 0.0 && t.efficiency <= 1.0 && t.runtime_s >= 0.0 &&
-        t.voltage_drop_v >= 0.0 && t.renewable_fraction >= 0.0 &&
-        t.renewable_fraction <= 1.0 && t.embodied_carbon_g_per_j >= 0.0 &&
-        t.biodiversity_risk >= 0.0 && t.biodiversity_risk <= 1.0;
+int assess_workload(const WorkloadInput* input, WorkloadAssessment* output);
 
-    if (!valid) {
-        return {0.0, 0.0, 0.0, 0.0, false};
+}
+
+static_assert(std::is_standard_layout_v<WorkloadInput>);
+static_assert(std::is_standard_layout_v<WorkloadAssessment>);
+
+namespace {
+
+constexpr int kUsageError = 1;
+constexpr int kRejected = 2;
+constexpr int kFfiError = 3;
+
+struct CliTelemetry {
+    std::string node_id;
+    WorkloadInput workload;
+};
+
+bool parse_finite_double(const char* text, double& value) {
+    try {
+        std::size_t consumed = 0;
+        value = std::stod(text, &consumed);
+        return text[consumed] == '\0' && std::isfinite(value);
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+bool valid_node_id(const std::string& node_id) {
+    return !node_id.empty() && node_id.size() <= 128;
+}
+
+bool valid_result(const WorkloadAssessment& result) {
+    return std::isfinite(result.energyreq_j) && result.energyreq_j >= 0.0 &&
+           std::isfinite(result.delta_vt) && result.delta_vt >= 0.0 &&
+           result.delta_vt <= 1.0 &&
+           std::isfinite(result.knowledge_factor) &&
+           result.knowledge_factor >= 0.0 && result.knowledge_factor <= 1.0 &&
+           std::isfinite(result.eco_impact_value) &&
+           result.eco_impact_value >= 0.0 && result.eco_impact_value <= 1.0 &&
+           result.accepted <= 1U;
+}
+
+void print_usage(const char* program) {
+    std::cerr
+        << "Usage: " << program
+        << " node_id flow_m3_s lift_m efficiency runtime_s voltage_drop_v"
+        << " renewable_fraction embodied_carbon_g_per_j biodiversity_risk\n";
+}
+
+bool parse_arguments(int argc, char* argv[], CliTelemetry& telemetry) {
+    if (argc == 1) {
+        telemetry = {
+            "phoenix-canal-pump-01",
+            {0.035, 4.2, 0.78, 900.0, 2.1, 0.82, 0.000035, 0.08}
+        };
+        return true;
     }
 
-    constexpr double water_density_kg_m3 = 997.0;
-    constexpr double gravity_m_s2 = 9.80665;
-    const double hydraulic_j =
-        water_density_kg_m3 * gravity_m_s2 * t.flow_m3_s * t.lift_m * t.runtime_s;
-    const double energyreq_j = hydraulic_j / t.efficiency;
-    const double renewable_energy_j = energyreq_j * t.renewable_fraction;
-    const double grid_energy_j = energyreq_j - renewable_energy_j;
-    const double carbon_g = grid_energy_j * t.embodied_carbon_g_per_j;
-    const double delta_vt =
-        0.55 * std::min(1.0, carbon_g / 1000.0) +
-        0.30 * std::min(1.0, t.voltage_drop_v / 24.0) +
-        0.15 * t.biodiversity_risk;
+    if (argc != 10) {
+        return false;
+    }
 
-    const double measurement_completeness =
-        (t.flow_m3_s > 0.0 ? 0.25 : 0.0) +
-        (t.lift_m >= 0.0 ? 0.25 : 0.0) +
-        (t.runtime_s > 0.0 ? 0.25 : 0.0) +
-        (t.efficiency > 0.0 ? 0.25 : 0.0);
-    const double knowledge_factor =
-        std::clamp(measurement_completeness * (1.0 - 0.5 * t.biodiversity_risk), 0.0, 1.0);
-    const double eco_impact_value =
-        std::clamp((0.55 * t.renewable_fraction + 0.45 * (1.0 - delta_vt)) *
-                   (1.0 - t.biodiversity_risk), 0.0, 1.0);
-    const bool accepted =
-        delta_vt <= 0.35 && eco_impact_value >= 0.60 && knowledge_factor >= 0.75;
-    return {energyreq_j, delta_vt, knowledge_factor, eco_impact_value, accepted};
+    telemetry.node_id = argv[1];
+    return valid_node_id(telemetry.node_id) &&
+           parse_finite_double(argv[2], telemetry.workload.flow_m3_s) &&
+           parse_finite_double(argv[3], telemetry.workload.lift_m) &&
+           parse_finite_double(argv[4], telemetry.workload.efficiency) &&
+           parse_finite_double(argv[5], telemetry.workload.runtime_s) &&
+           parse_finite_double(argv[6], telemetry.workload.voltage_drop_v) &&
+           parse_finite_double(argv[7], telemetry.workload.renewable_fraction) &&
+           parse_finite_double(argv[8], telemetry.workload.embodied_carbon_g_per_j) &&
+           parse_finite_double(argv[9], telemetry.workload.biodiversity_risk);
 }
 
-}  // namespace cyboquatic
-
-static void print_usage(const char* prog) {
-    std::cerr << "Usage: " << prog << " node_id flow_m3_s lift_m efficiency runtime_s voltage_drop_v renewable_fraction embodied_carbon_g_per_j biodiversity_risk\n";
-    std::cerr << "  node_id               : non-empty string\n";
-    std::cerr << "  flow_m3_s             : >= 0.0\n";
-    std::cerr << "  lift_m                : >= 0.0\n";
-    std::cerr << "  efficiency            : (0.0, 1.0]\n";
-    std::cerr << "  runtime_s             : >= 0.0\n";
-    std::cerr << "  voltage_drop_v        : >= 0.0\n";
-    std::cerr << "  renewable_fraction    : [0.0, 1.0]\n";
-    std::cerr << "  embodied_carbon_g_per_j : >= 0.0\n";
-    std::cerr << "  biodiversity_risk     : [0.0, 1.0]\n";
-}
+}  // namespace
 
 int main(int argc, char* argv[]) {
-    cyboquatic::Telemetry telemetry;
-
-    if (argc == 1) {
-        // No arguments: use built-in sample
-        telemetry = {"phoenix-canal-pump-01", 0.035, 4.2, 0.78, 900.0, 2.1, 0.82, 0.000035, 0.08};
-    } else if (argc == 10) {
-        // Parse 9 positional arguments
-        try {
-            telemetry.node_id = argv[1];
-            telemetry.flow_m3_s = std::stod(argv[2]);
-            telemetry.lift_m = std::stod(argv[3]);
-            telemetry.efficiency = std::stod(argv[4]);
-            telemetry.runtime_s = std::stod(argv[5]);
-            telemetry.voltage_drop_v = std::stod(argv[6]);
-            telemetry.renewable_fraction = std::stod(argv[7]);
-            telemetry.embodied_carbon_g_per_j = std::stod(argv[8]);
-            telemetry.biodiversity_risk = std::stod(argv[9]);
-        } catch (const std::exception& e) {
-            print_usage(argv[0]);
-            return 1;
-        }
-    } else {
+    CliTelemetry telemetry{};
+    if (!parse_arguments(argc, argv, telemetry)) {
         print_usage(argv[0]);
-        return 1;
+        return kUsageError;
     }
 
-    const auto result = cyboquatic::assess(telemetry);
+    WorkloadAssessment result{};
+    const int status = assess_workload(&telemetry.workload, &result);
+    if (status != 0) {
+        std::cerr << "cyboquatic-core assessment failed with status=" << status << '\n';
+        return kFfiError;
+    }
+
+    if (!valid_result(result)) {
+        std::cerr << "cyboquatic-core returned an invalid assessment\n";
+        return kFfiError;
+    }
 
     std::cout << std::fixed << std::setprecision(6)
               << "node_id=" << telemetry.node_id << '\n'
@@ -120,6 +129,7 @@ int main(int argc, char* argv[]) {
               << "deltaVt=" << result.delta_vt << '\n'
               << "knowledge_factor=" << result.knowledge_factor << '\n'
               << "eco_impact_value=" << result.eco_impact_value << '\n'
-              << "accepted=" << (result.accepted ? "1" : "0") << '\n';
-    return result.accepted ? 0 : 2;
+              << "accepted=" << static_cast<unsigned int>(result.accepted) << '\n';
+
+    return result.accepted == 1U ? 0 : kRejected;
 }
