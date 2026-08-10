@@ -7,9 +7,15 @@ mod frame_registry;
 mod lane_promotion;
 mod metrics;
 
+pub mod thresholds;
+
+use std::sync::OnceLock;
+
 use jni::objects::{JClass, JValue};
 use jni::sys::{jdouble, jobject};
 use jni::JNIEnv;
+
+use thresholds::Thresholds;
 
 pub use crate::cyboquatic_index::{
     aggregate_by_region, build_cyboquatic_index, emit_region_geojson,
@@ -27,6 +33,16 @@ pub use crate::lane_promotion::{
     KerSnapshot, Lane, LanePromotionRecommender, LanePromotionSuggestion,
 };
 pub use crate::metrics::{export_last_metrics, record_metrics_snapshot, MetricsSnapshot};
+
+const STATUS_OK: i32 = 0;
+const STATUS_NULL_POINTER: i32 = 1;
+const STATUS_INVALID_INPUT: i32 = 2;
+const STATUS_CONFIGURATION_ERROR: i32 = 3;
+
+const WATER_DENSITY_KG_M3: f64 = 997.0;
+const GRAVITY_M_S2: f64 = 9.80665;
+
+static THRESHOLDS: OnceLock<Result<Thresholds, String>> = OnceLock::new();
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -51,11 +67,20 @@ pub struct WorkloadAssessment {
     pub accepted: u8,
 }
 
-const STATUS_OK: i32 = 0;
-const STATUS_NULL_POINTER: i32 = 1;
-const STATUS_INVALID_INPUT: i32 = 2;
-const WATER_DENSITY_KG_M3: f64 = 997.0;
-const GRAVITY_M_S2: f64 = 9.80665;
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WorkloadError {
+    InvalidInput,
+    InvalidConfiguration,
+    NonFiniteResult,
+}
+
+fn thresholds() -> Result<Thresholds, WorkloadError> {
+    THRESHOLDS
+        .get_or_init(Thresholds::load)
+        .as_ref()
+        .copied()
+        .map_err(|_| WorkloadError::InvalidConfiguration)
+}
 
 fn bounded(value: f64, lower: f64, upper: f64) -> bool {
     value.is_finite() && (lower..=upper).contains(&value)
@@ -74,17 +99,29 @@ impl WorkloadInput {
     }
 }
 
-pub fn assess_workload_value(input: WorkloadInput) -> Result<WorkloadAssessment, &'static str> {
+pub fn workload_thresholds() -> Result<Thresholds, WorkloadError> {
+    thresholds()
+}
+
+pub fn assess_workload_value(
+    input: WorkloadInput,
+) -> Result<WorkloadAssessment, WorkloadError> {
     if !input.is_valid() {
-        return Err("invalid cyboquatic workload input");
+        return Err(WorkloadError::InvalidInput);
     }
 
+    let limits = thresholds()?;
     let energyreq_j = WATER_DENSITY_KG_M3
         * GRAVITY_M_S2
         * input.flow_m3_s
         * input.lift_m
         * input.runtime_s
         / input.efficiency;
+
+    if !energyreq_j.is_finite() {
+        return Err(WorkloadError::NonFiniteResult);
+    }
+
     let carbon_g =
         energyreq_j * (1.0 - input.renewable_fraction) * input.embodied_carbon_g_per_j;
     let delta_vt = 0.55 * (carbon_g / 1000.0).min(1.0)
@@ -94,19 +131,25 @@ pub fn assess_workload_value(input: WorkloadInput) -> Result<WorkloadAssessment,
     let eco_impact_value = ((0.55 * input.renewable_fraction + 0.45 * (1.0 - delta_vt))
         * (1.0 - input.biodiversity_risk))
         .clamp(0.0, 1.0);
-    let accepted =
-        delta_vt <= 0.35 && knowledge_factor >= 0.75 && eco_impact_value >= 0.60;
+
+    if !delta_vt.is_finite() || !knowledge_factor.is_finite() || !eco_impact_value.is_finite() {
+        return Err(WorkloadError::NonFiniteResult);
+    }
 
     Ok(WorkloadAssessment {
         energyreq_j,
         delta_vt,
         knowledge_factor,
         eco_impact_value,
-        accepted: u8::from(accepted),
+        accepted: u8::from(
+            delta_vt <= limits.delta_vt_max
+                && knowledge_factor >= limits.knowledge_factor_min
+                && eco_impact_value >= limits.eco_impact_min,
+        ),
     })
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assess_workload(
     input: *const WorkloadInput,
     output: *mut WorkloadAssessment,
@@ -121,11 +164,12 @@ pub extern "C" fn assess_workload(
             unsafe { *output = assessment };
             STATUS_OK
         }
-        Err(_) => STATUS_INVALID_INPUT,
+        Err(WorkloadError::InvalidConfiguration) => STATUS_CONFIGURATION_ERROR,
+        Err(WorkloadError::InvalidInput | WorkloadError::NonFiniteResult) => STATUS_INVALID_INPUT,
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_org_prometheuspraxis_cyboquatic_WorkloadTelemetry_nativeAssess(
     mut env: JNIEnv,
     _: JClass,
@@ -151,8 +195,18 @@ pub extern "system" fn Java_org_prometheuspraxis_cyboquatic_WorkloadTelemetry_na
 
     let assessment = match assess_workload_value(input) {
         Ok(value) => value,
-        Err(message) => {
-            let _ = env.throw_new("java/lang/IllegalArgumentException", message);
+        Err(WorkloadError::InvalidConfiguration) => {
+            let _ = env.throw_new(
+                "java/lang/IllegalStateException",
+                "Cyboquatic threshold configuration is unavailable or invalid",
+            );
+            return std::ptr::null_mut();
+        }
+        Err(WorkloadError::InvalidInput | WorkloadError::NonFiniteResult) => {
+            let _ = env.throw_new(
+                "java/lang/IllegalArgumentException",
+                "Invalid cyboquatic workload telemetry",
+            );
             return std::ptr::null_mut();
         }
     };
@@ -183,9 +237,8 @@ pub extern "system" fn Java_org_prometheuspraxis_cyboquatic_WorkloadTelemetry_na
 mod tests {
     use super::*;
 
-    #[test]
-    fn valid_input_produces_bounded_assessment() {
-        let result = assess_workload_value(WorkloadInput {
+    fn sample() -> WorkloadInput {
+        WorkloadInput {
             flow_m3_s: 0.035,
             lift_m: 4.2,
             efficiency: 0.78,
@@ -194,9 +247,12 @@ mod tests {
             renewable_fraction: 0.82,
             embodied_carbon_g_per_j: 0.000035,
             biodiversity_risk: 0.08,
-        })
-        .expect("sample must be valid");
+        }
+    }
 
+    #[test]
+    fn valid_input_produces_bounded_assessment() {
+        let result = assess_workload_value(sample()).expect("sample must be valid");
         assert!(result.energyreq_j > 0.0);
         assert!((0.0..=1.0).contains(&result.delta_vt));
         assert!((0.0..=1.0).contains(&result.knowledge_factor));
@@ -205,17 +261,11 @@ mod tests {
 
     #[test]
     fn invalid_efficiency_is_rejected() {
-        let result = assess_workload_value(WorkloadInput {
-            flow_m3_s: 0.035,
-            lift_m: 4.2,
-            efficiency: 0.0,
-            runtime_s: 900.0,
-            voltage_drop_v: 2.1,
-            renewable_fraction: 0.82,
-            embodied_carbon_g_per_j: 0.000035,
-            biodiversity_risk: 0.08,
-        });
-
-        assert!(result.is_err());
+        let mut input = sample();
+        input.efficiency = 0.0;
+        assert_eq!(
+            assess_workload_value(input),
+            Err(WorkloadError::InvalidInput)
+        );
     }
 }
