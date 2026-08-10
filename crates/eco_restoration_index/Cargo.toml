@@ -6,10 +6,6 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 
-[lib]
-name = "eco_restoration_index"
-crate-type = ["rlib", "cdylib"]
-
 [[bin]]
 name = "eco_restoration_migrate"
 path = "src/bin/migrate.rs"
