@@ -14,3 +14,19 @@ data class WorkloadFrame(
     fun sqlValues(): String =
         "('${nodeId.replace("'", "''")}', $energyReqJ, $deltaVt, $knowledgeFactor, $ecoImpactValue)"
 }
+
+/**
+ * Converts a [WorkloadTelemetry.Assessment] into a validated [WorkloadFrame].
+ * The produced frame contains the shared nodeId, calculated energy, deltaVt,
+ * knowledge factor, and eco-impact value. The workload formula is not duplicated
+ * here; it relies on the Java assessment logic.
+ */
+fun WorkloadTelemetry.Assessment.toWorkloadFrame(nodeId: String): WorkloadFrame {
+    return WorkloadFrame(
+        nodeId = nodeId,
+        energyReqJ = this.energyReqJ,
+        deltaVt = this.deltaVt,
+        knowledgeFactor = this.knowledgeFactor,
+        ecoImpactValue = this.ecoImpactValue
+    )
+}
