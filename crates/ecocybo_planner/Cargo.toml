@@ -6,7 +6,6 @@ name = "ecocybo_planner"
 version = "0.1.0"
 edition = "2024"
 description = "Non-actuating eco-restoration planner for Cyboquatic nodes."
-license = "Apache-2.0"
 
 [dependencies]
 rusqlite = { workspace = true }
