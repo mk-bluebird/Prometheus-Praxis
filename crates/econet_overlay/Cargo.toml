@@ -2,6 +2,7 @@
 name = "econet_overlay"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
 description = "Non-actuating smart-simplicity overlay types and chat summaries for EcoNet."
 
 [dependencies]
