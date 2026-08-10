@@ -3,3 +3,14 @@
 name = "round-trip-verify"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
+description = "Cross-language verification for cyboquatic workload assessment"
+license = "Apache-2.0"
+readme = "README.md"
+publish = false
+
+[[bin]]
+name = "round-trip-verify"
+path = "src/main.rs"
+
+[dependencies]
