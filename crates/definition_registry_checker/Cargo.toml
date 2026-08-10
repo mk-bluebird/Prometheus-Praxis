@@ -5,6 +5,7 @@
 name = "definition_registry_checker"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
 
 [dependencies]
 rusqlite = { version = "0.31", features = ["bundled"] }
