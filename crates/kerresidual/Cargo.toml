@@ -24,7 +24,7 @@ default = ["nonactuating"]
 nonactuating = []
 
 [dependencies]
-serde = { version = "1.0.197", features = ["derive"] }
+serde = { version = "1.0.203", features = ["derive"] }
 kani = { version = "0.53.0" }
 
 [dev-dependencies]
