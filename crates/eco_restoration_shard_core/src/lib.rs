@@ -1,19 +1,25 @@
-// Filename: crates/eco_restoration_shard_core/src/lib.rs
-
-//! Eco Restoration Shard Core
+// File: crates/eco_restoration_shard_core/src/lib.rs
+//! Eco Restoration Shard Core.
 //!
-//! Purpose:
-//!   - Authoritative Rust core for qpudatashard handling in eco-restoration systems.
-//!   - Computes K/E/R scores, Lyapunov residual V_t, and corridor status.
-//!   - Exposes a narrow JSON IPC surface for Android/Kotlin apps and other clients.
-//!   - Enforces non-actuating governance: no direct actuator commands.
-//!
-//! This crate is designed to integrate with EcoNetSchemaShard2026v1 and
-//! ecosafety.riskvector/corridors grammar as described in your ecosystem docs.[file:29][file:114]
+//! Non-actuating qpudatashard state management, corridor evaluation, K/E/R
+//! scoring, JSON IPC, materialized-report refresh, and MCP planner wiring.
 
 use serde::{Deserialize, Serialize};
+use std::{
+    collections::BTreeMap,
+    sync::{OnceLock, RwLock},
+};
 
-/// Canonical qpudatashard representation in the core.
+pub mod materialized_refresh;
+
+pub mod mcp {
+    pub mod eco_planner_tile_index;
+}
+
+pub use materialized_refresh::{refresh, run_periodically};
+
+const WEIGHTS: [f64; 6] = [0.15, 0.20, 0.20, 0.15, 0.15, 0.15];
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct QpuDataShard {
     pub node_id: String,
@@ -29,11 +35,10 @@ pub struct QpuDataShard {
     pub ker_k: f64,
     pub ker_e: f64,
     pub ker_r: f64,
-    pub corridor_status: String, // JSON summary of safe/gold/hard per coordinate
+    pub corridor_status: String,
     pub evidencehex: String,
 }
 
-/// Eco-safety corridor bands for one coordinate (normalized).
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct CorridorBands {
     pub safe_min: f64,
@@ -44,7 +49,6 @@ pub struct CorridorBands {
     pub hard_max: f64,
 }
 
-/// Simple KER scoring bundle.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct KerScores {
     pub k: f64,
@@ -52,11 +56,12 @@ pub struct KerScores {
     pub r: f64,
 }
 
-/// IPC request types from external clients (Android app, edge services).
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum AppRequest {
-    FetchShard { node_id: String },
+    FetchShard {
+        node_id: String,
+    },
     MaintenanceEvent {
         node_id: String,
         event_ts: String,
@@ -69,7 +74,6 @@ pub enum AppRequest {
     },
 }
 
-/// IPC response variants.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum AppResponse {
@@ -93,8 +97,45 @@ pub enum AppResponse {
     },
 }
 
-/// Compute Lyapunov residual V_t from normalized risk coordinates.
-/// In production, this should match ecosafety core's quadratic residual.[file:29]
+#[derive(Clone, Debug)]
+struct MaintenanceRecord {
+    node_id: String,
+    event_ts: String,
+    engineer_id: String,
+    event_type: String,
+    notes: Option<String>,
+    photo_uri: Option<String>,
+    evidencehex: String,
+    device_id: String,
+}
+
+#[derive(Default)]
+struct CoreState {
+    shards: BTreeMap<String, QpuDataShard>,
+    maintenance_records: Vec<MaintenanceRecord>,
+}
+
+static STATE: OnceLock<RwLock<CoreState>> = OnceLock::new();
+
+fn state() -> &'static RwLock<CoreState> {
+    STATE.get_or_init(|| RwLock::new(CoreState::default()))
+}
+
+fn bounded(value: f64) -> bool {
+    value.is_finite() && (0.0..=1.0).contains(&value)
+}
+
+fn shard_risks(shard: &QpuDataShard) -> [f64; 6] {
+    [
+        shard.energy_risk,
+        shard.hydraulics_risk,
+        shard.biology_risk,
+        shard.carbon_risk,
+        shard.materials_risk,
+        shard.dataquality_risk,
+    ]
+}
+
 pub fn compute_vt(
     energy_risk: f64,
     hydraulics_risk: f64,
@@ -103,129 +144,131 @@ pub fn compute_vt(
     materials_risk: f64,
     dataquality_risk: f64,
 ) -> f64 {
-    let w_e = 0.15;
-    let w_h = 0.20;
-    let w_b = 0.20;
-    let w_c = 0.15;
-    let w_m = 0.15;
-    let w_d = 0.15;
-
-    w_e * energy_risk * energy_risk +
-    w_h * hydraulics_risk * hydraulics_risk +
-    w_b * biology_risk * biology_risk +
-    w_c * carbon_risk * carbon_risk +
-    w_m * materials_risk * materials_risk +
-    w_d * dataquality_risk * dataquality_risk
+    let risks = [
+        energy_risk,
+        hydraulics_risk,
+        biology_risk,
+        carbon_risk,
+        materials_risk,
+        dataquality_risk,
+    ];
+    WEIGHTS
+        .iter()
+        .zip(risks)
+        .map(|(weight, risk)| weight * risk * risk)
+        .sum()
 }
 
-/// Simple corridor classification for one coordinate.
-pub fn classify_corridor(value: f64, bands: CorridorBands) -> &'static str {
-    if value < bands.safe_min || value > bands.hard_max {
-        "breach"
-    } else if value >= bands.safe_min && value <= bands.safe_max {
-        "safe"
-    } else if value > bands.safe_max && value <= bands.gold_max {
-        "gold"
-    } else if value > bands.gold_max && value <= bands.hard_max {
-        "hard"
-    } else {
-        "unknown"
+pub fn compute_ker(vt: f64) -> KerScores {
+    let residual_risk = vt.clamp(0.0, 1.0);
+    KerScores {
+        k: 1.0 - residual_risk,
+        e: 1.0 - residual_risk,
+        r: residual_risk,
     }
 }
 
-/// Compute K/E/R scores from normalized risks and V_t.
-/// Placeholder scoring; replace with full KER grammar in production.[file:29]
-pub fn compute_ker(vt: f64) -> KerScores {
-    // Knowledge K ~ 0.90–0.95, Eco-impact E ~ 0.88–0.93, Risk R ~ normalized V_t.
-    let k = 0.93;
-    let e = 0.90;
-    let r = (vt).min(1.0).max(0.0);
-    KerScores { k, e, r }
+pub fn classify_corridor(value: f64, bands: CorridorBands) -> &'static str {
+    if !value.is_finite()
+        || bands.safe_min > bands.safe_max
+        || bands.safe_max > bands.gold_min
+        || bands.gold_min > bands.gold_max
+        || bands.gold_max > bands.hard_min
+        || bands.hard_min > bands.hard_max
+    {
+        return "invalid";
+    }
+    if value >= bands.safe_min && value <= bands.safe_max {
+        "safe"
+    } else if value >= bands.gold_min && value <= bands.gold_max {
+        "gold"
+    } else if value >= bands.hard_min && value <= bands.hard_max {
+        "hard"
+    } else {
+        "breach"
+    }
 }
 
-/// Serialize corridor status summary as JSON string for clients.
-pub fn corridor_status_json(
-    energy_status: &str,
-    hydraulics_status: &str,
-    biology_status: &str,
-    carbon_status: &str,
-    materials_status: &str,
-    dataquality_status: &str,
-) -> String {
-    let obj = serde_json::json!({
-        "energy": energy_status,
-        "hydraulics": hydraulics_status,
-        "biology": biology_status,
-        "carbon": carbon_status,
-        "materials": materials_status,
-        "dataquality": dataquality_status,
-    });
-    serde_json::to_string(&obj).unwrap_or_else(|_| "{}".to_string())
+pub fn corridor_status_json(statuses: [&str; 6]) -> String {
+    serde_json::json!({
+        "energy": statuses[0],
+        "hydraulics": statuses[1],
+        "biology": statuses[2],
+        "carbon": statuses[3],
+        "materials": statuses[4],
+        "dataquality": statuses[5],
+    })
+    .to_string()
 }
 
-/// Handle an incoming IPC request and return a JSON response value.
-///
-/// In practice, this would read/write from an internal database of qpudatashards
-/// and maintenance events. Here we show the type-safe surface.[file:66]
-pub fn handle_request(req: AppRequest) -> Result<serde_json::Value, String> {
-    match req {
+pub fn validate_and_prepare_shard(shard: &mut QpuDataShard) -> Result<(), String> {
+    if shard.node_id.trim().is_empty()
+        || shard.window_start_ts.trim().is_empty()
+        || shard.window_end_ts.trim().is_empty()
+        || shard.evidencehex.trim().is_empty()
+    {
+        return Err("node, window bounds, and evidence are required".into());
+    }
+
+    let risks = shard_risks(shard);
+    if risks.iter().any(|risk| !bounded(*risk)) {
+        return Err("all risk coordinates must be finite values in [0,1]".into());
+    }
+
+    let bands = CorridorBands {
+        safe_min: 0.0,
+        safe_max: 0.30,
+        gold_min: 0.30,
+        gold_max: 0.60,
+        hard_min: 0.60,
+        hard_max: 1.0,
+    };
+    shard.vt = compute_vt(
+        risks[0], risks[1], risks[2], risks[3], risks[4], risks[5],
+    );
+    let ker = compute_ker(shard.vt);
+    shard.ker_k = ker.k;
+    shard.ker_e = ker.e;
+    shard.ker_r = ker.r;
+    shard.corridor_status = corridor_status_json([
+        classify_corridor(risks[0], bands),
+        classify_corridor(risks[1], bands),
+        classify_corridor(risks[2], bands),
+        classify_corridor(risks[3], bands),
+        classify_corridor(risks[4], bands),
+        classify_corridor(risks[5], bands),
+    ]);
+    Ok(())
+}
+
+pub fn upsert_shard(mut shard: QpuDataShard) -> Result<(), String> {
+    validate_and_prepare_shard(&mut shard)?;
+    let mut guard = state().write().map_err(|_| "core state unavailable")?;
+    guard.shards.insert(shard.node_id.clone(), shard);
+    Ok(())
+}
+
+pub fn handle_request(request: AppRequest) -> Result<serde_json::Value, String> {
+    match request {
         AppRequest::FetchShard { node_id } => {
-            // Look up latest shard (placeholder/example; replace with DB lookup).
-            let energy_risk = 0.3;
-            let hydraulics_risk = 0.2;
-            let biology_risk = 0.25;
-            let carbon_risk = 0.15;
-            let materials_risk = 0.20;
-            let dataquality_risk = 0.10;
+            let guard = state().read().map_err(|_| "core state unavailable")?;
+            let shard = guard
+                .shards
+                .get(&node_id)
+                .ok_or_else(|| format!("no qpudatashard registered for node {node_id}"))?;
 
-            let vt = compute_vt(
-                energy_risk,
-                hydraulics_risk,
-                biology_risk,
-                carbon_risk,
-                materials_risk,
-                dataquality_risk,
-            );
-            let ker = compute_ker(vt);
-
-            let bands = CorridorBands {
-                safe_min: 0.0,
-                safe_max: 0.3,
-                gold_min: 0.3,
-                gold_max: 0.6,
-                hard_min: 0.6,
-                hard_max: 1.0,
-            };
-
-            let energy_status = classify_corridor(energy_risk, bands);
-            let hydraulics_status = classify_corridor(hydraulics_risk, bands);
-            let biology_status = classify_corridor(biology_risk, bands);
-            let carbon_status = classify_corridor(carbon_risk, bands);
-            let materials_status = classify_corridor(materials_risk, bands);
-            let dataquality_status = classify_corridor(dataquality_risk, bands);
-
-            let corridor_status = corridor_status_json(
-                energy_status,
-                hydraulics_status,
-                biology_status,
-                carbon_status,
-                materials_status,
-                dataquality_status,
-            );
-
-            let resp = AppResponse::Shard {
-                node_id,
-                window_start_ts: "2026-07-06T09:00:00Z".to_string(),
-                window_end_ts: "2026-07-06T09:15:00Z".to_string(),
-                ker_k: ker.k,
-                ker_e: ker.e,
-                ker_r: ker.r,
-                vt,
-                corridor_status,
-                evidencehex: "0xa1b2c3d4e5f6".to_string(),
-            };
-
-            Ok(serde_json::to_value(resp).map_err(|e| e.to_string())?)
+            serde_json::to_value(AppResponse::Shard {
+                node_id: shard.node_id.clone(),
+                window_start_ts: shard.window_start_ts.clone(),
+                window_end_ts: shard.window_end_ts.clone(),
+                ker_k: shard.ker_k,
+                ker_e: shard.ker_e,
+                ker_r: shard.ker_r,
+                vt: shard.vt,
+                corridor_status: shard.corridor_status.clone(),
+                evidencehex: shard.evidencehex.clone(),
+            })
+            .map_err(|error| error.to_string())
         }
         AppRequest::MaintenanceEvent {
             node_id,
@@ -237,27 +280,40 @@ pub fn handle_request(req: AppRequest) -> Result<serde_json::Value, String> {
             local_evidencehex,
             device_id,
         } => {
-            // Record maintenance event and generate core evidence hex and KER impact.
-            // In a full implementation, these values would depend on DB state.
-            let core_evidencehex = format!(
-                "0xcf34e1a2b3c4-{}-{}-{}",
-                node_id, event_ts, device_id
-            );
-            let ker_impact_delta_k = 0.01;
-            let ker_impact_delta_e = 0.00;
-            let ker_impact_delta_r = -0.01;
+            if node_id.trim().is_empty()
+                || event_ts.trim().is_empty()
+                || engineer_id.trim().is_empty()
+                || event_type.trim().is_empty()
+                || local_evidencehex.trim().is_empty()
+                || device_id.trim().is_empty()
+            {
+                return Err("maintenance event contains required empty fields".into());
+            }
 
-            let _ignored = (engineer_id, event_type, notes, photo_uri, local_evidencehex);
+            let mut guard = state().write().map_err(|_| "core state unavailable")?;
+            if !guard.shards.contains_key(&node_id) {
+                return Err(format!("cannot record maintenance for unknown node {node_id}"));
+            }
 
-            let resp = AppResponse::MaintenanceAck {
-                status: "ok".to_string(),
-                core_evidencehex,
-                ker_impact_delta_k,
-                ker_impact_delta_e,
-                ker_impact_delta_r,
-            };
+            guard.maintenance_records.push(MaintenanceRecord {
+                node_id,
+                event_ts,
+                engineer_id,
+                event_type,
+                notes,
+                photo_uri,
+                evidencehex: local_evidencehex.clone(),
+                device_id,
+            });
 
-            Ok(serde_json::to_value(resp).map_err(|e| e.to_string())?)
+            serde_json::to_value(AppResponse::MaintenanceAck {
+                status: "recorded".into(),
+                core_evidencehex: local_evidencehex,
+                ker_impact_delta_k: 0.0,
+                ker_impact_delta_e: 0.0,
+                ker_impact_delta_r: 0.0,
+            })
+            .map_err(|error| error.to_string())
         }
     }
 }
