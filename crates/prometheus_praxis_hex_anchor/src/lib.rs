@@ -1,30 +1,42 @@
 // File: crates/prometheus_praxis_hex_anchor/src/lib.rs
-// Target repo: mk-bluebird/eco_restoration_shard
-// Role: Non-actuating hex-anchor DID binding and zk-proof verification for ALNv2 particles.
-// License: MIT OR Apache-2.0
-// Edition: 2024
-// rust-version = "1.85"
-// !forbidunsafecode
+#![forbid(unsafe_code)]
 
-use ed25519_dalek::{Verifier, PublicKey, Signature};
-use hex::FromHex;
+pub mod canal_node_anchor;
+
+use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
+use std::{error::Error, fmt};
 
-/// Governance DID bound to a long-term public key via RepoManifest.
-pub const GOVERNANCE_DID: &str =
-    "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7";
+pub use canal_node_anchor::{
+    hex_distance, CanalAnchorError, CanalNodeAnchor, CanalNodeAnchorIndex, HexGridCoordinate,
+};
 
-/// Error type for hex-anchor verification.
-#[derive(Debug)]
+pub const GOVERNANCE_DID: &str = "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7";
+const KER_PROOF_DOMAIN: &[u8] = b"prometheus-praxis-ker-attestation-v1";
+const KER_PROOF_BYTES: usize = 24 + 64;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HexAnchorError {
     InvalidHex(String),
     InvalidSignature(String),
-    ZkProofVerificationFailed(String),
+    InvalidProof(String),
     PolicyMismatch(String),
 }
 
-/// K,E,R corridor bounds (non-actuating) from RepoManifest.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+impl fmt::Display for HexAnchorError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidHex(message)
+            | Self::InvalidSignature(message)
+            | Self::InvalidProof(message)
+            | Self::PolicyMismatch(message) => formatter.write_str(message),
+        }
+    }
+}
+
+impl Error for HexAnchorError {}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct KerPolicy {
     pub k_min: f64,
     pub e_min: f64,
@@ -32,178 +44,239 @@ pub struct KerPolicy {
     pub non_actuating: bool,
 }
 
-/// Public inputs for zk verification.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct HexAnchorPublicInputs {
-    /// Governance DID (should match GOVERNANCE_DID).
     pub did: String,
-    /// Governance public key (Ed25519) in hex.
     pub pubkey_hex: String,
-    /// evidencehex commitment to the ALNv2 particle.
     pub evidencehex: String,
-    /// Signature over evidencehex (Ed25519) in hex.
     pub sig_hex: String,
-    /// RepoManifest corridor policy parameters.
     pub policy: KerPolicy,
 }
 
-/// Result of a successful zk verification.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct HexAnchorVerificationResult {
     pub did: String,
     pub evidencehex: String,
     pub policy: KerPolicy,
+    pub ker_k: f64,
+    pub ker_e: f64,
+    pub ker_r: f64,
     pub ker_safe: bool,
     pub non_actuating: bool,
 }
 
-/// Stub for zk proof verification.
-/// In a real deployment, this would call a SNARK/SNARG verifier with
-/// a circuit that checks:
-//  1. evidencehex == H(D)
-//  2. EdDSA signature valid for H(D) under pubkey
-//  3. K,E,R extracted from D satisfy KerPolicy
-pub fn verify_zk_proof(
-    _public_inputs: &HexAnchorPublicInputs,
-    zk_proof_bytes: &[u8],
-) -> Result<bool, HexAnchorError> {
-    if zk_proof_bytes.is_empty() {
-        return Err(HexAnchorError::ZkProofVerificationFailed(
-            "empty zk proof".to_string(),
-        ));
-    }
-    // For now, treat any non-empty proof as syntactically valid.
-    // Replace with actual SNARK verification wiring.
-    Ok(true)
+#[derive(Clone, Copy)]
+struct KerAttestation {
+    k: f64,
+    e: f64,
+    r: f64,
+    signature: Signature,
 }
 
-/// Verify that evidencehex was signed by the governance DID's public key
-/// and that the zk proof asserts K,E,R non-actuating corridor safety.
-///
-/// This function is strictly non-actuating; it only verifies signatures and proofs.
-pub fn verify_hex_anchor_did_binding(
-    public_inputs: &HexAnchorPublicInputs,
-    zk_proof_bytes: &[u8],
-) -> Result<HexAnchorVerificationResult, HexAnchorError> {
-    // 1. DID check: must match GOVERNANCE_DID.
-    if public_inputs.did != GOVERNANCE_DID {
-        return Err(HexAnchorError::PolicyMismatch(format!(
-            "DID mismatch: expected {}, got {}",
-            GOVERNANCE_DID, public_inputs.did
+fn decode_hex(value: &str, field: &str) -> Result<Vec<u8>, HexAnchorError> {
+    let normalized = value.strip_prefix("0x").unwrap_or(value);
+    hex::decode(normalized)
+        .map_err(|error| HexAnchorError::InvalidHex(format!("invalid {field}: {error}")))
+}
+
+fn bounded_unit(value: f64) -> bool {
+    value.is_finite() && (0.0..=1.0).contains(&value)
+}
+
+fn validate_policy(policy: &KerPolicy) -> Result<(), HexAnchorError> {
+    if !policy.non_actuating {
+        return Err(HexAnchorError::PolicyMismatch(
+            "governance policy must be non-actuating".into(),
+        ));
+    }
+    if !bounded_unit(policy.k_min) || !bounded_unit(policy.e_min) || !bounded_unit(policy.r_max) {
+        return Err(HexAnchorError::PolicyMismatch(
+            "KER policy bounds must be finite values in [0,1]".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn policy_message(evidence: &[u8], k: f64, e: f64, r: f64) -> Vec<u8> {
+    let mut message = Vec::with_capacity(KER_PROOF_DOMAIN.len() + evidence.len() + 24);
+    message.extend_from_slice(KER_PROOF_DOMAIN);
+    message.extend_from_slice(evidence);
+    message.extend_from_slice(&k.to_le_bytes());
+    message.extend_from_slice(&e.to_le_bytes());
+    message.extend_from_slice(&r.to_le_bytes());
+    message
+}
+
+fn decode_attestation(bytes: &[u8]) -> Result<KerAttestation, HexAnchorError> {
+    if bytes.len() != KER_PROOF_BYTES {
+        return Err(HexAnchorError::InvalidProof(format!(
+            "KER attestation must contain {KER_PROOF_BYTES} bytes"
         )));
     }
 
-    // 2. Decode governance public key from hex.
-    let pubkey_bytes = <[u8; 32]>::from_hex(&public_inputs.pubkey_hex)
-        .map_err(|e| HexAnchorError::InvalidHex(format!(
-            "invalid pubkey_hex: {}",
-            e
-        )))?;
-    let pubkey = PublicKey::from_bytes(&pubkey_bytes)
-        .map_err(|e| HexAnchorError::InvalidHex(format!(
-            "failed to construct PublicKey: {}",
-            e
-        )))?;
+    let k = f64::from_le_bytes(bytes[0..8].try_into().expect("fixed slice length"));
+    let e = f64::from_le_bytes(bytes[8..16].try_into().expect("fixed slice length"));
+    let r = f64::from_le_bytes(bytes[16..24].try_into().expect("fixed slice length"));
+    let signature = Signature::from_slice(&bytes[24..])
+        .map_err(|error| HexAnchorError::InvalidProof(format!("invalid KER signature: {error}")))?;
 
-    // 3. Decode evidencehex as bytes.
-    let evidence_bytes = Vec::from_hex(&public_inputs.evidencehex)
-        .map_err(|e| HexAnchorError::InvalidHex(format!(
-            "invalid evidencehex: {}",
-            e
-        )))?;
-
-    // 4. Decode signature from hex.
-    let sig_bytes = Vec::from_hex(&public_inputs.sig_hex)
-        .map_err(|e| HexAnchorError::InvalidHex(format!(
-            "invalid sig_hex: {}",
-            e
-        )))?;
-    let signature = Signature::from_bytes(&sig_bytes)
-        .map_err(|e| HexAnchorError::InvalidSignature(format!(
-            "failed to construct Signature: {}",
-            e
-        )))?;
-
-    // 5. Verify Ed25519 signature over evidencehex.
-    pubkey
-        .verify(&evidence_bytes, &signature)
-        .map_err(|e| HexAnchorError::InvalidSignature(format!(
-            "signature verification failed: {}",
-            e
-        )))?;
-
-    // 6. Verify zk proof (succinct argument) that the hidden document D:
-    //    - hashes to evidencehex
-    //    - obeys KerPolicy (non-actuating K,E,R corridor)
-    let zk_ok = verify_zk_proof(public_inputs, zk_proof_bytes)?;
-    if !zk_ok {
-        return Err(HexAnchorError::ZkProofVerificationFailed(
-            "zk proof did not verify".to_string(),
+    if !bounded_unit(k) || !bounded_unit(e) || !bounded_unit(r) {
+        return Err(HexAnchorError::InvalidProof(
+            "attested KER values must be finite values in [0,1]".into(),
         ));
     }
 
-    // 7. Policy sanity check: non_actuating flag must be true.
-    if !public_inputs.policy.non_actuating {
+    Ok(KerAttestation { k, e, r, signature })
+}
+
+pub fn verify_ker_attestation(
+    public_inputs: &HexAnchorPublicInputs,
+    evidence: &[u8],
+    verifying_key: &VerifyingKey,
+    attestation_bytes: &[u8],
+) -> Result<(f64, f64, f64), HexAnchorError> {
+    let attestation = decode_attestation(attestation_bytes)?;
+    let message = policy_message(evidence, attestation.k, attestation.e, attestation.r);
+
+    verifying_key
+        .verify(&message, &attestation.signature)
+        .map_err(|error| {
+            HexAnchorError::InvalidProof(format!("KER attestation signature failed: {error}"))
+        })?;
+
+    if attestation.k < public_inputs.policy.k_min
+        || attestation.e < public_inputs.policy.e_min
+        || attestation.r > public_inputs.policy.r_max
+        || attestation.k * attestation.e <= attestation.r
+    {
         return Err(HexAnchorError::PolicyMismatch(
-            "policy.non_actuating must be true for governance particles".to_string(),
+            "attested KER values violate the declared corridor policy".into(),
         ));
     }
 
-    // If we reach here, DID binding and zk corridor safety both hold.
+    Ok((attestation.k, attestation.e, attestation.r))
+}
+
+pub fn verify_hex_anchor_did_binding(
+    public_inputs: &HexAnchorPublicInputs,
+    ker_attestation_bytes: &[u8],
+) -> Result<HexAnchorVerificationResult, HexAnchorError> {
+    if public_inputs.did != GOVERNANCE_DID {
+        return Err(HexAnchorError::PolicyMismatch(format!(
+            "DID mismatch: expected {GOVERNANCE_DID}, got {}",
+            public_inputs.did
+        )));
+    }
+    validate_policy(&public_inputs.policy)?;
+
+    let key_bytes = decode_hex(&public_inputs.pubkey_hex, "pubkey_hex")?;
+    let key_array: [u8; 32] = key_bytes.try_into().map_err(|_| {
+        HexAnchorError::InvalidHex("pubkey_hex must encode exactly 32 bytes".into())
+    })?;
+    let verifying_key = VerifyingKey::from_bytes(&key_array)
+        .map_err(|error| HexAnchorError::InvalidHex(format!("invalid public key: {error}")))?;
+
+    let evidence = decode_hex(&public_inputs.evidencehex, "evidencehex")?;
+    if evidence.is_empty() {
+        return Err(HexAnchorError::InvalidHex(
+            "evidencehex must not be empty".into(),
+        ));
+    }
+
+    let signature_bytes = decode_hex(&public_inputs.sig_hex, "sig_hex")?;
+    let signature = Signature::from_slice(&signature_bytes).map_err(|error| {
+        HexAnchorError::InvalidSignature(format!("invalid evidence signature: {error}"))
+    })?;
+    verifying_key.verify(&evidence, &signature).map_err(|error| {
+        HexAnchorError::InvalidSignature(format!("evidence signature verification failed: {error}"))
+    })?;
+
+    let (ker_k, ker_e, ker_r) =
+        verify_ker_attestation(public_inputs, &evidence, &verifying_key, ker_attestation_bytes)?;
+
     Ok(HexAnchorVerificationResult {
         did: public_inputs.did.clone(),
         evidencehex: public_inputs.evidencehex.clone(),
         policy: public_inputs.policy.clone(),
+        ker_k,
+        ker_e,
+        ker_r,
         ker_safe: true,
-        non_actuating: public_inputs.policy.non_actuating,
+        non_actuating: true,
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ed25519_dalek::{Keypair, Signer};
-    use rand::rngs::OsRng;
+    use ed25519_dalek::{Signer, SigningKey};
+
+    fn ker_attestation(
+        signing_key: &SigningKey,
+        evidence: &[u8],
+        k: f64,
+        e: f64,
+        r: f64,
+    ) -> Vec<u8> {
+        let mut output = Vec::with_capacity(KER_PROOF_BYTES);
+        output.extend_from_slice(&k.to_le_bytes());
+        output.extend_from_slice(&e.to_le_bytes());
+        output.extend_from_slice(&r.to_le_bytes());
+        output.extend_from_slice(&signing_key.sign(&policy_message(evidence, k, e, r)).to_bytes());
+        output
+    }
 
     #[test]
-    fn test_hex_anchor_verification_roundtrip() {
-        // 1. Generate a temporary keypair (in production, use fixed pk_gov from RepoManifest).
-        let keypair: Keypair = Keypair::generate(&mut OsRng);
-        let pubkey_bytes = keypair.public.to_bytes();
-        let pubkey_hex = hex::encode(pubkey_bytes);
-
-        // 2. Dummy evidencehex: hash of D (here just random bytes).
-        let evidence_bytes: [u8; 32] = [1u8; 32];
-        let evidencehex = hex::encode(evidence_bytes);
-
-        // 3. Sign evidencehex bytes.
-        let sig = keypair.sign(&evidence_bytes);
-        let sig_hex = hex::encode(sig.to_bytes());
-
-        // 4. Policy: non-actuating corridor.
+    fn verifies_signed_evidence_and_attested_ker_corridor() {
+        let signing_key = SigningKey::from_bytes(&[7_u8; 32]);
+        let evidence = [1_u8; 32];
         let policy = KerPolicy {
-            k_min: 0.8,
-            e_min: 0.9,
-            r_max: 0.2,
+            k_min: 0.80,
+            e_min: 0.85,
+            r_max: 0.20,
             non_actuating: true,
         };
-
         let public_inputs = HexAnchorPublicInputs {
-            did: GOVERNANCE_DID.to_string(),
-            pubkey_hex,
-            evidencehex,
-            sig_hex,
+            did: GOVERNANCE_DID.into(),
+            pubkey_hex: hex::encode(signing_key.verifying_key().to_bytes()),
+            evidencehex: format!("0x{}", hex::encode(evidence)),
+            sig_hex: hex::encode(signing_key.sign(&evidence).to_bytes()),
             policy,
         };
+        let result = verify_hex_anchor_did_binding(
+            &public_inputs,
+            &ker_attestation(&signing_key, &evidence, 0.93, 0.90, 0.12),
+        )
+        .unwrap();
 
-        // 5. Dummy zk proof bytes (non-empty).
-        let zk_proof_bytes = vec![0x42, 0x99];
+        assert!(result.ker_safe);
+        assert_eq!(result.ker_k, 0.93);
+        assert_eq!(result.ker_e, 0.90);
+        assert_eq!(result.ker_r, 0.12);
+        assert!(result.non_actuating);
+    }
 
-        let res = verify_hex_anchor_did_binding(&public_inputs, &zk_proof_bytes)
-            .expect("verification should succeed");
+    #[test]
+    fn rejects_attestation_that_fails_ker_margin() {
+        let signing_key = SigningKey::from_bytes(&[9_u8; 32]);
+        let evidence = [2_u8; 32];
+        let public_inputs = HexAnchorPublicInputs {
+            did: GOVERNANCE_DID.into(),
+            pubkey_hex: hex::encode(signing_key.verifying_key().to_bytes()),
+            evidencehex: hex::encode(evidence),
+            sig_hex: hex::encode(signing_key.sign(&evidence).to_bytes()),
+            policy: KerPolicy {
+                k_min: 0.50,
+                e_min: 0.50,
+                r_max: 0.40,
+                non_actuating: true,
+            },
+        };
 
-        assert_eq!(res.did, GOVERNANCE_DID);
-        assert!(res.ker_safe);
-        assert!(res.non_actuating);
+        let result = verify_hex_anchor_did_binding(
+            &public_inputs,
+            &ker_attestation(&signing_key, &evidence, 0.50, 0.50, 0.25),
+        );
+        assert!(matches!(result, Err(HexAnchorError::PolicyMismatch(_))));
     }
 }
