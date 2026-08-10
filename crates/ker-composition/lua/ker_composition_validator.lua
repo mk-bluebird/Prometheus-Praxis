@@ -1,110 +1,141 @@
--- ker_composition_validator.lua
--- Lightweight Lua validator for KERComposition2026v1 invariants.
--- Non-actuating: used only for offline integrity checks.
-
+-- File: crates/ker-composition/lua/ker_composition_validator.lua
 local M = {}
 
--- theta is corridor-level risk cap; keep default consistent with ALN spec.
 local THETA = 0.30
+local RULE_ID = "keroplusgeomminmaxv1"
 
--- Expect composition row as:
--- {
---   left = { K=..., E=..., R=..., lane="RESEARCH|PILOT|PROD" },
---   right = { K=..., E=..., R=..., lane="..." },
---   comp = {
---     Kcombined = ...,
---     Ecombined = ...,
---     Rcombined = ...,
---     members   = "idmin,idmax",
---     ruleid    = "keroplusgeomminmaxv1",
---     lane      = "RESEARCH|PILOT|PROD",
---     evidencehex = "...", -- optional
---   }
--- }
+local function finite_number(value)
+  return type(value) == "number"
+    and value == value
+    and value ~= math.huge
+    and value ~= -math.huge
+end
 
-local function kercombineriskcap(left, right, comp)
-  if left.R <= THETA and right.R <= THETA then
-    return comp.Rcombined <= THETA
+local function unit_interval(value)
+  return finite_number(value) and value >= 0.0 and value <= 1.0
+end
+
+local function canonical_lane(value)
+  if value == "PILOT" then
+    return "EXPPROD"
+  end
+  return value
+end
+
+local function valid_lane(value)
+  value = canonical_lane(value)
+  return value == "RESEARCH" or value == "EXPPROD" or value == "PROD"
+end
+
+local function field(table_value, modern_name, legacy_name)
+  if table_value[modern_name] ~= nil then
+    return table_value[modern_name]
+  end
+  return table_value[legacy_name]
+end
+
+local function normalize_payload(payload)
+  if type(payload) ~= "table"
+    or type(payload.left) ~= "table"
+    or type(payload.right) ~= "table" then
+    return nil
+  end
+
+  local source = payload.composition or payload.comp
+  if type(source) ~= "table" then
+    return nil
+  end
+
+  local left = {
+    k = field(payload.left, "k", "K"),
+    e = field(payload.left, "e", "E"),
+    r = field(payload.left, "r", "R"),
+    lane = canonical_lane(payload.left.lane),
+  }
+  local right = {
+    k = field(payload.right, "k", "K"),
+    e = field(payload.right, "e", "E"),
+    r = field(payload.right, "r", "R"),
+    lane = canonical_lane(payload.right.lane),
+  }
+  local composition = {
+    k = field(source, "k_combined", "Kcombined"),
+    e = field(source, "e_combined", "Ecombined"),
+    r = field(source, "r_combined", "Rcombined"),
+    members = source.members,
+    rule_id = field(source, "rule_id", "ruleid"),
+    lane = canonical_lane(source.lane),
+    evidencehex = source.evidencehex,
+  }
+
+  return left, right, composition
+end
+
+local function valid_particle(particle)
+  return unit_interval(particle.k)
+    and unit_interval(particle.e)
+    and unit_interval(particle.r)
+    and valid_lane(particle.lane)
+end
+
+local function valid_composition(composition)
+  return unit_interval(composition.k)
+    and unit_interval(composition.e)
+    and unit_interval(composition.r)
+    and valid_lane(composition.lane)
+    and type(composition.members) == "string"
+    and composition.members ~= ""
+    and composition.rule_id == RULE_ID
+end
+
+local function risk_cap(left, right, composition)
+  if left.r <= THETA and right.r <= THETA then
+    return composition.r <= THETA
   end
   return true
 end
 
-local function kercombineKEbounds(left, right, comp)
-  local kmin = math.min(left.K, right.K)
-  local kmax = math.max(left.K, right.K)
-  if comp.Kcombined < kmin then
-    return false
+local function knowledge_and_impact_bounds(left, right, composition)
+  local k_min = math.min(left.k, right.k)
+  local k_max = math.max(left.k, right.k)
+  return composition.k >= k_min
+    and composition.k <= k_max
+    and composition.e <= left.e
+    and composition.e <= right.e
+end
+
+local function risk_monotone(left, right, composition)
+  return composition.r >= left.r and composition.r >= right.r
+end
+
+local function lane_safe(left, right, composition)
+  if composition.lane == "PROD" then
+    return left.lane == "PROD" and right.lane == "PROD"
   end
-  if comp.Kcombined > kmax then
-    return false
-  end
-  if comp.Ecombined > left.E then
-    return false
-  end
-  if comp.Ecombined > right.E then
-    return false
+  if composition.lane == "EXPPROD" then
+    return left.lane ~= "RESEARCH" and right.lane ~= "RESEARCH"
   end
   return true
 end
 
-local function kercombineRmonotone(left, right, comp)
-  if comp.Rcombined < left.R then
-    return false
-  end
-  if comp.Rcombined < right.R then
-    return false
-  end
-  return true
+local function positive_ker_margin(composition)
+  return composition.k * composition.e > composition.r
 end
 
-local function kercombinelanesafety(left, right, comp)
-  if comp.lane == "PROD" then
-    if left.lane ~= "PROD" or right.lane ~= "PROD" then
-      return false
-    end
-  end
-  return true
-end
-
--- Provenance invariants: in this offline Lua checker we only require
--- that ruleid is "keroplusgeomminmaxv1" and members is non-empty,
--- because hashing is handled in a separate, signed layer.
-local function kercombineprovenance(_, _, comp)
-  if comp.ruleid ~= "keroplusgeomminmaxv1" then
-    return false
-  end
-  if comp.members == nil or comp.members == "" then
-    return false
-  end
-  return true
-end
-
-function M.validate(row)
-  local left  = row.left
-  local right = row.right
-  local comp  = row.comp
-
-  if left == nil or right == nil or comp == nil then
+function M.validate(payload)
+  local left, right, composition = normalize_payload(payload)
+  if left == nil
+    or not valid_particle(left)
+    or not valid_particle(right)
+    or not valid_composition(composition) then
     return false
   end
 
-  if not kercombineriskcap(left, right, comp) then
-    return false
-  end
-  if not kercombineKEbounds(left, right, comp) then
-    return false
-  end
-  if not kercombineRmonotone(left, right, comp) then
-    return false
-  end
-  if not kercombineprovenance(left, right, comp) then
-    return false
-  end
-  if not kercombinelanesafety(left, right, comp) then
-    return false
-  end
-
-  return true
+  return risk_cap(left, right, composition)
+    and knowledge_and_impact_bounds(left, right, composition)
+    and risk_monotone(left, right, composition)
+    and lane_safe(left, right, composition)
+    and positive_ker_margin(composition)
 end
 
 return M
