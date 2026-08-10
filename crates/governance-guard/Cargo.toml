@@ -6,6 +6,7 @@
 name = "governance-guard"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
 license = "MIT OR Apache-2.0"
 description = "Non-actuating governance guard functions for KER, lanes, and MT6883 RoH ceilings."
 repository = "https://github.com/mk-bluebird/eco_restoration_shard"
