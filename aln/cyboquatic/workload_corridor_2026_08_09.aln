@@ -5,6 +5,7 @@ particle workload_frame {
   owner_did: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
   energyreqJ: real [0, inf)
   deltaVt: real [0, 1]
+  knowledge_factor: real [0, 1]
   K: real [0, 1]
   E: real [0, 1]
   R: real [0, 1]
@@ -18,6 +19,7 @@ invariant energy_corridor(frame: workload_frame) {
   frame.K * frame.E > frame.R
   frame.fog_confidence >= 0.75
   frame.eco_impact_value >= 0.60
+  frame.knowledge_factor >= 0.75
 }
 
 decision admit(frame: workload_frame) {
