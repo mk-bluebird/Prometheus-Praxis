@@ -1,0 +1,5 @@
+# File: kotlin/cyboquatic/src/nativeInterop/cinterop/cyboquatic_core.def
+headers = cyboquatic_core.h
+package = org.prometheuspraxis.cyboquatic.nativecore
+compilerOpts = -I../../../cyboquatic-core/include
+linkerOpts = -L../../../cyboquatic-core/target/release -lcyboquatic_core
