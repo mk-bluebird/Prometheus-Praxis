@@ -1,0 +1,49 @@
+// File: aln/ppx_ai_workload/governance_particle.aln
+module ppx_ai_workload_governance_v2
+
+record governance_particle {
+  owner_did: text
+  policy_id: text
+  k_min: decimal
+  e_min: decimal
+  r_max: decimal
+  roh_max: decimal
+}
+
+record telemetry_frame {
+  frame_id: text
+  owner_did: text
+  signature_id: text
+  hex_anchor: integer
+  K: decimal
+  E: decimal
+  R: decimal
+  RoH: decimal
+  deltaVt: decimal
+}
+
+invariant owner_identity {
+  governance_particle.owner_did == "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+}
+
+invariant telemetry_owner_matches_governance {
+  telemetry_frame.owner_did == governance_particle.owner_did
+}
+
+invariant signature_reference_required {
+  telemetry_frame.signature_id != ""
+}
+
+invariant ker_bounds {
+  telemetry_frame.K >= 0.0 and telemetry_frame.K <= 1.0 and
+  telemetry_frame.E >= 0.0 and telemetry_frame.E <= 1.0 and
+  telemetry_frame.R >= 0.0 and telemetry_frame.R <= 1.0 and
+  telemetry_frame.RoH >= 0.0 and telemetry_frame.RoH <= 1.0
+}
+
+invariant governance_corridor {
+  telemetry_frame.K >= governance_particle.k_min and
+  telemetry_frame.E >= governance_particle.e_min and
+  telemetry_frame.R <= governance_particle.r_max and
+  telemetry_frame.RoH <= governance_particle.roh_max
+}
