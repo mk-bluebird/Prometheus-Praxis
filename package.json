@@ -1,0 +1,15 @@
+{
+  "name": "prometheus-praxis-eco-restoration",
+  "private": true,
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "commitlint": "commitlint --edit",
+    "commitlint:range": "commitlint --from ${BASE_SHA} --to ${HEAD_SHA}",
+    "release": "standard-version"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.0",
+    "@commitlint/config-conventional": "^19.8.0",
+    "standard-version": "^9.5.0"
+  }
+}
