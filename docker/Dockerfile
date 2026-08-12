@@ -1,56 +1,57 @@
-# File: docker/Dockerfile
-# Docker image for the Prometheus-Praxis governance stack:
-# - C++ MCP server (universal toolbox + stdio bridge)
-# - SQLite test database
-# - Lua FOG router and governance daemons
+# File: Dockerfile
+FROM ubuntu:24.04 AS build
 
-FROM debian:stable-slim
-
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     build-essential \
-    sqlite3 \
-    lua5.3 \
-    lsqlite3-dev \
+    cmake \
+    pkg-config \
+    libsqlite3-dev \
+    libgdal-dev \
+    libeigen3-dev \
+    libsndfile1-dev \
     && rm -rf /var/lib/apt/lists/*
 
+WORKDIR /src
+COPY cpp ./cpp
+COPY lua ./lua
+COPY CMakeLists.txt ./CMakeLists.txt
+
+RUN test -d cpp/tools \
+    && test -f cpp/tools/mcp_stdio_governance_bridge.cpp \
+    && test -f cpp/tools/fog_schedule_predictor.cpp \
+    && g++ -std=c++20 -O2 -Wall -Wextra -Wpedantic \
+        cpp/tools/mcp_stdio_governance_bridge.cpp \
+        -o /out/mcp_stdio_governance_bridge \
+        $(pkg-config --cflags --libs sqlite3) \
+    && g++ -std=c++20 -O2 -Wall -Wextra -Wpedantic \
+        cpp/tools/fog_schedule_predictor.cpp \
+        -o /out/fog_schedule_predictor \
+        $(pkg-config --cflags --libs sqlite3)
+
+FROM ubuntu:24.04
+
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    sqlite3 \
+    lua5.4 \
+    lua-sql-sqlite3 \
+    libsqlite3-0 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --system --create-home --uid 10001 eco
+
 WORKDIR /app
+COPY --from=build /out/mcp_stdio_governance_bridge /usr/local/bin/mcp_stdio_governance_bridge
+COPY --from=build /out/fog_schedule_predictor /usr/local/bin/fog_schedule_predictor
+COPY lua ./lua
+COPY docker/entrypoint.sh /usr/local/bin/prometheus-praxis-entrypoint
 
-# Copy C++ sources (MCP toolbox, stdio bridge, fog predictor, ALN/SQL generators, etc.)
-COPY cpp /app/cpp
-# Copy Lua governance scripts
-COPY lua /app/lua
+RUN chmod 0755 /usr/local/bin/mcp_stdio_governance_bridge \
+    /usr/local/bin/fog_schedule_predictor \
+    /usr/local/bin/prometheus-praxis-entrypoint \
+    && mkdir -p /data \
+    && chown eco:eco /data
 
-# Build C++ MCP toolbox and fog predictor
-RUN g++ -std=c++20 -O2 -o mcp_stdio_governance_bridge cpp/tools/mcp_stdio_governance_bridge.cpp \
-    && g++ -std=c++20 -O2 -o fog_schedule_predictor cpp/tools/fog_schedule_predictor.cpp
-
-# Initialize SQLite test database
-RUN sqlite3 prometheus_praxis.db "PRAGMA journal_mode=WAL;"
-
-# Optionally load basic schema for hex_stability_carbon, schedule_cache, etc.
-RUN sqlite3 prometheus_praxis.db "\
-  CREATE TABLE IF NOT EXISTS hex_stability_carbon (\
-    hex_id TEXT PRIMARY KEY,\
-    band TEXT,\
-    ker_k REAL,\
-    ker_e REAL,\
-    ker_r REAL,\
-    carbon_intensity REAL,\
-    max_carbon REAL,\
-    ker_s REAL,\
-    carbon_corridor REAL,\
-    v_residual REAL\
-  );\
-  CREATE TABLE IF NOT EXISTS schedule_cache (\
-    hex_id TEXT,\
-    hour INTEGER,\
-    priority REAL,\
-    ts TEXT\
-  );\
-"
-
-# Default CMD: start MCP stdio bridge and run Lua FOG router once as a sample evaluation.
-CMD ["/bin/sh", "-c", "\
-  echo 'hex_stability_carbon_snapshot' | ./mcp_stdio_governance_bridge; \
-  lua5.3 lua/fog/fog_router.lua \
-"]
+USER eco
+VOLUME ["/data"]
+ENTRYPOINT ["/usr/local/bin/prometheus-praxis-entrypoint"]
+CMD ["/bin/sh", "-c", "printf '%s\n' 'hex_stability_carbon_snapshot' | mcp_stdio_governance_bridge && lua5.4 lua/fog/fog_router.lua"]
