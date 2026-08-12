@@ -1,0 +1,38 @@
+// File: aln/cyboquatic_workload_2026_08_10/workload_corridor.aln
+module cyboquatic_workload_corridor_v2
+
+governance_particle {
+  owner_did: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+  domain: "cyboquatic_workload"
+  mode: "measurement_and_advisory"
+}
+
+record workload_frame {
+  node_id: text
+  energyreqJ: decimal
+  deltaVt: decimal
+  K: decimal
+  E: decimal
+  R: decimal
+  FOG: text
+  canal_node_parameter: decimal
+}
+
+invariant nonnegative_energy {
+  workload_frame.energyreqJ >= 0.0
+}
+
+invariant ker_bounds {
+  workload_frame.K >= 0.0 and workload_frame.K <= 1.0 and
+  workload_frame.E >= 0.0 and workload_frame.E <= 1.0 and
+  workload_frame.R >= 0.0 and workload_frame.R <= 1.0
+}
+
+invariant residual_corridor {
+  workload_frame.deltaVt >= 0.0 and workload_frame.deltaVt <= 0.20 and
+  workload_frame.R >= workload_frame.deltaVt
+}
+
+invariant eco_operation {
+  workload_frame.K >= 0.60 and workload_frame.E >= 0.55
+}
