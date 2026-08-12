@@ -1,96 +1,214 @@
--- CI Orchestration for EcoNet Constellation
--- Validates blast-radius, enforces KER thresholds, and triggers corridor-tightening
-
+-- File: lua/ppx_ai_workload/constellation_workload_audit.lua
 local sqlite3 = require("lsqlite3")
-local json = require("json")
 
-local DB_PATH = "data/constellation/econet_constellation_index.db"
-local KER_THRESHOLDS = {K_min = 0.90, E_min = 0.90, R_max = 0.13}
+local DEFAULT_DATABASE_PATH = "data/constellation/econet_constellation_index.db"
 
-local function open_db()
-    local db = sqlite3.open(DB_PATH)
-    if not db then
-        error("Failed to open constellation database")
-    end
-    return db
+local POLICY = {
+    K_min = 0.90,
+    E_min = 0.90,
+    R_max = 0.13,
+    roh_max = 0.13,
+    max_delta_vt = 0.02,
+    maximum_critical_dependencies = 3,
+    risk_trend_window = 5,
+    risk_trend_trigger = 0.12,
+    minimum_eco_impact_for_canal = 0.55,
+}
+
+local function fail(message)
+    io.stderr:write("PPX workload audit: " .. message .. "\n")
+    os.exit(1)
 end
 
-local function check_ker_compliance(db)
-    local query = [[
-        SELECT a.artifact_path, k.knowledge_factor, k.eco_impact, k.risk_of_harm
-        FROM artifacts a
-        JOIN ker_scores k ON a.artifact_id = k.artifact_id
-        WHERE k.knowledge_factor < ? OR k.eco_impact < ? OR k.risk_of_harm > ?
-    ]]
-    
-    local fails = {}
-    for row in db:nrows(query, KER_THRESHOLDS.K_min, KER_THRESHOLDS.E_min, KER_THRESHOLDS.R_max) do
-        table.insert(fails, {
-            path = row.artifact_path,
-            K = row.knowledge_factor,
-            E = row.eco_impact,
-            R = row.risk_of_harm
-        })
+local function open_database(path)
+    local database = sqlite3.open(path)
+    if not database then
+        fail("cannot open SQLite database at " .. path)
     end
-    return fails
+    return database
 end
 
-local function validate_blast_radius(db, artifact_id)
-    local query = [[
-        SELECT COUNT(*) as critical_deps
+local function prepare(database, sql)
+    local statement = database:prepare(sql)
+    if not statement then
+        fail("cannot prepare required query: " .. database:errmsg())
+    end
+    return statement
+end
+
+local function collect_rows(database, sql, values)
+    local statement = prepare(database, sql)
+    if values then
+        statement:bind_values(table.unpack(values))
+    end
+
+    local rows = {}
+    for row in statement:nrows() do
+        rows[#rows + 1] = row
+    end
+    statement:finalize()
+    return rows
+end
+
+local function scalar(database, sql, values)
+    local rows = collect_rows(database, sql, values)
+    if #rows == 0 then
+        return 0
+    end
+    for _, value in pairs(rows[1]) do
+        if type(value) == "number" then
+            return value
+        end
+    end
+    return 0
+end
+
+local function check_artifact_ker(database)
+    return collect_rows(database, [[
+        SELECT
+            a.artifact_path AS artifact_path,
+            k.knowledge_factor AS k_knowledge,
+            k.eco_impact AS e_eco_impact,
+            k.risk_of_harm AS r_risk
+        FROM artifacts AS a
+        JOIN ker_scores AS k ON k.artifact_id = a.artifact_id
+        WHERE k.knowledge_factor < ?
+           OR k.eco_impact < ?
+           OR k.risk_of_harm > ?
+    ]], { POLICY.K_min, POLICY.E_min, POLICY.R_max })
+end
+
+local function check_ppx_workload_corridor(database)
+    return collect_rows(database, [[
+        SELECT
+            workload_id,
+            lane,
+            action,
+            k_knowledge,
+            e_eco_impact,
+            r_risk,
+            roh,
+            delta_vt,
+            canal_node_parameter,
+            canal_threshold,
+            reason_code
+        FROM ppx_ker_fog_canal_shard
+        WHERE roh > ?
+           OR r_risk > ?
+           OR delta_vt > ?
+           OR (
+               lane <> 'RESEARCH'
+               AND canal_node_parameter > canal_threshold
+               AND e_eco_impact < ?
+           )
+           OR (
+               lane = 'RESEARCH'
+               AND canal_node_parameter > canal_threshold
+               AND e_eco_impact < ?
+               AND action = 'PROCEED'
+           )
+    ]], {
+        POLICY.roh_max,
+        POLICY.R_max,
+        POLICY.max_delta_vt,
+        POLICY.minimum_eco_impact_for_canal,
+        POLICY.minimum_eco_impact_for_canal,
+    })
+end
+
+local function critical_dependency_count(database, artifact_id)
+    return scalar(database, [[
+        SELECT COUNT(*)
         FROM blast_radius
-        WHERE source_artifact_id = ? AND impact_severity = 'critical'
-    ]]
-    
-    local stmt = db:prepare(query)
-    stmt:bind(1, artifact_id)
-    local row = stmt:step()
-    return row and row.critical_deps or 0
+        WHERE source_artifact_id = ?
+          AND impact_severity = 'critical'
+    ]], { artifact_id })
+end
+
+local function risk_trend_requires_attention(database)
+    local rows = collect_rows(database, [[
+        SELECT r_risk
+        FROM ppx_ker_fog_canal_shard
+        ORDER BY observed_utc DESC
+        LIMIT ?
+    ]], { POLICY.risk_trend_window })
+
+    if #rows < POLICY.risk_trend_window then
+        return false, 0.0
+    end
+
+    local oldest = tonumber(rows[#rows].r_risk)
+    local newest = tonumber(rows[1].r_risk)
+    if not oldest or not newest then
+        return true, 1.0
+    end
+    return newest - oldest > POLICY.risk_trend_trigger, newest - oldest
+end
+
+local function print_violations(title, rows)
+    if #rows == 0 then
+        print("  PASS " .. title)
+        return true
+    end
+
+    print("  FAIL " .. title .. ": " .. #rows .. " violating record(s)")
+    for _, row in ipairs(rows) do
+        print(string.format(
+            "    id=%s lane=%s action=%s K=%s E=%s R=%s RoH=%s deltaV=%s reason=%s",
+            tostring(row.workload_id or row.artifact_path),
+            tostring(row.lane or "N/A"),
+            tostring(row.action or "N/A"),
+            tostring(row.k_knowledge or "N/A"),
+            tostring(row.e_eco_impact or "N/A"),
+            tostring(row.r_risk or "N/A"),
+            tostring(row.roh or "N/A"),
+            tostring(row.delta_vt or "N/A"),
+            tostring(row.reason_code or "artifact_ker_violation")
+        ))
+    end
+    return false
 end
 
 local function main()
-    print("=== EcoNet Constellation CI Orchestrator ===")
-    local db = open_db()
-    
-    -- Step 1: Check KER compliance
-    print("\n[1/3] Checking KER compliance...")
-    local fails = check_ker_compliance(db)
-    if #fails > 0 then
-        print("⚠ KER violations detected:")
-        for _, f in ipairs(fails) do
-            print(string.format("  %s: K=%.2f, E=%.2f, R=%.2f", f.path, f.K, f.E, f.R))
-        end
-        print("✗ CI FAILED: KER thresholds not met")
-        db:close()
-        os.exit(1)
-    else
-        print("✓ All artifacts meet KER thresholds")
+    local database_path = arg[1] or DEFAULT_DATABASE_PATH
+    local artifact_id = tonumber(arg[2]) or 5
+    local database = open_database(database_path)
+
+    print("=== PPX Eco-Restoration Workload Audit ===")
+    print("[1/4] Artifact KER policy")
+    local artifacts_ok = print_violations("artifact KER", check_artifact_ker(database))
+
+    print("[2/4] Workload corridor policy")
+    local workloads_ok = print_violations(
+        "K/E/R, RoH, residual, and canal corridor",
+        check_ppx_workload_corridor(database)
+    )
+
+    print("[3/4] Dependency exposure")
+    local critical_count = critical_dependency_count(database, artifact_id)
+    local dependencies_ok = critical_count <= POLICY.maximum_critical_dependencies
+    print(string.format(
+        "  %s artifact=%d critical_dependencies=%d maximum=%d",
+        dependencies_ok and "PASS" or "FAIL",
+        artifact_id,
+        critical_count,
+        POLICY.maximum_critical_dependencies
+    ))
+
+    print("[4/4] Risk trend advisory")
+    local attention_required, trend = risk_trend_requires_attention(database)
+    print(string.format(
+        "  %s five_window_risk_change=%.6f threshold=%.6f",
+        attention_required and "ADVISORY_REVIEW" or "PASS",
+        trend,
+        POLICY.risk_trend_trigger
+    ))
+
+    database:close()
+    if not artifacts_ok or not workloads_ok or not dependencies_ok then
+        fail("audit failed; no workload admission recommendation emitted")
     end
-    
-    -- Step 2: Validate blast radius for critical artifacts
-    print("\n[2/3] Validating blast radius...")
-    local critical_count = validate_blast_radius(db, 5)
-    if critical_count > 3 then
-        print(string.format("⚠ Artifact 5 has %d critical dependencies (limit: 3)", critical_count))
-        print("✗ CI FAILED: Blast radius too large")
-        db:close()
-        os.exit(1)
-    else
-        print("✓ Blast radius within acceptable limits")
-    end
-    
-    -- Step 3: Energy-cost check (placeholder for advanced logic)
-    print("\n[3/3] Checking energy efficiency...")
-    local energy_query = "SELECT AVG(joules_per_cycle) as avg_j FROM energy_metrics WHERE carbon_offset_kg < 0"
-    for row in db:nrows(energy_query) do
-        if row.avg_j and row.avg_j < 1.0 then
-            print(string.format("✓ Average carbon-negative energy: %.2f J/cycle", row.avg_j))
-        end
-    end
-    
-    db:close()
-    print("\n✓ CI PASSED: All checks successful")
-    print("Next step: Trigger corridor-tightening if R trend > 0.12 over 5 iterations")
+    print("PASS audit complete; workload decisions remain non-actuating")
 end
 
 main()
