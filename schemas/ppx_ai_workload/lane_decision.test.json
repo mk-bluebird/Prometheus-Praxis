@@ -1,0 +1,19 @@
+{
+  "schema_id": "ppx.ai_workload.lane.v1",
+  "machine_id": "ai-node-01",
+  "station_id": "camelback-canal-02",
+  "timestamp_utc": "2026-08-11T23:33:00Z",
+  "hex_anchor": 1152921505680588801,
+  "k_knowledge": 0.81,
+  "e_eco_impact": 0.72,
+  "r_risk": 0.12,
+  "roh": 0.08,
+  "r_extra_1": 0.10,
+  "r_extra_2": null,
+  "vt_current": 0.11,
+  "vt_next": 0.10,
+  "delta_vt": -0.01,
+  "lane": "PILOT",
+  "action": "PROCEED",
+  "reason_code": "all_governance_gates_passed"
+}
