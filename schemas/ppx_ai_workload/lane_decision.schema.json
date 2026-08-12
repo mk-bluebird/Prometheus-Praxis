@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PPX Lane Decision v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "machine_id", "station_id", "timestamp_utc", "hex_anchor",
+    "k_knowledge", "e_eco_impact", "r_risk", "roh", "vt_current", "vt_next",
+    "delta_vt", "lane", "action", "reason_code"],
+  "properties": {
+    "schema_id": {"const": "ppx.ai_workload.lane.v1"},
+    "machine_id": {"type": "string", "minLength": 1, "maxLength": 63},
+    "station_id": {"type": "string", "minLength": 1, "maxLength": 63},
+    "timestamp_utc": {"type": "string", "format": "date-time"},
+    "hex_anchor": {"type": "integer", "minimum": 0},
+    "k_knowledge": {"type": "number", "minimum": 0, "maximum": 1},
+    "e_eco_impact": {"type": "number", "minimum": 0, "maximum": 1},
+    "r_risk": {"type": "number", "minimum": 0, "maximum": 1},
+    "roh": {"type": "number", "minimum": 0, "maximum": 1},
+    "r_extra_1": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+    "r_extra_2": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+    "vt_current": {"type": "number", "minimum": 0},
+    "vt_next": {"type": "number", "minimum": 0},
+    "delta_vt": {"type": "number"},
+    "lane": {"enum": ["RESEARCH", "PILOT", "PRODUCTION"]},
+    "action": {"enum": ["PROCEED", "DERATE", "HALT"]},
+    "reason_code": {"type": "string", "minLength": 1}
+  }
+}
