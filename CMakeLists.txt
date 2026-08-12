@@ -8,9 +8,14 @@ project(PrometheusPraxis
     LANGUAGES CXX
 )
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Find required packages
+find_package(Eigen3 QUIET)
+find_package(SQLite3 QUIET)
+find_package(PROJ QUIET)
 
 # Add subdirectories for C++ components (tools only)
 add_subdirectory(cpp)
