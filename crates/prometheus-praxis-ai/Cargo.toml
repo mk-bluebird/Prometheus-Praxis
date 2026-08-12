@@ -1,0 +1,22 @@
+# File: crates/prometheus-praxis-ai/Cargo.toml
+[package]
+name = "prometheus-praxis-ai"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "Non-actuating ecological AI-workload lane evaluation for Prometheus-Praxis."
+repository = "https://github.com/mk-bluebird/Prometheus-Praxis"
+keywords = ["ecology", "telemetry", "governance", "ai-workloads"]
+categories = ["science", "command-line-utilities"]
+
+[lib]
+name = "prometheus_praxis_ai"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ppx-ai-lane-check"
+path = "src/bin/ppx_ai_lane_check.rs"
+
+[dependencies]
+rust_decimal = "1"
