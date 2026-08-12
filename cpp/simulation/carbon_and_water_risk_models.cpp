@@ -5,8 +5,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include <fstream>
-#include <iomanip>
 #include <iostream>
 #include <numeric>
 #include <sstream>
@@ -15,224 +15,284 @@
 #include <vector>
 
 namespace eco_restoration {
+constexpr double eps = 1e-9;
 
-struct GarchModel {
-    double mean{};
-    double omega{};
-    double alpha{};
-    double beta{};
-    double last_residual{};
-    double last_variance{};
-};
+struct Garch { double mean, omega, alpha, beta, residual, variance; };
+struct Water { Eigen::VectorXd x; double y; std::string site; };
+struct Logistic { Eigen::VectorXd mean, scale, coefficient; };
 
-std::vector<double> load_carbon(const std::string& path) {
-    std::ifstream input(path);
-    if (!input) throw std::runtime_error("cannot open carbon CSV");
-    std::string line;
-    std::getline(input, line);
-    std::vector<double> values;
-    while (std::getline(input, line)) {
-        const auto comma = line.find(',');
-        values.push_back(std::stod(line.substr(comma + 1U)));
-    }
-    if (values.size() < 48U) throw std::invalid_argument("carbon history requires at least 48 records");
-    return values;
+void require(bool ok, const std::string& message) {
+    if (!ok) throw std::runtime_error(message);
 }
 
-double sigmoid(double value) {
+void readable(const std::string& path) {
+    require(std::filesystem::is_regular_file(path), "input file is unavailable: " + path);
+}
+
+void writable_parent(const std::string& path) {
+    std::filesystem::path parent = std::filesystem::path(path).parent_path();
+    if (parent.empty()) parent = ".";
+    require(std::filesystem::is_directory(parent), "output directory is unavailable: " + parent.string());
+}
+
+std::vector<std::string> fields(const std::string& line) {
+    std::vector<std::string> result;
+    std::stringstream input(line);
+    std::string field;
+    while (std::getline(input, field, ',')) result.push_back(field);
+    return result;
+}
+
+double logistic(double value) {
     return value >= 0.0 ? 1.0 / (1.0 + std::exp(-value))
                         : std::exp(value) / (1.0 + std::exp(value));
 }
 
-GarchModel decode(const Eigen::Vector4d& parameter, double last_residual, double last_variance) {
-    const double alpha = 0.999 * sigmoid(parameter[2]);
-    const double beta = (0.999 - alpha) * sigmoid(parameter[3]);
-    return {parameter[0], std::exp(parameter[1]), alpha, beta, last_residual, last_variance};
+int site_bucket(const std::string& site) {
+    unsigned value = 0;
+    for (unsigned char c : site) value = value * 131U + c;
+    return static_cast<int>(value % 5U);
 }
 
-double garch_loss(const Eigen::Vector4d& parameter, const std::vector<double>& values) {
-    const double mean = parameter[0];
-    const double variance0 = std::max(1e-9, std::exp(parameter[1]) / 0.02);
-    GarchModel model = decode(parameter, values.front() - mean, variance0);
-    double variance = variance0;
+std::vector<double> carbon_history(const std::string& path) {
+    readable(path);
+    std::ifstream input(path);
+    std::string line;
+    std::getline(input, line);
+    std::vector<double> values;
+
+    while (std::getline(input, line)) {
+        const auto row = fields(line);
+        require(row.size() == 2U, "carbon CSV requires timestamp,intensity");
+        const double value = std::stod(row[1]);
+        require(std::isfinite(value) && value >= 0.0, "invalid carbon intensity");
+        values.push_back(value);
+    }
+    require(values.size() >= 48U, "carbon history requires at least 48 observations");
+    return values;
+}
+
+Garch unpack(const Eigen::Vector4d& p, double residual, double variance) {
+    const double alpha = 0.995 * logistic(p[2]);
+    const double beta = (0.995 - alpha) * logistic(p[3]);
+    return {p[0], std::exp(p[1]), alpha, beta, residual, variance};
+}
+
+double garch_loss(const Eigen::Vector4d& p, const std::vector<double>& values) {
+    Garch m = unpack(p, values.front() - p[0], 1.0);
+    double v = std::max(eps, m.omega / std::max(eps, 1.0 - m.alpha - m.beta));
     double loss = 0.0;
 
-    for (const double value : values) {
-        const double residual = value - model.mean;
-        variance = std::max(1e-9, model.omega + model.alpha * model.last_residual * model.last_residual +
-                                      model.beta * variance);
-        loss += 0.5 * (std::log(variance) + residual * residual / variance);
-        model.last_residual = residual;
+    for (double value : values) {
+        const double residual = value - m.mean;
+        v = std::max(eps, m.omega + m.alpha * m.residual * m.residual + m.beta * v);
+        loss += 0.5 * (std::log(v) + residual * residual / v);
+        m.residual = residual;
     }
     return loss / static_cast<double>(values.size());
 }
 
-GarchModel fit_garch(const std::vector<double>& values) {
+Garch fit_garch(const std::vector<double>& values) {
     const double mean = std::accumulate(values.begin(), values.end(), 0.0) / values.size();
     double variance = 0.0;
     for (double value : values) variance += (value - mean) * (value - mean);
     variance /= values.size();
 
-    Eigen::Vector4d parameter(mean, std::log(std::max(1e-8, variance * 0.05)), -2.0, 2.0);
-    double step = 0.05;
+    Eigen::Vector4d p(mean, std::log(std::max(eps, variance * 0.03)), -2.0, 1.5);
+    double step = 0.03;
 
-    for (int iteration = 0; iteration < 600; ++iteration) {
+    for (int iteration = 0; iteration < 800; ++iteration) {
         Eigen::Vector4d gradient;
         for (int i = 0; i < 4; ++i) {
-            Eigen::Vector4d plus = parameter;
-            Eigen::Vector4d minus = parameter;
-            const double epsilon = 1e-5 * std::max(1.0, std::abs(parameter[i]));
-            plus[i] += epsilon;
-            minus[i] -= epsilon;
-            gradient[i] = (garch_loss(plus, values) - garch_loss(minus, values)) / (2.0 * epsilon);
+            const double d = 1e-5 * std::max(1.0, std::abs(p[i]));
+            Eigen::Vector4d high = p, low = p;
+            high[i] += d;
+            low[i] -= d;
+            gradient[i] = (garch_loss(high, values) - garch_loss(low, values)) / (2.0 * d);
         }
-
-        const double prior_loss = garch_loss(parameter, values);
-        Eigen::Vector4d proposal = parameter - step * gradient;
-        if (garch_loss(proposal, values) < prior_loss) {
-            parameter = proposal;
-            step = std::min(0.15, step * 1.02);
+        const Eigen::Vector4d proposal = p - step * gradient;
+        if (garch_loss(proposal, values) <= garch_loss(p, values)) {
+            p = proposal;
+            step = std::min(0.10, step * 1.01);
         } else {
             step *= 0.5;
         }
         if (gradient.norm() < 1e-6 || step < 1e-8) break;
     }
 
-    const double residual = values.back() - parameter[0];
-    const GarchModel provisional = decode(parameter, residual, variance);
-    const double final_variance = provisional.omega +
-        provisional.alpha * residual * residual + provisional.beta * variance;
-    return decode(parameter, residual, std::max(1e-9, final_variance));
+    Garch m = unpack(p, values.front() - p[0], 1.0);
+    m.variance = std::max(eps, m.omega / std::max(eps, 1.0 - m.alpha - m.beta));
+    for (double value : values) {
+        m.residual = value - m.mean;
+        m.variance = std::max(eps, m.omega + m.alpha * m.residual * m.residual + m.beta * m.variance);
+    }
+    return m;
 }
 
-void store_garch(sqlite3* database, const GarchModel& model) {
-    sqlite3_exec(database,
-        "CREATE TABLE IF NOT EXISTS carbon_garch_model("
-        "model_id TEXT PRIMARY KEY,mean REAL,omega REAL,alpha REAL,beta REAL,"
-        "last_residual REAL,last_variance REAL) STRICT;",
-        nullptr, nullptr, nullptr);
-    sqlite3_stmt* statement = nullptr;
-    sqlite3_prepare_v2(database,
-        "INSERT INTO carbon_garch_model VALUES('default',?,?,?,?,?,?) "
-        "ON CONFLICT(model_id) DO UPDATE SET mean=excluded.mean,omega=excluded.omega,"
-        "alpha=excluded.alpha,beta=excluded.beta,last_residual=excluded.last_residual,"
-        "last_variance=excluded.last_variance;",
-        -1, &statement, nullptr);
-    sqlite3_bind_double(statement, 1, model.mean);
-    sqlite3_bind_double(statement, 2, model.omega);
-    sqlite3_bind_double(statement, 3, model.alpha);
-    sqlite3_bind_double(statement, 4, model.beta);
-    sqlite3_bind_double(statement, 5, model.last_residual);
-    sqlite3_bind_double(statement, 6, model.last_variance);
-    if (sqlite3_step(statement) != SQLITE_DONE) throw std::runtime_error("cannot store GARCH model");
-    sqlite3_finalize(statement);
-}
-
-struct WaterRecord {
-    Eigen::Matrix<double, 5, 1> features;
-    double outcome{};
-    std::string site;
-};
-
-std::vector<WaterRecord> load_water(const std::string& path) {
+std::vector<Water> water_history(const std::string& path) {
+    readable(path);
     std::ifstream input(path);
-    if (!input) throw std::runtime_error("cannot open water outcome CSV");
     std::string line;
     std::getline(input, line);
-    std::vector<WaterRecord> records;
+    std::vector<Water> records;
 
     while (std::getline(input, line)) {
-        std::replace(line.begin(), line.end(), ',', ' ');
-        std::istringstream row(line);
-        double wqi, turbidity, oxygen, temperature, flow, outcome;
-        std::string site;
-        row >> wqi >> turbidity >> oxygen >> temperature >> flow >> outcome >> site;
-        if (!row || outcome < 0.0 || outcome > 1.0 || site.empty()) {
-            throw std::invalid_argument("invalid water record");
-        }
-        records.push_back({Eigen::Matrix<double, 5, 1>(1.0 - wqi, turbidity, oxygen, temperature, flow), outcome, site});
+        const auto row = fields(line);
+        require(row.size() == 7U, "water CSV requires wqi,turbidity,oxygen,temperature,flow,outcome,site");
+        const double wqi = std::stod(row[0]);
+        const double turbidity = std::stod(row[1]);
+        const double oxygen = std::stod(row[2]);
+        const double temperature = std::stod(row[3]);
+        const double flow = std::stod(row[4]);
+        const double outcome = std::stod(row[5]);
+
+        require(std::isfinite(wqi) && std::isfinite(turbidity) && std::isfinite(oxygen) &&
+                    std::isfinite(temperature) && std::isfinite(flow) &&
+                    outcome >= 0.0 && outcome <= 1.0 && !row[6].empty(),
+                "invalid water observation");
+
+        Eigen::VectorXd x(5);
+        x << 1.0 - std::clamp(wqi, 0.0, 1.0), turbidity, oxygen, temperature, flow;
+        records.push_back({x, outcome, row[6]});
     }
-    if (records.size() < 30U) throw std::invalid_argument("water outcome history requires 30 records");
+    require(records.size() >= 30U, "water history requires at least 30 observations");
     return records;
 }
 
-int site_fold(const std::string& site) {
-    unsigned value = 0;
-    for (unsigned char character : site) value = value * 131U + character;
-    return static_cast<int>(value % 5U);
-}
-
-struct LogisticModel {
-    Eigen::Matrix<double, 5, 1> mean;
-    Eigen::Matrix<double, 5, 1> deviation;
-    Eigen::Matrix<double, 6, 1> weights;
-};
-
-LogisticModel train_water(const std::vector<WaterRecord>& records, int excluded_fold, double lambda) {
-    LogisticModel model{};
+Logistic train_water(const std::vector<Water>& records, int omitted_bucket, double l2) {
+    Logistic m{Eigen::VectorXd::Zero(5), Eigen::VectorXd::Zero(5), Eigen::VectorXd::Zero(6)};
     int count = 0;
 
-    for (const auto& record : records) {
-        if (site_fold(record.site) != excluded_fold) {
-            model.mean += record.features;
+    for (const Water& record : records) {
+        if (site_bucket(record.site) != omitted_bucket) {
+            m.mean += record.x;
             ++count;
         }
     }
-    model.mean /= std::max(1, count);
+    require(count >= 7, "insufficient water training observations");
+    m.mean /= count;
 
-    for (const auto& record : records) {
-        if (site_fold(record.site) != excluded_fold) {
-            model.deviation += (record.features - model.mean).cwiseAbs2();
+    for (const Water& record : records) {
+        if (site_bucket(record.site) != omitted_bucket) {
+            m.scale += (record.x - m.mean).cwiseAbs2();
         }
     }
-    model.deviation = (model.deviation / std::max(1, count)).cwiseSqrt().cwiseMax(1e-8);
+    m.scale = (m.scale / count).cwiseSqrt().cwiseMax(1e-8);
 
     for (int iteration = 0; iteration < 100; ++iteration) {
-        Eigen::Matrix<double, 6, 6> hessian = lambda * Eigen::Matrix<double, 6, 6>::Identity();
-        Eigen::Matrix<double, 6, 1> gradient = lambda * model.weights;
-        gradient[0] = 0.0;
+        Eigen::MatrixXd h = l2 * Eigen::MatrixXd::Identity(6, 6);
+        Eigen::VectorXd g = l2 * m.coefficient;
+        g[0] = 0.0;
 
-        for (const auto& record : records) {
-            if (site_fold(record.site) == excluded_fold) continue;
-            Eigen::Matrix<double, 6, 1> x;
+        for (const Water& record : records) {
+            if (site_bucket(record.site) == omitted_bucket) continue;
+            Eigen::VectorXd x(6);
             x[0] = 1.0;
-            x.tail<5>() = (record.features - model.mean).cwiseQuotient(model.deviation);
-            const double probability = sigmoid(model.weights.dot(x));
-            gradient += (probability - record.outcome) * x;
-            hessian += probability * (1.0 - probability) * x * x.transpose();
+            x.tail(5) = (record.x - m.mean).cwiseQuotient(m.scale);
+            const double p = logistic(m.coefficient.dot(x));
+            g += (p - record.y) * x;
+            h += p * (1.0 - p) * x * x.transpose();
         }
-        const Eigen::Matrix<double, 6, 1> update = hessian.ldlt().solve(gradient);
-        model.weights -= update;
-        if (update.norm() < 1e-8) break;
+
+        const Eigen::VectorXd delta = h.ldlt().solve(g);
+        m.coefficient -= delta;
+        if (delta.norm() < 1e-8) break;
     }
-    return model;
+    return m;
 }
 
-double calibration_error(const LogisticModel& model, const std::vector<WaterRecord>& records, int fold) {
-    double total = 0.0;
+double brier(const Logistic& m, const std::vector<Water>& records, int bucket) {
+    double score = 0.0;
     int count = 0;
-    for (const auto& record : records) {
-        if (site_fold(record.site) != fold) continue;
-        Eigen::Matrix<double, 6, 1> x;
+    for (const Water& record : records) {
+        if (site_bucket(record.site) != bucket) continue;
+        Eigen::VectorXd x(6);
         x[0] = 1.0;
-        x.tail<5>() = (record.features - model.mean).cwiseQuotient(model.deviation);
-        total += std::pow(sigmoid(model.weights.dot(x)) - record.outcome, 2.0);
+        x.tail(5) = (record.x - m.mean).cwiseQuotient(m.scale);
+        score += std::pow(logistic(m.coefficient.dot(x)) - record.y, 2.0);
         ++count;
     }
-    return count == 0 ? 0.0 : total / count;
+    return count == 0 ? 0.0 : score / count;
 }
 
-void export_lua(const LogisticModel& model, const std::string& path) {
-    std::ofstream output(path);
-    if (!output) throw std::runtime_error("cannot write Lua model");
-    output << "local model={mean={";
-    for (int i = 0; i < 5; ++i) output << model.mean[i] << (i == 4 ? "},deviation={" : ",");
-    for (int i = 0; i < 5; ++i) output << model.deviation[i] << (i == 4 ? "},weights={" : ",");
-    for (int i = 0; i < 6; ++i) output << model.weights[i] << (i == 5 ? "}}\n" : ",");
-    output << "function model.predict(wqi,turbidity,oxygen,temperature,flow) "
-              "local v={1-wqi,turbidity,oxygen,temperature,flow};local z=model.weights[1];"
-              "for i=1,5 do z=z+model.weights[i+1]*(v[i]-model.mean[i])/model.deviation[i] end "
-              "return 1/(1+math.exp(-z)) end return model\n";
+void check_sql(int result, sqlite3* db, const std::string& operation) {
+    if (result != SQLITE_OK && result != SQLITE_DONE) {
+        throw std::runtime_error(operation + ": " + sqlite3_errmsg(db));
+    }
+}
+
+void persist(sqlite3* db, const Garch& g, const Logistic& w) {
+    check_sql(sqlite3_exec(db,
+        "CREATE TABLE IF NOT EXISTS carbon_garch_model("
+        "model_id TEXT PRIMARY KEY,mean REAL,omega REAL,alpha REAL,beta REAL,residual REAL,variance REAL) STRICT;"
+        "CREATE TABLE IF NOT EXISTS carbon_garch_forecast("
+        "forecast_hour INTEGER PRIMARY KEY,mean REAL,lower_95 REAL,upper_95 REAL,variance REAL) STRICT;"
+        "CREATE TABLE IF NOT EXISTS water_risk_model("
+        "feature_index INTEGER PRIMARY KEY,mean REAL,deviation REAL,coefficient REAL) STRICT;"
+        "DELETE FROM carbon_garch_forecast;DELETE FROM water_risk_model;",
+        nullptr, nullptr, nullptr), db, "SQLite schema update");
+
+    sqlite3_stmt* model = nullptr;
+    check_sql(sqlite3_prepare_v2(db,
+        "INSERT INTO carbon_garch_model VALUES('default',?,?,?,?,?,?) "
+        "ON CONFLICT(model_id) DO UPDATE SET mean=excluded.mean,omega=excluded.omega,"
+        "alpha=excluded.alpha,beta=excluded.beta,residual=excluded.residual,variance=excluded.variance;",
+        -1, &model, nullptr), db, "GARCH statement preparation");
+
+    for (int i = 0; i < 6; ++i) sqlite3_bind_double(model, i + 1, (&g.mean)[i]);
+    check_sql(sqlite3_step(model), db, "GARCH persistence");
+    sqlite3_finalize(model);
+
+    sqlite3_stmt* forecast = nullptr;
+    check_sql(sqlite3_prepare_v2(db, "INSERT INTO carbon_garch_forecast VALUES(?,?,?,?,?);",
+                                 -1, &forecast, nullptr), db, "forecast statement preparation");
+
+    double variance = g.variance;
+    for (int hour = 1; hour <= 24; ++hour) {
+        variance = std::max(eps, hour == 1
+            ? g.omega + g.alpha * g.residual * g.residual + g.beta * variance
+            : g.omega + (g.alpha + g.beta) * variance);
+        const double interval = 1.96 * std::sqrt(variance);
+        sqlite3_bind_int(forecast, 1, hour);
+        sqlite3_bind_double(forecast, 2, g.mean);
+        sqlite3_bind_double(forecast, 3, std::max(0.0, g.mean - interval));
+        sqlite3_bind_double(forecast, 4, g.mean + interval);
+        sqlite3_bind_double(forecast, 5, variance);
+        check_sql(sqlite3_step(forecast), db, "forecast persistence");
+        sqlite3_reset(forecast);
+        sqlite3_clear_bindings(forecast);
+    }
+    sqlite3_finalize(forecast);
+
+    sqlite3_stmt* water = nullptr;
+    check_sql(sqlite3_prepare_v2(db, "INSERT INTO water_risk_model VALUES(?,?,?,?);",
+                                 -1, &water, nullptr), db, "water statement preparation");
+
+    for (int i = 0; i < 6; ++i) {
+        sqlite3_bind_int(water, 1, i);
+        sqlite3_bind_double(water, 2, i == 0 ? 0.0 : w.mean[i - 1]);
+        sqlite3_bind_double(water, 3, i == 0 ? 1.0 : w.scale[i - 1]);
+        sqlite3_bind_double(water, 4, w.coefficient[i]);
+        check_sql(sqlite3_step(water), db, "water-model persistence");
+        sqlite3_reset(water);
+        sqlite3_clear_bindings(water);
+    }
+    sqlite3_finalize(water);
+}
+
+void export_lua(const Logistic& w, const std::string& path) {
+    writable_parent(path);
+    std::ofstream output(path, std::ios::trunc);
+    require(static_cast<bool>(output), "cannot create Lua module");
+
+    output << std::setprecision(17) << "local m={mean={";
+    for (int i = 0; i < 5; ++i) output << w.mean[i] << (i == 4 ? "},scale={" : ",");
+    for (int i = 0; i < 5; ++i) output << w.scale[i] << (i == 4 ? "},coefficient={" : ",");
+    for (int i = 0; i < 6; ++i) output << w.coefficient[i] << (i == 5 ? "}}\n" : ",");
+    output << "function m.predict(wqi,turbidity,oxygen,temperature,flow)"
+              "local x={1-wqi,turbidity,oxygen,temperature,flow};local z=m.coefficient[1];"
+              "for i=1,5 do z=z+m.coefficient[i+1]*(x[i]-m.mean[i])/m.scale[i] end "
+              "return 1/(1+math.exp(-z)) end return m\n";
 }
 
 }  // namespace eco_restoration
@@ -244,33 +304,33 @@ int main(int argc, char** argv) {
         return 2;
     }
 
-    sqlite3* database = nullptr;
-    if (sqlite3_open(argv[3], &database) != SQLITE_OK) return 1;
+    writable_parent(argv[3]);
+    sqlite3* db = nullptr;
+    if (sqlite3_open_v2(argv[3], &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr) != SQLITE_OK) {
+        std::cerr << "{\"error\":\"cannot open model database\"}\n";
+        return 1;
+    }
 
     try {
-        const GarchModel garch = fit_garch(load_carbon(argv[1]));
-        store_garch(database, garch);
-
-        const auto records = load_water(argv[2]);
-        double cross_validation_brier = 0.0;
-        for (int fold = 0; fold < 5; ++fold) {
-            cross_validation_brier += calibration_error(train_water(records, fold, 0.1), records, fold);
+        const Garch garch = fit_garch(carbon_history(argv[1]));
+        const std::vector<Water> records = water_history(argv[2]);
+        double validation_brier = 0.0;
+        for (int bucket = 0; bucket < 5; ++bucket) {
+            validation_brier += brier(train_water(records, bucket, 0.1), records, bucket);
         }
 
-        const LogisticModel water = train_water(records, -1, 0.1);
+        const Logistic water = train_water(records, -1, 0.1);
+        persist(db, garch, water);
         export_lua(water, argv[4]);
+        sqlite3_close(db);
 
         std::cout << std::fixed << std::setprecision(6)
-                  << "{\"garch\":{\"mean\":" << garch.mean
-                  << ",\"omega\":" << garch.omega
-                  << ",\"alpha\":" << garch.alpha
-                  << ",\"beta\":" << garch.beta
-                  << ",\"next_hour_lower\":" << garch.mean - 1.96 * std::sqrt(garch.last_variance)
-                  << ",\"next_hour_upper\":" << garch.mean + 1.96 * std::sqrt(garch.last_variance)
-                  << "},\"water_cross_validation_brier\":" << cross_validation_brier / 5.0 << "}\n";
-        sqlite3_close(database);
+                  << "{\"garch_alpha\":" << garch.alpha
+                  << ",\"garch_beta\":" << garch.beta
+                  << ",\"held_out_brier\":" << validation_brier / 5.0
+                  << ",\"forecast_hours\":24,\"water_features\":5}\n";
     } catch (const std::exception& error) {
-        sqlite3_close(database);
+        sqlite3_close(db);
         std::cerr << "{\"error\":\"" << error.what() << "\"}\n";
         return 1;
     }
