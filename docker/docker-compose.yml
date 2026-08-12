@@ -1,20 +1,54 @@
 # File: docker/docker-compose.yml
-version: "3.9"
-
 services:
-  governance-stack:
+  telemetry:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    container_name: prometheus_praxis_governance
-    working_dir: /app
-    volumes:
-      - ../cpp:/app/cpp:ro
-      - ../lua:/app/lua:ro
+    working_dir: /data
     command: >
-      sh -c "
-        echo 'hex_stability_carbon_snapshot' | ./mcp_stdio_governance_bridge;
-        lua5.3 lua/fog/fog_router.lua
-      "
-    stdin_open: true
-    tty: true
+      set -eu;
+      executable="$(find /opt/prometheus-praxis -type f -name lorawan_telemetry_bridge -perm -111 -print -quit)";
+      test -n "$executable";
+      exec "$executable" /data/eco.sqlite 8081
+    environment:
+      CHIRPSTACK_BRIDGE_TOKEN: ${CHIRPSTACK_BRIDGE_TOKEN:?set_CHIRPSTACK_BRIDGE_TOKEN}
+    volumes:
+      - eco-data:/data
+    init: true
+    restart: unless-stopped
+
+  lane-engine:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    working_dir: /data
+    command: >
+      set -eu;
+      executable="$(find /opt/prometheus-praxis -type f -name eco_workload_admission -perm -111 -print -quit)";
+      test -n "$executable";
+      exec "$executable"
+    volumes:
+      - eco-data:/data
+    init: true
+    restart: "no"
+
+  dashboard:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    working_dir: /data
+    command: >
+      set -eu;
+      executable="$(find /opt/prometheus-praxis -type f -name hex_state_dashboard -perm -111 -print -quit)";
+      test -n "$executable";
+      exec "$executable" /data/eco.sqlite 8080
+    volumes:
+      - eco-data:/data
+    depends_on:
+      telemetry:
+        condition: service_started
+    init: true
+    restart: unless-stopped
+
+volumes:
+  eco-data:
