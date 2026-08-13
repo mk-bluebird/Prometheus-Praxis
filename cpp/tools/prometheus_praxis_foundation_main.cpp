@@ -7582,3 +7582,1503 @@ bool LoadCollaboratorOnboardingStubSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+struct PrometheusResearchObject {
+    std::uint32_t object_number{};
+    std::string name;
+    std::string description;
+};
+
+class PrometheusResearchObjectRegistry {
+public:
+    bool Append(
+        std::uint32_t object_number,
+        std::string_view name,
+        std::string_view description) {
+        if (object_number == 0U ||
+            name.empty() ||
+            description.empty() ||
+            !IsIdentifierSafe(name) ||
+            ContainsObjectNumber(object_number) ||
+            ContainsName(name)) {
+            return false;
+        }
+
+        objects_.push_back({
+            object_number,
+            std::string(name),
+            std::string(description)
+        });
+
+        std::sort(
+            objects_.begin(),
+            objects_.end(),
+            [](const PrometheusResearchObject& left,
+               const PrometheusResearchObject& right) {
+                return left.object_number < right.object_number;
+            });
+
+        return true;
+    }
+
+    bool ContainsObjectNumber(
+        std::uint32_t object_number) const {
+        return std::any_of(
+            objects_.begin(),
+            objects_.end(),
+            [object_number](const PrometheusResearchObject& object) {
+                return object.object_number == object_number;
+            });
+    }
+
+    bool ContainsName(
+        std::string_view name) const {
+        return std::any_of(
+            objects_.begin(),
+            objects_.end(),
+            [name](const PrometheusResearchObject& object) {
+                return object.name == name;
+            });
+    }
+
+    const PrometheusResearchObject* FindByNumber(
+        std::uint32_t object_number) const {
+        const auto found = std::find_if(
+            objects_.begin(),
+            objects_.end(),
+            [object_number](const PrometheusResearchObject& object) {
+                return object.object_number == object_number;
+            });
+
+        return found == objects_.end() ? nullptr : &(*found);
+    }
+
+    const PrometheusResearchObject* FindByName(
+        std::string_view name) const {
+        const auto found = std::find_if(
+            objects_.begin(),
+            objects_.end(),
+            [name](const PrometheusResearchObject& object) {
+                return object.name == name;
+            });
+
+        return found == objects_.end() ? nullptr : &(*found);
+    }
+
+    const std::vector<PrometheusResearchObject>& Objects() const noexcept {
+        return objects_;
+    }
+
+    std::size_t Size() const noexcept {
+        return objects_.size();
+    }
+
+    bool Empty() const noexcept {
+        return objects_.empty();
+    }
+
+    static bool IsIdentifierSafe(
+        std::string_view value) {
+        return std::all_of(
+            value.begin(),
+            value.end(),
+            [](unsigned char character) {
+                return std::isalnum(character) != 0 ||
+                       character == '_' ||
+                       character == '-';
+            });
+    }
+
+private:
+    std::vector<PrometheusResearchObject> objects_;
+};
+
+PrometheusResearchObjectRegistry MakeFoundationResearchObjectRegistry() {
+    PrometheusResearchObjectRegistry registry;
+
+    const std::vector<PrometheusResearchObject> definitions{
+        {29U, "FoundationInputs",
+         "Aggregate inputs for the six foundation stages."},
+        {30U, "FoundationOutputs",
+         "Machine-readable foundation report outputs and status."},
+        {31U, "StageResultTracker",
+         "Validated records for each foundation stage."},
+        {32U, "AggregateKnowledgeFactor",
+         "Clamped arithmetic mean of stage knowledge factors."},
+        {33U, "AggregateEcoImpact",
+         "Clamped arithmetic mean of stage eco-impact values."},
+        {34U, "FoundationReportSummaryWriter",
+         "Concise human-readable foundation report summary."},
+        {35U, "FoundationCsvEmitter",
+         "Escaped CSV emission for foundation reports."},
+        {36U, "FoundationMarkdownEmitter",
+         "GitHub-compatible markdown foundation report table."},
+        {37U, "StableLogLineBuilder",
+         "Escaped stable log records with UTC-epoch-like timestamps."},
+        {38U, "GovernancePolicyRegistry",
+         "Canonical ecological governance policy identifiers and aliases."},
+        {39U, "CorridorTableMetadata",
+         "Spatial corridor table identity, resolution, and coverage counts."},
+        {40U, "PrivateHeatProofPlanValidator",
+         "Specific validation reasons for heat-proof corridor plans."},
+        {41U, "AiChatGuidelinesStub",
+         "Stable in-memory eco-restoration chat guidance."},
+        {42U, "CollaboratorOnboardingStub",
+         "Stable in-memory collaborator onboarding guidance."},
+        {43U, "PrometheusResearchObjectRegistry",
+         "Append-only registry for named research objects."},
+        {44U, "EcoNetCentralAzPathResolver",
+         "Portable resolver for the EcoNet Central AZ source directory."}
+    };
+
+    for (const auto& definition : definitions) {
+        if (!registry.Append(
+                definition.object_number,
+                definition.name,
+                definition.description)) {
+            throw std::runtime_error(
+                "foundation research registry fixture could not append object");
+        }
+    }
+
+    return registry;
+}
+
+std::string ExplainPrometheusResearchObjectRegistry(
+    const PrometheusResearchObjectRegistry& registry) {
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << "prometheus_research_object_registry\n";
+    output << "object_count=" << registry.Size() << '\n';
+
+    for (const auto& object : registry.Objects()) {
+        output << "object_" << object.object_number
+               << "_name=" << object.name << '\n';
+        output << "object_" << object.object_number
+               << "_description=" << object.description << '\n';
+    }
+
+    return output.str();
+}
+
+bool PrometheusResearchObjectRegistrySelfTest() {
+    PrometheusResearchObjectRegistry registry;
+
+    if (!registry.Empty() ||
+        registry.Size() != 0U) {
+        return false;
+    }
+
+    if (!registry.Append(
+            1U,
+            "EcoRestorationModel",
+            "A deterministic ecological restoration model.") ||
+        !registry.Append(
+            2U,
+            "WaterQualityReport",
+            "A validated water quality report.")) {
+        return false;
+    }
+
+    if (registry.Size() != 2U ||
+        !registry.ContainsObjectNumber(1U) ||
+        !registry.ContainsName("WaterQualityReport") ||
+        registry.FindByNumber(3U) != nullptr ||
+        registry.FindByName("Unknown") != nullptr) {
+        return false;
+    }
+
+    if (registry.Append(
+            1U,
+            "DuplicateNumber",
+            "Duplicate object number.") ||
+        registry.Append(
+            3U,
+            "EcoRestorationModel",
+            "Duplicate object name.") ||
+        registry.Append(
+            0U,
+            "Invalid",
+            "Zero object number.") ||
+        registry.Append(
+            3U,
+            "Invalid Name",
+            "Unsafe name.") ||
+        registry.Append(
+            3U,
+            "ValidName",
+            "")) {
+        return false;
+    }
+
+    const auto foundation_registry =
+        MakeFoundationResearchObjectRegistry();
+    const auto* object_44 =
+        foundation_registry.FindByNumber(44U);
+
+    if (foundation_registry.Size() != 16U ||
+        object_44 == nullptr ||
+        object_44->name != "EcoNetCentralAzPathResolver") {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainPrometheusResearchObjectRegistry(
+            foundation_registry);
+
+    return explanation.find("object_count=16") !=
+               std::string::npos &&
+           explanation.find("object_29_name=FoundationInputs") !=
+               std::string::npos &&
+           explanation.find(
+               "object_44_name=EcoNetCentralAzPathResolver") !=
+               std::string::npos;
+}
+
+}  // namespace prometheus_praxis_foundation_extensions
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+std::string NormalizeRepositoryPathSeparators(
+    std::string_view path) {
+    std::string normalized;
+    normalized.reserve(path.size());
+
+    bool previous_separator = false;
+
+    for (const char character : path) {
+        const bool separator =
+            character == '/' || character == '\\';
+
+        if (separator) {
+            if (!previous_separator) {
+                normalized += std::filesystem::path::preferred_separator;
+            }
+        } else {
+            normalized += character;
+        }
+
+        previous_separator = separator;
+    }
+
+    while (!normalized.empty() &&
+           normalized.back() ==
+               std::filesystem::path::preferred_separator) {
+        normalized.pop_back();
+    }
+
+    return normalized;
+}
+
+std::filesystem::path EcoNetCentralAzPathObject() {
+    return std::filesystem::path("cpp") /
+           std::filesystem::path("EcoNetCentralAZ");
+}
+
+std::string ResolveEcoNetCentralAzPath() {
+    const std::filesystem::path path =
+        EcoNetCentralAzPathObject();
+
+    return NormalizeRepositoryPathSeparators(
+        path.string());
+}
+
+std::string ResolveEcoNetCentralAzGenericPath() {
+    return EcoNetCentralAzPathObject().generic_string();
+}
+
+bool EcoNetCentralAzPathExists() {
+    std::error_code error;
+    const bool exists = std::filesystem::is_directory(
+        EcoNetCentralAzPathObject(),
+        error);
+
+    return !error && exists;
+}
+
+bool IsEcoNetCentralAzPathShapeValid(
+    std::string_view path) {
+    if (path.empty() ||
+        path.find("EcoNetCentralAZ") == std::string_view::npos ||
+        path.find("cpp") == std::string_view::npos) {
+        return false;
+    }
+
+    const std::filesystem::path parsed{
+        std::string(path)};
+
+    return parsed.filename() == "EcoNetCentralAZ" &&
+           parsed.parent_path().filename() == "cpp";
+}
+
+std::string ExplainEcoNetCentralAzPath() {
+    const std::string native_path =
+        ResolveEcoNetCentralAzPath();
+    const std::string generic_path =
+        ResolveEcoNetCentralAzGenericPath();
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << "econet_central_az_path\n";
+    output << "native_path="
+           << native_path << '\n';
+    output << "generic_path="
+           << generic_path << '\n';
+    output << "path_shape_valid="
+           << (IsEcoNetCentralAzPathShapeValid(native_path)
+               ? "true"
+               : "false")
+           << '\n';
+    output << "directory_exists="
+           << (EcoNetCentralAzPathExists()
+               ? "true"
+               : "false")
+           << '\n';
+
+    return output.str();
+}
+
+bool EcoNetCentralAzPathResolverSelfTest() {
+    const std::string native_path =
+        ResolveEcoNetCentralAzPath();
+    const std::string generic_path =
+        ResolveEcoNetCentralAzGenericPath();
+
+    if (!IsEcoNetCentralAzPathShapeValid(native_path) ||
+        generic_path != "cpp/EcoNetCentralAZ") {
+        return false;
+    }
+
+    const std::string normalized_forward =
+        NormalizeRepositoryPathSeparators(
+            "cpp///EcoNetCentralAZ/");
+    const std::string normalized_backward =
+        NormalizeRepositoryPathSeparators(
+            "cpp\\\\EcoNetCentralAZ\\");
+
+    const std::string expected =
+        std::string("cpp") +
+        std::filesystem::path::preferred_separator +
+        "EcoNetCentralAZ";
+
+    if (normalized_forward != expected ||
+        normalized_backward != expected) {
+        return false;
+    }
+
+    const std::filesystem::path path_object =
+        EcoNetCentralAzPathObject();
+
+    if (path_object.filename() != "EcoNetCentralAZ" ||
+        path_object.parent_path().filename() != "cpp") {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainEcoNetCentralAzPath();
+
+    if (explanation.find("native_path=") ==
+            std::string::npos ||
+        explanation.find("generic_path=cpp/EcoNetCentralAZ") ==
+            std::string::npos ||
+        explanation.find("path_shape_valid=true") ==
+            std::string::npos) {
+        return false;
+    }
+
+    return true;
+}
+
+}  // namespace prometheus_praxis_foundation_extensions
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+struct RepositoryLayoutDescriptor {
+    std::string repository_name;
+    std::string core_models_path;
+    std::string simulations_path;
+    std::string tools_path;
+    std::string econet_central_az_path;
+    std::string source_language;
+    bool reads_files{};
+};
+
+RepositoryLayoutDescriptor KnownRepositoryLayout() {
+    return {
+        "mk-bluebird/Prometheus-Praxis",
+        "cpp/eco_restoration",
+        "cpp/simulation",
+        "cpp/tools",
+        ResolveEcoNetCentralAzGenericPath(),
+        "C++20",
+        false
+    };
+}
+
+std::string DescribeRepositoryLayout() {
+    const RepositoryLayoutDescriptor layout =
+        KnownRepositoryLayout();
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << "Repository "
+           << layout.repository_name
+           << " uses " << layout.source_language
+           << " sources under "
+           << layout.core_models_path
+           << " for ecological models, "
+           << layout.simulations_path
+           << " for scenario analysis, "
+           << layout.tools_path
+           << " for utilities, and "
+           << layout.econet_central_az_path
+           << " for EcoNet Central AZ components.";
+
+    return output.str();
+}
+
+bool RepositoryLayoutDoesNotReadFiles(
+    const RepositoryLayoutDescriptor& layout) {
+    return !layout.reads_files;
+}
+
+bool RepositoryLayoutHasRequiredPaths(
+    const RepositoryLayoutDescriptor& layout) {
+    return layout.repository_name ==
+               "mk-bluebird/Prometheus-Praxis" &&
+           layout.core_models_path ==
+               "cpp/eco_restoration" &&
+           layout.simulations_path ==
+               "cpp/simulation" &&
+           layout.tools_path ==
+               "cpp/tools" &&
+           layout.econet_central_az_path ==
+               "cpp/EcoNetCentralAZ";
+}
+
+bool RepositoryLayoutPathIsNormalized(
+    std::string_view path) {
+    return !path.empty() &&
+           path.front() != '/' &&
+           path.front() != '\\' &&
+           path.back() != '/' &&
+           path.back() != '\\' &&
+           path.find('\\') == std::string_view::npos &&
+           path.find("//") == std::string_view::npos;
+}
+
+bool RepositoryLayoutPathsAreNormalized(
+    const RepositoryLayoutDescriptor& layout) {
+    return RepositoryLayoutPathIsNormalized(
+               layout.core_models_path) &&
+           RepositoryLayoutPathIsNormalized(
+               layout.simulations_path) &&
+           RepositoryLayoutPathIsNormalized(
+               layout.tools_path) &&
+           RepositoryLayoutPathIsNormalized(
+               layout.econet_central_az_path);
+}
+
+std::vector<std::string> RepositoryLayoutPaths(
+    const RepositoryLayoutDescriptor& layout) {
+    return {
+        layout.core_models_path,
+        layout.simulations_path,
+        layout.tools_path,
+        layout.econet_central_az_path
+    };
+}
+
+bool RepositoryLayoutContainsPath(
+    const RepositoryLayoutDescriptor& layout,
+    std::string_view path) {
+    const auto paths =
+        RepositoryLayoutPaths(layout);
+
+    return std::find(
+        paths.begin(),
+        paths.end(),
+        path) != paths.end();
+}
+
+std::string ExplainRepositoryLayoutDescriptor(
+    const RepositoryLayoutDescriptor& layout) {
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << "repository_layout_descriptor\n";
+    output << "repository_name="
+           << layout.repository_name << '\n';
+    output << "source_language="
+           << layout.source_language << '\n';
+    output << "core_models_path="
+           << layout.core_models_path << '\n';
+    output << "simulations_path="
+           << layout.simulations_path << '\n';
+    output << "tools_path="
+           << layout.tools_path << '\n';
+    output << "econet_central_az_path="
+           << layout.econet_central_az_path << '\n';
+    output << "reads_files="
+           << (layout.reads_files ? "true" : "false") << '\n';
+    output << "required_paths_present="
+           << (RepositoryLayoutHasRequiredPaths(layout)
+               ? "true"
+               : "false")
+           << '\n';
+    output << "paths_normalized="
+           << (RepositoryLayoutPathsAreNormalized(layout)
+               ? "true"
+               : "false")
+           << '\n';
+
+    return output.str();
+}
+
+bool DescribeRepositoryLayoutSelfTest() {
+    const RepositoryLayoutDescriptor layout =
+        KnownRepositoryLayout();
+    const std::string description =
+        DescribeRepositoryLayout();
+
+    if (!RepositoryLayoutDoesNotReadFiles(layout) ||
+        !RepositoryLayoutHasRequiredPaths(layout) ||
+        !RepositoryLayoutPathsAreNormalized(layout)) {
+        return false;
+    }
+
+    if (!RepositoryLayoutContainsPath(
+            layout,
+            "cpp/eco_restoration") ||
+        !RepositoryLayoutContainsPath(
+            layout,
+            "cpp/simulation") ||
+        !RepositoryLayoutContainsPath(
+            layout,
+            "cpp/tools") ||
+        !RepositoryLayoutContainsPath(
+            layout,
+            "cpp/EcoNetCentralAZ")) {
+        return false;
+    }
+
+    if (description.find("mk-bluebird/Prometheus-Praxis") ==
+            std::string::npos ||
+        description.find("cpp/eco_restoration") ==
+            std::string::npos ||
+        description.find("cpp/simulation") ==
+            std::string::npos ||
+        description.find("cpp/tools") ==
+            std::string::npos ||
+        description.find("cpp/EcoNetCentralAZ") ==
+            std::string::npos) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainRepositoryLayoutDescriptor(layout);
+
+    if (explanation.find("reads_files=false") ==
+            std::string::npos ||
+        explanation.find("required_paths_present=true") ==
+            std::string::npos ||
+        explanation.find("paths_normalized=true") ==
+            std::string::npos) {
+        return false;
+    }
+
+    return true;
+}
+
+}  // namespace prometheus_praxis_foundation_extensions
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace ppf_constants {
+
+constexpr double minimum_unit_score = 0.0;
+constexpr double maximum_unit_score = 1.0;
+
+constexpr double maximum_risk_of_harm = 0.30;
+constexpr double preferred_risk_of_harm = 0.20;
+constexpr double minimum_knowledge_factor = 0.50;
+constexpr double minimum_eco_impact_value = 0.50;
+
+constexpr std::int64_t fixed_point_scale = 1'000'000LL;
+constexpr std::int64_t fixed_point_unit_maximum =
+    fixed_point_scale;
+
+constexpr double probability_zero = 0.0;
+constexpr double probability_one = 1.0;
+constexpr double probability_half = 0.50;
+constexpr double probability_low_rainfall = 0.35;
+constexpr double probability_typical_rainfall = 0.65;
+
+constexpr std::uint32_t report_version_major = 1U;
+constexpr std::uint32_t report_version_minor = 0U;
+constexpr std::uint32_t report_version_patch = 0U;
+constexpr std::string_view report_version = "1.0.0";
+
+constexpr std::uint32_t stage_count = 6U;
+constexpr std::uint32_t h3_resolution_minimum = 0U;
+constexpr std::uint32_t h3_resolution_maximum = 15U;
+
+constexpr std::uint64_t zero_epoch_milliseconds = 0U;
+constexpr std::uint64_t default_authorization_sequence = 1U;
+
+constexpr bool IsUnitScore(
+    double value) {
+    return value >= minimum_unit_score &&
+           value <= maximum_unit_score;
+}
+
+constexpr bool IsProbability(
+    double value) {
+    return IsUnitScore(value);
+}
+
+constexpr std::int64_t ToFixedPoint(
+    double value) {
+    return static_cast<std::int64_t>(
+        value * static_cast<double>(fixed_point_scale) +
+        (value >= 0.0 ? 0.5 : -0.5));
+}
+
+constexpr double FromFixedPoint(
+    std::int64_t value) {
+    return static_cast<double>(value) /
+           static_cast<double>(fixed_point_scale);
+}
+
+constexpr bool IsFixedPointUnitScore(
+    std::int64_t value) {
+    return value >= 0LL &&
+           value <= fixed_point_unit_maximum;
+}
+
+constexpr double ClampRiskOfHarm(
+    double value) {
+    return value < minimum_unit_score
+        ? minimum_unit_score
+        : (value > maximum_unit_score
+            ? maximum_unit_score
+            : value);
+}
+
+constexpr bool IsRiskWithinFoundationLimit(
+    double risk_of_harm) {
+    return IsUnitScore(risk_of_harm) &&
+           risk_of_harm <= maximum_risk_of_harm;
+}
+
+constexpr bool IsPreferredRisk(
+    double risk_of_harm) {
+    return IsRiskWithinFoundationLimit(risk_of_harm) &&
+           risk_of_harm <= preferred_risk_of_harm;
+}
+
+constexpr bool IsKnowledgeSufficient(
+    double knowledge_factor) {
+    return IsUnitScore(knowledge_factor) &&
+           knowledge_factor >= minimum_knowledge_factor;
+}
+
+constexpr bool IsEcoImpactSufficient(
+    double eco_impact_value) {
+    return IsUnitScore(eco_impact_value) &&
+           eco_impact_value >= minimum_eco_impact_value;
+}
+
+constexpr bool RainfallProbabilitiesAreNormalized() {
+    return probability_low_rainfall +
+               probability_typical_rainfall ==
+           probability_one;
+}
+
+static_assert(minimum_unit_score == 0.0);
+static_assert(maximum_unit_score == 1.0);
+static_assert(maximum_risk_of_harm > minimum_unit_score);
+static_assert(maximum_risk_of_harm < maximum_unit_score);
+static_assert(preferred_risk_of_harm <= maximum_risk_of_harm);
+static_assert(minimum_knowledge_factor >= minimum_unit_score);
+static_assert(minimum_knowledge_factor <= maximum_unit_score);
+static_assert(minimum_eco_impact_value >= minimum_unit_score);
+static_assert(minimum_eco_impact_value <= maximum_unit_score);
+
+static_assert(fixed_point_scale > 0LL);
+static_assert(fixed_point_unit_maximum == fixed_point_scale);
+static_assert(ToFixedPoint(0.0) == 0LL);
+static_assert(ToFixedPoint(1.0) == fixed_point_scale);
+static_assert(FromFixedPoint(fixed_point_scale) == 1.0);
+static_assert(IsFixedPointUnitScore(0LL));
+static_assert(IsFixedPointUnitScore(fixed_point_unit_maximum));
+static_assert(!IsFixedPointUnitScore(-1LL));
+
+static_assert(IsProbability(probability_zero));
+static_assert(IsProbability(probability_half));
+static_assert(IsProbability(probability_one));
+static_assert(IsProbability(probability_low_rainfall));
+static_assert(IsProbability(probability_typical_rainfall));
+static_assert(RainfallProbabilitiesAreNormalized());
+
+static_assert(report_version_major == 1U);
+static_assert(report_version_minor == 0U);
+static_assert(report_version_patch == 0U);
+static_assert(report_version == "1.0.0");
+static_assert(stage_count == 6U);
+static_assert(h3_resolution_minimum == 0U);
+static_assert(h3_resolution_maximum == 15U);
+static_assert(h3_resolution_minimum < h3_resolution_maximum);
+static_assert(zero_epoch_milliseconds == 0U);
+static_assert(default_authorization_sequence > 0U);
+
+static_assert(IsRiskWithinFoundationLimit(0.30));
+static_assert(!IsRiskWithinFoundationLimit(0.31));
+static_assert(IsPreferredRisk(0.20));
+static_assert(!IsPreferredRisk(0.21));
+static_assert(IsKnowledgeSufficient(0.50));
+static_assert(!IsKnowledgeSufficient(0.49));
+static_assert(IsEcoImpactSufficient(0.50));
+static_assert(!IsEcoImpactSufficient(0.49));
+
+}  // namespace ppf_constants
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+struct ExtensionSelfTestResult {
+    std::string extension_name;
+    bool passed{};
+    std::string detail;
+};
+
+template <typename Registry>
+std::vector<ExtensionSelfTestResult> RunExtensionSelfTests(
+    const Registry& registry) {
+    std::vector<ExtensionSelfTestResult> results;
+
+    if constexpr (requires { registry.Extensions(); }) {
+        const auto& extensions = registry.Extensions();
+        results.reserve(extensions.size());
+
+        for (const auto& extension : extensions) {
+            if constexpr (
+                requires {
+                    extension.name;
+                    extension.self_test;
+                }) {
+                const bool passed =
+                    static_cast<bool>(extension.self_test());
+
+                results.push_back({
+                    std::string(extension.name),
+                    passed,
+                    passed
+                        ? "self-test passed"
+                        : "self-test failed"
+                });
+            } else {
+                results.push_back({
+                    "unavailable_extension",
+                    false,
+                    "registry extension lacks name or self_test"
+                });
+            }
+        }
+    } else {
+        results.push_back({
+            "extension_registry",
+            false,
+            "registry does not expose Extensions()"
+        });
+    }
+
+    return results;
+}
+
+template <typename Registry>
+bool AllExtensionSelfTestsPassed(
+    const Registry& registry) {
+    const auto results =
+        RunExtensionSelfTests(registry);
+
+    return !results.empty() &&
+           std::all_of(
+               results.begin(),
+               results.end(),
+               [](const ExtensionSelfTestResult& result) {
+                   return result.passed;
+               });
+}
+
+template <typename Registry>
+std::string ExplainExtensionSelfTests(
+    const Registry& registry) {
+    const auto results =
+        RunExtensionSelfTests(registry);
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << "extension_self_tests\n";
+    output << "test_count="
+           << results.size() << '\n';
+
+    std::size_t passed_count = 0U;
+    for (const auto& result : results) {
+        if (result.passed) {
+            ++passed_count;
+        }
+
+        output << "extension="
+               << result.extension_name
+               << ",passed="
+               << (result.passed ? "true" : "false")
+               << ",detail="
+               << result.detail << '\n';
+    }
+
+    output << "passed_count="
+           << passed_count << '\n';
+    output << "all_passed="
+           << (!results.empty() &&
+               passed_count == results.size()
+                   ? "true"
+                   : "false")
+           << '\n';
+
+    return output.str();
+}
+
+struct ExtensionSelfTestFixture {
+    std::string name;
+    bool (*self_test)();
+};
+
+class ExtensionSelfTestFixtureRegistry {
+public:
+    bool Append(
+        std::string_view name,
+        bool (*self_test)()) {
+        if (name.empty() ||
+            self_test == nullptr ||
+            Contains(name)) {
+            return false;
+        }
+
+        extensions_.push_back({
+            std::string(name),
+            self_test
+        });
+
+        return true;
+    }
+
+    bool Contains(
+        std::string_view name) const {
+        return std::any_of(
+            extensions_.begin(),
+            extensions_.end(),
+            [name](const ExtensionSelfTestFixture& extension) {
+                return extension.name == name;
+            });
+    }
+
+    const std::vector<ExtensionSelfTestFixture>& Extensions() const noexcept {
+        return extensions_;
+    }
+
+private:
+    std::vector<ExtensionSelfTestFixture> extensions_;
+};
+
+bool PassingExtensionSelfTest() {
+    return true;
+}
+
+bool FailingExtensionSelfTest() {
+    return false;
+}
+
+bool RunExtensionSelfTestsSelfTest() {
+    ExtensionSelfTestFixtureRegistry passing_registry;
+
+    if (!passing_registry.Append(
+            "passing_extension",
+            &PassingExtensionSelfTest) ||
+        passing_registry.Append(
+            "passing_extension",
+            &PassingExtensionSelfTest) ||
+        passing_registry.Append(
+            "",
+            &PassingExtensionSelfTest) ||
+        passing_registry.Append(
+            "null_extension",
+            nullptr)) {
+        return false;
+    }
+
+    const auto passing_results =
+        RunExtensionSelfTests(passing_registry);
+
+    if (passing_results.size() != 1U ||
+        !passing_results.front().passed ||
+        !AllExtensionSelfTestsPassed(passing_registry)) {
+        return false;
+    }
+
+    ExtensionSelfTestFixtureRegistry mixed_registry;
+
+    if (!mixed_registry.Append(
+            "passing_extension",
+            &PassingExtensionSelfTest) ||
+        !mixed_registry.Append(
+            "failing_extension",
+            &FailingExtensionSelfTest)) {
+        return false;
+    }
+
+    const auto mixed_results =
+        RunExtensionSelfTests(mixed_registry);
+
+    if (mixed_results.size() != 2U ||
+        !mixed_results[0].passed ||
+        mixed_results[1].passed ||
+        AllExtensionSelfTestsPassed(mixed_registry)) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainExtensionSelfTests(mixed_registry);
+
+    if (explanation.find("test_count=2") ==
+            std::string::npos ||
+        explanation.find("passed_count=1") ==
+            std::string::npos ||
+        explanation.find("all_passed=false") ==
+            std::string::npos) {
+        return false;
+    }
+
+    return true;
+}
+
+}  // namespace prometheus_praxis_foundation_extensions
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+class FinalIntegrationBarrier {
+public:
+    static constexpr bool allows_physical_actuation = false;
+    static constexpr bool allows_network_access = false;
+    static constexpr bool exposes_direct_hardware_dispatch = false;
+
+    static_assert(!allows_physical_actuation);
+    static_assert(!allows_network_access);
+    static_assert(!exposes_direct_hardware_dispatch);
+
+    static constexpr std::string_view Name() {
+        return "final_integration_barrier";
+    }
+
+    static constexpr std::string_view PhysicalActuationPolicy() {
+        return "Physical actuation is excluded because this component "
+               "performs analysis, validation, reporting, and review support.";
+    }
+
+    static constexpr std::string_view NetworkAccessPolicy() {
+        return "Network access is excluded because external references are "
+               "handled as inert data for human review.";
+    }
+
+    static constexpr std::string_view HardwareDispatchPolicy() {
+        return "No direct hardware dispatch interface is exposed by this "
+               "analysis-only integration barrier.";
+    }
+
+    bool AllowsPhysicalActuation() const noexcept {
+        return allows_physical_actuation;
+    }
+
+    bool AllowsNetworkAccess() const noexcept {
+        return allows_network_access;
+    }
+
+    bool ExposesDirectHardwareDispatch() const noexcept {
+        return exposes_direct_hardware_dispatch;
+    }
+
+    bool AcceptsAnalyticOperation(
+        std::string_view operation_name) const {
+        if (operation_name.empty()) {
+            return false;
+        }
+
+        return operation_name == "validate" ||
+               operation_name == "simulate" ||
+               operation_name == "score" ||
+               operation_name == "report" ||
+               operation_name == "serialize" ||
+               operation_name == "summarize";
+    }
+
+    bool RejectsExternalOperation(
+        std::string_view operation_name) const {
+        if (operation_name.empty()) {
+            return true;
+        }
+
+        return operation_name == "actuate" ||
+               operation_name == "dispatch_hardware" ||
+               operation_name == "connect_network" ||
+               operation_name == "send_network_request" ||
+               operation_name == "modify_external_system";
+    }
+
+    std::string Describe() const {
+        std::ostringstream output;
+        output.imbue(std::locale::classic());
+        output << "name=" << Name() << '\n';
+        output << "physical_actuation_allowed="
+               << (AllowsPhysicalActuation() ? "true" : "false")
+               << '\n';
+        output << "network_access_allowed="
+               << (AllowsNetworkAccess() ? "true" : "false")
+               << '\n';
+        output << "direct_hardware_dispatch_exposed="
+               << (ExposesDirectHardwareDispatch() ? "true" : "false")
+               << '\n';
+        output << "physical_policy="
+               << PhysicalActuationPolicy() << '\n';
+        output << "network_policy="
+               << NetworkAccessPolicy() << '\n';
+        output << "hardware_policy="
+               << HardwareDispatchPolicy() << '\n';
+
+        return output.str();
+    }
+};
+
+template <typename Type>
+concept HasDirectHardwareDispatch =
+    requires(Type value) {
+        value.DispatchHardware();
+    };
+
+static_assert(!HasDirectHardwareDispatch<FinalIntegrationBarrier>);
+
+bool FinalIntegrationBarrierSelfTest() {
+    const FinalIntegrationBarrier barrier;
+
+    if (barrier.AllowsPhysicalActuation() ||
+        barrier.AllowsNetworkAccess() ||
+        barrier.ExposesDirectHardwareDispatch()) {
+        return false;
+    }
+
+    const std::vector<std::string> accepted_operations{
+        "validate",
+        "simulate",
+        "score",
+        "report",
+        "serialize",
+        "summarize"
+    };
+
+    for (const auto& operation : accepted_operations) {
+        if (!barrier.AcceptsAnalyticOperation(operation) ||
+            barrier.RejectsExternalOperation(operation)) {
+            return false;
+        }
+    }
+
+    const std::vector<std::string> rejected_operations{
+        "actuate",
+        "dispatch_hardware",
+        "connect_network",
+        "send_network_request",
+        "modify_external_system"
+    };
+
+    for (const auto& operation : rejected_operations) {
+        if (barrier.AcceptsAnalyticOperation(operation) ||
+            !barrier.RejectsExternalOperation(operation)) {
+            return false;
+        }
+    }
+
+    if (barrier.AcceptsAnalyticOperation("") ||
+        !barrier.RejectsExternalOperation("")) {
+        return false;
+    }
+
+    const std::string description =
+        barrier.Describe();
+
+    if (description.find(
+            "physical_actuation_allowed=false") ==
+            std::string::npos ||
+        description.find(
+            "network_access_allowed=false") ==
+            std::string::npos ||
+        description.find(
+            "direct_hardware_dispatch_exposed=false") ==
+            std::string::npos ||
+        description.find("analysis-only integration barrier") ==
+            std::string::npos) {
+        return false;
+    }
+
+    return true;
+}
+
+}  // namespace prometheus_praxis_foundation_extensions
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+// Object 49 — Future Comment Expansion
+//
+// Roadmap Scope
+// - Keep this file self-contained until a stable library boundary is justified.
+// - Preserve deterministic ecological validation and reporting behavior.
+// - Keep physical actuation excluded from all extension interfaces.
+// - Keep external network access excluded from all extension interfaces.
+//
+// Foundation Inputs
+// - Extend inputs only with field-observable restoration measurements.
+// - Document units beside new numeric values.
+// - Validate finite numeric values before score calculations.
+// - Retain explicit failure reasons for rejected input combinations.
+// - Keep future input fixtures bounded and reproducible.
+//
+// Foundation Outputs
+// - Preserve machine-readable status values across report versions.
+// - Maintain compatibility for CSV, Markdown, and log consumers.
+// - Add fields only when their restoration interpretation is documented.
+// - Continue surfacing uncertainty rather than implying field certainty.
+//
+// Stage Tracking
+// - Keep the six foundation stages independently reviewable.
+// - Record stage success and failure without suppressing reasons.
+// - Preserve bounded risk, knowledge, and eco-impact values.
+// - Add stage metrics only when they improve restoration decisions.
+//
+// Ecological Scoring
+// - Keep aggregate scores clamped to the unit interval.
+// - Preserve arithmetic transparency for community review.
+// - Separate observed values from inferred values in future models.
+// - Flag low knowledge factors before recommending deployment.
+// - Penalize plausible harmful by-products in eco-impact evaluation.
+//
+// Spatial Corridor Work
+// - Keep corridor table identifiers explicit and versioned.
+// - Require compatible spatial resolution before lookup use.
+// - Require one complete lookup row per corridor cell.
+// - Report missing thermal and biodiversity coverage separately.
+// - Avoid treating spatial summaries as site-survey substitutes.
+//
+// Water and Biodiversity
+// - Prefer water stewardship and native-habitat outcomes.
+// - Track uncertainty in rainfall and irrigation scenario inputs.
+// - Flag water depletion, erosion, contamination, and heat stress risks.
+// - Preserve fail-closed outcomes when ecological evidence is incomplete.
+//
+// Materials and Waste
+// - Prefer non-toxic, recyclable, reusable, or biodegradable workflows.
+// - Record waste streams and possible contaminant pathways.
+// - Avoid recommending disposal approaches without local verification.
+// - Keep harmful-by-product detection visible in future reports.
+//
+// Governance
+// - Preserve policy_eco_safe_v1 as the current stable policy identifier.
+// - Add future aliases only through validated registry operations.
+// - Keep policy records descriptive, reviewable, and machine-readable.
+// - Preserve human review and local participation in restoration work.
+//
+// Reporting
+// - Keep CSV fields escaped and stable.
+// - Keep Markdown tables readable in repository reviews.
+// - Keep log lines one-line and escaped.
+// - Include failure counts whenever a report is blocked.
+// - Retain concise summaries for community operators.
+//
+// Contributor Experience
+// - Keep onboarding guidance available without file access.
+// - Keep AI-chat guidance advisory and non-actuating.
+// - Require self-tests for empty, boundary, and rejected inputs.
+// - Prefer standard-library C++20 facilities for portability.
+// - Keep repository paths normalized for cross-platform tooling.
+//
+// Integration Boundary
+// - Continue permitting validation, simulation, scoring, and reporting.
+// - Continue excluding physical actuation interfaces.
+// - Continue excluding direct hardware dispatch interfaces.
+// - Continue excluding automatic network requests.
+// - Treat external references as reviewable data only.
+//
+// Future Review Gates
+// - Review ecological assumptions with local subject-matter expertise.
+// - Review invasive-species implications before field recommendations.
+// - Review water-use assumptions against local conditions.
+// - Review biodiversity impacts before accepting corridor changes.
+// - Review material safety information before waste workflow adoption.
+// - Review output compatibility before changing serialized reports.
+// - Review new constants with compile-time assertions.
+// - Review all additions for explicit failure behavior.
+// - Review all extensions for self-contained test coverage.
+//
+// Completion Criteria
+// - A future object should improve restoration analysis or safety.
+// - A future object should remain deterministic where practical.
+// - A future object should not conceal uncertainty or risk.
+// - A future object should retain human-readable explanations.
+// - A future object should preserve community-operable workflows.
+// - A future object should remain compatible with the integration barrier.
+// - A future object should document its knowledge factor and eco-impact value.
+// - A future object should avoid harmful by-products and unsafe designs.
+//
+// End of Object 49 roadmap comments.
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+struct SingleFileConsistencyAudit {
+    std::size_t line_count{};
+    std::size_t section_marker_count{};
+    std::size_t namespace_marker_count{};
+    bool has_sufficient_lines{};
+    bool has_required_sections{};
+    bool has_required_namespaces{};
+    bool passed{};
+    std::vector<std::string> failure_reasons;
+};
+
+std::size_t CountSourceLines(
+    std::string_view source) {
+    if (source.empty()) {
+        return 0U;
+    }
+
+    return static_cast<std::size_t>(
+        std::count(source.begin(), source.end(), '\n')) +
+        (source.back() == '\n' ? 0U : 1U);
+}
+
+std::size_t CountSourceOccurrences(
+    std::string_view source,
+    std::string_view needle) {
+    if (needle.empty()) {
+        return 0U;
+    }
+
+    std::size_t count = 0U;
+    std::size_t position = 0U;
+
+    while (position < source.size()) {
+        const std::size_t found =
+            source.find(needle, position);
+
+        if (found == std::string_view::npos) {
+            break;
+        }
+
+        ++count;
+        position = found + needle.size();
+    }
+
+    return count;
+}
+
+std::vector<std::string> RequiredSingleFileSectionMarkers() {
+    return {
+        "Object 29",
+        "Object 30",
+        "Object 31",
+        "Object 32",
+        "Object 33",
+        "Object 34",
+        "Object 35",
+        "Object 36",
+        "Object 37",
+        "Object 38",
+        "Object 39",
+        "Object 40",
+        "Object 41",
+        "Object 42",
+        "Object 43",
+        "Object 44",
+        "Object 45",
+        "Object 46",
+        "Object 47",
+        "Object 48",
+        "Object 49",
+        "Object 50"
+    };
+}
+
+std::vector<std::string> RequiredSingleFileNamespaceMarkers() {
+    return {
+        "namespace prometheus_praxis_foundation_extensions",
+        "namespace ppf_constants"
+    };
+}
+
+bool ContainsAllRequiredMarkers(
+    std::string_view source,
+    const std::vector<std::string>& markers,
+    std::vector<std::string>& failure_reasons) {
+    bool complete = true;
+
+    for (const auto& marker : markers) {
+        if (source.find(marker) == std::string_view::npos) {
+            complete = false;
+            failure_reasons.emplace_back(
+                "missing required marker: " + marker);
+        }
+    }
+
+    return complete;
+}
+
+SingleFileConsistencyAudit AuditSingleFileConsistency(
+    std::string_view source,
+    std::size_t minimum_line_count = 1U) {
+    SingleFileConsistencyAudit audit;
+    audit.line_count = CountSourceLines(source);
+    audit.section_marker_count = CountSourceOccurrences(
+        source,
+        "Object ");
+    audit.namespace_marker_count = CountSourceOccurrences(
+        source,
+        "namespace ");
+
+    audit.has_sufficient_lines =
+        audit.line_count >= minimum_line_count;
+
+    if (!audit.has_sufficient_lines) {
+        audit.failure_reasons.emplace_back(
+            "source line count is below the requested minimum");
+    }
+
+    audit.has_required_sections =
+        ContainsAllRequiredMarkers(
+            source,
+            RequiredSingleFileSectionMarkers(),
+            audit.failure_reasons);
+
+    audit.has_required_namespaces =
+        ContainsAllRequiredMarkers(
+            source,
+            RequiredSingleFileNamespaceMarkers(),
+            audit.failure_reasons);
+
+    if (audit.namespace_marker_count == 0U) {
+        audit.failure_reasons.emplace_back(
+            "no namespace declaration marker was found");
+    }
+
+    audit.passed =
+        audit.has_sufficient_lines &&
+        audit.has_required_sections &&
+        audit.has_required_namespaces &&
+        audit.failure_reasons.empty();
+
+    return audit;
+}
+
+std::string ExplainSingleFileConsistencyAudit(
+    const SingleFileConsistencyAudit& audit) {
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << "single_file_consistency_audit\n";
+    output << "line_count=" << audit.line_count << '\n';
+    output << "section_marker_count="
+           << audit.section_marker_count << '\n';
+    output << "namespace_marker_count="
+           << audit.namespace_marker_count << '\n';
+    output << "has_sufficient_lines="
+           << (audit.has_sufficient_lines ? "true" : "false") << '\n';
+    output << "has_required_sections="
+           << (audit.has_required_sections ? "true" : "false") << '\n';
+    output << "has_required_namespaces="
+           << (audit.has_required_namespaces ? "true" : "false") << '\n';
+    output << "passed="
+           << (audit.passed ? "true" : "false") << '\n';
+    output << "failure_count="
+           << audit.failure_reasons.size() << '\n';
+
+    for (std::size_t index = 0U;
+         index < audit.failure_reasons.size();
+         ++index) {
+        output << "failure_" << index << '='
+               << audit.failure_reasons[index] << '\n';
+    }
+
+    return output.str();
+}
+
+bool SingleFileConsistencyAuditSelfTest() {
+    std::ostringstream complete_source;
+
+    for (const auto& marker :
+         RequiredSingleFileSectionMarkers()) {
+        complete_source << "// " << marker << '\n';
+    }
+
+    for (const auto& marker :
+         RequiredSingleFileNamespaceMarkers()) {
+        complete_source << marker << " {\n}\n";
+    }
+
+    const SingleFileConsistencyAudit complete =
+        AuditSingleFileConsistency(
+            complete_source.str(),
+            10U);
+
+    if (!complete.passed ||
+        !complete.failure_reasons.empty() ||
+        complete.line_count < 10U ||
+        complete.section_marker_count != 22U ||
+        complete.namespace_marker_count != 2U) {
+        return false;
+    }
+
+    const SingleFileConsistencyAudit incomplete =
+        AuditSingleFileConsistency(
+            "namespace prometheus_praxis_foundation_extensions {}\n",
+            2U);
+
+    if (incomplete.passed ||
+        incomplete.has_sufficient_lines ||
+        incomplete.has_required_sections ||
+        incomplete.has_required_namespaces ||
+        incomplete.failure_reasons.empty()) {
+        return false;
+    }
+
+    if (CountSourceLines("") != 0U ||
+        CountSourceLines("one") != 1U ||
+        CountSourceLines("one\ntwo\n") != 2U ||
+        CountSourceOccurrences("Object 50 Object 50", "Object 50") !=
+            2U) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainSingleFileConsistencyAudit(complete);
+
+    if (explanation.find("passed=true") ==
+            std::string::npos ||
+        explanation.find("failure_count=0") ==
+            std::string::npos ||
+        explanation.find("has_required_sections=true") ==
+            std::string::npos) {
+        return false;
+    }
+
+    return true;
+}
+
+}  // namespace prometheus_praxis_foundation_extensions
