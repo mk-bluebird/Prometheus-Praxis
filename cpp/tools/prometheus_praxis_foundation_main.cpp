@@ -9047,3 +9047,1118 @@ bool SingleFileConsistencyAuditSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+struct CanonicalExtensionDescriptor {
+    std::string name;
+    bool (*self_test)();
+    std::string_view purpose;
+    bool diagnostics_only;
+};
+
+class CanonicalExtensionRegistry {
+public:
+    bool Register(CanonicalExtensionDescriptor descriptor) {
+        if (!IsDescriptorValid(descriptor) || Contains(descriptor.name)) {
+            return false;
+        }
+        extensions_.push_back(std::move(descriptor));
+        return true;
+    }
+
+    bool Contains(std::string_view name) const {
+        return std::any_of(
+            extensions_.begin(),
+            extensions_.end(),
+            [name](const CanonicalExtensionDescriptor& descriptor) {
+                return descriptor.name == name;
+            });
+    }
+
+    const std::vector<CanonicalExtensionDescriptor>& Extensions() const noexcept {
+        return extensions_;
+    }
+
+    std::size_t Size() const noexcept {
+        return extensions_.size();
+    }
+
+    bool Empty() const noexcept {
+        return extensions_.empty();
+    }
+
+    static bool IsStableDescriptorName(std::string_view name) {
+        if (name.empty()) {
+            return false;
+        }
+
+        const char first = name.front();
+        if (first < 'a' || first > 'z') {
+            return false;
+        }
+
+        for (const char character : name) {
+            const bool lower =
+                character >= 'a' && character <= 'z';
+            const bool digit =
+                character >= '0' && character <= '9';
+
+            if (!lower && !digit && character != '_') {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    static bool IsDescriptorValid(
+        const CanonicalExtensionDescriptor& descriptor) {
+        return IsStableDescriptorName(descriptor.name) &&
+               descriptor.self_test != nullptr &&
+               !descriptor.purpose.empty();
+    }
+
+private:
+    std::vector<CanonicalExtensionDescriptor> extensions_;
+};
+
+bool CanonicalExtensionRegistryAlwaysPasses() {
+    return true;
+}
+
+bool CanonicalExtensionRegistryAlwaysFails() {
+    return false;
+}
+
+bool CanonicalExtensionRegistrySelfTest() {
+    CanonicalExtensionRegistry registry;
+
+    if (!registry.Empty() ||
+        registry.Size() != 0U ||
+        registry.Contains("registry_probe")) {
+        return false;
+    }
+
+    const CanonicalExtensionDescriptor valid{
+        "registry_probe",
+        &CanonicalExtensionRegistryAlwaysPasses,
+        "validate canonical extension registry registration",
+        true
+    };
+
+    if (!CanonicalExtensionRegistry::IsDescriptorValid(valid) ||
+        !registry.Register(valid) ||
+        registry.Empty() ||
+        registry.Size() != 1U ||
+        !registry.Contains("registry_probe")) {
+        return false;
+    }
+
+    const auto& extensions = registry.Extensions();
+    if (extensions.size() != 1U ||
+        extensions.front().name != "registry_probe" ||
+        extensions.front().self_test == nullptr ||
+        extensions.front().purpose !=
+            "validate canonical extension registry registration" ||
+        !extensions.front().diagnostics_only ||
+        !extensions.front().self_test()) {
+        return false;
+    }
+
+    const CanonicalExtensionDescriptor duplicate{
+        "registry_probe",
+        &CanonicalExtensionRegistryAlwaysFails,
+        "duplicate canonical registry entry",
+        true
+    };
+
+    if (registry.Register(duplicate) ||
+        registry.Size() != 1U) {
+        return false;
+    }
+
+    const CanonicalExtensionDescriptor empty_name{
+        "",
+        &CanonicalExtensionRegistryAlwaysPasses,
+        "empty name must be rejected",
+        true
+    };
+
+    const CanonicalExtensionDescriptor invalid_case{
+        "Registry_probe",
+        &CanonicalExtensionRegistryAlwaysPasses,
+        "uppercase name must be rejected",
+        true
+    };
+
+    const CanonicalExtensionDescriptor invalid_symbol{
+        "registry-probe",
+        &CanonicalExtensionRegistryAlwaysPasses,
+        "symbolic name must be rejected",
+        true
+    };
+
+    const CanonicalExtensionDescriptor missing_test{
+        "missing_test",
+        nullptr,
+        "null test callback must be rejected",
+        true
+    };
+
+    const CanonicalExtensionDescriptor missing_purpose{
+        "missing_purpose",
+        &CanonicalExtensionRegistryAlwaysPasses,
+        "",
+        true
+    };
+
+    if (CanonicalExtensionRegistry::IsDescriptorValid(empty_name) ||
+        CanonicalExtensionRegistry::IsDescriptorValid(invalid_case) ||
+        CanonicalExtensionRegistry::IsDescriptorValid(invalid_symbol) ||
+        CanonicalExtensionRegistry::IsDescriptorValid(missing_test) ||
+        CanonicalExtensionRegistry::IsDescriptorValid(missing_purpose) ||
+        registry.Register(empty_name) ||
+        registry.Register(invalid_case) ||
+        registry.Register(invalid_symbol) ||
+        registry.Register(missing_test) ||
+        registry.Register(missing_purpose) ||
+        registry.Size() != 1U) {
+        return false;
+    }
+
+    const CanonicalExtensionDescriptor second_valid{
+        "report_probe_2",
+        &CanonicalExtensionRegistryAlwaysPasses,
+        "validate ordered canonical registry iteration",
+        true
+    };
+
+    if (!registry.Register(second_valid) ||
+        registry.Size() != 2U ||
+        !registry.Contains("report_probe_2") ||
+        registry.Contains("report_probe_3")) {
+        return false;
+    }
+
+    const auto& final_extensions = registry.Extensions();
+    if (final_extensions.size() != 2U ||
+        final_extensions[0].name != "registry_probe" ||
+        final_extensions[1].name != "report_probe_2" ||
+        !final_extensions[0].self_test() ||
+        !final_extensions[1].self_test()) {
+        return false;
+    }
+
+    return CanonicalExtensionRegistry::IsStableDescriptorName(
+               "eco_restoration_2026") &&
+           !CanonicalExtensionRegistry::IsStableDescriptorName(
+               "2eco_restoration") &&
+           !CanonicalExtensionRegistry::IsStableDescriptorName(
+               "eco restoration");
+}
+
+}
+
+namespace prometheus_praxis_foundation_extensions {
+
+bool CanonicalDescriptorHasExpectedProperties(
+    const CanonicalExtensionDescriptor& descriptor,
+    std::string_view expected_name,
+    std::string_view expected_purpose) {
+    return descriptor.name == expected_name &&
+           descriptor.self_test != nullptr &&
+           descriptor.purpose == expected_purpose &&
+           descriptor.diagnostics_only &&
+           CanonicalExtensionRegistry::IsDescriptorValid(descriptor);
+}
+
+bool CanonicalRegistryContainsRunnableTest(
+    const CanonicalExtensionRegistry& registry,
+    std::string_view name) {
+    const auto& extensions = registry.Extensions();
+    const auto iterator = std::find_if(
+        extensions.begin(),
+        extensions.end(),
+        [name](const CanonicalExtensionDescriptor& descriptor) {
+            return descriptor.name == name;
+        });
+
+    return iterator != extensions.end() &&
+           iterator->self_test != nullptr;
+}
+
+bool CanonicalRegistryNamesAreUniqueAndValid(
+    const CanonicalExtensionRegistry& registry) {
+    const auto& extensions = registry.Extensions();
+
+    if (extensions.empty()) {
+        return false;
+    }
+
+    for (std::size_t left = 0U; left < extensions.size(); ++left) {
+        if (!CanonicalExtensionRegistry::IsDescriptorValid(
+                extensions[left])) {
+            return false;
+        }
+
+        for (std::size_t right = left + 1U;
+             right < extensions.size();
+             ++right) {
+            if (extensions[left].name == extensions[right].name) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+bool RegisterKnownExtensionSelfTest(
+    CanonicalExtensionRegistry& registry,
+    std::string_view name,
+    bool (*self_test)(),
+    std::string_view purpose) {
+    CanonicalExtensionDescriptor descriptor{
+        std::string(name),
+        self_test,
+        purpose,
+        true
+    };
+
+    return registry.Register(std::move(descriptor));
+}
+
+CanonicalExtensionRegistry BuildKnownExtensionRegistry() {
+    CanonicalExtensionRegistry registry;
+
+    const bool registry_registered = RegisterKnownExtensionSelfTest(
+        registry,
+        "extension_registry",
+        &extension_registry_self_test,
+        "validate legacy extension registry naming and uniqueness");
+
+    const bool report_json_registered = RegisterKnownExtensionSelfTest(
+        registry,
+        "foundation_report_json",
+        &foundation_report_json_self_test,
+        "validate foundation report JSON serialization and escaping");
+
+    const bool key_value_registered = RegisterKnownExtensionSelfTest(
+        registry,
+        "emit_key_value",
+        &EmitKeyValueSelfTest,
+        "validate stable key value output serialization");
+
+    const bool usage_registered = RegisterKnownExtensionSelfTest(
+        registry,
+        "build_usage_message",
+        &BuildUsageMessageSelfTest,
+        "validate bounded command usage message generation");
+
+    const bool exit_code_registered = RegisterKnownExtensionSelfTest(
+        registry,
+        "foundation_exit_code",
+        &FoundationExitCodeSelfTest,
+        "validate foundation process exit code classification");
+
+    const bool private_heat_plan_registered = RegisterKnownExtensionSelfTest(
+        registry,
+        "private_heat_proof_plan",
+        &PrivateHeatProofPlanSelfTest,
+        "validate private heat proof plan defaults and overrides");
+
+    const bool safety_verdict_registered = RegisterKnownExtensionSelfTest(
+        registry,
+        "foundation_safety_verdict",
+        &FoundationSafetyVerdictSelfTest,
+        "validate foundation safety verdict reasoning");
+
+    const bool known_registry_registered = RegisterKnownExtensionSelfTest(
+        registry,
+        "canonical_extension_registry",
+        &CanonicalExtensionRegistrySelfTest,
+        "validate canonical extension descriptor registry behavior");
+
+    if (!registry_registered ||
+        !report_json_registered ||
+        !key_value_registered ||
+        !usage_registered ||
+        !exit_code_registered ||
+        !private_heat_plan_registered ||
+        !safety_verdict_registered ||
+        !known_registry_registered) {
+        throw std::logic_error(
+            "known extension registry registration unexpectedly failed");
+    }
+
+    return registry;
+}
+
+bool BuildKnownExtensionRegistrySelfTest() {
+    const CanonicalExtensionRegistry registry =
+        BuildKnownExtensionRegistry();
+
+    if (registry.Empty() ||
+        registry.Size() != 8U ||
+        !CanonicalRegistryNamesAreUniqueAndValid(registry)) {
+        return false;
+    }
+
+    if (!registry.Contains("extension_registry") ||
+        !registry.Contains("foundation_report_json") ||
+        !registry.Contains("emit_key_value") ||
+        !registry.Contains("build_usage_message") ||
+        !registry.Contains("foundation_exit_code") ||
+        !registry.Contains("private_heat_proof_plan") ||
+        !registry.Contains("foundation_safety_verdict") ||
+        !registry.Contains("canonical_extension_registry") ||
+        registry.Contains("not_a_registered_test")) {
+        return false;
+    }
+
+    const auto& extensions = registry.Extensions();
+
+    if (extensions.size() != 8U ||
+        !CanonicalDescriptorHasExpectedProperties(
+            extensions[0],
+            "extension_registry",
+            "validate legacy extension registry naming and uniqueness") ||
+        !CanonicalDescriptorHasExpectedProperties(
+            extensions[1],
+            "foundation_report_json",
+            "validate foundation report JSON serialization and escaping") ||
+        !CanonicalDescriptorHasExpectedProperties(
+            extensions[2],
+            "emit_key_value",
+            "validate stable key value output serialization") ||
+        !CanonicalDescriptorHasExpectedProperties(
+            extensions[3],
+            "build_usage_message",
+            "validate bounded command usage message generation") ||
+        !CanonicalDescriptorHasExpectedProperties(
+            extensions[4],
+            "foundation_exit_code",
+            "validate foundation process exit code classification") ||
+        !CanonicalDescriptorHasExpectedProperties(
+            extensions[5],
+            "private_heat_proof_plan",
+            "validate private heat proof plan defaults and overrides") ||
+        !CanonicalDescriptorHasExpectedProperties(
+            extensions[6],
+            "foundation_safety_verdict",
+            "validate foundation safety verdict reasoning") ||
+        !CanonicalDescriptorHasExpectedProperties(
+            extensions[7],
+            "canonical_extension_registry",
+            "validate canonical extension descriptor registry behavior")) {
+        return false;
+    }
+
+    for (const auto& descriptor : extensions) {
+        if (!descriptor.diagnostics_only ||
+            descriptor.self_test == nullptr ||
+            descriptor.name.empty() ||
+            descriptor.purpose.empty() ||
+            !CanonicalExtensionRegistry::IsStableDescriptorName(
+                descriptor.name)) {
+            return false;
+        }
+    }
+
+    if (!CanonicalRegistryContainsRunnableTest(
+            registry,
+            "extension_registry") ||
+        !CanonicalRegistryContainsRunnableTest(
+            registry,
+            "foundation_safety_verdict") ||
+        !CanonicalRegistryContainsRunnableTest(
+            registry,
+            "canonical_extension_registry") ||
+        CanonicalRegistryContainsRunnableTest(
+            registry,
+            "missing_test")) {
+        return false;
+    }
+
+    CanonicalExtensionRegistry duplicate_registry;
+    if (!RegisterKnownExtensionSelfTest(
+            duplicate_registry,
+            "known_extension_probe",
+            &CanonicalExtensionRegistryAlwaysPasses,
+            "validate known extension registration helper") ||
+        RegisterKnownExtensionSelfTest(
+            duplicate_registry,
+            "known_extension_probe",
+            &CanonicalExtensionRegistryAlwaysPasses,
+            "duplicate names must be rejected") ||
+        duplicate_registry.Size() != 1U) {
+        return false;
+    }
+
+    CanonicalExtensionRegistry invalid_registry;
+    if (RegisterKnownExtensionSelfTest(
+            invalid_registry,
+            "Known_extension_probe",
+            &CanonicalExtensionRegistryAlwaysPasses,
+            "uppercase names must be rejected") ||
+        RegisterKnownExtensionSelfTest(
+            invalid_registry,
+            "known_extension_probe",
+            nullptr,
+            "null test callbacks must be rejected") ||
+        RegisterKnownExtensionSelfTest(
+            invalid_registry,
+            "known_extension_probe",
+            &CanonicalExtensionRegistryAlwaysPasses,
+            "") ||
+        !invalid_registry.Empty()) {
+        return false;
+    }
+
+    return true;
+}
+
+}
+
+namespace prometheus_praxis_foundation_extensions {
+
+struct KnownExtensionExecutionSummary {
+    std::size_t total{};
+    std::size_t passed{};
+    std::size_t failed{};
+    bool completed{};
+    bool all_passed{};
+};
+
+KnownExtensionExecutionSummary SummarizeKnownExtensionRun(
+    const std::vector<CanonicalExtensionRunResult>& results) {
+    KnownExtensionExecutionSummary summary;
+    summary.total = results.size();
+    summary.completed = true;
+
+    for (const auto& result : results) {
+        if (result.passed) {
+            ++summary.passed;
+        } else {
+            ++summary.failed;
+        }
+    }
+
+    summary.all_passed =
+        summary.total > 0U &&
+        summary.failed == 0U &&
+        summary.passed == summary.total;
+
+    return summary;
+}
+
+bool IsKnownExtensionExecutionSummaryValid(
+    const KnownExtensionExecutionSummary& summary) {
+    if (!summary.completed) {
+        return false;
+    }
+
+    if (summary.passed + summary.failed != summary.total) {
+        return false;
+    }
+
+    if (summary.all_passed) {
+        return summary.total > 0U &&
+               summary.passed == summary.total &&
+               summary.failed == 0U;
+    }
+
+    return summary.total == 0U ||
+           summary.failed > 0U;
+}
+
+std::string StableExtensionResultKey(
+    std::string_view extension_name,
+    std::string_view suffix) {
+    if (!CanonicalExtensionRegistry::IsStableDescriptorName(extension_name) ||
+        !CanonicalExtensionRegistry::IsStableDescriptorName(suffix)) {
+        throw std::invalid_argument(
+            "extension result key segments must be lower_snake_case");
+    }
+
+    return std::string("extension_") +
+           std::string(extension_name) +
+           "_" +
+           std::string(suffix);
+}
+
+void EmitCanonicalExtensionRunResult(
+    std::ostream& output,
+    const CanonicalExtensionRunResult& result) {
+    if (!CanonicalExtensionRegistry::IsStableDescriptorName(result.name)) {
+        throw std::invalid_argument(
+            "canonical extension result has invalid name");
+    }
+
+    EmitKeyValue(
+        output,
+        StableExtensionResultKey(result.name, "passed"),
+        result.passed);
+
+    EmitKeyValue(
+        output,
+        StableExtensionResultKey(result.name, "detail"),
+        result.detail.empty() ? std::string_view("no_detail") :
+                                std::string_view(result.detail));
+}
+
+void EmitKnownExtensionExecutionSummary(
+    std::ostream& output,
+    const KnownExtensionExecutionSummary& summary) {
+    if (!IsKnownExtensionExecutionSummaryValid(summary)) {
+        throw std::invalid_argument(
+            "known extension execution summary is invalid");
+    }
+
+    EmitKeyValue(
+        output,
+        "known_extension_test_total",
+        static_cast<unsigned long long>(summary.total));
+
+    EmitKeyValue(
+        output,
+        "known_extension_test_passed",
+        static_cast<unsigned long long>(summary.passed));
+
+    EmitKeyValue(
+        output,
+        "known_extension_test_failed",
+        static_cast<unsigned long long>(summary.failed));
+
+    EmitKeyValue(
+        output,
+        "known_extension_test_completed",
+        summary.completed);
+
+    EmitKeyValue(
+        output,
+        "known_extension_test_all_passed",
+        summary.all_passed);
+}
+
+int RunKnownExtensionRegistryAndWriteResults(
+    std::ostream& output) {
+    try {
+        const CanonicalExtensionRegistry registry =
+            BuildKnownExtensionRegistry();
+
+        if (registry.Empty() ||
+            !CanonicalRegistryNamesAreUniqueAndValid(registry)) {
+            EmitKeyValue(output, "known_extension_test_completed", false);
+            EmitKeyValue(output, "known_extension_test_all_passed", false);
+            EmitKeyValue(
+                output,
+                "known_extension_test_error",
+                "registry_validation_failed");
+            return 1;
+        }
+
+        const std::vector<CanonicalExtensionRunResult> results =
+            RunCanonicalExtensionSelfTests(registry);
+
+        const KnownExtensionExecutionSummary summary =
+            SummarizeKnownExtensionRun(results);
+
+        if (!IsKnownExtensionExecutionSummaryValid(summary) ||
+            summary.total != registry.Size()) {
+            EmitKeyValue(output, "known_extension_test_completed", false);
+            EmitKeyValue(output, "known_extension_test_all_passed", false);
+            EmitKeyValue(
+                output,
+                "known_extension_test_error",
+                "result_summary_validation_failed");
+            return 1;
+        }
+
+        for (const auto& result : results) {
+            EmitCanonicalExtensionRunResult(output, result);
+        }
+
+        EmitKnownExtensionExecutionSummary(output, summary);
+        return summary.all_passed ? 0 : 2;
+    } catch (const std::exception& error) {
+        EmitKeyValue(output, "known_extension_test_completed", false);
+        EmitKeyValue(output, "known_extension_test_all_passed", false);
+        EmitKeyValue(output, "known_extension_test_error", error.what());
+        return 1;
+    }
+}
+
+int RunAllKnownExtensionSelfTestsAndExit() {
+    return RunKnownExtensionRegistryAndWriteResults(std::cout);
+}
+
+bool RunAllKnownExtensionSelfTestsAndExitSelfTest() {
+    std::ostringstream output;
+
+    const int exit_code =
+        RunKnownExtensionRegistryAndWriteResults(output);
+
+    const std::string report = output.str();
+
+    if (exit_code != 0 &&
+        exit_code != 2 &&
+        exit_code != 1) {
+        return false;
+    }
+
+    if (report.find("known_extension_test_completed=") ==
+            std::string::npos ||
+        report.find("known_extension_test_all_passed=") ==
+            std::string::npos) {
+        return false;
+    }
+
+    if (exit_code == 0) {
+        if (report.find("known_extension_test_all_passed=true") ==
+                std::string::npos ||
+            report.find("known_extension_test_failed=0") ==
+                std::string::npos) {
+            return false;
+        }
+    }
+
+    if (exit_code == 2) {
+        if (report.find("known_extension_test_all_passed=false") ==
+                std::string::npos ||
+            report.find("known_extension_test_failed=") ==
+                std::string::npos) {
+            return false;
+        }
+    }
+
+    if (exit_code == 1) {
+        if (report.find("known_extension_test_completed=false") ==
+                std::string::npos ||
+            report.find("known_extension_test_error=") ==
+                std::string::npos) {
+            return false;
+        }
+    }
+
+    const CanonicalExtensionRunResult passed_result{
+        "adapter_probe",
+        true,
+        "passed"
+    };
+
+    const CanonicalExtensionRunResult failed_result{
+        "adapter_probe_failure",
+        false,
+        "failed"
+    };
+
+    std::ostringstream result_output;
+    EmitCanonicalExtensionRunResult(result_output, passed_result);
+    EmitCanonicalExtensionRunResult(result_output, failed_result);
+
+    const std::string serialized_results = result_output.str();
+
+    if (serialized_results.find(
+            "extension_adapter_probe_passed=true") ==
+            std::string::npos ||
+        serialized_results.find(
+            "extension_adapter_probe_detail=passed") ==
+            std::string::npos ||
+        serialized_results.find(
+            "extension_adapter_probe_failure_passed=false") ==
+            std::string::npos ||
+        serialized_results.find(
+            "extension_adapter_probe_failure_detail=failed") ==
+            std::string::npos) {
+        return false;
+    }
+
+    const KnownExtensionExecutionSummary empty_summary =
+        SummarizeKnownExtensionRun({});
+
+    if (!empty_summary.completed ||
+        empty_summary.total != 0U ||
+        empty_summary.passed != 0U ||
+        empty_summary.failed != 0U ||
+        empty_summary.all_passed ||
+        !IsKnownExtensionExecutionSummaryValid(empty_summary)) {
+        return false;
+    }
+
+    const KnownExtensionExecutionSummary passing_summary =
+        SummarizeKnownExtensionRun({passed_result});
+
+    if (!passing_summary.completed ||
+        passing_summary.total != 1U ||
+        passing_summary.passed != 1U ||
+        passing_summary.failed != 0U ||
+        !passing_summary.all_passed ||
+        !IsKnownExtensionExecutionSummaryValid(passing_summary)) {
+        return false;
+    }
+
+    const KnownExtensionExecutionSummary failing_summary =
+        SummarizeKnownExtensionRun(
+            {passed_result, failed_result});
+
+    if (!failing_summary.completed ||
+        failing_summary.total != 2U ||
+        failing_summary.passed != 1U ||
+        failing_summary.failed != 1U ||
+        failing_summary.all_passed ||
+        !IsKnownExtensionExecutionSummaryValid(failing_summary)) {
+        return false;
+    }
+
+    return true;
+}
+
+// Future main integration: add a command branch that returns
+// RunAllKnownExtensionSelfTestsAndExit() for a dedicated diagnostics command.
+
+}
+
+namespace prometheus_praxis_foundation_extensions {
+
+struct SymbolAuditResult {
+    std::string symbol;
+    bool present{};
+    std::size_t occurrences{};
+};
+
+bool IsCanonicalAuditSymbolName(std::string_view symbol) {
+    if (symbol.empty()) {
+        return false;
+    }
+
+    for (const char character : symbol) {
+        const bool upper =
+            character >= 'A' && character <= 'Z';
+        const bool lower =
+            character >= 'a' && character <= 'z';
+        const bool digit =
+            character >= '0' && character <= '9';
+        const bool underscore = character == '_';
+
+        if (!upper && !lower && !digit && !underscore) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+std::size_t CountCanonicalSymbolOccurrences(
+    std::string_view source,
+    std::string_view symbol) {
+    if (symbol.empty()) {
+        throw std::invalid_argument(
+            "canonical audit symbol must not be empty");
+    }
+
+    std::size_t occurrences = 0U;
+    std::size_t position = 0U;
+
+    while (position < source.size()) {
+        const std::size_t found = source.find(symbol, position);
+
+        if (found == std::string_view::npos) {
+            break;
+        }
+
+        ++occurrences;
+        position = found + symbol.size();
+    }
+
+    return occurrences;
+}
+
+bool IsSymbolAuditResultValid(
+    const SymbolAuditResult& result) {
+    if (!IsCanonicalAuditSymbolName(result.symbol)) {
+        return false;
+    }
+
+    return result.present == (result.occurrences > 0U);
+}
+
+const std::vector<std::string>& RequiredCanonicalSymbols() {
+    static const std::vector<std::string> symbols{
+        "FoundationReport",
+        "FoundationInputs",
+        "FoundationOutputs",
+        "CanonicalExtensionRegistry",
+        "RunCanonicalExtensionSelfTests",
+        "ppf_constants",
+        "FinalIntegrationBarrier",
+        "GovernancePolicyRegistry",
+        "WriteFoundationCsv",
+        "WriteFoundationMarkdown",
+        "SingleFileConsistencyAudit"
+    };
+
+    return symbols;
+}
+
+bool AreCanonicalAuditSymbolsValid(
+    const std::vector<std::string>& symbols) {
+    if (symbols.empty()) {
+        return false;
+    }
+
+    for (std::size_t left = 0U; left < symbols.size(); ++left) {
+        if (!IsCanonicalAuditSymbolName(symbols[left])) {
+            return false;
+        }
+
+        for (std::size_t right = left + 1U;
+             right < symbols.size();
+             ++right) {
+            if (symbols[left] == symbols[right]) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+std::vector<SymbolAuditResult> AuditCanonicalSymbols(
+    std::string_view source) {
+    const auto& required_symbols = RequiredCanonicalSymbols();
+
+    if (!AreCanonicalAuditSymbolsValid(required_symbols)) {
+        throw std::logic_error(
+            "required canonical symbol set is invalid");
+    }
+
+    std::vector<SymbolAuditResult> results;
+    results.reserve(required_symbols.size());
+
+    for (const auto& symbol : required_symbols) {
+        const std::size_t occurrences =
+            CountCanonicalSymbolOccurrences(source, symbol);
+
+        results.push_back({
+            symbol,
+            occurrences > 0U,
+            occurrences
+        });
+    }
+
+    return results;
+}
+
+bool SourceContainsAllCanonicalSymbols(
+    std::string_view source,
+    const std::vector<std::string>& symbols) {
+    if (!AreCanonicalAuditSymbolsValid(symbols)) {
+        return false;
+    }
+
+    for (const auto& symbol : symbols) {
+        if (CountCanonicalSymbolOccurrences(source, symbol) == 0U) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool SymbolAuditResultsMatchRequiredSymbols(
+    const std::vector<SymbolAuditResult>& results) {
+    const auto& required_symbols = RequiredCanonicalSymbols();
+
+    if (results.size() != required_symbols.size()) {
+        return false;
+    }
+
+    for (std::size_t index = 0U;
+         index < required_symbols.size();
+         ++index) {
+        if (!IsSymbolAuditResultValid(results[index]) ||
+            results[index].symbol != required_symbols[index]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+std::size_t CountPresentCanonicalSymbols(
+    const std::vector<SymbolAuditResult>& results) {
+    std::size_t present_count = 0U;
+
+    for (const auto& result : results) {
+        if (!IsSymbolAuditResultValid(result)) {
+            throw std::invalid_argument(
+                "symbol audit result is invalid");
+        }
+
+        if (result.present) {
+            ++present_count;
+        }
+    }
+
+    return present_count;
+}
+
+std::string ExplainCanonicalSymbolAudit(
+    const std::vector<SymbolAuditResult>& results) {
+    if (!SymbolAuditResultsMatchRequiredSymbols(results)) {
+        throw std::invalid_argument(
+            "canonical symbol audit results are invalid");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+
+    output << "canonical_symbol_audit\n";
+    output << "required_symbol_count=" << results.size() << '\n';
+    output << "present_symbol_count="
+           << CountPresentCanonicalSymbols(results)
+           << '\n';
+
+    for (const auto& result : results) {
+        output << "symbol_" << result.symbol << "_present="
+               << (result.present ? "true" : "false")
+               << '\n';
+        output << "symbol_" << result.symbol << "_occurrences="
+               << result.occurrences
+               << '\n';
+    }
+
+    return output.str();
+}
+
+bool CanonicalSymbolAuditSelfTest() {
+    const std::string partial_source =
+        "struct FoundationReport {};\n"
+        "class CanonicalExtensionRegistry {};\n"
+        "void RunCanonicalExtensionSelfTests() {}\n"
+        "namespace ppf_constants {}\n"
+        "void WriteFoundationCsv() {}\n"
+        "void WriteFoundationCsv() {}\n"
+        "struct SingleFileConsistencyAudit {};\n";
+
+    const std::vector<SymbolAuditResult> partial_results =
+        AuditCanonicalSymbols(partial_source);
+
+    if (!SymbolAuditResultsMatchRequiredSymbols(partial_results) ||
+        partial_results.size() != 11U ||
+        partial_results[0].symbol != "FoundationReport" ||
+        !partial_results[0].present ||
+        partial_results[0].occurrences != 1U ||
+        partial_results[1].symbol != "FoundationInputs" ||
+        partial_results[1].present ||
+        partial_results[1].occurrences != 0U ||
+        partial_results[3].symbol !=
+            "CanonicalExtensionRegistry" ||
+        !partial_results[3].present ||
+        partial_results[3].occurrences != 1U ||
+        partial_results[4].symbol !=
+            "RunCanonicalExtensionSelfTests" ||
+        !partial_results[4].present ||
+        partial_results[4].occurrences != 1U ||
+        partial_results[5].symbol != "ppf_constants" ||
+        !partial_results[5].present ||
+        partial_results[5].occurrences != 1U ||
+        partial_results[8].symbol != "WriteFoundationCsv" ||
+        !partial_results[8].present ||
+        partial_results[8].occurrences != 2U ||
+        partial_results[10].symbol !=
+            "SingleFileConsistencyAudit" ||
+        !partial_results[10].present) {
+        return false;
+    }
+
+    if (CountPresentCanonicalSymbols(partial_results) != 6U ||
+        SourceContainsAllCanonicalSymbols(
+            partial_source,
+            RequiredCanonicalSymbols())) {
+        return false;
+    }
+
+    std::ostringstream complete_source;
+    for (const auto& symbol : RequiredCanonicalSymbols()) {
+        complete_source << symbol << '\n';
+    }
+
+    const std::string complete_text = complete_source.str();
+
+    if (!SourceContainsAllCanonicalSymbols(
+            complete_text,
+            RequiredCanonicalSymbols())) {
+        return false;
+    }
+
+    const std::vector<SymbolAuditResult> complete_results =
+        AuditCanonicalSymbols(complete_text);
+
+    if (!SymbolAuditResultsMatchRequiredSymbols(complete_results) ||
+        CountPresentCanonicalSymbols(complete_results) !=
+            RequiredCanonicalSymbols().size()) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainCanonicalSymbolAudit(partial_results);
+
+    if (explanation.find("canonical_symbol_audit") ==
+            std::string::npos ||
+        explanation.find("required_symbol_count=11") ==
+            std::string::npos ||
+        explanation.find("present_symbol_count=6") ==
+            std::string::npos ||
+        explanation.find(
+            "symbol_WriteFoundationCsv_occurrences=2") ==
+            std::string::npos ||
+        explanation.find(
+            "symbol_FoundationInputs_present=false") ==
+            std::string::npos) {
+        return false;
+    }
+
+    const std::vector<std::string> invalid_symbols{
+        "FoundationReport",
+        "invalid-symbol"
+    };
+
+    const std::vector<std::string> duplicate_symbols{
+        "FoundationReport",
+        "FoundationReport"
+    };
+
+    const std::vector<std::string> empty_symbols{
+        ""
+    };
+
+    if (AreCanonicalAuditSymbolsValid(invalid_symbols) ||
+        AreCanonicalAuditSymbolsValid(duplicate_symbols) ||
+        AreCanonicalAuditSymbolsValid(empty_symbols) ||
+        SourceContainsAllCanonicalSymbols(
+            partial_source,
+            invalid_symbols) ||
+        SourceContainsAllCanonicalSymbols(
+            partial_source,
+            duplicate_symbols) ||
+        SourceContainsAllCanonicalSymbols(
+            partial_source,
+            empty_symbols)) {
+        return false;
+    }
+
+    try {
+        static_cast<void>(
+            CountCanonicalSymbolOccurrences(partial_source, ""));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    return true;
+}
+
+}
