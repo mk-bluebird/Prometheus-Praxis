@@ -16659,3 +16659,2444 @@ bool PrivateHeatProofPlanBuilderV2SelfTest() {
 }
 
 }
+
+namespace prometheus_praxis_foundation_extensions {
+
+struct CorridorMetadataConsistencyResult {
+    bool valid{};
+    std::size_t expected_cell_count{};
+    std::size_t observed_cell_count{};
+    std::size_t membership_lookup_rows{};
+    std::size_t heat_range_lookup_rows{};
+    std::uint8_t expected_h3_resolution{};
+    std::uint8_t observed_h3_resolution{};
+    std::vector<std::string> reasons;
+};
+
+bool IsCorridorLookupRowCountValid(
+    std::size_t rows) {
+    return rows > 0U;
+}
+
+bool IsCorridorH3ResolutionValid(
+    std::uint8_t resolution) {
+    return resolution <= 15U;
+}
+
+bool IsCorridorCellCountValid(
+    std::size_t cell_count) {
+    return cell_count > 0U;
+}
+
+void AddCorridorMetadataConsistencyReason(
+    CorridorMetadataConsistencyResult& result,
+    bool condition,
+    std::string_view reason) {
+    if (!condition) {
+        result.reasons.emplace_back(reason);
+    }
+}
+
+bool IsCorridorMetadataConsistencyResultValid(
+    const CorridorMetadataConsistencyResult& result) {
+    if (result.valid != result.reasons.empty()) {
+        return false;
+    }
+
+    if (!IsCorridorCellCountValid(result.expected_cell_count) ||
+        !IsCorridorCellCountValid(result.observed_cell_count) ||
+        !IsCorridorLookupRowCountValid(
+            result.membership_lookup_rows) ||
+        !IsCorridorLookupRowCountValid(
+            result.heat_range_lookup_rows) ||
+        !IsCorridorH3ResolutionValid(
+            result.expected_h3_resolution) ||
+        !IsCorridorH3ResolutionValid(
+            result.observed_h3_resolution)) {
+        return false;
+    }
+
+    return true;
+}
+
+CorridorMetadataConsistencyResult
+ValidateExtendedCorridorMetadataConsistency(
+    const eco_restoration::PrivateHeatProofPlan& plan,
+    const PrivateHeatStatementPublicView& view) {
+    ValidatePrivateHeatProofPlan(plan);
+
+    if (!IsPrivateHeatStatementPublicViewValid(view)) {
+        throw std::invalid_argument(
+            "private heat statement public view is invalid");
+    }
+
+    CorridorMetadataConsistencyResult result;
+    result.expected_cell_count = plan.corridor_cell_count;
+    result.observed_cell_count = view.membership_lookup_rows;
+    result.membership_lookup_rows = view.membership_lookup_rows;
+    result.heat_range_lookup_rows = view.heat_range_lookup_rows;
+    result.expected_h3_resolution = plan.h3_resolution;
+    result.observed_h3_resolution = plan.h3_resolution;
+
+    AddCorridorMetadataConsistencyReason(
+        result,
+        IsCorridorCellCountValid(plan.corridor_cell_count),
+        "expected corridor cell count must be positive");
+
+    AddCorridorMetadataConsistencyReason(
+        result,
+        IsCorridorLookupRowCountValid(
+            view.membership_lookup_rows),
+        "membership lookup rows must be positive");
+
+    AddCorridorMetadataConsistencyReason(
+        result,
+        IsCorridorLookupRowCountValid(
+            view.heat_range_lookup_rows),
+        "heat range lookup rows must be positive");
+
+    AddCorridorMetadataConsistencyReason(
+        result,
+        IsCorridorH3ResolutionValid(plan.h3_resolution),
+        "H3 resolution must lie in [0,15]");
+
+    AddCorridorMetadataConsistencyReason(
+        result,
+        view.membership_lookup_rows ==
+            plan.corridor_cell_count,
+        "membership lookup rows do not match corridor cell count");
+
+    AddCorridorMetadataConsistencyReason(
+        result,
+        view.heat_range_lookup_rows >=
+            view.membership_lookup_rows,
+        "heat range lookup rows must cover membership lookup rows");
+
+    AddCorridorMetadataConsistencyReason(
+        result,
+        view.heat_range_lookup_rows >=
+            plan.proof_target_bytes,
+        "heat range lookup rows are below proof target byte capacity");
+
+    result.valid = result.reasons.empty();
+    return result;
+}
+
+std::string ExplainExtendedCorridorMetadataConsistency(
+    const CorridorMetadataConsistencyResult& result) {
+    if (!IsCorridorMetadataConsistencyResultValid(result)) {
+        throw std::invalid_argument(
+            "corridor metadata consistency result is invalid");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+
+    output << "corridor_metadata_extended_consistency\n";
+    output << "valid=" << (result.valid ? "true" : "false")
+           << '\n';
+    output << "expected_cell_count="
+           << result.expected_cell_count << '\n';
+    output << "observed_cell_count="
+           << result.observed_cell_count << '\n';
+    output << "membership_lookup_rows="
+           << result.membership_lookup_rows << '\n';
+    output << "heat_range_lookup_rows="
+           << result.heat_range_lookup_rows << '\n';
+    output << "expected_h3_resolution="
+           << static_cast<unsigned int>(
+                  result.expected_h3_resolution)
+           << '\n';
+    output << "observed_h3_resolution="
+           << static_cast<unsigned int>(
+                  result.observed_h3_resolution)
+           << '\n';
+    output << "reason_count="
+           << result.reasons.size() << '\n';
+
+    for (std::size_t index = 0U;
+         index < result.reasons.size();
+         ++index) {
+        output << "reason_" << index << '='
+               << result.reasons[index] << '\n';
+    }
+
+    return output.str();
+}
+
+bool CorridorMetadataExtendedConsistencySelfTest() {
+    const eco_restoration::PrivateHeatProofPlan plan =
+        PrivateHeatProofPlanBuilderV2()
+            .SetCorridorCellCount(384U)
+            .SetH3Resolution(
+                static_cast<std::uint8_t>(11U))
+            .SetProofTargetBytes(32U * 1024U)
+            .Build();
+
+    const PrivateHeatStatementPublicView matching_view{
+        "central_az_corridor_table",
+        "external_private_proof",
+        true,
+        384U,
+        65'536U,
+        0.91,
+        0.82
+    };
+
+    const CorridorMetadataConsistencyResult matching =
+        ValidateExtendedCorridorMetadataConsistency(
+            plan,
+            matching_view);
+
+    if (!matching.valid ||
+        !matching.reasons.empty() ||
+        matching.expected_cell_count != 384U ||
+        matching.observed_cell_count != 384U ||
+        matching.membership_lookup_rows != 384U ||
+        matching.heat_range_lookup_rows != 65'536U ||
+        matching.expected_h3_resolution != 11U ||
+        !IsCorridorMetadataConsistencyResultValid(matching)) {
+        return false;
+    }
+
+    const std::string matching_explanation =
+        ExplainExtendedCorridorMetadataConsistency(matching);
+
+    if (matching_explanation.find(
+            "corridor_metadata_extended_consistency") ==
+            std::string::npos ||
+        matching_explanation.find("valid=true") ==
+            std::string::npos ||
+        matching_explanation.find(
+            "expected_cell_count=384") ==
+            std::string::npos ||
+        matching_explanation.find(
+            "heat_range_lookup_rows=65536") ==
+            std::string::npos ||
+        matching_explanation.find("reason_count=0") ==
+            std::string::npos) {
+        return false;
+    }
+
+    PrivateHeatStatementPublicView mismatched_view =
+        matching_view;
+    mismatched_view.membership_lookup_rows = 383U;
+    mismatched_view.heat_range_lookup_rows = 1'000U;
+
+    const CorridorMetadataConsistencyResult mismatched =
+        ValidateExtendedCorridorMetadataConsistency(
+            plan,
+            mismatched_view);
+
+    if (mismatched.valid ||
+        mismatched.reasons.size() != 3U ||
+        !IsCorridorMetadataConsistencyResultValid(mismatched)) {
+        return false;
+    }
+
+    if (std::find(
+            mismatched.reasons.begin(),
+            mismatched.reasons.end(),
+            "membership lookup rows do not match corridor cell count") ==
+            mismatched.reasons.end() ||
+        std::find(
+            mismatched.reasons.begin(),
+            mismatched.reasons.end(),
+            "heat range lookup rows are below proof target byte capacity") ==
+            mismatched.reasons.end()) {
+        return false;
+    }
+
+    PrivateHeatStatementPublicView insufficient_view =
+        matching_view;
+    insufficient_view.heat_range_lookup_rows = 100U;
+
+    const CorridorMetadataConsistencyResult insufficient =
+        ValidateExtendedCorridorMetadataConsistency(
+            plan,
+            insufficient_view);
+
+    if (insufficient.valid ||
+        insufficient.reasons.size() != 2U) {
+        return false;
+    }
+
+    try {
+        PrivateHeatStatementPublicView invalid_view =
+            matching_view;
+        invalid_view.membership_lookup_rows = 0U;
+        static_cast<void>(
+            ValidateExtendedCorridorMetadataConsistency(
+                plan,
+                invalid_view));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    return true;
+}
+
+}
+
+namespace prometheus_praxis_foundation_extensions {
+
+struct IdentifiedInvasiveControlCandidate {
+    std::string id;
+    eco_restoration::InvasiveControlCandidate candidate;
+};
+
+struct IdentifiedInvasiveControlSelection {
+    std::string selected_id;
+    eco_restoration::StochasticControlDecision decision;
+    bool selected{};
+    std::vector<std::string> reasons;
+};
+
+bool IsIdentifiedInvasiveControlCandidateValid(
+    const IdentifiedInvasiveControlCandidate& identified) {
+    return IsStableKey(identified.id) &&
+           IsInvasiveControlCandidateValid(
+               identified.candidate);
+}
+
+bool AreIdentifiedInvasiveControlCandidatesValid(
+    const std::vector<IdentifiedInvasiveControlCandidate>&
+        candidates) {
+    if (candidates.empty()) {
+        return false;
+    }
+
+    for (std::size_t left = 0U;
+         left < candidates.size();
+         ++left) {
+        if (!IsIdentifiedInvasiveControlCandidateValid(
+                candidates[left])) {
+            return false;
+        }
+
+        for (std::size_t right = left + 1U;
+             right < candidates.size();
+             ++right) {
+            if (candidates[left].id == candidates[right].id) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+std::vector<eco_restoration::InvasiveControlCandidate>
+ExtractInvasiveControlCandidates(
+    const std::vector<IdentifiedInvasiveControlCandidate>&
+        candidates) {
+    if (!AreIdentifiedInvasiveControlCandidatesValid(
+            candidates)) {
+        throw std::invalid_argument(
+            "identified invasive-control candidates are invalid");
+    }
+
+    std::vector<eco_restoration::InvasiveControlCandidate>
+        extracted;
+    extracted.reserve(candidates.size());
+
+    for (const auto& identified : candidates) {
+        extracted.push_back(identified.candidate);
+    }
+
+    return extracted;
+}
+
+std::optional<IdentifiedInvasiveControlCandidate>
+FindIdentifiedInvasiveControlCandidate(
+    const std::vector<IdentifiedInvasiveControlCandidate>&
+        candidates,
+    std::string_view id) {
+    const auto iterator = std::find_if(
+        candidates.begin(),
+        candidates.end(),
+        [id](const IdentifiedInvasiveControlCandidate& candidate) {
+            return candidate.id == id;
+        });
+
+    if (iterator == candidates.end()) {
+        return std::nullopt;
+    }
+
+    return *iterator;
+}
+
+IdentifiedInvasiveControlSelection
+SelectIdentifiedSafeInvasiveControl(
+    const eco_restoration::StochasticPopulationModel& model,
+    const std::vector<IdentifiedInvasiveControlCandidate>&
+        candidates) {
+    ValidateStochasticPopulationModel(model);
+
+    IdentifiedInvasiveControlSelection selection;
+    selection.decision = MakeInvasiveControlFallback(model);
+
+    if (!AreIdentifiedInvasiveControlCandidatesValid(
+            candidates)) {
+        selection.reasons.emplace_back(
+            "identified invasive-control candidates are invalid or empty");
+        return selection;
+    }
+
+    const std::vector<eco_restoration::InvasiveControlCandidate>
+        raw_candidates =
+            ExtractInvasiveControlCandidates(candidates);
+
+    const SafeInvasiveControlSelectionResult wrapped =
+        SelectSafeInvasiveControlWrapper(model, raw_candidates);
+
+    if (!wrapped.selected) {
+        selection.reasons = wrapped.failure_reasons;
+        if (selection.reasons.empty()) {
+            selection.reasons.emplace_back(
+                "no safe invasive-control candidate was selected");
+        }
+        return selection;
+    }
+
+    std::optional<std::string> selected_id;
+
+    for (std::size_t index = 0U;
+         index < candidates.size();
+         ++index) {
+        const auto& candidate = candidates[index].candidate;
+
+        if (candidate.treatment_intensity ==
+                wrapped.decision.treatment_intensity &&
+            candidate.treatment_cost ==
+                raw_candidates[index].treatment_cost &&
+            candidate.expected_benefit ==
+                raw_candidates[index].expected_benefit &&
+            candidate.risk_of_harm ==
+                raw_candidates[index].risk_of_harm) {
+            selected_id = candidates[index].id;
+            break;
+        }
+    }
+
+    if (!selected_id.has_value()) {
+        selection.reasons.emplace_back(
+            "selected invasive-control decision did not map to a candidate identity");
+        return selection;
+    }
+
+    selection.selected_id = *selected_id;
+    selection.decision = wrapped.decision;
+    selection.selected = true;
+    return selection;
+}
+
+bool IsIdentifiedInvasiveControlSelectionValid(
+    const IdentifiedInvasiveControlSelection& selection) {
+    if (selection.selected) {
+        return IsStableKey(selection.selected_id) &&
+               selection.decision.safe &&
+               selection.reasons.empty();
+    }
+
+    return selection.selected_id.empty() &&
+           !selection.decision.safe &&
+           !selection.reasons.empty();
+}
+
+std::string ExplainIdentifiedInvasiveControlSelection(
+    const IdentifiedInvasiveControlSelection& selection) {
+    if (!IsIdentifiedInvasiveControlSelectionValid(selection)) {
+        throw std::invalid_argument(
+            "identified invasive-control selection is invalid");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << std::fixed << std::setprecision(6);
+
+    output << "identified_invasive_control_selection\n";
+    output << "selected="
+           << (selection.selected ? "true" : "false")
+           << '\n';
+    output << "selected_id="
+           << (selection.selected
+                   ? selection.selected_id
+                   : std::string("none"))
+           << '\n';
+    output << "decision_safe="
+           << (selection.decision.safe ? "true" : "false")
+           << '\n';
+    output << "treatment_intensity="
+           << selection.decision.treatment_intensity
+           << '\n';
+    output << "failure_count="
+           << selection.reasons.size()
+           << '\n';
+
+    for (std::size_t index = 0U;
+         index < selection.reasons.size();
+         ++index) {
+        output << "failure_" << index << '='
+               << selection.reasons[index] << '\n';
+    }
+
+    return output.str();
+}
+
+bool IdentifiedInvasiveControlCandidateSelfTest() {
+    const auto model =
+        MakeStochasticPopulationModel();
+
+    const std::vector<IdentifiedInvasiveControlCandidate>
+        candidates{
+            {
+                "low_intensity",
+                {0.30, 10.0, 15.0, 0.20}
+            },
+            {
+                "medium_intensity",
+                {0.50, 20.0, 24.0, 0.25}
+            },
+            {
+                "unsafe_candidate",
+                {0.80, 12.0, 10.0, 0.34}
+            }
+        };
+
+    if (!AreIdentifiedInvasiveControlCandidatesValid(
+            candidates) ||
+        !FindIdentifiedInvasiveControlCandidate(
+            candidates,
+            "low_intensity").has_value() ||
+        FindIdentifiedInvasiveControlCandidate(
+            candidates,
+            "missing_candidate").has_value()) {
+        return false;
+    }
+
+    const IdentifiedInvasiveControlSelection selection =
+        SelectIdentifiedSafeInvasiveControl(
+            model,
+            candidates);
+
+    if (!selection.selected ||
+        selection.selected_id != "low_intensity" ||
+        !selection.decision.safe ||
+        !selection.reasons.empty() ||
+        !IsIdentifiedInvasiveControlSelectionValid(
+            selection)) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainIdentifiedInvasiveControlSelection(selection);
+
+    if (explanation.find(
+            "identified_invasive_control_selection") ==
+            std::string::npos ||
+        explanation.find("selected=true") ==
+            std::string::npos ||
+        explanation.find("selected_id=low_intensity") ==
+            std::string::npos ||
+        explanation.find("decision_safe=true") ==
+            std::string::npos) {
+        return false;
+    }
+
+    auto duplicate_id_candidates = candidates;
+    duplicate_id_candidates[1].id = "low_intensity";
+
+    if (AreIdentifiedInvasiveControlCandidatesValid(
+            duplicate_id_candidates)) {
+        return false;
+    }
+
+    auto invalid_id_candidates = candidates;
+    invalid_id_candidates[0].id = "Invalid-Identifier";
+
+    if (AreIdentifiedInvasiveControlCandidatesValid(
+            invalid_id_candidates)) {
+        return false;
+    }
+
+    const std::vector<IdentifiedInvasiveControlCandidate>
+        unsafe_candidates{
+            {
+                "benefit_failure",
+                {0.20, 12.0, 10.0, 0.20}
+            },
+            {
+                "risk_failure",
+                {0.30, 10.0, 12.0, 0.31}
+            }
+        };
+
+    const IdentifiedInvasiveControlSelection fallback =
+        SelectIdentifiedSafeInvasiveControl(
+            model,
+            unsafe_candidates);
+
+    if (fallback.selected ||
+        !fallback.selected_id.empty() ||
+        fallback.decision.safe ||
+        fallback.reasons.empty() ||
+        !IsIdentifiedInvasiveControlSelectionValid(
+            fallback)) {
+        return false;
+    }
+
+    const double near_low_intensity =
+        std::nextafter(0.30, 1.0);
+
+    if (near_low_intensity == candidates[0]
+            .candidate.treatment_intensity) {
+        return false;
+    }
+
+    const auto low =
+        FindIdentifiedInvasiveControlCandidate(
+            candidates,
+            "low_intensity");
+
+    if (!low.has_value() ||
+        low->id != "low_intensity" ||
+        low->candidate.treatment_intensity != 0.30) {
+        return false;
+    }
+
+    return true;
+}
+
+}
+
+namespace prometheus_praxis_foundation_extensions {
+
+struct InvasiveTreatmentCostBenefitAudit {
+    std::string candidate_id;
+    bool structurally_valid{};
+    bool benefit_covers_cost{};
+    bool risk_within_corridor{};
+    bool next_state_nonnegative{};
+    bool safe{};
+    double treatment_intensity{};
+    double treatment_cost{};
+    double expected_benefit{};
+    double benefit_cost_ratio{};
+    double risk_of_harm{};
+    double risk_margin{};
+    double expected_next_abundance{};
+    double abundance_change{};
+    std::vector<std::string> reasons;
+};
+
+bool IsInvasiveTreatmentCostBenefitAuditValid(
+    const InvasiveTreatmentCostBenefitAudit& audit) {
+    if (!IsStableKey(audit.candidate_id) ||
+        !std::isfinite(audit.treatment_intensity) ||
+        !std::isfinite(audit.treatment_cost) ||
+        !std::isfinite(audit.expected_benefit) ||
+        !std::isfinite(audit.benefit_cost_ratio) ||
+        !std::isfinite(audit.risk_of_harm) ||
+        !std::isfinite(audit.risk_margin) ||
+        !std::isfinite(audit.expected_next_abundance) ||
+        !std::isfinite(audit.abundance_change)) {
+        return false;
+    }
+
+    if (audit.safe != audit.reasons.empty()) {
+        return false;
+    }
+
+    if (audit.safe) {
+        return audit.structurally_valid &&
+               audit.benefit_covers_cost &&
+               audit.risk_within_corridor &&
+               audit.next_state_nonnegative;
+    }
+
+    return !audit.reasons.empty();
+}
+
+void AddInvasiveTreatmentCostBenefitReason(
+    InvasiveTreatmentCostBenefitAudit& audit,
+    bool condition,
+    std::string_view reason) {
+    if (!condition) {
+        audit.reasons.emplace_back(reason);
+    }
+}
+
+double InvasiveTreatmentBenefitCostRatio(
+    const eco_restoration::InvasiveControlCandidate& candidate) {
+    ValidateInvasiveControlCandidate(candidate);
+
+    if (candidate.treatment_cost == 0.0) {
+        return candidate.expected_benefit == 0.0
+            ? 1.0
+            : std::numeric_limits<double>::infinity();
+    }
+
+    return candidate.expected_benefit /
+           candidate.treatment_cost;
+}
+
+double InvasiveTreatmentRiskMargin(
+    const eco_restoration::InvasiveControlCandidate& candidate) {
+    ValidateInvasiveControlCandidate(candidate);
+    return 0.30 - candidate.risk_of_harm;
+}
+
+InvasiveTreatmentCostBenefitAudit
+AuditInvasiveTreatmentCostBenefit(
+    const eco_restoration::StochasticPopulationModel& model,
+    std::string_view candidate_id,
+    const eco_restoration::InvasiveControlCandidate& candidate) {
+    InvasiveTreatmentCostBenefitAudit audit;
+    audit.candidate_id = std::string(candidate_id);
+    audit.treatment_intensity = candidate.treatment_intensity;
+    audit.treatment_cost = candidate.treatment_cost;
+    audit.expected_benefit = candidate.expected_benefit;
+    audit.risk_of_harm = candidate.risk_of_harm;
+
+    audit.structurally_valid =
+        IsStableKey(candidate_id) &&
+        IsStochasticPopulationModelValid(model) &&
+        IsInvasiveControlCandidateValid(candidate);
+
+    AddInvasiveTreatmentCostBenefitReason(
+        audit,
+        IsStableKey(candidate_id),
+        "candidate identity must be lower_snake_case");
+
+    AddInvasiveTreatmentCostBenefitReason(
+        audit,
+        IsStochasticPopulationModelValid(model),
+        "stochastic population model is invalid");
+
+    AddInvasiveTreatmentCostBenefitReason(
+        audit,
+        IsInvasiveControlCandidateValid(candidate),
+        "invasive-control candidate is invalid");
+
+    if (!audit.structurally_valid) {
+        audit.benefit_cost_ratio = 0.0;
+        audit.risk_margin = 0.0;
+        audit.expected_next_abundance = 0.0;
+        audit.abundance_change = 0.0;
+        audit.safe = false;
+        return audit;
+    }
+
+    audit.benefit_cost_ratio =
+        InvasiveTreatmentBenefitCostRatio(candidate);
+
+    audit.risk_margin =
+        InvasiveTreatmentRiskMargin(candidate);
+
+    audit.expected_next_abundance =
+        ExpectedPopulationAfterTreatment(model, candidate);
+
+    audit.abundance_change =
+        audit.expected_next_abundance -
+        model.current_abundance;
+
+    audit.benefit_covers_cost =
+        candidate.expected_benefit >=
+        candidate.treatment_cost;
+
+    audit.risk_within_corridor =
+        candidate.risk_of_harm <= 0.30;
+
+    audit.next_state_nonnegative =
+        audit.expected_next_abundance >= 0.0;
+
+    AddInvasiveTreatmentCostBenefitReason(
+        audit,
+        audit.benefit_covers_cost,
+        "expected benefit does not cover treatment cost");
+
+    AddInvasiveTreatmentCostBenefitReason(
+        audit,
+        audit.risk_within_corridor,
+        "risk of harm exceeds the 0.30 safety corridor");
+
+    AddInvasiveTreatmentCostBenefitReason(
+        audit,
+        audit.next_state_nonnegative,
+        "expected next abundance is below zero");
+
+    audit.safe = audit.reasons.empty();
+    return audit;
+}
+
+std::string ExplainInvasiveTreatmentCostBenefitAudit(
+    const InvasiveTreatmentCostBenefitAudit& audit) {
+    if (!IsInvasiveTreatmentCostBenefitAuditValid(audit)) {
+        throw std::invalid_argument(
+            "invasive treatment cost benefit audit is invalid");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << std::fixed << std::setprecision(6);
+
+    output << "invasive_treatment_cost_benefit_audit\n";
+    output << "candidate_id=" << audit.candidate_id << '\n';
+    output << "structurally_valid="
+           << (audit.structurally_valid ? "true" : "false")
+           << '\n';
+    output << "benefit_covers_cost="
+           << (audit.benefit_covers_cost ? "true" : "false")
+           << '\n';
+    output << "risk_within_corridor="
+           << (audit.risk_within_corridor ? "true" : "false")
+           << '\n';
+    output << "next_state_nonnegative="
+           << (audit.next_state_nonnegative ? "true" : "false")
+           << '\n';
+    output << "safe="
+           << (audit.safe ? "true" : "false")
+           << '\n';
+    output << "treatment_intensity="
+           << audit.treatment_intensity << '\n';
+    output << "treatment_cost="
+           << audit.treatment_cost << '\n';
+    output << "expected_benefit="
+           << audit.expected_benefit << '\n';
+    output << "benefit_cost_ratio="
+           << audit.benefit_cost_ratio << '\n';
+    output << "risk_of_harm="
+           << audit.risk_of_harm << '\n';
+    output << "risk_margin="
+           << audit.risk_margin << '\n';
+    output << "expected_next_abundance="
+           << audit.expected_next_abundance << '\n';
+    output << "abundance_change="
+           << audit.abundance_change << '\n';
+    output << "reason_count="
+           << audit.reasons.size() << '\n';
+
+    for (std::size_t index = 0U;
+         index < audit.reasons.size();
+         ++index) {
+        output << "reason_" << index << '='
+               << audit.reasons[index] << '\n';
+    }
+
+    return output.str();
+}
+
+bool InvasiveTreatmentCostBenefitAuditSelfTest() {
+    const eco_restoration::StochasticPopulationModel model =
+        MakeStochasticPopulationModel();
+
+    const eco_restoration::InvasiveControlCandidate safe_candidate{
+        0.30,
+        10.0,
+        15.0,
+        0.20
+    };
+
+    const InvasiveTreatmentCostBenefitAudit safe_audit =
+        AuditInvasiveTreatmentCostBenefit(
+            model,
+            "safe_candidate",
+            safe_candidate);
+
+    if (!safe_audit.structurally_valid ||
+        !safe_audit.benefit_covers_cost ||
+        !safe_audit.risk_within_corridor ||
+        !safe_audit.next_state_nonnegative ||
+        !safe_audit.safe ||
+        !safe_audit.reasons.empty() ||
+        std::abs(safe_audit.benefit_cost_ratio - 1.5) >
+            1e-12 ||
+        std::abs(safe_audit.risk_margin - 0.10) >
+            1e-12 ||
+        std::abs(safe_audit.expected_next_abundance - 102.0) >
+            1e-12 ||
+        std::abs(safe_audit.abundance_change - 2.0) >
+            1e-12 ||
+        !IsInvasiveTreatmentCostBenefitAuditValid(safe_audit)) {
+        return false;
+    }
+
+    const std::string safe_explanation =
+        ExplainInvasiveTreatmentCostBenefitAudit(safe_audit);
+
+    if (safe_explanation.find(
+            "invasive_treatment_cost_benefit_audit") ==
+            std::string::npos ||
+        safe_explanation.find(
+            "candidate_id=safe_candidate") ==
+            std::string::npos ||
+        safe_explanation.find("benefit_cost_ratio=1.500000") ==
+            std::string::npos ||
+        safe_explanation.find("risk_margin=0.100000") ==
+            std::string::npos ||
+        safe_explanation.find("safe=true") ==
+            std::string::npos) {
+        return false;
+    }
+
+    const eco_restoration::InvasiveControlCandidate unsafe_candidate{
+        0.80,
+        12.0,
+        10.0,
+        0.34
+    };
+
+    const InvasiveTreatmentCostBenefitAudit unsafe_audit =
+        AuditInvasiveTreatmentCostBenefit(
+            model,
+            "unsafe_candidate",
+            unsafe_candidate);
+
+    if (!unsafe_audit.structurally_valid ||
+        unsafe_audit.benefit_covers_cost ||
+        unsafe_audit.risk_within_corridor ||
+        !unsafe_audit.next_state_nonnegative ||
+        unsafe_audit.safe ||
+        unsafe_audit.reasons.size() != 2U ||
+        std::abs(unsafe_audit.benefit_cost_ratio -
+                 (10.0 / 12.0)) > 1e-12 ||
+        std::abs(unsafe_audit.risk_margin + 0.04) >
+            1e-12) {
+        return false;
+    }
+
+    if (std::find(
+            unsafe_audit.reasons.begin(),
+            unsafe_audit.reasons.end(),
+            "expected benefit does not cover treatment cost") ==
+            unsafe_audit.reasons.end() ||
+        std::find(
+            unsafe_audit.reasons.begin(),
+            unsafe_audit.reasons.end(),
+            "risk of harm exceeds the 0.30 safety corridor") ==
+            unsafe_audit.reasons.end()) {
+        return false;
+    }
+
+    const eco_restoration::InvasiveControlCandidate zero_cost{
+        0.0,
+        0.0,
+        1.0,
+        0.10
+    };
+
+    if (!std::isinf(
+            InvasiveTreatmentBenefitCostRatio(zero_cost))) {
+        return false;
+    }
+
+    const InvasiveTreatmentCostBenefitAudit invalid_id_audit =
+        AuditInvasiveTreatmentCostBenefit(
+            model,
+            "Invalid-Candidate",
+            safe_candidate);
+
+    if (invalid_id_audit.structurally_valid ||
+        invalid_id_audit.safe ||
+        invalid_id_audit.reasons.empty() ||
+        !IsInvasiveTreatmentCostBenefitAuditValid(
+            invalid_id_audit)) {
+        return false;
+    }
+
+    return true;
+}
+
+}
+
+namespace prometheus_praxis_foundation_extensions {
+
+struct IrrigationDryRunStep {
+    std::size_t scenario_index{};
+    std::size_t horizon_index{};
+    double planned_irrigation{};
+    double rainfall{};
+    double moisture_before{};
+    double moisture_after{};
+    bool within_bounds{};
+};
+
+struct IrrigationDryRunResult {
+    bool valid{};
+    bool robustly_feasible{};
+    std::vector<IrrigationDryRunStep> steps;
+    std::vector<std::string> reasons;
+};
+
+bool IsIrrigationDryRunStepValid(
+    const IrrigationDryRunStep& step) {
+    return std::isfinite(step.planned_irrigation) &&
+           std::isfinite(step.rainfall) &&
+           std::isfinite(step.moisture_before) &&
+           std::isfinite(step.moisture_after) &&
+           step.planned_irrigation >= 0.0 &&
+           step.rainfall >= 0.0;
+}
+
+bool IsIrrigationDryRunResultValid(
+    const IrrigationDryRunResult& result) {
+    if (result.valid != result.reasons.empty()) {
+        return false;
+    }
+
+    if (!result.valid) {
+        return !result.reasons.empty();
+    }
+
+    for (const auto& step : result.steps) {
+        if (!IsIrrigationDryRunStepValid(step)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void AddIrrigationDryRunReason(
+    IrrigationDryRunResult& result,
+    bool condition,
+    std::string_view reason) {
+    if (!condition) {
+        result.reasons.emplace_back(reason);
+    }
+}
+
+double ComputeIrrigationDryRunMoistureAfter(
+    double moisture_before,
+    double planned_irrigation,
+    double rainfall,
+    const eco_restoration::IrrigationDynamics& dynamics) {
+    if (!std::isfinite(moisture_before) ||
+        !std::isfinite(planned_irrigation) ||
+        !std::isfinite(rainfall) ||
+        planned_irrigation < 0.0 ||
+        rainfall < 0.0) {
+        throw std::invalid_argument(
+            "irrigation dry-run moisture inputs are invalid");
+    }
+
+    const double effective_irrigation =
+        planned_irrigation * (1.0 - dynamics.evapotranspiration_ratio);
+
+    const double effective_rainfall =
+        rainfall * (1.0 - dynamics.evapotranspiration_ratio);
+
+    const double depletion =
+        dynamics.crop_water_demand +
+        dynamics.soil_drainage_rate * moisture_before;
+
+    const double moisture_after =
+        moisture_before +
+        effective_irrigation +
+        effective_rainfall -
+        depletion;
+
+    if (!std::isfinite(moisture_after)) {
+        throw std::runtime_error(
+            "irrigation dry-run moisture result is nonfinite");
+    }
+
+    return moisture_after;
+}
+
+IrrigationDryRunResult VisualizeIrrigationScheduleDryRun(
+    const std::vector<double>& schedule,
+    const std::vector<eco_restoration::RainfallScenario>& scenarios,
+    const eco_restoration::IrrigationDynamics& dynamics) {
+    IrrigationDryRunResult result;
+
+    AddIrrigationDryRunReason(
+        result,
+        !schedule.empty(),
+        "irrigation schedule must not be empty");
+
+    AddIrrigationDryRunReason(
+        result,
+        !scenarios.empty(),
+        "rainfall scenario collection must not be empty");
+
+    for (const double irrigation : schedule) {
+        AddIrrigationDryRunReason(
+            result,
+            std::isfinite(irrigation) && irrigation >= 0.0,
+            "irrigation schedule contains invalid value");
+    }
+
+    if (!result.reasons.empty()) {
+        result.valid = false;
+        return result;
+    }
+
+    for (std::size_t scenario_index = 0U;
+         scenario_index < scenarios.size();
+         ++scenario_index) {
+        const auto& scenario = scenarios[scenario_index];
+
+        AddIrrigationDryRunReason(
+            result,
+            std::isfinite(scenario.probability) &&
+                scenario.probability >= 0.0 &&
+                scenario.probability <= 1.0,
+            "rainfall scenario probability is invalid");
+
+        AddIrrigationDryRunReason(
+            result,
+            scenario.rainfall_mm.size() == schedule.size(),
+            "rainfall scenario horizon does not match schedule");
+
+        for (const double rainfall : scenario.rainfall_mm) {
+            AddIrrigationDryRunReason(
+                result,
+                std::isfinite(rainfall) && rainfall >= 0.0,
+                "rainfall scenario contains invalid value");
+        }
+    }
+
+    if (!result.reasons.empty()) {
+        result.valid = false;
+        return result;
+    }
+
+    for (std::size_t scenario_index = 0U;
+         scenario_index < scenarios.size();
+         ++scenario_index) {
+        const auto& scenario = scenarios[scenario_index];
+        double moisture = dynamics.initial_moisture;
+
+        for (std::size_t horizon_index = 0U;
+             horizon_index < schedule.size();
+             ++horizon_index) {
+            const double moisture_after =
+                ComputeIrrigationDryRunMoistureAfter(
+                    moisture,
+                    schedule[horizon_index],
+                    scenario.rainfall_mm[horizon_index],
+                    dynamics);
+
+            const bool within_bounds =
+                moisture_after >= dynamics.minimum_moisture &&
+                moisture_after <= dynamics.maximum_moisture;
+
+            result.steps.push_back({
+                scenario_index,
+                horizon_index,
+                schedule[horizon_index],
+                scenario.rainfall_mm[horizon_index],
+                moisture,
+                moisture_after,
+                within_bounds
+            });
+
+            moisture = moisture_after;
+        }
+    }
+
+    result.robustly_feasible = std::all_of(
+        result.steps.begin(),
+        result.steps.end(),
+        [](const IrrigationDryRunStep& step) {
+            return step.within_bounds;
+        });
+
+    result.valid = result.reasons.empty();
+    return result;
+}
+
+std::string ExplainIrrigationScheduleDryRun(
+    const IrrigationDryRunResult& result) {
+    if (!IsIrrigationDryRunResultValid(result)) {
+        throw std::invalid_argument(
+            "irrigation dry-run result is invalid");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << std::fixed << std::setprecision(6);
+
+    output << "irrigation_schedule_dry_run\n";
+    output << "valid=" << (result.valid ? "true" : "false")
+           << '\n';
+    output << "robustly_feasible="
+           << (result.robustly_feasible ? "true" : "false")
+           << '\n';
+    output << "step_count=" << result.steps.size() << '\n';
+    output << "reason_count=" << result.reasons.size() << '\n';
+
+    for (const auto& step : result.steps) {
+        const std::string line =
+            "scenario=" + std::to_string(step.scenario_index) +
+            " horizon=" + std::to_string(step.horizon_index) +
+            " irrigation=" + FormatNumericFixed(
+                step.planned_irrigation) +
+            " rainfall=" + FormatNumericFixed(step.rainfall) +
+            " before=" + FormatNumericFixed(step.moisture_before) +
+            " after=" + FormatNumericFixed(step.moisture_after) +
+            " within_bounds=" +
+            (step.within_bounds ? "true" : "false");
+
+        if (!IsUsageLineWidthValid(line, 119U)) {
+            throw std::length_error(
+                "irrigation dry-run line exceeds width limit");
+        }
+
+        output << line << '\n';
+    }
+
+    for (std::size_t index = 0U;
+         index < result.reasons.size();
+         ++index) {
+        output << "reason_" << index << '='
+               << result.reasons[index] << '\n';
+    }
+
+    return output.str();
+}
+
+bool IrrigationScheduleDryRunVisualizerSelfTest() {
+    const eco_restoration::IrrigationDynamics dynamics{
+        15.0,
+        3.0,
+        0.10,
+        10.0,
+        30.0,
+        12.0,
+        25.0,
+        8.0,
+        0.10,
+        0.50
+    };
+
+    const std::vector<double> schedule{
+        12.0,
+        12.0,
+        12.0
+    };
+
+    const std::vector<eco_restoration::RainfallScenario> scenarios{
+        {0.60, {2.0, 1.0, 3.0}},
+        {0.40, {0.0, 0.0, 1.0}}
+    };
+
+    const IrrigationDryRunResult result =
+        VisualizeIrrigationScheduleDryRun(
+            schedule,
+            scenarios,
+            dynamics);
+
+    if (!result.valid ||
+        result.steps.size() != 6U ||
+        result.reasons.size() != 0U ||
+        !IsIrrigationDryRunResultValid(result) ||
+        result.steps.front().scenario_index != 0U ||
+        result.steps.front().horizon_index != 0U ||
+        std::abs(
+            result.steps.front().moisture_before - 15.0) >
+            1e-12 ||
+        !std::isfinite(
+            result.steps.front().moisture_after)) {
+        return false;
+    }
+
+    for (const auto& step : result.steps) {
+        if (!IsIrrigationDryRunStepValid(step)) {
+            return false;
+        }
+    }
+
+    const std::string explanation =
+        ExplainIrrigationScheduleDryRun(result);
+
+    if (explanation.find(
+            "irrigation_schedule_dry_run") ==
+            std::string::npos ||
+        explanation.find("valid=true") ==
+            std::string::npos ||
+        explanation.find("step_count=6") ==
+            std::string::npos ||
+        explanation.find("scenario=0 horizon=0") ==
+            std::string::npos ||
+        !IsUsageLineWidthValid(explanation, 119U)) {
+        return false;
+    }
+
+    const std::vector<eco_restoration::RainfallScenario>
+        malformed_scenarios{
+            {1.0, {1.0, 2.0}}
+        };
+
+    const IrrigationDryRunResult malformed =
+        VisualizeIrrigationScheduleDryRun(
+            schedule,
+            malformed_scenarios,
+            dynamics);
+
+    if (malformed.valid ||
+        malformed.reasons.empty() ||
+        !IsIrrigationDryRunResultValid(malformed)) {
+        return false;
+    }
+
+    const IrrigationDryRunResult empty =
+        VisualizeIrrigationScheduleDryRun(
+            {},
+            scenarios,
+            dynamics);
+
+    return !empty.valid &&
+           !empty.reasons.empty() &&
+           IsIrrigationDryRunResultValid(empty);
+}
+
+}
+
+namespace prometheus_praxis_foundation_extensions {
+
+struct TerminalMoistureScenarioResult {
+    std::size_t scenario_index{};
+    double probability{};
+    double terminal_moisture{};
+    bool within_bounds{};
+};
+
+struct TerminalMoistureSetAnalysis {
+    bool valid{};
+    bool all_within_bounds{};
+    std::size_t worst_case_scenario_index{};
+    double worst_case_terminal_moisture{};
+    double minimum_terminal_moisture{};
+    double maximum_terminal_moisture{};
+    std::vector<TerminalMoistureScenarioResult> scenarios;
+    std::vector<std::string> reasons;
+};
+
+bool IsTerminalMoistureScenarioResultValid(
+    const TerminalMoistureScenarioResult& result) {
+    return std::isfinite(result.probability) &&
+           result.probability >= 0.0 &&
+           result.probability <= 1.0 &&
+           std::isfinite(result.terminal_moisture);
+}
+
+bool IsTerminalMoistureSetAnalysisValid(
+    const TerminalMoistureSetAnalysis& analysis) {
+    if (analysis.valid != analysis.reasons.empty()) {
+        return false;
+    }
+
+    if (!analysis.valid) {
+        return !analysis.reasons.empty();
+    }
+
+    if (analysis.scenarios.empty() ||
+        !std::isfinite(analysis.worst_case_terminal_moisture) ||
+        !std::isfinite(analysis.minimum_terminal_moisture) ||
+        !std::isfinite(analysis.maximum_terminal_moisture) ||
+        analysis.minimum_terminal_moisture >
+            analysis.maximum_terminal_moisture ||
+        analysis.worst_case_scenario_index >=
+            analysis.scenarios.size()) {
+        return false;
+    }
+
+    bool observed_all_within_bounds = true;
+    double observed_minimum =
+        analysis.scenarios.front().terminal_moisture;
+    double observed_maximum =
+        analysis.scenarios.front().terminal_moisture;
+
+    for (const auto& scenario : analysis.scenarios) {
+        if (!IsTerminalMoistureScenarioResultValid(scenario)) {
+            return false;
+        }
+
+        observed_all_within_bounds =
+            observed_all_within_bounds &&
+            scenario.within_bounds;
+
+        observed_minimum = std::min(
+            observed_minimum,
+            scenario.terminal_moisture);
+
+        observed_maximum = std::max(
+            observed_maximum,
+            scenario.terminal_moisture);
+    }
+
+    return analysis.all_within_bounds ==
+               observed_all_within_bounds &&
+           std::abs(
+               analysis.minimum_terminal_moisture -
+               observed_minimum) <= 1e-12 &&
+           std::abs(
+               analysis.maximum_terminal_moisture -
+               observed_maximum) <= 1e-12 &&
+           std::abs(
+               analysis.worst_case_terminal_moisture -
+               observed_minimum) <= 1e-12;
+}
+
+void AddTerminalMoistureAnalysisReason(
+    TerminalMoistureSetAnalysis& analysis,
+    bool condition,
+    std::string_view reason) {
+    if (!condition) {
+        analysis.reasons.emplace_back(reason);
+    }
+}
+
+TerminalMoistureSetAnalysis AnalyzeTerminalMoistureSet(
+    const std::vector<double>& schedule,
+    const std::vector<eco_restoration::RainfallScenario>& scenarios,
+    const eco_restoration::IrrigationDynamics& dynamics) {
+    TerminalMoistureSetAnalysis analysis;
+
+    const IrrigationDryRunResult dry_run =
+        VisualizeIrrigationScheduleDryRun(
+            schedule,
+            scenarios,
+            dynamics);
+
+    AddTerminalMoistureAnalysisReason(
+        analysis,
+        dry_run.valid,
+        "irrigation dry-run input validation failed");
+
+    if (!dry_run.valid) {
+        analysis.reasons.insert(
+            analysis.reasons.end(),
+            dry_run.reasons.begin(),
+            dry_run.reasons.end());
+
+        analysis.valid = false;
+        return analysis;
+    }
+
+    AddTerminalMoistureAnalysisReason(
+        analysis,
+        !schedule.empty(),
+        "irrigation schedule must not be empty");
+
+    AddTerminalMoistureAnalysisReason(
+        analysis,
+        !scenarios.empty(),
+        "rainfall scenario collection must not be empty");
+
+    if (!analysis.reasons.empty()) {
+        analysis.valid = false;
+        return analysis;
+    }
+
+    for (std::size_t scenario_index = 0U;
+         scenario_index < scenarios.size();
+         ++scenario_index) {
+        const std::size_t last_step_index =
+            scenario_index * schedule.size() +
+            (schedule.size() - 1U);
+
+        if (last_step_index >= dry_run.steps.size()) {
+            analysis.reasons.emplace_back(
+                "terminal moisture dry-run index is unavailable");
+            analysis.valid = false;
+            return analysis;
+        }
+
+        const double terminal_moisture =
+            dry_run.steps[last_step_index].moisture_after;
+
+        const bool within_bounds =
+            terminal_moisture >= dynamics.minimum_moisture &&
+            terminal_moisture <= dynamics.maximum_moisture;
+
+        analysis.scenarios.push_back({
+            scenario_index,
+            scenarios[scenario_index].probability,
+            terminal_moisture,
+            within_bounds
+        });
+    }
+
+    analysis.minimum_terminal_moisture =
+        analysis.scenarios.front().terminal_moisture;
+
+    analysis.maximum_terminal_moisture =
+        analysis.scenarios.front().terminal_moisture;
+
+    analysis.worst_case_scenario_index = 0U;
+    analysis.worst_case_terminal_moisture =
+        analysis.scenarios.front().terminal_moisture;
+
+    analysis.all_within_bounds = true;
+
+    for (const auto& scenario : analysis.scenarios) {
+        if (scenario.terminal_moisture <
+            analysis.minimum_terminal_moisture) {
+            analysis.minimum_terminal_moisture =
+                scenario.terminal_moisture;
+            analysis.worst_case_terminal_moisture =
+                scenario.terminal_moisture;
+            analysis.worst_case_scenario_index =
+                scenario.scenario_index;
+        }
+
+        analysis.maximum_terminal_moisture = std::max(
+            analysis.maximum_terminal_moisture,
+            scenario.terminal_moisture);
+
+        analysis.all_within_bounds =
+            analysis.all_within_bounds &&
+            scenario.within_bounds;
+    }
+
+    AddTerminalMoistureAnalysisReason(
+        analysis,
+        analysis.all_within_bounds,
+        "one or more terminal moisture values are outside permitted bounds");
+
+    analysis.valid = analysis.reasons.empty();
+    return analysis;
+}
+
+std::string ExplainTerminalMoistureSetAnalysis(
+    const TerminalMoistureSetAnalysis& analysis) {
+    if (!IsTerminalMoistureSetAnalysisValid(analysis)) {
+        throw std::invalid_argument(
+            "terminal moisture set analysis is invalid");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << std::fixed << std::setprecision(6);
+
+    output << "terminal_moisture_set_analysis\n";
+    output << "valid=" << (analysis.valid ? "true" : "false")
+           << '\n';
+    output << "all_within_bounds="
+           << (analysis.all_within_bounds ? "true" : "false")
+           << '\n';
+    output << "worst_case_scenario_index="
+           << analysis.worst_case_scenario_index << '\n';
+    output << "worst_case_terminal_moisture="
+           << analysis.worst_case_terminal_moisture << '\n';
+    output << "minimum_terminal_moisture="
+           << analysis.minimum_terminal_moisture << '\n';
+    output << "maximum_terminal_moisture="
+           << analysis.maximum_terminal_moisture << '\n';
+    output << "scenario_count="
+           << analysis.scenarios.size() << '\n';
+    output << "reason_count="
+           << analysis.reasons.size() << '\n';
+
+    for (const auto& scenario : analysis.scenarios) {
+        output << "scenario_" << scenario.scenario_index
+               << "_probability=" << scenario.probability << '\n';
+        output << "scenario_" << scenario.scenario_index
+               << "_terminal_moisture="
+               << scenario.terminal_moisture << '\n';
+        output << "scenario_" << scenario.scenario_index
+               << "_within_bounds="
+               << (scenario.within_bounds ? "true" : "false")
+               << '\n';
+    }
+
+    for (std::size_t index = 0U;
+         index < analysis.reasons.size();
+         ++index) {
+        output << "reason_" << index << '='
+               << analysis.reasons[index] << '\n';
+    }
+
+    return output.str();
+}
+
+bool TerminalMoistureSetAnalyzerSelfTest() {
+    const eco_restoration::IrrigationDynamics dynamics{
+        15.0,
+        3.0,
+        0.10,
+        10.0,
+        30.0,
+        12.0,
+        25.0,
+        8.0,
+        0.10,
+        0.50
+    };
+
+    const std::vector<eco_restoration::RainfallScenario> scenarios{
+        {0.60, {2.0, 1.0, 3.0}},
+        {0.40, {0.0, 0.0, 1.0}}
+    };
+
+    const std::vector<double> feasible_schedule{
+        20.0,
+        20.0,
+        20.0
+    };
+
+    const TerminalMoistureSetAnalysis feasible =
+        AnalyzeTerminalMoistureSet(
+            feasible_schedule,
+            scenarios,
+            dynamics);
+
+    if (!feasible.valid ||
+        !feasible.all_within_bounds ||
+        feasible.scenarios.size() != 2U ||
+        !IsTerminalMoistureSetAnalysisValid(feasible) ||
+        feasible.minimum_terminal_moisture <
+            dynamics.minimum_moisture ||
+        feasible.maximum_terminal_moisture >
+            dynamics.maximum_moisture) {
+        return false;
+    }
+
+    const std::string feasible_explanation =
+        ExplainTerminalMoistureSetAnalysis(feasible);
+
+    if (feasible_explanation.find(
+            "terminal_moisture_set_analysis") ==
+            std::string::npos ||
+        feasible_explanation.find("valid=true") ==
+            std::string::npos ||
+        feasible_explanation.find(
+            "all_within_bounds=true") ==
+            std::string::npos ||
+        feasible_explanation.find("scenario_count=2") ==
+            std::string::npos ||
+        feasible_explanation.find("reason_count=0") ==
+            std::string::npos) {
+        return false;
+    }
+
+    const std::vector<double> infeasible_schedule{
+        0.0,
+        0.0,
+        0.0
+    };
+
+    const TerminalMoistureSetAnalysis infeasible =
+        AnalyzeTerminalMoistureSet(
+            infeasible_schedule,
+            scenarios,
+            dynamics);
+
+    if (infeasible.valid ||
+        infeasible.all_within_bounds ||
+        infeasible.scenarios.size() != 2U ||
+        infeasible.reasons.size() != 1U ||
+        infeasible.reasons.front() !=
+            "one or more terminal moisture values are outside permitted bounds" ||
+        !IsTerminalMoistureSetAnalysisValid(infeasible)) {
+        return false;
+    }
+
+    if (infeasible.worst_case_scenario_index != 1U ||
+        infeasible.worst_case_terminal_moisture !=
+            infeasible.minimum_terminal_moisture) {
+        return false;
+    }
+
+    const TerminalMoistureSetAnalysis malformed =
+        AnalyzeTerminalMoistureSet(
+            {},
+            scenarios,
+            dynamics);
+
+    if (malformed.valid ||
+        malformed.reasons.empty() ||
+        !IsTerminalMoistureSetAnalysisValid(malformed)) {
+        return false;
+    }
+
+    return true;
+}
+
+}
+
+namespace prometheus_praxis_foundation_extensions {
+
+struct AuthorizationSequenceLedgerEntry {
+    std::uint64_t sequence{};
+    std::uint64_t issue_time_s{};
+    std::uint64_t expiry_time_s{};
+    std::string action_identifier;
+    std::string policy_identifier;
+    std::int32_t risk_of_harm_fixed{};
+};
+
+struct AuthorizationSequenceLedgerAudit {
+    bool valid{};
+    bool strictly_monotonic{};
+    bool contiguous{};
+    bool all_active_at_observation{};
+    std::vector<std::string> reasons;
+};
+
+bool IsAuthorizationSequenceLedgerEntryValid(
+    const AuthorizationSequenceLedgerEntry& entry) {
+    return entry.sequence > 0U &&
+           entry.issue_time_s <= entry.expiry_time_s &&
+           IsStableKey(entry.action_identifier) &&
+           IsStableKey(entry.policy_identifier) &&
+           entry.risk_of_harm_fixed >= 0 &&
+           entry.risk_of_harm_fixed <=
+               foundation_risk_fixed_scale;
+}
+
+AuthorizationSequenceLedgerEntry
+MakeAuthorizationSequenceLedgerEntry(
+    const eco_restoration::AuthorizationEvidence& evidence) {
+    return {
+        evidence.sequence,
+        evidence.issue_time_s,
+        evidence.expiry_time_s,
+        evidence.action_identifier,
+        evidence.policy_identifier,
+        evidence.risk_of_harm_fixed
+    };
+}
+
+class AuthorizationEvidenceSequenceLedger {
+public:
+    bool RecordAccepted(
+        const eco_restoration::AuthorizationEvidence& evidence) {
+        if (!evidence.externally_verified) {
+            return false;
+        }
+
+        const AuthorizationSequenceLedgerEntry entry =
+            MakeAuthorizationSequenceLedgerEntry(evidence);
+
+        if (!IsAuthorizationSequenceLedgerEntryValid(entry) ||
+            ContainsSequence(entry.sequence)) {
+            return false;
+        }
+
+        entries_.push_back(entry);
+        std::sort(
+            entries_.begin(),
+            entries_.end(),
+            [](const AuthorizationSequenceLedgerEntry& left,
+               const AuthorizationSequenceLedgerEntry& right) {
+                return left.sequence < right.sequence;
+            });
+
+        return true;
+    }
+
+    bool ContainsSequence(
+        std::uint64_t sequence) const {
+        return std::any_of(
+            entries_.begin(),
+            entries_.end(),
+            [sequence](
+                const AuthorizationSequenceLedgerEntry& entry) {
+                return entry.sequence == sequence;
+            });
+    }
+
+    std::optional<AuthorizationSequenceLedgerEntry> Latest() const {
+        if (entries_.empty()) {
+            return std::nullopt;
+        }
+
+        return entries_.back();
+    }
+
+    const std::vector<AuthorizationSequenceLedgerEntry>&
+    Entries() const noexcept {
+        return entries_;
+    }
+
+    std::size_t Size() const noexcept {
+        return entries_.size();
+    }
+
+    bool Empty() const noexcept {
+        return entries_.empty();
+    }
+
+    void Clear() {
+        entries_.clear();
+    }
+
+private:
+    std::vector<AuthorizationSequenceLedgerEntry> entries_;
+};
+
+void AddAuthorizationSequenceLedgerReason(
+    AuthorizationSequenceLedgerAudit& audit,
+    bool condition,
+    std::string_view reason) {
+    if (!condition) {
+        audit.reasons.emplace_back(reason);
+    }
+}
+
+AuthorizationSequenceLedgerAudit
+AuditAuthorizationEvidenceSequenceLedger(
+    const AuthorizationEvidenceSequenceLedger& ledger,
+    std::uint64_t observed_at_s) {
+    AuthorizationSequenceLedgerAudit audit;
+    const auto& entries = ledger.Entries();
+
+    AddAuthorizationSequenceLedgerReason(
+        audit,
+        !entries.empty(),
+        "authorization sequence ledger is empty");
+
+    if (entries.empty()) {
+        audit.valid = false;
+        return audit;
+    }
+
+    audit.strictly_monotonic = true;
+    audit.contiguous = true;
+    audit.all_active_at_observation = true;
+
+    for (std::size_t index = 0U;
+         index < entries.size();
+         ++index) {
+        const auto& entry = entries[index];
+
+        AddAuthorizationSequenceLedgerReason(
+            audit,
+            IsAuthorizationSequenceLedgerEntryValid(entry),
+            "authorization sequence ledger entry is invalid");
+
+        const bool active =
+            entry.issue_time_s <= observed_at_s &&
+            observed_at_s <= entry.expiry_time_s;
+
+        audit.all_active_at_observation =
+            audit.all_active_at_observation && active;
+
+        AddAuthorizationSequenceLedgerReason(
+            audit,
+            active,
+            "authorization sequence ledger contains inactive or expired evidence");
+
+        if (index > 0U) {
+            const auto& previous = entries[index - 1U];
+
+            const bool monotonic =
+                entry.sequence > previous.sequence;
+
+            const bool contiguous =
+                entry.sequence ==
+                previous.sequence + 1U;
+
+            audit.strictly_monotonic =
+                audit.strictly_monotonic && monotonic;
+
+            audit.contiguous =
+                audit.contiguous && contiguous;
+
+            AddAuthorizationSequenceLedgerReason(
+                audit,
+                monotonic,
+                "authorization sequence is not strictly monotonic");
+
+            AddAuthorizationSequenceLedgerReason(
+                audit,
+                contiguous,
+                "authorization sequence contains a gap");
+        }
+    }
+
+    audit.valid = audit.reasons.empty();
+    return audit;
+}
+
+bool IsAuthorizationSequenceLedgerAuditValid(
+    const AuthorizationSequenceLedgerAudit& audit) {
+    return audit.valid == audit.reasons.empty();
+}
+
+std::string ExplainAuthorizationEvidenceSequenceLedger(
+    const AuthorizationEvidenceSequenceLedger& ledger,
+    const AuthorizationSequenceLedgerAudit& audit) {
+    if (!IsAuthorizationSequenceLedgerAuditValid(audit)) {
+        throw std::invalid_argument(
+            "authorization sequence ledger audit is invalid");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+
+    output << "authorization_evidence_sequence_ledger\n";
+    output << "entry_count=" << ledger.Size() << '\n';
+    output << "valid=" << (audit.valid ? "true" : "false")
+           << '\n';
+    output << "strictly_monotonic="
+           << (audit.strictly_monotonic ? "true" : "false")
+           << '\n';
+    output << "contiguous="
+           << (audit.contiguous ? "true" : "false")
+           << '\n';
+    output << "all_active_at_observation="
+           << (audit.all_active_at_observation
+                   ? "true"
+                   : "false")
+           << '\n';
+    output << "reason_count=" << audit.reasons.size()
+           << '\n';
+
+    for (const auto& entry : ledger.Entries()) {
+        output << "sequence_" << entry.sequence
+               << "_policy=" << entry.policy_identifier
+               << '\n';
+        output << "sequence_" << entry.sequence
+               << "_action=" << entry.action_identifier
+               << '\n';
+        output << "sequence_" << entry.sequence
+               << "_issue_time_s=" << entry.issue_time_s
+               << '\n';
+        output << "sequence_" << entry.sequence
+               << "_expiry_time_s=" << entry.expiry_time_s
+               << '\n';
+        output << "sequence_" << entry.sequence
+               << "_risk_of_harm_fixed="
+               << entry.risk_of_harm_fixed << '\n';
+    }
+
+    for (std::size_t index = 0U;
+         index < audit.reasons.size();
+         ++index) {
+        output << "reason_" << index << '='
+               << audit.reasons[index] << '\n';
+    }
+
+    return output.str();
+}
+
+bool AuthorizationEvidenceSequenceLedgerSelfTest() {
+    constexpr std::uint64_t observed_at_s = 10'000U;
+
+    AuthorizationEvidenceSequenceLedger ledger;
+
+    if (!ledger.Empty() ||
+        ledger.Size() != 0U ||
+        ledger.Latest().has_value() ||
+        ledger.ContainsSequence(1U)) {
+        return false;
+    }
+
+    const auto first =
+        MakeValidAuthorizationEvidence(
+            "diagnostic_review",
+            "policy_eco_safe_v1",
+            observed_at_s,
+            1U,
+            200'000);
+
+    auto second =
+        MakeValidAuthorizationEvidence(
+            "diagnostic_review",
+            "policy_eco_safe_v1",
+            observed_at_s,
+            2U,
+            250'000);
+
+    second.issue_time_s = observed_at_s - 1U;
+    second.expiry_time_s = observed_at_s + 1U;
+
+    if (!ledger.RecordAccepted(first) ||
+        !ledger.RecordAccepted(second) ||
+        ledger.RecordAccepted(first) ||
+        ledger.Size() != 2U ||
+        !ledger.ContainsSequence(1U) ||
+        !ledger.ContainsSequence(2U) ||
+        ledger.ContainsSequence(3U)) {
+        return false;
+    }
+
+    const auto latest = ledger.Latest();
+
+    if (!latest.has_value() ||
+        latest->sequence != 2U ||
+        latest->risk_of_harm_fixed != 250'000) {
+        return false;
+    }
+
+    const AuthorizationSequenceLedgerAudit clean_audit =
+        AuditAuthorizationEvidenceSequenceLedger(
+            ledger,
+            observed_at_s);
+
+    if (!clean_audit.valid ||
+        !clean_audit.strictly_monotonic ||
+        !clean_audit.contiguous ||
+        !clean_audit.all_active_at_observation ||
+        !clean_audit.reasons.empty() ||
+        !IsAuthorizationSequenceLedgerAuditValid(clean_audit)) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainAuthorizationEvidenceSequenceLedger(
+            ledger,
+            clean_audit);
+
+    if (explanation.find(
+            "authorization_evidence_sequence_ledger") ==
+            std::string::npos ||
+        explanation.find("entry_count=2") ==
+            std::string::npos ||
+        explanation.find("valid=true") ==
+            std::string::npos ||
+        explanation.find("contiguous=true") ==
+            std::string::npos ||
+        explanation.find(
+            "sequence_2_risk_of_harm_fixed=250000") ==
+            std::string::npos) {
+        return false;
+    }
+
+    AuthorizationEvidenceSequenceLedger gap_ledger;
+
+    const auto gap_first =
+        MakeValidAuthorizationEvidence(
+            observed_at_s,
+            1U);
+
+    const auto gap_third =
+        MakeValidAuthorizationEvidence(
+            observed_at_s,
+            3U);
+
+    if (!gap_ledger.RecordAccepted(gap_first) ||
+        !gap_ledger.RecordAccepted(gap_third)) {
+        return false;
+    }
+
+    const AuthorizationSequenceLedgerAudit gap_audit =
+        AuditAuthorizationEvidenceSequenceLedger(
+            gap_ledger,
+            observed_at_s);
+
+    if (gap_audit.valid ||
+        !gap_audit.strictly_monotonic ||
+        gap_audit.contiguous ||
+        gap_audit.reasons.size() != 1U ||
+        gap_audit.reasons.front() !=
+            "authorization sequence contains a gap") {
+        return false;
+    }
+
+    AuthorizationEvidenceSequenceLedger expiry_ledger;
+    auto expired =
+        MakeValidAuthorizationEvidence(
+            observed_at_s,
+            1U);
+
+    expired.expiry_time_s = observed_at_s - 1U;
+
+    if (!expiry_ledger.RecordAccepted(expired)) {
+        return false;
+    }
+
+    const AuthorizationSequenceLedgerAudit expiry_audit =
+        AuditAuthorizationEvidenceSequenceLedger(
+            expiry_ledger,
+            observed_at_s);
+
+    if (expiry_audit.valid ||
+        expiry_audit.all_active_at_observation ||
+        expiry_audit.reasons.size() != 1U ||
+        expiry_audit.reasons.front() !=
+            "authorization sequence ledger contains inactive or expired evidence") {
+        return false;
+    }
+
+    auto unverified =
+        MakeValidAuthorizationEvidence(
+            observed_at_s,
+            4U);
+    unverified.externally_verified = false;
+
+    if (ledger.RecordAccepted(unverified) ||
+        ledger.Size() != 2U) {
+        return false;
+    }
+
+    ledger.Clear();
+
+    return ledger.Empty() &&
+           ledger.Size() == 0U &&
+           !ledger.Latest().has_value();
+}
+
+}
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+struct AuthorizationReplayRecord {
+    eco_restoration::AuthorizationEvidence evidence;
+    std::uint64_t observed_at_s{};
+};
+
+struct AuthorizationReplayResult {
+    std::size_t record_index{};
+    std::uint64_t sequence{};
+    bool accepted{};
+    std::string reason;
+};
+
+struct ProofCheckedDispatchReplay {
+    bool completed{};
+    bool all_expected_outcomes_match{};
+    std::size_t accepted_count{};
+    std::size_t rejected_count{};
+    std::vector<AuthorizationReplayResult> results;
+    std::vector<std::string> reasons;
+};
+
+bool IsAuthorizationReplayRecordValid(
+    const AuthorizationReplayRecord& record) {
+    const auto& evidence = record.evidence;
+
+    return !evidence.action_identifier.empty() &&
+           !evidence.policy_identifier.empty() &&
+           evidence.sequence > 0U &&
+           evidence.issue_time_s <= evidence.expiry_time_s &&
+           evidence.risk_of_harm_fixed >= 0 &&
+           evidence.risk_of_harm_fixed <=
+               eco_restoration::unit_interval_scale;
+}
+
+bool IsAuthorizationReplayResultValid(
+    const AuthorizationReplayResult& result) {
+    return result.sequence > 0U &&
+           !result.reason.empty() &&
+           result.reason.find_first_of("\r\n") ==
+               std::string::npos;
+}
+
+bool IsProofCheckedDispatchReplayValid(
+    const ProofCheckedDispatchReplay& replay) {
+    if (!replay.completed) {
+        return !replay.reasons.empty();
+    }
+
+    if (replay.results.empty() ||
+        replay.accepted_count + replay.rejected_count !=
+            replay.results.size()) {
+        return false;
+    }
+
+    std::size_t observed_accepted = 0U;
+    std::size_t observed_rejected = 0U;
+
+    for (std::size_t index = 0U;
+         index < replay.results.size();
+         ++index) {
+        const auto& result = replay.results[index];
+
+        if (!IsAuthorizationReplayResultValid(result) ||
+            result.record_index != index) {
+            return false;
+        }
+
+        if (result.accepted) {
+            ++observed_accepted;
+        } else {
+            ++observed_rejected;
+        }
+    }
+
+    return replay.accepted_count == observed_accepted &&
+           replay.rejected_count == observed_rejected;
+}
+
+std::string DescribeAuthorizationReplayOutcome(
+    const AuthorizationReplayRecord& record,
+    bool accepted) {
+    const auto& evidence = record.evidence;
+
+    if (accepted) {
+        return "accepted";
+    }
+
+    if (!evidence.externally_verified) {
+        return "rejected_unverified";
+    }
+
+    if (evidence.issue_time_s > record.observed_at_s) {
+        return "rejected_not_active";
+    }
+
+    if (record.observed_at_s > evidence.expiry_time_s) {
+        return "rejected_expired";
+    }
+
+    if (evidence.risk_of_harm_fixed >
+        eco_restoration::risk_of_harm_limit_fixed) {
+        return "rejected_risk_corridor";
+    }
+
+    return "rejected_policy_or_sequence";
+}
+
+ProofCheckedDispatchReplay ReplayProofCheckedDispatch(
+    std::string_view policy_identifier,
+    const std::vector<AuthorizationReplayRecord>& records) {
+    ProofCheckedDispatchReplay replay;
+
+    if (policy_identifier.empty()) {
+        replay.reasons.emplace_back(
+            "replay policy identifier must not be empty");
+        return replay;
+    }
+
+    if (records.empty()) {
+        replay.reasons.emplace_back(
+            "authorization replay record collection must not be empty");
+        return replay;
+    }
+
+    eco_restoration::ProofCheckedDispatcher dispatcher(
+        std::string(policy_identifier));
+
+    for (std::size_t index = 0U;
+         index < records.size();
+         ++index) {
+        const AuthorizationReplayRecord& record =
+            records[index];
+
+        if (!IsAuthorizationReplayRecordValid(record)) {
+            replay.reasons.emplace_back(
+                "authorization replay record is structurally invalid at index " +
+                std::to_string(index));
+
+            replay.results.push_back({
+                index,
+                record.evidence.sequence,
+                false,
+                "rejected_invalid_record"
+            });
+
+            ++replay.rejected_count;
+            continue;
+        }
+
+        const bool accepted =
+            dispatcher.accept(
+                record.evidence,
+                record.observed_at_s);
+
+        replay.results.push_back({
+            index,
+            record.evidence.sequence,
+            accepted,
+            DescribeAuthorizationReplayOutcome(
+                record,
+                accepted)
+        });
+
+        if (accepted) {
+            ++replay.accepted_count;
+        } else {
+            ++replay.rejected_count;
+        }
+    }
+
+    replay.completed = true;
+    replay.all_expected_outcomes_match =
+        replay.reasons.empty();
+
+    return replay;
+}
+
+std::string ExplainProofCheckedDispatchReplay(
+    const ProofCheckedDispatchReplay& replay) {
+    if (!IsProofCheckedDispatchReplayValid(replay)) {
+        throw std::invalid_argument(
+            "proof-checked dispatch replay is invalid");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+
+    output << "proof_checked_dispatch_replay\n";
+    output << "completed="
+           << (replay.completed ? "true" : "false")
+           << '\n';
+    output << "all_expected_outcomes_match="
+           << (replay.all_expected_outcomes_match
+                   ? "true"
+                   : "false")
+           << '\n';
+    output << "accepted_count="
+           << replay.accepted_count << '\n';
+    output << "rejected_count="
+           << replay.rejected_count << '\n';
+    output << "result_count="
+           << replay.results.size() << '\n';
+    output << "reason_count="
+           << replay.reasons.size() << '\n';
+
+    for (const auto& result : replay.results) {
+        output << "record_" << result.record_index
+               << "_sequence=" << result.sequence << '\n';
+        output << "record_" << result.record_index
+               << "_accepted="
+               << (result.accepted ? "true" : "false")
+               << '\n';
+        output << "record_" << result.record_index
+               << "_reason=" << result.reason << '\n';
+    }
+
+    for (std::size_t index = 0U;
+         index < replay.reasons.size();
+         ++index) {
+        output << "reason_" << index << '='
+               << replay.reasons[index] << '\n';
+    }
+
+    return output.str();
+}
+
+bool ProofCheckedDispatchReplaySimulatorSelfTest() {
+    constexpr std::uint64_t observed_at_s = 10'000U;
+    constexpr std::string_view policy =
+        "policy_eco_safe_v1";
+
+    auto accepted_first =
+        MakeValidAuthorizationEvidence(
+            "diagnostic_review",
+            policy,
+            observed_at_s,
+            1U,
+            200'000);
+
+    auto accepted_second =
+        MakeValidAuthorizationEvidence(
+            "diagnostic_review",
+            policy,
+            observed_at_s,
+            2U,
+            250'000);
+
+    auto duplicate_sequence = accepted_second;
+    duplicate_sequence.action_identifier =
+        "duplicate_sequence_review";
+
+    auto expired =
+        MakeValidAuthorizationEvidence(
+            "diagnostic_review",
+            policy,
+            observed_at_s,
+            3U,
+            200'000);
+    expired.expiry_time_s = observed_at_s - 1U;
+
+    auto unverified =
+        MakeValidAuthorizationEvidence(
+            "diagnostic_review",
+            policy,
+            observed_at_s,
+            4U,
+            200'000);
+    unverified.externally_verified = false;
+
+    auto unsafe_risk =
+        MakeValidAuthorizationEvidence(
+            "diagnostic_review",
+            policy,
+            observed_at_s,
+            5U,
+            300'001);
+
+    const std::vector<AuthorizationReplayRecord> records{
+        {accepted_first, observed_at_s},
+        {accepted_second, observed_at_s},
+        {duplicate_sequence, observed_at_s},
+        {expired, observed_at_s},
+        {unverified, observed_at_s},
+        {unsafe_risk, observed_at_s}
+    };
+
+    const ProofCheckedDispatchReplay replay =
+        ReplayProofCheckedDispatch(policy, records);
+
+    if (!replay.completed ||
+        !replay.all_expected_outcomes_match ||
+        replay.accepted_count != 2U ||
+        replay.rejected_count != 4U ||
+        replay.results.size() != 6U ||
+        !replay.reasons.empty() ||
+        !IsProofCheckedDispatchReplayValid(replay)) {
+        return false;
+    }
+
+    if (!replay.results[0].accepted ||
+        !replay.results[1].accepted ||
+        replay.results[2].accepted ||
+        replay.results[3].accepted ||
+        replay.results[4].accepted ||
+        replay.results[5].accepted ||
+        replay.results[0].reason != "accepted" ||
+        replay.results[2].reason !=
+            "rejected_policy_or_sequence" ||
+        replay.results[3].reason != "rejected_expired" ||
+        replay.results[4].reason != "rejected_unverified" ||
+        replay.results[5].reason !=
+            "rejected_risk_corridor") {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainProofCheckedDispatchReplay(replay);
+
+    if (explanation.find(
+            "proof_checked_dispatch_replay") ==
+            std::string::npos ||
+        explanation.find("completed=true") ==
+            std::string::npos ||
+        explanation.find("accepted_count=2") ==
+            std::string::npos ||
+        explanation.find("rejected_count=4") ==
+            std::string::npos ||
+        explanation.find(
+            "record_3_reason=rejected_expired") ==
+            std::string::npos ||
+        explanation.find(
+            "record_5_reason=rejected_risk_corridor") ==
+            std::string::npos) {
+        return false;
+    }
+
+    const ProofCheckedDispatchReplay empty =
+        ReplayProofCheckedDispatch(policy, {});
+
+    if (empty.completed ||
+        empty.reasons.size() != 1U ||
+        empty.reasons.front() !=
+            "authorization replay record collection must not be empty" ||
+        IsProofCheckedDispatchReplayValid(empty)) {
+        return false;
+    }
+
+    const ProofCheckedDispatchReplay missing_policy =
+        ReplayProofCheckedDispatch("", records);
+
+    if (missing_policy.completed ||
+        missing_policy.reasons.size() != 1U ||
+        missing_policy.reasons.front() !=
+            "replay policy identifier must not be empty" ||
+        IsProofCheckedDispatchReplayValid(missing_policy)) {
+        return false;
+    }
+
+    return true;
+}
+
+}
