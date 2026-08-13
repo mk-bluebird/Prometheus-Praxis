@@ -4373,3 +4373,1588 @@ bool EquitableWaterAllocationEvaluatorSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+constexpr std::int32_t fixed_point_unit_scale = 1'000'000;
+
+constexpr bool IsFixedPointScaleValid(std::int32_t scale) {
+    return scale > 0;
+}
+
+constexpr bool IsFixedPointValueInRange(
+    std::int32_t value,
+    std::int32_t minimum,
+    std::int32_t maximum) {
+    return minimum <= maximum &&
+           value >= minimum &&
+           value <= maximum;
+}
+
+constexpr std::int32_t ClampFixedPointValue(
+    std::int32_t value,
+    std::int32_t minimum,
+    std::int32_t maximum) {
+    return value < minimum ? minimum :
+           value > maximum ? maximum :
+           value;
+}
+
+constexpr bool IsUnitFixedPointValue(std::int32_t value) {
+    return IsFixedPointValueInRange(
+        value,
+        0,
+        fixed_point_unit_scale);
+}
+
+inline double FixedPointToDouble(
+    std::int32_t value,
+    std::int32_t scale,
+    std::int32_t minimum,
+    std::int32_t maximum) {
+    if (!IsFixedPointScaleValid(scale)) {
+        throw std::invalid_argument("fixed-point scale must be positive");
+    }
+
+    if (!IsFixedPointValueInRange(value, minimum, maximum)) {
+        throw std::invalid_argument("fixed-point value is outside declared bounds");
+    }
+
+    return static_cast<double>(value) /
+           static_cast<double>(scale);
+}
+
+inline double UnitFixedPointToDouble(std::int32_t value) {
+    return FixedPointToDouble(
+        value,
+        fixed_point_unit_scale,
+        0,
+        fixed_point_unit_scale);
+}
+
+inline std::int32_t DoubleToFixedPointNearestAwayFromZero(
+    double value,
+    std::int32_t scale,
+    std::int32_t minimum,
+    std::int32_t maximum) {
+    if (!std::isfinite(value)) {
+        throw std::invalid_argument("floating-point value must be finite");
+    }
+
+    if (!IsFixedPointScaleValid(scale)) {
+        throw std::invalid_argument("fixed-point scale must be positive");
+    }
+
+    if (minimum > maximum) {
+        throw std::invalid_argument("fixed-point bounds are invalid");
+    }
+
+    const double scaled =
+        value * static_cast<double>(scale);
+
+    if (!std::isfinite(scaled) ||
+        scaled < static_cast<double>(std::numeric_limits<std::int32_t>::min()) ||
+        scaled > static_cast<double>(std::numeric_limits<std::int32_t>::max())) {
+        throw std::invalid_argument("fixed-point conversion exceeds int32 range");
+    }
+
+    const long long rounded = std::llround(scaled);
+
+    if (rounded < static_cast<long long>(minimum) ||
+        rounded > static_cast<long long>(maximum)) {
+        throw std::invalid_argument(
+            "rounded fixed-point value is outside declared bounds");
+    }
+
+    return static_cast<std::int32_t>(rounded);
+}
+
+inline std::int32_t DoubleToUnitFixedPoint(
+    double value) {
+    return DoubleToFixedPointNearestAwayFromZero(
+        value,
+        fixed_point_unit_scale,
+        0,
+        fixed_point_unit_scale);
+}
+
+inline std::int32_t DoubleToUnitFixedPointClamped(
+    double value) {
+    if (!std::isfinite(value)) {
+        throw std::invalid_argument("floating-point value must be finite");
+    }
+
+    const double clamped =
+        std::clamp(value, 0.0, 1.0);
+
+    return DoubleToUnitFixedPoint(clamped);
+}
+
+inline double FixedPointAbsoluteDifference(
+    std::int32_t left,
+    std::int32_t right,
+    std::int32_t scale,
+    std::int32_t minimum,
+    std::int32_t maximum) {
+    const double left_value =
+        FixedPointToDouble(left, scale, minimum, maximum);
+    const double right_value =
+        FixedPointToDouble(right, scale, minimum, maximum);
+    return std::abs(left_value - right_value);
+}
+
+inline std::int32_t FixedPointAddClamped(
+    std::int32_t left,
+    std::int32_t right,
+    std::int32_t minimum,
+    std::int32_t maximum) {
+    if (minimum > maximum) {
+        throw std::invalid_argument("fixed-point bounds are invalid");
+    }
+
+    const std::int64_t total =
+        static_cast<std::int64_t>(left) +
+        static_cast<std::int64_t>(right);
+
+    if (total < static_cast<std::int64_t>(minimum)) {
+        return minimum;
+    }
+
+    if (total > static_cast<std::int64_t>(maximum)) {
+        return maximum;
+    }
+
+    return static_cast<std::int32_t>(total);
+}
+
+constexpr bool FixedPointUtilityStaticSelfTest() {
+    return IsFixedPointScaleValid(fixed_point_unit_scale) &&
+           !IsFixedPointScaleValid(0) &&
+           IsUnitFixedPointValue(0) &&
+           IsUnitFixedPointValue(fixed_point_unit_scale) &&
+           !IsUnitFixedPointValue(-1) &&
+           !IsUnitFixedPointValue(fixed_point_unit_scale + 1) &&
+           ClampFixedPointValue(-1, 0, 10) == 0 &&
+           ClampFixedPointValue(11, 0, 10) == 10 &&
+           ClampFixedPointValue(5, 0, 10) == 5;
+}
+
+static_assert(FixedPointUtilityStaticSelfTest());
+
+bool FixedPointUtilitySelfTest() {
+    if (std::abs(UnitFixedPointToDouble(125'000) - 0.125) > 1e-12) {
+        return false;
+    }
+
+    if (DoubleToUnitFixedPoint(0.125) != 125'000 ||
+        DoubleToUnitFixedPoint(0.5) != 500'000 ||
+        DoubleToUnitFixedPoint(1.0) != fixed_point_unit_scale) {
+        return false;
+    }
+
+    if (DoubleToUnitFixedPointClamped(-0.25) != 0 ||
+        DoubleToUnitFixedPointClamped(1.25) != fixed_point_unit_scale) {
+        return false;
+    }
+
+    if (FixedPointAddClamped(900'000, 200'000, 0,
+                             fixed_point_unit_scale) !=
+            fixed_point_unit_scale ||
+        FixedPointAddClamped(100'000, -200'000, 0,
+                             fixed_point_unit_scale) != 0) {
+        return false;
+    }
+
+    if (std::abs(FixedPointAbsoluteDifference(
+                     900'000,
+                     250'000,
+                     fixed_point_unit_scale,
+                     0,
+                     fixed_point_unit_scale) - 0.65) > 1e-12) {
+        return false;
+    }
+
+    try {
+        static_cast<void>(FixedPointToDouble(10, 0, 0, 10));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    try {
+        static_cast<void>(DoubleToUnitFixedPoint(1.000001));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    return true;
+}
+
+}  // namespace prometheus_praxis_foundation_extensions
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+struct FoundationInputBundle {
+    eco_restoration::PrivateHeatProofPlan heat_plan;
+    std::vector<eco_restoration::ThreatObservation> threats;
+    eco_restoration::WaterAllocation water_allocation;
+    eco_restoration::BiodiversityIndex biodiversity_index;
+    eco_restoration::AuthorizationEvidence authorization_evidence;
+    std::uint64_t authorization_now_s{};
+    std::uint64_t last_authorization_sequence{};
+    eco_restoration::StochasticPopulationModel population_model;
+    std::vector<eco_restoration::InvasiveControlCandidate> invasive_candidates;
+    eco_restoration::IrrigationDynamics irrigation_dynamics;
+    std::vector<eco_restoration::RainfallScenario> rainfall_scenarios;
+    IrrigationScheduleSet irrigation_schedules;
+};
+
+void AddFoundationInputError(
+    std::vector<std::string>& errors,
+    bool condition,
+    std::string_view message) {
+    if (!condition) {
+        errors.emplace_back(message);
+    }
+}
+
+std::vector<std::string> ValidateFoundationInputs(
+    const FoundationInputBundle& inputs) {
+    std::vector<std::string> errors;
+
+    try {
+        ValidatePrivateHeatProofPlan(inputs.heat_plan);
+    } catch (const std::exception& error) {
+        errors.emplace_back(
+            std::string("private_heat_plan: ") + error.what());
+    }
+
+    AddFoundationInputError(
+        errors,
+        IsThreatObservationSetValid(inputs.threats),
+        "threat_observations: required four-surface set is invalid");
+
+    AddFoundationInputError(
+        errors,
+        ThreatObservationSetIsSafe(inputs.threats),
+        "threat_observations: fixture is outside safe diagnostic bounds");
+
+    AddFoundationInputError(
+        errors,
+        IsWaterAllocationStructurallyValid(inputs.water_allocation),
+        "water_allocation: values must be nonnegative");
+
+    AddFoundationInputError(
+        errors,
+        WaterAllocationPreservesReserve(inputs.water_allocation),
+        "water_allocation: ecological reserve is not preserved");
+
+    AddFoundationInputError(
+        errors,
+        IsBiodiversityIndexValid(inputs.biodiversity_index),
+        "biodiversity_index: fixed-point values are outside the unit interval");
+
+    const auto authorization = ValidateAuthorizationEvidenceFixedPoint(
+        inputs.authorization_evidence,
+        default_foundation_policy_identifier,
+        inputs.authorization_now_s,
+        inputs.last_authorization_sequence);
+
+    if (!authorization.valid) {
+        for (const auto& reason : authorization.failure_reasons) {
+            errors.emplace_back(
+                std::string("authorization_evidence: ") + reason);
+        }
+    }
+
+    try {
+        ValidateStochasticPopulationModel(inputs.population_model);
+    } catch (const std::exception& error) {
+        errors.emplace_back(
+            std::string("population_model: ") + error.what());
+    }
+
+    AddFoundationInputError(
+        errors,
+        !inputs.invasive_candidates.empty(),
+        "invasive_candidates: candidate set is empty");
+
+    for (std::size_t index = 0U;
+         index < inputs.invasive_candidates.size();
+         ++index) {
+        AddFoundationInputError(
+            errors,
+            IsInvasiveControlCandidateValid(
+                inputs.invasive_candidates[index]),
+            "invasive_candidates: candidate " +
+                std::to_string(index) + " is invalid");
+    }
+
+    AddFoundationInputError(
+        errors,
+        CountSafeInvasiveControlCandidates(
+            inputs.population_model,
+            inputs.invasive_candidates) > 0U,
+        "invasive_candidates: no safe candidate satisfies ecological corridors");
+
+    try {
+        ValidateIrrigationDynamics(inputs.irrigation_dynamics);
+    } catch (const std::exception& error) {
+        errors.emplace_back(
+            std::string("irrigation_dynamics: ") + error.what());
+    }
+
+    const std::size_t horizon =
+        inputs.irrigation_schedules.empty()
+            ? 0U
+            : inputs.irrigation_schedules.front().size();
+
+    AddFoundationInputError(
+        errors,
+        horizon > 0U,
+        "irrigation_schedules: schedule horizon is empty");
+
+    if (horizon > 0U) {
+        AddFoundationInputError(
+            errors,
+            RainfallScenariosAreValid(
+                inputs.rainfall_scenarios,
+                horizon),
+            "rainfall_scenarios: probabilities or vector lengths are invalid");
+
+        try {
+            ValidateIrrigationCandidateSchedules(
+                inputs.irrigation_schedules,
+                horizon,
+                inputs.irrigation_dynamics);
+        } catch (const std::exception& error) {
+            errors.emplace_back(
+                std::string("irrigation_schedules: ") + error.what());
+        }
+    }
+
+    return errors;
+}
+
+bool FoundationInputsAreValid(
+    const FoundationInputBundle& inputs) {
+    return ValidateFoundationInputs(inputs).empty();
+}
+
+FoundationInputBundle MakeFoundationInputBundleFixture() {
+    const auto irrigation_dynamics = MakeIrrigationDynamics();
+    const auto irrigation_schedules =
+        MakeIrrigationCandidateSchedules(irrigation_dynamics);
+
+    return {
+        MakePrivateHeatProofPlan(),
+        MakeThreatObservationSet(),
+        MakeWaterAllocation(),
+        MakeBiodiversityIndex(),
+        MakeValidAuthorizationEvidence(10'000U, 1U),
+        10'000U,
+        0U,
+        MakeStochasticPopulationModel(),
+        MakeInvasiveControlCandidates(),
+        irrigation_dynamics,
+        MakeRainfallScenarios(),
+        irrigation_schedules
+    };
+}
+
+bool FoundationInputValidationSelfTest() {
+    const FoundationInputBundle fixture =
+        MakeFoundationInputBundleFixture();
+
+    if (!FoundationInputsAreValid(fixture) ||
+        !ValidateFoundationInputs(fixture).empty()) {
+        return false;
+    }
+
+    auto invalid_heat = fixture;
+    invalid_heat.heat_plan.corridor_cell_count = 0U;
+
+    if (FoundationInputsAreValid(invalid_heat)) {
+        return false;
+    }
+
+    auto invalid_threats = fixture;
+    invalid_threats.threats.pop_back();
+
+    if (FoundationInputsAreValid(invalid_threats)) {
+        return false;
+    }
+
+    auto invalid_authorization = fixture;
+    invalid_authorization.authorization_evidence.sequence = 0U;
+
+    if (FoundationInputsAreValid(invalid_authorization)) {
+        return false;
+    }
+
+    auto invalid_irrigation = fixture;
+    invalid_irrigation.irrigation_schedules[0].pop_back();
+
+    if (FoundationInputsAreValid(invalid_irrigation)) {
+        return false;
+    }
+
+    return true;
+}
+
+}  // namespace prometheus_praxis_foundation_extensions
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+struct FoundationInputs {
+    eco_restoration::PrivateHeatProofPlan private_heat_plan;
+    std::vector<eco_restoration::ThreatObservation> threat_observations;
+    eco_restoration::WaterAllocation water_allocation;
+    eco_restoration::BiodiversityIndex biodiversity_index;
+    eco_restoration::AuthorizationEvidence authorization_evidence;
+    std::uint64_t authorization_now_s{};
+    std::uint64_t last_authorization_sequence{};
+    eco_restoration::StochasticPopulationModel population_model;
+    std::vector<eco_restoration::InvasiveControlCandidate> invasive_candidates;
+    eco_restoration::IrrigationDynamics irrigation_dynamics;
+    std::vector<eco_restoration::RainfallScenario> rainfall_scenarios;
+    IrrigationScheduleSet irrigation_candidate_schedules;
+};
+
+FoundationInputBundle ToFoundationInputBundle(
+    const FoundationInputs& inputs) {
+    return {
+        inputs.private_heat_plan,
+        inputs.threat_observations,
+        inputs.water_allocation,
+        inputs.biodiversity_index,
+        inputs.authorization_evidence,
+        inputs.authorization_now_s,
+        inputs.last_authorization_sequence,
+        inputs.population_model,
+        inputs.invasive_candidates,
+        inputs.irrigation_dynamics,
+        inputs.rainfall_scenarios,
+        inputs.irrigation_candidate_schedules
+    };
+}
+
+FoundationInputs ToFoundationInputs(
+    const FoundationInputBundle& inputs) {
+    return {
+        inputs.heat_plan,
+        inputs.threats,
+        inputs.water_allocation,
+        inputs.biodiversity_index,
+        inputs.authorization_evidence,
+        inputs.authorization_now_s,
+        inputs.last_authorization_sequence,
+        inputs.population_model,
+        inputs.invasive_candidates,
+        inputs.irrigation_dynamics,
+        inputs.rainfall_scenarios,
+        inputs.irrigation_schedules
+    };
+}
+
+std::vector<std::string> ValidateFoundationInputs(
+    const FoundationInputs& inputs) {
+    return ValidateFoundationInputs(
+        ToFoundationInputBundle(inputs));
+}
+
+bool FoundationInputsAreValid(
+    const FoundationInputs& inputs) {
+    return ValidateFoundationInputs(inputs).empty();
+}
+
+FoundationInputs MakeValidFoundationInputs(
+    std::uint64_t authorization_now_s = 10'000U) {
+    if (authorization_now_s < default_authorization_issue_lead_seconds) {
+        throw std::invalid_argument(
+            "authorization time is too early for the bounded fixture window");
+    }
+
+    const auto irrigation_dynamics = MakeIrrigationDynamics();
+    const auto rainfall_scenarios = MakeRainfallScenarios();
+    const auto irrigation_schedules =
+        MakeIrrigationCandidateSchedules(irrigation_dynamics);
+
+    FoundationInputs inputs{
+        MakePrivateHeatProofPlan(),
+        MakeThreatObservationSet(),
+        MakeWaterAllocation(),
+        MakeBiodiversityIndex(),
+        MakeValidAuthorizationEvidence(
+            authorization_now_s,
+            1U),
+        authorization_now_s,
+        0U,
+        MakeStochasticPopulationModel(),
+        MakeInvasiveControlCandidates(),
+        irrigation_dynamics,
+        rainfall_scenarios,
+        irrigation_schedules
+    };
+
+    const auto errors = ValidateFoundationInputs(inputs);
+    if (!errors.empty()) {
+        throw std::runtime_error(
+            "valid foundation input factory produced invalid inputs");
+    }
+
+    return inputs;
+}
+
+std::string ExplainFoundationInputs(
+    const FoundationInputs& inputs) {
+    const auto errors = ValidateFoundationInputs(inputs);
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << "foundation_inputs\n";
+    output << "valid=" << (errors.empty() ? "true" : "false") << '\n';
+    output << "threat_observation_count="
+           << inputs.threat_observations.size() << '\n';
+    output << "invasive_candidate_count="
+           << inputs.invasive_candidates.size() << '\n';
+    output << "rainfall_scenario_count="
+           << inputs.rainfall_scenarios.size() << '\n';
+    output << "irrigation_schedule_count="
+           << inputs.irrigation_candidate_schedules.size() << '\n';
+    output << "validation_error_count="
+           << errors.size() << '\n';
+
+    for (std::size_t index = 0U; index < errors.size(); ++index) {
+        output << "validation_error_" << index << '='
+               << errors[index] << '\n';
+    }
+
+    return output.str();
+}
+
+bool FoundationInputsFactorySelfTest() {
+    const FoundationInputs inputs =
+        MakeValidFoundationInputs();
+
+    if (!FoundationInputsAreValid(inputs) ||
+        !ValidateFoundationInputs(inputs).empty() ||
+        inputs.threat_observations.size() != 4U ||
+        inputs.invasive_candidates.size() < 3U ||
+        inputs.rainfall_scenarios.size() != 2U ||
+        inputs.irrigation_candidate_schedules.size() < 3U) {
+        return false;
+    }
+
+    const FoundationInputBundle bundle =
+        ToFoundationInputBundle(inputs);
+    const FoundationInputs round_trip =
+        ToFoundationInputs(bundle);
+
+    if (!FoundationInputsAreValid(round_trip) ||
+        round_trip.authorization_now_s !=
+            inputs.authorization_now_s ||
+        round_trip.private_heat_plan.corridor_cell_count !=
+            inputs.private_heat_plan.corridor_cell_count) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainFoundationInputs(inputs);
+
+    if (explanation.find("valid=true") == std::string::npos ||
+        explanation.find("threat_observation_count=4") ==
+            std::string::npos ||
+        explanation.find("validation_error_count=0") ==
+            std::string::npos) {
+        return false;
+    }
+
+    FoundationInputs invalid = inputs;
+    invalid.rainfall_scenarios[0].probability = 0.80;
+
+    if (FoundationInputsAreValid(invalid) ||
+        ValidateFoundationInputs(invalid).empty()) {
+        return false;
+    }
+
+    try {
+        static_cast<void>(MakeValidFoundationInputs(1U));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    return true;
+}
+
+}  // namespace prometheus_praxis_foundation_extensions
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+struct FoundationOutputs {
+    bool private_heat_accepted{};
+    bool threat_fail_closed{};
+    bool water_biodiversity_allowed{};
+    bool water_biodiversity_invariant_holds{};
+    bool authorization_accepted{};
+    bool invasive_control_safe{};
+    bool irrigation_robustly_feasible{};
+    double maximum_risk_of_harm{};
+    double knowledge_factor{};
+    double eco_impact_value{};
+    bool foundation_safe{};
+    FoundationExitCode exit_code{FoundationExitCode::RuntimeFailure};
+    std::string machine_status;
+    std::vector<std::string> failure_reasons;
+};
+
+std::string FoundationMachineStatus(
+    FoundationExitCode code) {
+    switch (code) {
+        case FoundationExitCode::Success:
+            return "foundation_safe";
+        case FoundationExitCode::SafetyBlocked:
+            return "foundation_safety_blocked";
+        case FoundationExitCode::InvalidUsage:
+            return "foundation_invalid_usage";
+        case FoundationExitCode::RuntimeFailure:
+            return "foundation_runtime_failure";
+    }
+    return "foundation_runtime_failure";
+}
+
+FoundationOutputs MakeFoundationOutputs(
+    const FoundationReport& report) {
+    const FoundationSafetyVerdict verdict =
+        EvaluateFoundationSafety(report);
+    const FoundationExitCode exit_code =
+        FoundationExitCodeFromSafety(verdict.foundation_safe);
+
+    return {
+        report.private_heat_accepted,
+        report.threat_fail_closed,
+        report.water_biodiversity_allowed,
+        report.water_biodiversity_invariant_holds,
+        report.authorization_accepted,
+        report.invasive_control_safe,
+        report.irrigation_robustly_feasible,
+        report.maximum_risk_of_harm,
+        report.knowledge_factor,
+        report.eco_impact_value,
+        verdict.foundation_safe,
+        exit_code,
+        FoundationMachineStatus(exit_code),
+        verdict.failure_reasons
+    };
+}
+
+FoundationReport ToFoundationReport(
+    const FoundationOutputs& outputs) {
+    return {
+        outputs.private_heat_accepted,
+        outputs.threat_fail_closed,
+        outputs.water_biodiversity_allowed,
+        outputs.water_biodiversity_invariant_holds,
+        outputs.authorization_accepted,
+        outputs.invasive_control_safe,
+        outputs.irrigation_robustly_feasible,
+        outputs.maximum_risk_of_harm,
+        outputs.knowledge_factor,
+        outputs.eco_impact_value,
+        outputs.foundation_safe
+    };
+}
+
+bool IsFoundationOutputsValid(
+    const FoundationOutputs& outputs) {
+    if (!std::isfinite(outputs.maximum_risk_of_harm) ||
+        !IsUnitIntervalScore(outputs.maximum_risk_of_harm) ||
+        !IsUnitIntervalScore(outputs.knowledge_factor) ||
+        !IsUnitIntervalScore(outputs.eco_impact_value) ||
+        outputs.machine_status.empty()) {
+        return false;
+    }
+
+    const FoundationReport report =
+        ToFoundationReport(outputs);
+    const FoundationSafetyVerdict verdict =
+        EvaluateFoundationSafety(report);
+    const FoundationExitCode expected_exit =
+        FoundationExitCodeFromSafety(verdict.foundation_safe);
+
+    if (outputs.foundation_safe != verdict.foundation_safe ||
+        outputs.exit_code != expected_exit ||
+        outputs.machine_status !=
+            FoundationMachineStatus(expected_exit)) {
+        return false;
+    }
+
+    if (outputs.foundation_safe) {
+        return outputs.failure_reasons.empty();
+    }
+
+    return !outputs.failure_reasons.empty();
+}
+
+std::string SerializeFoundationOutputs(
+    const FoundationOutputs& outputs) {
+    if (!IsFoundationOutputsValid(outputs)) {
+        throw std::invalid_argument("foundation outputs are invalid");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << '{';
+
+    output << "\"machine_status\":";
+    json_string(output, outputs.machine_status);
+
+    output << ",\"exit_code\":"
+           << ToPlatformExitCode(outputs.exit_code);
+
+    output << ",\"foundation_report\":"
+           << serialize_foundation_report_json(
+               ToFoundationReport(outputs));
+
+    output << ",\"failure_reason_count\":"
+           << outputs.failure_reasons.size();
+
+    output << ",\"failure_reasons\":[";
+    for (std::size_t index = 0U;
+         index < outputs.failure_reasons.size();
+         ++index) {
+        if (index != 0U) output << ',';
+        json_string(output, outputs.failure_reasons[index]);
+    }
+    output << "]}";
+
+    return output.str();
+}
+
+bool FoundationOutputsSelfTest() {
+    const FoundationReport safe_report{
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        0.20,
+        0.90,
+        0.80,
+        true
+    };
+
+    const FoundationOutputs safe_outputs =
+        MakeFoundationOutputs(safe_report);
+
+    if (!safe_outputs.foundation_safe ||
+        safe_outputs.exit_code != FoundationExitCode::Success ||
+        safe_outputs.machine_status != "foundation_safe" ||
+        !safe_outputs.failure_reasons.empty() ||
+        !IsFoundationOutputsValid(safe_outputs)) {
+        return false;
+    }
+
+    FoundationReport blocked_report = safe_report;
+    blocked_report.threat_fail_closed = true;
+    blocked_report.maximum_risk_of_harm = 0.31;
+    blocked_report.foundation_safe = false;
+
+    const FoundationOutputs blocked_outputs =
+        MakeFoundationOutputs(blocked_report);
+
+    if (blocked_outputs.foundation_safe ||
+        blocked_outputs.exit_code != FoundationExitCode::SafetyBlocked ||
+        blocked_outputs.machine_status !=
+            "foundation_safety_blocked" ||
+        blocked_outputs.failure_reasons.empty() ||
+        !IsFoundationOutputsValid(blocked_outputs)) {
+        return false;
+    }
+
+    const std::string serialized =
+        SerializeFoundationOutputs(blocked_outputs);
+
+    if (serialized.find("\"machine_status\":\"foundation_safety_blocked\"") ==
+            std::string::npos ||
+        serialized.find("\"exit_code\":2") ==
+            std::string::npos ||
+        serialized.find("\"failure_reason_count\":") ==
+            std::string::npos) {
+        return false;
+    }
+
+    const FoundationReport round_trip =
+        ToFoundationReport(blocked_outputs);
+
+    return !round_trip.foundation_safe &&
+           std::abs(round_trip.maximum_risk_of_harm - 0.31) <
+               1e-12;
+}
+
+}  // namespace prometheus_praxis_foundation_extensions
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+struct FoundationStageRecord {
+    std::string stage_name;
+    bool succeeded{};
+    double primary_value{};
+    double risk_of_harm{};
+    double knowledge_factor{};
+    double eco_impact_value{};
+    std::string detail;
+};
+
+class StageResultTracker {
+public:
+    static const std::vector<std::string>& RequiredStageNames() {
+        static const std::vector<std::string> stage_names{
+            "private_heat",
+            "threat_containment",
+            "water_biodiversity",
+            "authorization",
+            "invasive_control",
+            "irrigation"
+        };
+        return stage_names;
+    }
+
+    static bool IsRequiredStageName(std::string_view stage_name) {
+        return std::find(
+            RequiredStageNames().begin(),
+            RequiredStageNames().end(),
+            stage_name) != RequiredStageNames().end();
+    }
+
+    bool Record(
+        std::string_view stage_name,
+        bool succeeded,
+        double primary_value,
+        double risk_of_harm,
+        double knowledge_factor,
+        double eco_impact_value,
+        std::string_view detail = {}) {
+        if (!IsRequiredStageName(stage_name) ||
+            HasStage(stage_name) ||
+            !std::isfinite(primary_value) ||
+            !IsUnitIntervalScore(risk_of_harm) ||
+            !IsUnitIntervalScore(knowledge_factor) ||
+            !IsUnitIntervalScore(eco_impact_value)) {
+            return false;
+        }
+
+        records_.push_back({
+            std::string(stage_name),
+            succeeded,
+            primary_value,
+            risk_of_harm,
+            knowledge_factor,
+            eco_impact_value,
+            std::string(detail)
+        });
+        return true;
+    }
+
+    bool HasStage(std::string_view stage_name) const {
+        return std::any_of(
+            records_.begin(),
+            records_.end(),
+            [stage_name](const FoundationStageRecord& record) {
+                return record.stage_name == stage_name;
+            });
+    }
+
+    const FoundationStageRecord* FindStage(
+        std::string_view stage_name) const {
+        const auto found = std::find_if(
+            records_.begin(),
+            records_.end(),
+            [stage_name](const FoundationStageRecord& record) {
+                return record.stage_name == stage_name;
+            });
+
+        return found == records_.end() ? nullptr : &(*found);
+    }
+
+    const std::vector<FoundationStageRecord>& Records() const noexcept {
+        return records_;
+    }
+
+    std::size_t Size() const noexcept {
+        return records_.size();
+    }
+
+    bool Complete() const {
+        if (records_.size() != RequiredStageNames().size()) {
+            return false;
+        }
+
+        return std::all_of(
+            RequiredStageNames().begin(),
+            RequiredStageNames().end(),
+            [this](const std::string& stage_name) {
+                return HasStage(stage_name);
+            });
+    }
+
+    bool AllSucceeded() const {
+        return Complete() &&
+               std::all_of(
+                   records_.begin(),
+                   records_.end(),
+                   [](const FoundationStageRecord& record) {
+                       return record.succeeded;
+                   });
+    }
+
+    double MaximumRiskOfHarm() const {
+        if (records_.empty()) return 0.0;
+
+        double maximum = 0.0;
+        for (const auto& record : records_) {
+            maximum = std::max(maximum, record.risk_of_harm);
+        }
+        return maximum;
+    }
+
+    std::vector<std::string> FailureReasons() const {
+        std::vector<std::string> reasons;
+
+        for (const auto& stage_name : RequiredStageNames()) {
+            const auto* record = FindStage(stage_name);
+
+            if (record == nullptr) {
+                reasons.emplace_back(
+                    stage_name + " stage result was not recorded");
+                continue;
+            }
+
+            if (!record->succeeded) {
+                const std::string detail = record->detail.empty()
+                    ? "stage reported failure"
+                    : record->detail;
+                reasons.emplace_back(stage_name + ": " + detail);
+            }
+        }
+
+        return reasons;
+    }
+
+    void Clear() noexcept {
+        records_.clear();
+    }
+
+private:
+    std::vector<FoundationStageRecord> records_;
+};
+
+std::string ExplainStageResultTracker(
+    const StageResultTracker& tracker) {
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << std::fixed << std::setprecision(6);
+    output << "foundation_stage_tracker\n";
+    output << "record_count=" << tracker.Size() << '\n';
+    output << "complete=" << (tracker.Complete() ? "true" : "false") << '\n';
+    output << "all_succeeded="
+           << (tracker.AllSucceeded() ? "true" : "false") << '\n';
+    output << "maximum_risk_of_harm="
+           << tracker.MaximumRiskOfHarm() << '\n';
+
+    for (const auto& record : tracker.Records()) {
+        output << "stage_" << record.stage_name << "_succeeded="
+               << (record.succeeded ? "true" : "false") << '\n';
+        output << "stage_" << record.stage_name << "_primary_value="
+               << record.primary_value << '\n';
+        output << "stage_" << record.stage_name << "_risk_of_harm="
+               << record.risk_of_harm << '\n';
+        output << "stage_" << record.stage_name << "_knowledge_factor="
+               << record.knowledge_factor << '\n';
+        output << "stage_" << record.stage_name << "_eco_impact_value="
+               << record.eco_impact_value << '\n';
+    }
+
+    const auto reasons = tracker.FailureReasons();
+    output << "failure_reason_count=" << reasons.size() << '\n';
+
+    for (std::size_t index = 0U; index < reasons.size(); ++index) {
+        output << "failure_reason_" << index << '='
+               << reasons[index] << '\n';
+    }
+
+    return output.str();
+}
+
+bool StageResultTrackerSelfTest() {
+    StageResultTracker tracker;
+
+    if (tracker.Complete() ||
+        tracker.AllSucceeded() ||
+        tracker.Size() != 0U ||
+        tracker.MaximumRiskOfHarm() != 0.0) {
+        return false;
+    }
+
+    for (const auto& stage_name : StageResultTracker::RequiredStageNames()) {
+        if (!tracker.Record(
+                stage_name,
+                true,
+                1.0,
+                0.20,
+                0.90,
+                0.80,
+                "bounded diagnostic accepted")) {
+            return false;
+        }
+    }
+
+    if (!tracker.Complete() ||
+        !tracker.AllSucceeded() ||
+        tracker.Size() != 6U ||
+        std::abs(tracker.MaximumRiskOfHarm() - 0.20) > 1e-12 ||
+        tracker.FailureReasons().size() != 0U) {
+        return false;
+    }
+
+    if (tracker.Record(
+            "private_heat",
+            true,
+            1.0,
+            0.20,
+            0.90,
+            0.80) ||
+        tracker.Record(
+            "unknown_stage",
+            true,
+            1.0,
+            0.20,
+            0.90,
+            0.80)) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainStageResultTracker(tracker);
+
+    if (explanation.find("record_count=6") == std::string::npos ||
+        explanation.find("complete=true") == std::string::npos ||
+        explanation.find("all_succeeded=true") == std::string::npos) {
+        return false;
+    }
+
+    tracker.Clear();
+
+    if (tracker.Size() != 0U ||
+        tracker.Complete() ||
+        tracker.AllSucceeded()) {
+        return false;
+    }
+
+    return true;
+}
+
+}  // namespace prometheus_praxis_foundation_extensions
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+bool IsStageKnowledgeOutputValid(
+    const FoundationStageRecord& record) {
+    return !record.stage_name.empty() &&
+           IsUnitIntervalScore(record.knowledge_factor);
+}
+
+double CalculateAggregateKnowledgeFactor(
+    const std::vector<FoundationStageRecord>& stage_outputs) {
+    if (stage_outputs.empty()) {
+        return 0.0;
+    }
+
+    double total = 0.0;
+    for (const auto& output : stage_outputs) {
+        if (!IsStageKnowledgeOutputValid(output)) {
+            throw std::invalid_argument(
+                "stage output contains an invalid knowledge factor");
+        }
+        total += output.knowledge_factor;
+    }
+
+    const double mean =
+        total / static_cast<double>(stage_outputs.size());
+
+    return std::clamp(mean, 0.0, 1.0);
+}
+
+double CalculateAggregateKnowledgeFactor(
+    const StageResultTracker& tracker) {
+    return CalculateAggregateKnowledgeFactor(tracker.Records());
+}
+
+double CalculateAggregateKnowledgeFactor(
+    const FoundationOutputs& outputs,
+    const StageResultTracker& tracker) {
+    if (!IsFoundationOutputsValid(outputs)) {
+        throw std::invalid_argument(
+            "foundation outputs must be valid before knowledge aggregation");
+    }
+
+    const double stage_mean =
+        CalculateAggregateKnowledgeFactor(tracker);
+
+    return std::clamp(
+        0.50 * outputs.knowledge_factor +
+        0.50 * stage_mean,
+        0.0,
+        1.0);
+}
+
+std::vector<FoundationStageRecord> MakeKnowledgeFactorFixture(
+    double value) {
+    if (!IsUnitIntervalScore(value)) {
+        throw std::invalid_argument(
+            "knowledge fixture value must lie in [0,1]");
+    }
+
+    std::vector<FoundationStageRecord> records;
+    records.reserve(StageResultTracker::RequiredStageNames().size());
+
+    for (const auto& stage_name : StageResultTracker::RequiredStageNames()) {
+        records.push_back({
+            stage_name,
+            true,
+            1.0,
+            0.20,
+            value,
+            0.80,
+            "knowledge fixture"
+        });
+    }
+
+    return records;
+}
+
+std::string ExplainAggregateKnowledgeFactor(
+    const std::vector<FoundationStageRecord>& stage_outputs) {
+    const double aggregate =
+        CalculateAggregateKnowledgeFactor(stage_outputs);
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << std::fixed << std::setprecision(6);
+    output << "aggregate_knowledge_factor\n";
+    output << "stage_output_count="
+           << stage_outputs.size() << '\n';
+    output << "aggregate_value="
+           << aggregate << '\n';
+
+    for (std::size_t index = 0U;
+         index < stage_outputs.size();
+         ++index) {
+        output << "stage_" << index << "_name="
+               << stage_outputs[index].stage_name << '\n';
+        output << "stage_" << index << "_knowledge_factor="
+               << stage_outputs[index].knowledge_factor << '\n';
+    }
+
+    return output.str();
+}
+
+bool AggregateKnowledgeFactorSelfTest() {
+    const std::vector<FoundationStageRecord> empty;
+
+    if (CalculateAggregateKnowledgeFactor(empty) != 0.0) {
+        return false;
+    }
+
+    const auto all_zero =
+        MakeKnowledgeFactorFixture(0.0);
+
+    if (CalculateAggregateKnowledgeFactor(all_zero) != 0.0) {
+        return false;
+    }
+
+    const auto all_one =
+        MakeKnowledgeFactorFixture(1.0);
+
+    if (CalculateAggregateKnowledgeFactor(all_one) != 1.0) {
+        return false;
+    }
+
+    const std::vector<FoundationStageRecord> mixed{
+        {"private_heat", true, 1.0, 0.10, 0.20, 0.80, {}},
+        {"threat_containment", true, 1.0, 0.10, 0.40, 0.80, {}},
+        {"water_biodiversity", true, 1.0, 0.10, 0.60, 0.80, {}},
+        {"authorization", true, 1.0, 0.10, 0.80, 0.80, {}}
+    };
+
+    if (std::abs(CalculateAggregateKnowledgeFactor(mixed) - 0.50) >
+        1e-12) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainAggregateKnowledgeFactor(mixed);
+
+    if (explanation.find("stage_output_count=4") ==
+            std::string::npos ||
+        explanation.find("aggregate_value=0.500000") ==
+            std::string::npos) {
+        return false;
+    }
+
+    auto invalid = mixed;
+    invalid[0].knowledge_factor = 1.01;
+
+    try {
+        static_cast<void>(
+            CalculateAggregateKnowledgeFactor(invalid));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    return true;
+}
+
+}  // namespace prometheus_praxis_foundation_extensions
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+bool IsStageEcoImpactOutputValid(
+    const FoundationStageRecord& record) {
+    return !record.stage_name.empty() &&
+           IsUnitIntervalScore(record.eco_impact_value);
+}
+
+double CalculateAggregateEcoImpact(
+    const std::vector<FoundationStageRecord>& stage_outputs) {
+    if (stage_outputs.empty()) {
+        return 0.0;
+    }
+
+    double total = 0.0;
+    for (const auto& output : stage_outputs) {
+        if (!IsStageEcoImpactOutputValid(output)) {
+            throw std::invalid_argument(
+                "stage output contains an invalid eco-impact value");
+        }
+        total += output.eco_impact_value;
+    }
+
+    const double mean =
+        total / static_cast<double>(stage_outputs.size());
+
+    return std::clamp(mean, 0.0, 1.0);
+}
+
+double CalculateAggregateEcoImpact(
+    const StageResultTracker& tracker) {
+    return CalculateAggregateEcoImpact(tracker.Records());
+}
+
+double CalculateAggregateEcoImpact(
+    const FoundationOutputs& outputs,
+    const StageResultTracker& tracker) {
+    if (!IsFoundationOutputsValid(outputs)) {
+        throw std::invalid_argument(
+            "foundation outputs must be valid before eco-impact aggregation");
+    }
+
+    const double stage_mean =
+        CalculateAggregateEcoImpact(tracker);
+
+    return std::clamp(
+        0.50 * outputs.eco_impact_value +
+        0.50 * stage_mean,
+        0.0,
+        1.0);
+}
+
+std::vector<FoundationStageRecord> MakeEcoImpactFixture(
+    double value) {
+    if (!IsUnitIntervalScore(value)) {
+        throw std::invalid_argument(
+            "eco-impact fixture value must lie in [0,1]");
+    }
+
+    std::vector<FoundationStageRecord> records;
+    records.reserve(StageResultTracker::RequiredStageNames().size());
+
+    for (const auto& stage_name : StageResultTracker::RequiredStageNames()) {
+        records.push_back({
+            stage_name,
+            true,
+            1.0,
+            0.20,
+            0.80,
+            value,
+            "eco-impact fixture"
+        });
+    }
+
+    return records;
+}
+
+std::string ExplainAggregateEcoImpact(
+    const std::vector<FoundationStageRecord>& stage_outputs) {
+    const double aggregate =
+        CalculateAggregateEcoImpact(stage_outputs);
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << std::fixed << std::setprecision(6);
+    output << "aggregate_eco_impact\n";
+    output << "stage_output_count="
+           << stage_outputs.size() << '\n';
+    output << "aggregate_value="
+           << aggregate << '\n';
+
+    for (std::size_t index = 0U;
+         index < stage_outputs.size();
+         ++index) {
+        output << "stage_" << index << "_name="
+               << stage_outputs[index].stage_name << '\n';
+        output << "stage_" << index << "_eco_impact_value="
+               << stage_outputs[index].eco_impact_value << '\n';
+    }
+
+    return output.str();
+}
+
+bool AggregateEcoImpactSelfTest() {
+    const std::vector<FoundationStageRecord> empty;
+
+    if (CalculateAggregateEcoImpact(empty) != 0.0) {
+        return false;
+    }
+
+    const auto all_zero =
+        MakeEcoImpactFixture(0.0);
+
+    if (CalculateAggregateEcoImpact(all_zero) != 0.0) {
+        return false;
+    }
+
+    const auto all_one =
+        MakeEcoImpactFixture(1.0);
+
+    if (CalculateAggregateEcoImpact(all_one) != 1.0) {
+        return false;
+    }
+
+    const std::vector<FoundationStageRecord> mixed{
+        {"private_heat", true, 1.0, 0.10, 0.80, 0.20, {}},
+        {"threat_containment", true, 1.0, 0.10, 0.80, 0.40, {}},
+        {"water_biodiversity", true, 1.0, 0.10, 0.80, 0.60, {}},
+        {"authorization", true, 1.0, 0.10, 0.80, 0.80, {}}
+    };
+
+    if (std::abs(CalculateAggregateEcoImpact(mixed) - 0.50) >
+        1e-12) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainAggregateEcoImpact(mixed);
+
+    if (explanation.find("stage_output_count=4") ==
+            std::string::npos ||
+        explanation.find("aggregate_value=0.500000") ==
+            std::string::npos) {
+        return false;
+    }
+
+    auto invalid = mixed;
+    invalid[0].eco_impact_value = -0.01;
+
+    try {
+        static_cast<void>(
+            CalculateAggregateEcoImpact(invalid));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    return true;
+}
+
+}  // namespace prometheus_praxis_foundation_extensions
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+bool IsFoundationReportSummaryInputValid(
+    const FoundationReport& report) {
+    return IsUnitIntervalScore(report.maximum_risk_of_harm) &&
+           IsUnitIntervalScore(report.knowledge_factor) &&
+           IsUnitIntervalScore(report.eco_impact_value);
+}
+
+std::string FoundationSummaryState(
+    const FoundationReport& report) {
+    const FoundationSafetyVerdict verdict =
+        EvaluateFoundationSafety(report);
+
+    if (verdict.foundation_safe) {
+        return "accepted";
+    }
+
+    if (report.threat_fail_closed) {
+        return "held";
+    }
+
+    if (report.maximum_risk_of_harm > 0.30) {
+        return "blocked";
+    }
+
+    return "not accepted";
+}
+
+void WriteFoundationSummary(
+    std::ostream& output,
+    const FoundationReport& report) {
+    if (!IsFoundationReportSummaryInputValid(report)) {
+        throw std::invalid_argument(
+            "foundation report contains invalid summary values");
+    }
+
+    const FoundationSafetyVerdict verdict =
+        EvaluateFoundationSafety(report);
+    const std::string state =
+        FoundationSummaryState(report);
+
+    output.imbue(std::locale::classic());
+    output << std::fixed << std::setprecision(6);
+    output << "Foundation assessment is " << state
+           << ": safety=" << (verdict.foundation_safe ? "true" : "false")
+           << ", maximum_roh=" << report.maximum_risk_of_harm
+           << ", knowledge_factor=" << report.knowledge_factor
+           << ", eco_impact_value=" << report.eco_impact_value
+           << ", failed_corridors=" << verdict.failure_reasons.size()
+           << ".\n";
+}
+
+std::string BuildFoundationSummary(
+    const FoundationReport& report) {
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    WriteFoundationSummary(output, report);
+    return output.str();
+}
+
+bool FoundationSummaryHasSingleParagraph(
+    std::string_view summary) {
+    if (summary.empty() ||
+        summary.back() != '\n') {
+        return false;
+    }
+
+    const std::size_t first_newline =
+        summary.find('\n');
+
+    return first_newline == summary.size() - 1U;
+}
+
+bool FoundationSummaryContainsStableFields(
+    std::string_view summary) {
+    const std::vector<std::string_view> fields{
+        "Foundation assessment is ",
+        "safety=",
+        "maximum_roh=",
+        "knowledge_factor=",
+        "eco_impact_value=",
+        "failed_corridors="
+    };
+
+    std::size_t prior = 0U;
+    for (const auto field : fields) {
+        const std::size_t position = summary.find(field);
+        if (position == std::string_view::npos ||
+            position < prior) {
+            return false;
+        }
+        prior = position;
+    }
+
+    return true;
+}
+
+bool FoundationReportSummaryWriterSelfTest() {
+    const FoundationReport accepted{
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        0.20,
+        0.90,
+        0.80,
+        true
+    };
+
+    const std::string accepted_summary =
+        BuildFoundationSummary(accepted);
+
+    const std::string expected =
+        "Foundation assessment is accepted: safety=true, "
+        "maximum_roh=0.200000, knowledge_factor=0.900000, "
+        "eco_impact_value=0.800000, failed_corridors=0.\n";
+
+    if (accepted_summary != expected ||
+        !FoundationSummaryHasSingleParagraph(accepted_summary) ||
+        !FoundationSummaryContainsStableFields(accepted_summary)) {
+        return false;
+    }
+
+    FoundationReport held = accepted;
+    held.threat_fail_closed = true;
+    held.foundation_safe = false;
+
+    const std::string held_summary =
+        BuildFoundationSummary(held);
+
+    if (held_summary.find("Foundation assessment is held") ==
+            std::string::npos ||
+        held_summary.find("safety=false") ==
+            std::string::npos ||
+        held_summary.find("failed_corridors=1") ==
+            std::string::npos) {
+        return false;
+    }
+
+    FoundationReport blocked = accepted;
+    blocked.maximum_risk_of_harm = 0.31;
+    blocked.foundation_safe = false;
+
+    const std::string blocked_summary =
+        BuildFoundationSummary(blocked);
+
+    if (blocked_summary.find("Foundation assessment is blocked") ==
+            std::string::npos ||
+        blocked_summary.find("maximum_roh=0.310000") ==
+            std::string::npos) {
+        return false;
+    }
+
+    FoundationReport invalid = accepted;
+    invalid.knowledge_factor =
+        std::numeric_limits<double>::quiet_NaN();
+
+    try {
+        static_cast<void>(BuildFoundationSummary(invalid));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    return true;
+}
+
+}  // namespace prometheus_praxis_foundation_extensions
