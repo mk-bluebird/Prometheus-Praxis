@@ -1,20 +1,32 @@
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
 #include "../eco_restoration/private_heat_membership_threat_model.hpp"
 #include "../eco_restoration/water_biodiversity_and_actuation_authorization.hpp"
 #include "../eco_restoration/stochastic_invasive_and_anchor_audit.hpp"
+
+// Workaround: <numeric> must precede irrigation_mpc_and_equitable_water.hpp
+// because that header uses std::accumulate but does not include <numeric>.
 #include <numeric>
 #include "../eco_restoration/irrigation_mpc_and_equitable_water.hpp"
 
 #include <algorithm>
+#include <cctype>
+#include <chrono>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <limits>
 #include <locale>
+#include <map>
+#include <optional>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <system_error>
+#include <utility>
 #include <vector>
 
 struct FoundationReport {
