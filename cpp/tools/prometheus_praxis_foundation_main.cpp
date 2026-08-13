@@ -257,7 +257,6 @@ int main(int argc, char** argv) {
     }
 }
 
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
 namespace prometheus_praxis_foundation_extensions {
 
 bool IsStableKey(std::string_view key) {
@@ -477,7 +476,6 @@ bool BuildUsageMessageSelfTest() {
 
 }  // namespace prometheus_praxis_foundation_extensions
 
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
 namespace prometheus_praxis_foundation_extensions {
 
 enum class FoundationExitCode : int {
@@ -620,7 +618,6 @@ bool FoundationExitCodeSelfTest() {
 
 }  // namespace prometheus_praxis_foundation_extensions
 
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
 namespace prometheus_praxis_foundation_extensions {
 
 constexpr std::int32_t foundation_risk_fixed_scale = 1'000'000;
@@ -769,7 +766,6 @@ bool MaximumRiskOfHarmSelfTest() {
 
 }  // namespace prometheus_praxis_foundation_extensions
 
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
 namespace prometheus_praxis_foundation_extensions {
 
 struct FoundationSafetyVerdict {
@@ -949,7 +945,6 @@ bool FoundationSafetyVerdictSelfTest() {
 
 }  // namespace prometheus_praxis_foundation_extensions
 
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
 #include <optional>
 
 namespace prometheus_praxis_foundation_extensions {
@@ -1122,7 +1117,6 @@ bool PrivateHeatProofPlanSelfTest() {
 
 }  // namespace prometheus_praxis_foundation_extensions
 
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
 namespace prometheus_praxis_foundation_extensions {
 
 struct PrivateHeatStatementPublicView {
@@ -1285,7 +1279,6 @@ bool PrivateHeatStatementPublicViewSelfTest() {
 
 }  // namespace prometheus_praxis_foundation_extensions
 
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
 namespace prometheus_praxis_foundation_extensions {
 
 constexpr double default_sensor_spoofing_anomaly = 0.08;
@@ -1438,7 +1431,6 @@ bool ThreatObservationFixtureSelfTest() {
 
 }  // namespace prometheus_praxis_foundation_extensions
 
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
 namespace prometheus_praxis_foundation_extensions {
 
 bool IsThreatAssessmentValid(
@@ -1634,7 +1626,6 @@ bool ExplainThreatAssessmentSelfTest() {
 
 }  // namespace prometheus_praxis_foundation_extensions
 
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
 namespace prometheus_praxis_foundation_extensions {
 
 constexpr std::int64_t default_water_permitted_ml = 1'000'000;
@@ -1796,7 +1787,6 @@ bool WaterAllocationFixtureSelfTest() {
 
 }  // namespace prometheus_praxis_foundation_extensions
 
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
 namespace prometheus_praxis_foundation_extensions {
 
 constexpr std::int32_t default_biodiversity_quality_fixed = 700'000;
@@ -1953,7 +1943,6 @@ bool BiodiversityIndexFixtureSelfTest() {
 
 }  // namespace prometheus_praxis_foundation_extensions
 
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
 namespace prometheus_praxis_foundation_extensions {
 
 struct WaterBiodiversityInvariantResult {
@@ -2124,7 +2113,6 @@ bool WaterBiodiversityInvariantSelfTest() {
 
 }  // namespace prometheus_praxis_foundation_extensions
 
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
 namespace prometheus_praxis_foundation_extensions {
 
 constexpr std::string_view default_foundation_policy_identifier =
@@ -2293,8 +2281,7 @@ bool ProofCheckedDispatcherAdapterSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 struct AuthorizationEvidenceValidation {
@@ -2507,8 +2494,7 @@ bool AuthorizationEvidenceFixedPointValidationSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 constexpr double default_population_abundance = 100.0;
@@ -2709,8 +2695,7 @@ bool StochasticPopulationModelFixtureSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 bool IsInvasiveControlCandidateValid(
@@ -2873,8 +2858,7 @@ bool InvasiveControlCandidateFixtureSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 struct SafeInvasiveControlSelectionResult {
@@ -3081,8 +3065,7 @@ bool SafeInvasiveControlSelectionWrapperSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 struct AnchorAuditAppendResult {
@@ -3275,8 +3258,7 @@ bool AnchorAuditStoreIntegrationSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 constexpr std::uint64_t default_anchor_sequence = 1U;
@@ -3455,8 +3437,7 @@ bool AnchorAuditRecordFixtureSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 constexpr double default_initial_moisture_mm = 15.0;
@@ -3623,8 +3604,7 @@ bool IrrigationDynamicsFixtureSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 constexpr std::size_t default_irrigation_horizon_steps = 3U;
@@ -3813,8 +3793,7 @@ bool RainfallScenarioFixtureSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 using IrrigationSchedule = std::vector<double>;
@@ -4015,8 +3994,7 @@ bool IrrigationCandidateScheduleFixtureSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 bool IsRobustIrrigationResultValid(
@@ -4173,8 +4151,7 @@ bool IrrigationResultExplainerSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 constexpr double default_available_water_mm = 90.0;
@@ -4385,8 +4362,7 @@ bool EquitableWaterAllocationEvaluatorSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 constexpr std::int32_t fixed_point_unit_scale = 1'000'000;
@@ -4603,8 +4579,7 @@ bool FixedPointUtilitySelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 struct FoundationInputBundle {
@@ -4816,8 +4791,7 @@ bool FoundationInputValidationSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 struct FoundationInputs {
@@ -5002,8 +4976,7 @@ bool FoundationInputsFactorySelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 struct FoundationOutputs {
@@ -5210,8 +5183,7 @@ bool FoundationOutputsSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 struct FoundationStageRecord {
@@ -5473,8 +5445,7 @@ bool StageResultTrackerSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 bool IsStageKnowledgeOutputValid(
@@ -5635,8 +5606,7 @@ bool AggregateKnowledgeFactorSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 bool IsStageEcoImpactOutputValid(
@@ -5797,8 +5767,7 @@ bool AggregateEcoImpactSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 bool IsFoundationReportSummaryInputValid(
@@ -5970,8 +5939,7 @@ bool FoundationReportSummaryWriterSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 std::string CsvBoolean(bool value) {
@@ -6187,8 +6155,7 @@ bool FoundationCsvEmitterSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 std::string EscapeFoundationMarkdownCell(
@@ -6420,8 +6387,7 @@ bool FoundationMarkdownEmitterSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 struct FoundationLogTimestamp {
@@ -6637,8 +6603,7 @@ bool FoundationLogLineBuilderSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 class GovernancePolicyRegistry {
@@ -6860,8 +6825,7 @@ bool GovernancePolicyRegistrySelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 struct CorridorTableMetadata {
@@ -7035,8 +6999,7 @@ bool CorridorTableMetadataSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 template <typename Plan>
@@ -7217,8 +7180,7 @@ bool PrivateHeatProofPlanValidatorSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 const std::string& LoadAiChatGuidelines() {
@@ -7412,8 +7374,7 @@ bool LoadAiChatGuidelinesSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 const std::string& LoadCollaboratorOnboardingStub() {
@@ -7594,8 +7555,7 @@ bool LoadCollaboratorOnboardingStubSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 struct PrometheusResearchObject {
@@ -7851,8 +7811,7 @@ bool PrometheusResearchObjectRegistrySelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 std::string NormalizeRepositoryPathSeparators(
@@ -8006,8 +7965,7 @@ bool EcoNetCentralAzPathResolverSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 struct RepositoryLayoutDescriptor {
@@ -8207,8 +8165,7 @@ bool DescribeRepositoryLayoutSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace ppf_constants {
 
 constexpr double minimum_unit_score = 0.0;
@@ -8357,8 +8314,7 @@ static_assert(IsEcoImpactSufficient(0.50));
 static_assert(!IsEcoImpactSufficient(0.49));
 
 }  // namespace ppf_constants
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 struct ExtensionSelfTestResult {
@@ -8578,8 +8534,7 @@ bool RunExtensionSelfTestsSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 class FinalIntegrationBarrier {
@@ -8748,8 +8703,7 @@ bool FinalIntegrationBarrierSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 // Object 49 — Future Comment Expansion
 //
 // Roadmap Scope
@@ -8852,8 +8806,7 @@ bool FinalIntegrationBarrierSelfTest() {
 // - A future object should avoid harmful by-products and unsafe designs.
 //
 // End of Object 49 roadmap comments.
-
-// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+ 
 namespace prometheus_praxis_foundation_extensions {
 
 struct SingleFileConsistencyAudit {
