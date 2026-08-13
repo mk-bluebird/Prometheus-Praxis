@@ -10162,3 +10162,2186 @@ bool CanonicalSymbolAuditSelfTest() {
 }
 
 }
+
+namespace prometheus_praxis_foundation_extensions {
+
+struct ObjectMarker {
+    std::size_t number{};
+    std::string title;
+};
+
+bool IsObjectMarkerTitleSafe(std::string_view title) {
+    if (title.empty()) {
+        return false;
+    }
+
+    const char first = title.front();
+    if ((first < 'A' || first > 'Z') &&
+        (first < 'a' || first > 'z')) {
+        return false;
+    }
+
+    for (const char character : title) {
+        const bool upper =
+            character >= 'A' && character <= 'Z';
+        const bool lower =
+            character >= 'a' && character <= 'z';
+        const bool digit =
+            character >= '0' && character <= '9';
+
+        if (!upper && !lower && !digit &&
+            character != '_' && character != ' ') {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool IsObjectMarkerValid(const ObjectMarker& marker) {
+    return marker.number > 0U &&
+           IsObjectMarkerTitleSafe(marker.title);
+}
+
+class ObjectMarkerRegistry {
+public:
+    bool Register(std::size_t number, std::string title) {
+        const ObjectMarker marker{
+            number,
+            std::move(title)
+        };
+
+        if (!IsObjectMarkerValid(marker) ||
+            ContainsNumber(marker.number)) {
+            return false;
+        }
+
+        markers_.push_back(marker);
+        std::sort(
+            markers_.begin(),
+            markers_.end(),
+            [](const ObjectMarker& left,
+               const ObjectMarker& right) {
+                return left.number < right.number;
+            });
+
+        return true;
+    }
+
+    bool ContainsNumber(std::size_t number) const {
+        return std::any_of(
+            markers_.begin(),
+            markers_.end(),
+            [number](const ObjectMarker& marker) {
+                return marker.number == number;
+            });
+    }
+
+    std::vector<ObjectMarker> Markers() const {
+        return markers_;
+    }
+
+    bool IsSequential() const {
+        if (markers_.empty()) {
+            return false;
+        }
+
+        for (std::size_t index = 0U;
+             index < markers_.size();
+             ++index) {
+            if (!IsObjectMarkerValid(markers_[index]) ||
+                markers_[index].number != index + 1U) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    std::size_t Size() const noexcept {
+        return markers_.size();
+    }
+
+    bool Empty() const noexcept {
+        return markers_.empty();
+    }
+
+private:
+    std::vector<ObjectMarker> markers_;
+};
+
+bool ObjectMarkersAreStrictlyOrdered(
+    const std::vector<ObjectMarker>& markers) {
+    if (markers.empty()) {
+        return false;
+    }
+
+    for (std::size_t index = 0U;
+         index < markers.size();
+         ++index) {
+        if (!IsObjectMarkerValid(markers[index])) {
+            return false;
+        }
+
+        if (index > 0U &&
+            markers[index - 1U].number >=
+                markers[index].number) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+std::string ExplainObjectMarkerRegistry(
+    const ObjectMarkerRegistry& registry) {
+    const std::vector<ObjectMarker> markers =
+        registry.Markers();
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+
+    output << "object_marker_registry\n";
+    output << "marker_count=" << markers.size() << '\n';
+    output << "sequential="
+           << (registry.IsSequential() ? "true" : "false")
+           << '\n';
+    output << "ordered="
+           << (ObjectMarkersAreStrictlyOrdered(markers)
+                   ? "true"
+                   : "false")
+           << '\n';
+
+    for (const auto& marker : markers) {
+        output << "marker_" << marker.number << "_title="
+               << marker.title << '\n';
+    }
+
+    return output.str();
+}
+
+bool ObjectMarkerRegistrySelfTest() {
+    ObjectMarkerRegistry registry;
+
+    if (!registry.Empty() ||
+        registry.Size() != 0U ||
+        registry.ContainsNumber(1U) ||
+        registry.IsSequential()) {
+        return false;
+    }
+
+    if (!registry.Register(3U, "Third Object") ||
+        !registry.Register(1U, "First Object") ||
+        !registry.Register(2U, "Second Object") ||
+        registry.Empty() ||
+        registry.Size() != 3U ||
+        !registry.ContainsNumber(1U) ||
+        !registry.ContainsNumber(2U) ||
+        !registry.ContainsNumber(3U) ||
+        registry.ContainsNumber(4U) ||
+        !registry.IsSequential()) {
+        return false;
+    }
+
+    const std::vector<ObjectMarker> markers =
+        registry.Markers();
+
+    if (markers.size() != 3U ||
+        markers[0].number != 1U ||
+        markers[0].title != "First Object" ||
+        markers[1].number != 2U ||
+        markers[1].title != "Second Object" ||
+        markers[2].number != 3U ||
+        markers[2].title != "Third Object" ||
+        !ObjectMarkersAreStrictlyOrdered(markers)) {
+        return false;
+    }
+
+    if (registry.Register(1U, "Duplicate Object") ||
+        registry.Register(0U, "Zero Object") ||
+        registry.Register(4U, "") ||
+        registry.Register(4U, "4 begins with digit") ||
+        registry.Register(4U, "Invalid-Title") ||
+        registry.Register(4U, "Invalid/Title") ||
+        registry.Size() != 3U) {
+        return false;
+    }
+
+    ObjectMarkerRegistry gapped_registry;
+    if (!gapped_registry.Register(51U, "Canonical Registry") ||
+        !gapped_registry.Register(53U, "Known Extensions") ||
+        gapped_registry.IsSequential()) {
+        return false;
+    }
+
+    ObjectMarkerRegistry sequential_registry;
+    if (!sequential_registry.Register(1U, "One") ||
+        !sequential_registry.Register(2U, "Two") ||
+        !sequential_registry.Register(3U, "Three") ||
+        !sequential_registry.IsSequential()) {
+        return false;
+    }
+
+    if (!IsObjectMarkerTitleSafe("Object 51") ||
+        !IsObjectMarkerTitleSafe("Eco Restoration 2026") ||
+        !IsObjectMarkerTitleSafe("Marker_Registry") ||
+        IsObjectMarkerTitleSafe("") ||
+        IsObjectMarkerTitleSafe("9 Marker") ||
+        IsObjectMarkerTitleSafe("Object-51") ||
+        IsObjectMarkerTitleSafe("Object/51") ||
+        IsObjectMarkerTitleSafe("Object\n51")) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainObjectMarkerRegistry(registry);
+
+    if (explanation.find("object_marker_registry") ==
+            std::string::npos ||
+        explanation.find("marker_count=3") ==
+            std::string::npos ||
+        explanation.find("sequential=true") ==
+            std::string::npos ||
+        explanation.find("ordered=true") ==
+            std::string::npos ||
+        explanation.find("marker_1_title=First Object") ==
+            std::string::npos ||
+        explanation.find("marker_3_title=Third Object") ==
+            std::string::npos) {
+        return false;
+    }
+
+    const std::vector<ObjectMarker> copied_markers =
+        registry.Markers();
+
+    if (copied_markers.empty() ||
+        copied_markers.front().number != 1U ||
+        copied_markers.back().number != 3U) {
+        return false;
+    }
+
+    return true;
+}
+
+}
+
+namespace prometheus_praxis_foundation_extensions {
+
+struct SourcedRiskOfHarm {
+    std::string source;
+    double risk{};
+    bool valid{};
+};
+
+bool IsSourcedRiskSourceValid(std::string_view source) {
+    return IsStableKey(source);
+}
+
+bool IsSourcedRiskValueValid(double risk) {
+    return std::isfinite(risk) &&
+           risk >= 0.0 &&
+           risk <= 1.0;
+}
+
+bool IsSourcedRiskOfHarmValid(
+    const SourcedRiskOfHarm& sourced_risk) {
+    return IsSourcedRiskSourceValid(sourced_risk.source) &&
+           sourced_risk.valid &&
+           IsSourcedRiskValueValid(sourced_risk.risk);
+}
+
+std::vector<std::string> ValidateSourcedRisks(
+    const std::vector<SourcedRiskOfHarm>& sources) {
+    std::vector<std::string> failures;
+
+    if (sources.empty()) {
+        failures.emplace_back("risk source collection is empty");
+        return failures;
+    }
+
+    for (std::size_t index = 0U;
+         index < sources.size();
+         ++index) {
+        const SourcedRiskOfHarm& source = sources[index];
+
+        if (!IsSourcedRiskSourceValid(source.source)) {
+            failures.emplace_back(
+                "risk source name is not lower_snake_case at index " +
+                std::to_string(index));
+        }
+
+        if (!source.valid) {
+            failures.emplace_back(
+                "risk source is marked invalid at index " +
+                std::to_string(index));
+        }
+
+        if (!std::isfinite(source.risk)) {
+            failures.emplace_back(
+                "risk source is nonfinite at index " +
+                std::to_string(index));
+        } else if (source.risk < 0.0 || source.risk > 1.0) {
+            failures.emplace_back(
+                "risk source is outside the unit interval at index " +
+                std::to_string(index));
+        }
+
+        for (std::size_t previous = 0U;
+             previous < index;
+             ++previous) {
+            if (sources[previous].source == source.source) {
+                failures.emplace_back(
+                    "risk source name is duplicated at index " +
+                    std::to_string(index));
+                break;
+            }
+        }
+    }
+
+    return failures;
+}
+
+double AggregateMaximumRiskOfHarm(
+    const std::vector<SourcedRiskOfHarm>& sources) {
+    const std::vector<std::string> failures =
+        ValidateSourcedRisks(sources);
+
+    if (!failures.empty()) {
+        throw std::invalid_argument(
+            "cannot aggregate invalid sourced risk values");
+    }
+
+    double maximum_risk = 0.0;
+
+    for (const auto& source : sources) {
+        maximum_risk = std::max(maximum_risk, source.risk);
+    }
+
+    return maximum_risk;
+}
+
+double AggregateWeightedRiskOfHarm(
+    const std::vector<SourcedRiskOfHarm>& sources) {
+    const std::vector<std::string> failures =
+        ValidateSourcedRisks(sources);
+
+    if (!failures.empty()) {
+        throw std::invalid_argument(
+            "cannot aggregate invalid sourced risk values");
+    }
+
+    double weighted_sum = 0.0;
+    double weight_sum = 0.0;
+
+    for (const auto& source : sources) {
+        const double weight = std::max(source.risk, 0.000001);
+        weighted_sum += source.risk * weight;
+        weight_sum += weight;
+    }
+
+    if (!std::isfinite(weighted_sum) ||
+        !std::isfinite(weight_sum) ||
+        weight_sum <= 0.0) {
+        throw std::runtime_error(
+            "risk aggregation produced an invalid weight total");
+    }
+
+    const double aggregate = weighted_sum / weight_sum;
+
+    if (!IsSourcedRiskValueValid(aggregate)) {
+        throw std::runtime_error(
+            "risk aggregation produced an invalid risk value");
+    }
+
+    return aggregate;
+}
+
+std::string ExplainSourcedRiskAggregation(
+    const std::vector<SourcedRiskOfHarm>& sources) {
+    const std::vector<std::string> failures =
+        ValidateSourcedRisks(sources);
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << std::fixed << std::setprecision(6);
+
+    output << "sourced_risk_aggregation\n";
+    output << "source_count=" << sources.size() << '\n';
+    output << "validation_failure_count="
+           << failures.size() << '\n';
+
+    for (std::size_t index = 0U;
+         index < sources.size();
+         ++index) {
+        const auto& source = sources[index];
+
+        output << "source_" << index << "_name="
+               << source.source << '\n';
+        output << "source_" << index << "_risk="
+               << source.risk << '\n';
+        output << "source_" << index << "_valid="
+               << (source.valid ? "true" : "false") << '\n';
+    }
+
+    for (std::size_t index = 0U;
+         index < failures.size();
+         ++index) {
+        output << "validation_failure_" << index << '='
+               << failures[index] << '\n';
+    }
+
+    if (failures.empty()) {
+        output << "maximum_risk="
+               << AggregateMaximumRiskOfHarm(sources) << '\n';
+        output << "weighted_risk="
+               << AggregateWeightedRiskOfHarm(sources) << '\n';
+    }
+
+    return output.str();
+}
+
+bool SourcedRiskOfHarmSelfTest() {
+    const std::vector<SourcedRiskOfHarm> valid_sources{
+        {"water_allocation", 0.12, true},
+        {"invasive_control", 0.24, true},
+        {"irrigation_schedule", 0.08, true}
+    };
+
+    const std::vector<std::string> valid_failures =
+        ValidateSourcedRisks(valid_sources);
+
+    if (!valid_failures.empty() ||
+        std::abs(AggregateMaximumRiskOfHarm(valid_sources) - 0.24) >
+            1e-12) {
+        return false;
+    }
+
+    const double weighted =
+        AggregateWeightedRiskOfHarm(valid_sources);
+
+    if (!std::isfinite(weighted) ||
+        weighted < 0.08 ||
+        weighted > 0.24 ||
+        std::abs(weighted - 0.17894736842105263) > 1e-12) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainSourcedRiskAggregation(valid_sources);
+
+    if (explanation.find("source_count=3") ==
+            std::string::npos ||
+        explanation.find("validation_failure_count=0") ==
+            std::string::npos ||
+        explanation.find("maximum_risk=0.240000") ==
+            std::string::npos ||
+        explanation.find("weighted_risk=0.178947") ==
+            std::string::npos) {
+        return false;
+    }
+
+    const std::vector<SourcedRiskOfHarm> empty_sources;
+    const std::vector<std::string> empty_failures =
+        ValidateSourcedRisks(empty_sources);
+
+    if (empty_failures.size() != 1U ||
+        empty_failures.front() !=
+            "risk source collection is empty") {
+        return false;
+    }
+
+    try {
+        static_cast<void>(
+            AggregateMaximumRiskOfHarm(empty_sources));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    const std::vector<SourcedRiskOfHarm> invalid_sources{
+        {"Water Allocation", 0.20, true},
+        {"invasive_control", 1.10, true},
+        {"invasive_control", 0.30, false}
+    };
+
+    const std::vector<std::string> invalid_failures =
+        ValidateSourcedRisks(invalid_sources);
+
+    if (invalid_failures.size() < 4U) {
+        return false;
+    }
+
+    try {
+        static_cast<void>(
+            AggregateWeightedRiskOfHarm(invalid_sources));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    const std::vector<SourcedRiskOfHarm> zero_sources{
+        {"soil_moisture", 0.0, true},
+        {"reserve_compliance", 0.0, true}
+    };
+
+    if (std::abs(AggregateMaximumRiskOfHarm(zero_sources)) >
+            1e-12 ||
+        std::abs(AggregateWeightedRiskOfHarm(zero_sources)) >
+            1e-12) {
+        return false;
+    }
+
+    return true;
+}
+
+}
+
+namespace prometheus_praxis_foundation_extensions {
+
+struct GovernanceAliasRecord {
+    std::string alias;
+    std::string canonical;
+    bool active{};
+};
+
+bool IsGovernanceAliasIdentifierValid(
+    std::string_view identifier) {
+    return IsStableKey(identifier);
+}
+
+bool IsGovernanceAliasRecordValid(
+    const GovernanceAliasRecord& record) {
+    return IsGovernanceAliasIdentifierValid(record.alias) &&
+           IsGovernanceAliasIdentifierValid(record.canonical) &&
+           record.alias != record.canonical;
+}
+
+class GovernancePolicyAliasRegistry {
+public:
+    bool AddAlias(
+        std::string_view alias,
+        std::string_view canonical) {
+        const GovernanceAliasRecord record{
+            std::string(alias),
+            std::string(canonical),
+            true
+        };
+
+        if (!IsGovernanceAliasRecordValid(record) ||
+            HasDuplicateAlias(alias)) {
+            return false;
+        }
+
+        aliases_.push_back(record);
+        return true;
+    }
+
+    std::optional<std::string> ResolveAlias(
+        std::string_view alias) const {
+        const auto iterator = std::find_if(
+            aliases_.begin(),
+            aliases_.end(),
+            [alias](const GovernanceAliasRecord& record) {
+                return record.active &&
+                       record.alias == alias;
+            });
+
+        if (iterator == aliases_.end()) {
+            return std::nullopt;
+        }
+
+        return iterator->canonical;
+    }
+
+    std::vector<std::string> ListAliases() const {
+        std::vector<std::string> aliases;
+        aliases.reserve(aliases_.size());
+
+        for (const auto& record : aliases_) {
+            if (record.active) {
+                aliases.push_back(record.alias);
+            }
+        }
+
+        std::sort(aliases.begin(), aliases.end());
+        return aliases;
+    }
+
+    bool HasDuplicateAlias(
+        std::string_view alias) const {
+        return std::count_if(
+                   aliases_.begin(),
+                   aliases_.end(),
+                   [alias](const GovernanceAliasRecord& record) {
+                       return record.alias == alias;
+                   }) > 0;
+    }
+
+    std::size_t Size() const noexcept {
+        return aliases_.size();
+    }
+
+    bool Empty() const noexcept {
+        return aliases_.empty();
+    }
+
+    const std::vector<GovernanceAliasRecord>& Records() const noexcept {
+        return aliases_;
+    }
+
+private:
+    std::vector<GovernanceAliasRecord> aliases_;
+};
+
+bool GovernancePolicyAliasRegistryRecordsValid(
+    const GovernancePolicyAliasRegistry& registry) {
+    const auto& records = registry.Records();
+
+    for (std::size_t left = 0U;
+         left < records.size();
+         ++left) {
+        if (!IsGovernanceAliasRecordValid(records[left])) {
+            return false;
+        }
+
+        for (std::size_t right = left + 1U;
+             right < records.size();
+             ++right) {
+            if (records[left].alias == records[right].alias) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+std::string ExplainGovernancePolicyAliasRegistry(
+    const GovernancePolicyAliasRegistry& registry) {
+    if (!GovernancePolicyAliasRegistryRecordsValid(registry)) {
+        throw std::invalid_argument(
+            "governance policy alias registry is invalid");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+
+    output << "governance_policy_alias_registry\n";
+    output << "record_count=" << registry.Size() << '\n';
+    output << "active_alias_count="
+           << registry.ListAliases().size() << '\n';
+
+    const auto& records = registry.Records();
+
+    for (std::size_t index = 0U;
+         index < records.size();
+         ++index) {
+        const auto& record = records[index];
+
+        output << "record_" << index << "_alias="
+               << record.alias << '\n';
+        output << "record_" << index << "_canonical="
+               << record.canonical << '\n';
+        output << "record_" << index << "_active="
+               << (record.active ? "true" : "false")
+               << '\n';
+    }
+
+    return output.str();
+}
+
+bool GovernancePolicyAliasRegistrySelfTest() {
+    GovernancePolicyAliasRegistry registry;
+
+    if (!registry.Empty() ||
+        registry.Size() != 0U ||
+        registry.HasDuplicateAlias("water_policy") ||
+        registry.ResolveAlias("water_policy").has_value() ||
+        !registry.ListAliases().empty()) {
+        return false;
+    }
+
+    if (!registry.AddAlias(
+            "water_policy",
+            "water_biodiversity_policy_v1") ||
+        !registry.AddAlias(
+            "heat_policy",
+            "private_heat_corridor_policy_v1") ||
+        !registry.AddAlias(
+            "invasive_policy",
+            "invasive_control_policy_v1") ||
+        registry.Empty() ||
+        registry.Size() != 3U ||
+        !GovernancePolicyAliasRegistryRecordsValid(registry)) {
+        return false;
+    }
+
+    const auto water =
+        registry.ResolveAlias("water_policy");
+    const auto heat =
+        registry.ResolveAlias("heat_policy");
+    const auto invasive =
+        registry.ResolveAlias("invasive_policy");
+
+    if (!water.has_value() ||
+        !heat.has_value() ||
+        !invasive.has_value() ||
+        *water != "water_biodiversity_policy_v1" ||
+        *heat != "private_heat_corridor_policy_v1" ||
+        *invasive != "invasive_control_policy_v1" ||
+        registry.ResolveAlias("missing_policy").has_value()) {
+        return false;
+    }
+
+    const std::vector<std::string> aliases =
+        registry.ListAliases();
+
+    if (aliases.size() != 3U ||
+        aliases[0] != "heat_policy" ||
+        aliases[1] != "invasive_policy" ||
+        aliases[2] != "water_policy") {
+        return false;
+    }
+
+    if (registry.AddAlias(
+            "water_policy",
+            "different_canonical_policy") ||
+        !registry.HasDuplicateAlias("water_policy") ||
+        registry.Size() != 3U) {
+        return false;
+    }
+
+    if (registry.AddAlias(
+            "WaterPolicy",
+            "water_biodiversity_policy_v1") ||
+        registry.AddAlias(
+            "water-policy",
+            "water_biodiversity_policy_v1") ||
+        registry.AddAlias(
+            "",
+            "water_biodiversity_policy_v1") ||
+        registry.AddAlias(
+            "water_policy_alias",
+            "") ||
+        registry.AddAlias(
+            "same_policy",
+            "same_policy") ||
+        registry.Size() != 3U) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainGovernancePolicyAliasRegistry(registry);
+
+    if (explanation.find(
+            "governance_policy_alias_registry") ==
+            std::string::npos ||
+        explanation.find("record_count=3") ==
+            std::string::npos ||
+        explanation.find("active_alias_count=3") ==
+            std::string::npos ||
+        explanation.find(
+            "record_0_alias=water_policy") ==
+            std::string::npos ||
+        explanation.find(
+            "record_1_canonical=private_heat_corridor_policy_v1") ==
+            std::string::npos ||
+        explanation.find(
+            "record_2_active=true") ==
+            std::string::npos) {
+        return false;
+    }
+
+    return IsGovernanceAliasIdentifierValid(
+               "governance_policy_2026") &&
+           !IsGovernanceAliasIdentifierValid(
+               "governance-policy") &&
+           !IsGovernanceAliasIdentifierValid(
+               "GovernancePolicy");
+}
+
+}
+
+namespace prometheus_praxis_foundation_extensions {
+
+bool ContainsRepositoryPathControlCharacter(
+    std::string_view path) {
+    for (const unsigned char character : path) {
+        if (character < 0x20U || character == 0x7fU) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool IsRepositoryPathSegmentValid(
+    std::string_view segment) {
+    if (segment.empty() ||
+        segment == "." ||
+        segment == "..") {
+        return false;
+    }
+
+    for (const unsigned char character : segment) {
+        if (character == '/' ||
+            character == '\\' ||
+            character < 0x20U ||
+            character == 0x7fU) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+std::vector<std::string> SplitRepositoryPathSegments(
+    std::string_view raw_path) {
+    if (raw_path.empty()) {
+        throw std::invalid_argument(
+            "repository path must not be empty");
+    }
+
+    if (ContainsRepositoryPathControlCharacter(raw_path)) {
+        throw std::invalid_argument(
+            "repository path contains control characters");
+    }
+
+    std::vector<std::string> segments;
+    std::string current;
+
+    for (const char character : raw_path) {
+        const bool separator =
+            character == '/' || character == '\\';
+
+        if (separator) {
+            if (!current.empty()) {
+                segments.push_back(std::move(current));
+                current.clear();
+            }
+            continue;
+        }
+
+        current.push_back(character);
+    }
+
+    if (!current.empty()) {
+        segments.push_back(std::move(current));
+    }
+
+    if (segments.empty()) {
+        throw std::invalid_argument(
+            "repository path contains no usable segments");
+    }
+
+    for (const auto& segment : segments) {
+        if (!IsRepositoryPathSegmentValid(segment)) {
+            throw std::invalid_argument(
+                "repository path contains an unsafe segment");
+        }
+    }
+
+    return segments;
+}
+
+std::string NormalizeRepositoryPath(
+    std::string_view raw_path) {
+    const std::vector<std::string> segments =
+        SplitRepositoryPathSegments(raw_path);
+
+    std::filesystem::path normalized;
+
+    for (const auto& segment : segments) {
+        normalized /= std::filesystem::path(segment);
+    }
+
+    const std::string generic =
+        normalized.lexically_normal().generic_string();
+
+    if (generic.empty() ||
+        generic == "." ||
+        generic == ".." ||
+        generic.front() == '/' ||
+        generic.find(':') != std::string::npos) {
+        throw std::invalid_argument(
+            "repository path must remain relative and normalized");
+    }
+
+    return generic;
+}
+
+bool IsRepositoryPathNormalized(
+    std::string_view path) {
+    if (path.empty() ||
+        ContainsRepositoryPathControlCharacter(path) ||
+        path.front() == '/' ||
+        path.find('\\') != std::string_view::npos ||
+        path.find("//") != std::string_view::npos ||
+        path.find(':') != std::string_view::npos) {
+        return false;
+    }
+
+    try {
+        return NormalizeRepositoryPath(path) == path;
+    } catch (const std::invalid_argument&) {
+        return false;
+    }
+}
+
+std::string ExplainPathNormalization(
+    std::string_view raw_path) {
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+
+    output << "repository_path_normalization\n";
+    output << "raw_path=" << raw_path << '\n';
+
+    try {
+        const std::vector<std::string> segments =
+            SplitRepositoryPathSegments(raw_path);
+        const std::string normalized =
+            NormalizeRepositoryPath(raw_path);
+
+        output << "valid=true\n";
+        output << "segment_count=" << segments.size() << '\n';
+        output << "normalized_path=" << normalized << '\n';
+        output << "normalized="
+               << (IsRepositoryPathNormalized(normalized)
+                       ? "true"
+                       : "false")
+               << '\n';
+
+        for (std::size_t index = 0U;
+             index < segments.size();
+             ++index) {
+            output << "segment_" << index << '='
+                   << segments[index] << '\n';
+        }
+    } catch (const std::exception& error) {
+        output << "valid=false\n";
+        output << "error=" << error.what() << '\n';
+    }
+
+    return output.str();
+}
+
+bool NormalizeRepositoryPathSelfTest() {
+    const std::string forward =
+        NormalizeRepositoryPath(
+            "cpp/eco_restoration/private_heat_model.hpp");
+
+    const std::string backward =
+        NormalizeRepositoryPath(
+            "cpp\\eco_restoration\\private_heat_model.hpp");
+
+    const std::string repeated =
+        NormalizeRepositoryPath(
+            "cpp///tools////foundation_main.cpp");
+
+    const std::string mixed =
+        NormalizeRepositoryPath(
+            "cpp\\simulation//water\\model.cpp");
+
+    if (forward !=
+            "cpp/eco_restoration/private_heat_model.hpp" ||
+        backward !=
+            "cpp/eco_restoration/private_heat_model.hpp" ||
+        repeated !=
+            "cpp/tools/foundation_main.cpp" ||
+        mixed !=
+            "cpp/simulation/water/model.cpp") {
+        return false;
+    }
+
+    if (!IsRepositoryPathNormalized(forward) ||
+        !IsRepositoryPathNormalized(repeated) ||
+        !IsRepositoryPathNormalized(mixed) ||
+        IsRepositoryPathNormalized(
+            "cpp\\tools\\foundation_main.cpp") ||
+        IsRepositoryPathNormalized(
+            "cpp//tools/foundation_main.cpp") ||
+        IsRepositoryPathNormalized(
+            "/cpp/tools/foundation_main.cpp") ||
+        IsRepositoryPathNormalized(
+            "C:/cpp/tools/foundation_main.cpp") ||
+        IsRepositoryPathNormalized("") ||
+        IsRepositoryPathNormalized("../cpp/tools")) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainPathNormalization(
+            "cpp\\\\tools////foundation_main.cpp");
+
+    if (explanation.find(
+            "repository_path_normalization") ==
+            std::string::npos ||
+        explanation.find("valid=true") ==
+            std::string::npos ||
+        explanation.find("segment_count=3") ==
+            std::string::npos ||
+        explanation.find(
+            "normalized_path=cpp/tools/foundation_main.cpp") ==
+            std::string::npos ||
+        explanation.find("normalized=true") ==
+            std::string::npos) {
+        return false;
+    }
+
+    const std::string empty_explanation =
+        ExplainPathNormalization("");
+
+    if (empty_explanation.find("valid=false") ==
+            std::string::npos ||
+        empty_explanation.find("error=") ==
+            std::string::npos) {
+        return false;
+    }
+
+    const std::vector<std::string> unsafe_paths{
+        "",
+        "/absolute/path",
+        "../outside/repository",
+        "cpp/../tools",
+        "cpp/./tools",
+        "cpp/\n/tools",
+        "C:\\workspace\\cpp"
+    };
+
+    for (const auto& path : unsafe_paths) {
+        try {
+            static_cast<void>(NormalizeRepositoryPath(path));
+            return false;
+        } catch (const std::invalid_argument&) {
+        }
+    }
+
+    return true;
+}
+
+}
+
+namespace prometheus_praxis_foundation_extensions {
+
+struct FoundationReportDiff {
+    std::vector<std::string> differences;
+    bool identical{};
+};
+
+bool IsFoundationReportToleranceValid(double tolerance) {
+    return std::isfinite(tolerance) &&
+           tolerance >= 0.0;
+}
+
+bool FoundationReportDoubleEqual(
+    double left,
+    double right,
+    double tolerance) {
+    if (!IsFoundationReportToleranceValid(tolerance)) {
+        throw std::invalid_argument(
+            "foundation report tolerance must be finite and nonnegative");
+    }
+
+    if (std::isnan(left) || std::isnan(right)) {
+        return std::isnan(left) && std::isnan(right);
+    }
+
+    if (std::isinf(left) || std::isinf(right)) {
+        return left == right;
+    }
+
+    return std::abs(left - right) <= tolerance;
+}
+
+void AddFoundationReportBooleanDifference(
+    FoundationReportDiff& diff,
+    std::string_view field_name,
+    bool left,
+    bool right) {
+    if (left != right) {
+        diff.differences.emplace_back(
+            std::string(field_name) + " differs: left=" +
+            (left ? "true" : "false") +
+            ", right=" +
+            (right ? "true" : "false"));
+    }
+}
+
+void AddFoundationReportDoubleDifference(
+    FoundationReportDiff& diff,
+    std::string_view field_name,
+    double left,
+    double right,
+    double tolerance) {
+    if (FoundationReportDoubleEqual(left, right, tolerance)) {
+        return;
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << std::fixed << std::setprecision(12);
+    output << field_name << " differs: left=" << left
+           << ", right=" << right
+           << ", tolerance=" << tolerance;
+
+    diff.differences.push_back(output.str());
+}
+
+FoundationReportDiff CompareFoundationReports(
+    const FoundationReport& left,
+    const FoundationReport& right,
+    double tolerance = 1e-9) {
+    if (!IsFoundationReportToleranceValid(tolerance)) {
+        throw std::invalid_argument(
+            "foundation report tolerance must be finite and nonnegative");
+    }
+
+    FoundationReportDiff diff;
+
+    AddFoundationReportBooleanDifference(
+        diff,
+        "private_heat_accepted",
+        left.private_heat_accepted,
+        right.private_heat_accepted);
+
+    AddFoundationReportBooleanDifference(
+        diff,
+        "threat_fail_closed",
+        left.threat_fail_closed,
+        right.threat_fail_closed);
+
+    AddFoundationReportBooleanDifference(
+        diff,
+        "water_biodiversity_allowed",
+        left.water_biodiversity_allowed,
+        right.water_biodiversity_allowed);
+
+    AddFoundationReportBooleanDifference(
+        diff,
+        "water_biodiversity_invariant_holds",
+        left.water_biodiversity_invariant_holds,
+        right.water_biodiversity_invariant_holds);
+
+    AddFoundationReportBooleanDifference(
+        diff,
+        "authorization_accepted",
+        left.authorization_accepted,
+        right.authorization_accepted);
+
+    AddFoundationReportBooleanDifference(
+        diff,
+        "invasive_control_safe",
+        left.invasive_control_safe,
+        right.invasive_control_safe);
+
+    AddFoundationReportBooleanDifference(
+        diff,
+        "irrigation_robustly_feasible",
+        left.irrigation_robustly_feasible,
+        right.irrigation_robustly_feasible);
+
+    AddFoundationReportDoubleDifference(
+        diff,
+        "maximum_risk_of_harm",
+        left.maximum_risk_of_harm,
+        right.maximum_risk_of_harm,
+        tolerance);
+
+    AddFoundationReportDoubleDifference(
+        diff,
+        "knowledge_factor",
+        left.knowledge_factor,
+        right.knowledge_factor,
+        tolerance);
+
+    AddFoundationReportDoubleDifference(
+        diff,
+        "eco_impact_value",
+        left.eco_impact_value,
+        right.eco_impact_value,
+        tolerance);
+
+    AddFoundationReportBooleanDifference(
+        diff,
+        "foundation_safe",
+        left.foundation_safe,
+        right.foundation_safe);
+
+    diff.identical = diff.differences.empty();
+    return diff;
+}
+
+bool IsFoundationReportDiffValid(
+    const FoundationReportDiff& diff) {
+    return diff.identical == diff.differences.empty();
+}
+
+std::string ExplainFoundationReportDiff(
+    const FoundationReportDiff& diff) {
+    if (!IsFoundationReportDiffValid(diff)) {
+        throw std::invalid_argument(
+            "foundation report difference state is inconsistent");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+
+    output << "foundation_report_diff\n";
+    output << "identical="
+           << (diff.identical ? "true" : "false")
+           << '\n';
+    output << "difference_count="
+           << diff.differences.size()
+           << '\n';
+
+    for (std::size_t index = 0U;
+         index < diff.differences.size();
+         ++index) {
+        output << "difference_" << index << '='
+               << diff.differences[index]
+               << '\n';
+    }
+
+    return output.str();
+}
+
+bool FoundationReportComparisonSelfTest() {
+    const FoundationReport baseline{
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        0.120000000,
+        0.875000000,
+        0.625000000,
+        true
+    };
+
+    const FoundationReport exact_copy = baseline;
+
+    const FoundationReportDiff identical =
+        CompareFoundationReports(baseline, exact_copy);
+
+    if (!identical.identical ||
+        !identical.differences.empty() ||
+        !IsFoundationReportDiffValid(identical)) {
+        return false;
+    }
+
+    FoundationReport within_tolerance = baseline;
+    within_tolerance.knowledge_factor += 0.0000000005;
+
+    const FoundationReportDiff approximately_equal =
+        CompareFoundationReports(
+            baseline,
+            within_tolerance,
+            1e-9);
+
+    if (!approximately_equal.identical ||
+        !approximately_equal.differences.empty()) {
+        return false;
+    }
+
+    const FoundationReportDiff outside_tolerance =
+        CompareFoundationReports(
+            baseline,
+            within_tolerance,
+            1e-12);
+
+    if (outside_tolerance.identical ||
+        outside_tolerance.differences.size() != 1U ||
+        outside_tolerance.differences.front().find(
+            "knowledge_factor differs") ==
+            std::string::npos) {
+        return false;
+    }
+
+    FoundationReport different = baseline;
+    different.private_heat_accepted = false;
+    different.water_biodiversity_allowed = false;
+    different.maximum_risk_of_harm = 0.31;
+    different.eco_impact_value = 0.50;
+    different.foundation_safe = false;
+
+    const FoundationReportDiff multiple_differences =
+        CompareFoundationReports(baseline, different);
+
+    if (multiple_differences.identical ||
+        multiple_differences.differences.size() != 5U ||
+        !IsFoundationReportDiffValid(multiple_differences)) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainFoundationReportDiff(multiple_differences);
+
+    if (explanation.find("foundation_report_diff") ==
+            std::string::npos ||
+        explanation.find("identical=false") ==
+            std::string::npos ||
+        explanation.find("difference_count=5") ==
+            std::string::npos ||
+        explanation.find(
+            "private_heat_accepted differs") ==
+            std::string::npos ||
+        explanation.find(
+            "maximum_risk_of_harm differs") ==
+            std::string::npos) {
+        return false;
+    }
+
+    try {
+        static_cast<void>(
+            CompareFoundationReports(
+                baseline,
+                exact_copy,
+                -0.01));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    try {
+        static_cast<void>(
+            CompareFoundationReports(
+                baseline,
+                exact_copy,
+                std::numeric_limits<double>::infinity()));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    FoundationReport nan_left = baseline;
+    FoundationReport nan_right = baseline;
+    nan_left.knowledge_factor =
+        std::numeric_limits<double>::quiet_NaN();
+    nan_right.knowledge_factor =
+        std::numeric_limits<double>::quiet_NaN();
+
+    const FoundationReportDiff nan_match =
+        CompareFoundationReports(nan_left, nan_right);
+
+    if (!nan_match.identical) {
+        return false;
+    }
+
+    nan_right.knowledge_factor = 0.5;
+
+    const FoundationReportDiff nan_mismatch =
+        CompareFoundationReports(nan_left, nan_right);
+
+    return !nan_mismatch.identical &&
+           nan_mismatch.differences.size() == 1U;
+}
+
+}
+
+namespace prometheus_praxis_foundation_extensions {
+
+bool IsFoundationReportUnitIntervalValueValid(
+    double value) {
+    return std::isfinite(value) &&
+           value >= 0.0 &&
+           value <= 1.0;
+}
+
+void AddFoundationReportValidationFailure(
+    std::vector<std::string>& failures,
+    bool condition,
+    std::string_view reason) {
+    if (!condition) {
+        failures.emplace_back(reason);
+    }
+}
+
+bool FoundationReportStagesIndicateSafeOutcome(
+    const FoundationReport& report) {
+    return report.private_heat_accepted &&
+           !report.threat_fail_closed &&
+           report.water_biodiversity_allowed &&
+           report.water_biodiversity_invariant_holds &&
+           report.authorization_accepted &&
+           report.invasive_control_safe &&
+           report.irrigation_robustly_feasible &&
+           IsFoundationReportUnitIntervalValueValid(
+               report.maximum_risk_of_harm) &&
+           report.maximum_risk_of_harm <= 0.30;
+}
+
+std::vector<std::string> ValidateFoundationReport(
+    const FoundationReport& report) {
+    std::vector<std::string> failures;
+
+    AddFoundationReportValidationFailure(
+        failures,
+        IsFoundationReportUnitIntervalValueValid(
+            report.maximum_risk_of_harm),
+        "maximum_risk_of_harm must be finite and lie in [0,1]");
+
+    AddFoundationReportValidationFailure(
+        failures,
+        IsFoundationReportUnitIntervalValueValid(
+            report.knowledge_factor),
+        "knowledge_factor must be finite and lie in [0,1]");
+
+    AddFoundationReportValidationFailure(
+        failures,
+        IsFoundationReportUnitIntervalValueValid(
+            report.eco_impact_value),
+        "eco_impact_value must be finite and lie in [0,1]");
+
+    if (report.foundation_safe) {
+        AddFoundationReportValidationFailure(
+            failures,
+            report.private_heat_accepted,
+            "foundation_safe requires private_heat_accepted");
+
+        AddFoundationReportValidationFailure(
+            failures,
+            !report.threat_fail_closed,
+            "foundation_safe requires threat_fail_closed to be false");
+
+        AddFoundationReportValidationFailure(
+            failures,
+            report.water_biodiversity_allowed,
+            "foundation_safe requires water_biodiversity_allowed");
+
+        AddFoundationReportValidationFailure(
+            failures,
+            report.water_biodiversity_invariant_holds,
+            "foundation_safe requires water biodiversity invariant");
+
+        AddFoundationReportValidationFailure(
+            failures,
+            report.authorization_accepted,
+            "foundation_safe requires authorization_accepted");
+
+        AddFoundationReportValidationFailure(
+            failures,
+            report.invasive_control_safe,
+            "foundation_safe requires invasive_control_safe");
+
+        AddFoundationReportValidationFailure(
+            failures,
+            report.irrigation_robustly_feasible,
+            "foundation_safe requires irrigation_robustly_feasible");
+
+        AddFoundationReportValidationFailure(
+            failures,
+            IsFoundationReportUnitIntervalValueValid(
+                report.maximum_risk_of_harm) &&
+                report.maximum_risk_of_harm <= 0.30,
+            "foundation_safe requires maximum_risk_of_harm <= 0.30");
+    } else {
+        AddFoundationReportValidationFailure(
+            failures,
+            !FoundationReportStagesIndicateSafeOutcome(),
+            "foundation_safe is false despite all safety conditions passing");
+    }
+
+    return failures;
+}
+
+bool IsFoundationReportValid(
+    const FoundationReport& report) {
+    return ValidateFoundationReport(report).empty();
+}
+
+std::string ExplainFoundationReportValidation(
+    const FoundationReport& report) {
+    const std::vector<std::string> failures =
+        ValidateFoundationReport(report);
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << std::fixed << std::setprecision(6);
+
+    output << "foundation_report_validation\n";
+    output << "valid="
+           << (failures.empty() ? "true" : "false")
+           << '\n';
+    output << "foundation_safe="
+           << (report.foundation_safe ? "true" : "false")
+           << '\n';
+    output << "maximum_risk_of_harm="
+           << report.maximum_risk_of_harm
+           << '\n';
+    output << "knowledge_factor="
+           << report.knowledge_factor
+           << '\n';
+    output << "eco_impact_value="
+           << report.eco_impact_value
+           << '\n';
+    output << "failure_count="
+           << failures.size()
+           << '\n';
+
+    for (std::size_t index = 0U;
+         index < failures.size();
+         ++index) {
+        output << "failure_" << index << '='
+               << failures[index]
+               << '\n';
+    }
+
+    return output.str();
+}
+
+bool ValidateFoundationReportSelfTest() {
+    const FoundationReport safe_report{
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        0.30,
+        0.90,
+        0.80,
+        true
+    };
+
+    if (!ValidateFoundationReport(safe_report).empty() ||
+        !IsFoundationReportValid(safe_report)) {
+        return false;
+    }
+
+    const std::string safe_explanation =
+        ExplainFoundationReportValidation(safe_report);
+
+    if (safe_explanation.find(
+            "foundation_report_validation") ==
+            std::string::npos ||
+        safe_explanation.find("valid=true") ==
+            std::string::npos ||
+        safe_explanation.find("failure_count=0") ==
+            std::string::npos) {
+        return false;
+    }
+
+    FoundationReport unsafe_report = safe_report;
+    unsafe_report.foundation_safe = false;
+
+    const std::vector<std::string> false_safe_failures =
+        ValidateFoundationReport(unsafe_report);
+
+    if (false_safe_failures.size() != 1U ||
+        false_safe_failures.front() !=
+            "foundation_safe is false despite all safety conditions passing" ||
+        IsFoundationReportValid(unsafe_report)) {
+        return false;
+    }
+
+    FoundationReport unsafe_stage_report = safe_report;
+    unsafe_stage_report.private_heat_accepted = false;
+    unsafe_stage_report.foundation_safe = true;
+
+    const std::vector<std::string> unsafe_stage_failures =
+        ValidateFoundationReport(unsafe_stage_report);
+
+    if (unsafe_stage_failures.size() != 1U ||
+        unsafe_stage_failures.front() !=
+            "foundation_safe requires private_heat_accepted") {
+        return false;
+    }
+
+    FoundationReport unsafe_risk_report = safe_report;
+    unsafe_risk_report.maximum_risk_of_harm = 0.31;
+
+    const std::vector<std::string> unsafe_risk_failures =
+        ValidateFoundationReport(unsafe_risk_report);
+
+    if (unsafe_risk_failures.size() != 1U ||
+        unsafe_risk_failures.front() !=
+            "foundation_safe requires maximum_risk_of_harm <= 0.30") {
+        return false;
+    }
+
+    FoundationReport nonfinite_report = safe_report;
+    nonfinite_report.knowledge_factor =
+        std::numeric_limits<double>::infinity();
+
+    const std::vector<std::string> nonfinite_failures =
+        ValidateFoundationReport(nonfinite_report);
+
+    if (nonfinite_failures.size() != 1U ||
+        nonfinite_failures.front() !=
+            "knowledge_factor must be finite and lie in [0,1]") {
+        return false;
+    }
+
+    FoundationReport multiple_failure_report = safe_report;
+    multiple_failure_report.private_heat_accepted = false;
+    multiple_failure_report.threat_fail_closed = true;
+    multiple_failure_report.water_biodiversity_allowed = false;
+    multiple_failure_report.maximum_risk_of_harm = 1.01;
+    multiple_failure_report.eco_impact_value = -0.01;
+
+    const std::vector<std::string> multiple_failures =
+        ValidateFoundationReport(multiple_failure_report);
+
+    if (multiple_failures.size() != 7U ||
+        IsFoundationReportValid(multiple_failure_report)) {
+        return false;
+    }
+
+    const std::string failure_explanation =
+        ExplainFoundationReportValidation(
+            multiple_failure_report);
+
+    if (failure_explanation.find("valid=false") ==
+            std::string::npos ||
+        failure_explanation.find("failure_count=7") ==
+            std::string::npos ||
+        failure_explanation.find(
+            "maximum_risk_of_harm must be finite") ==
+            std::string::npos ||
+        failure_explanation.find(
+            "foundation_safe requires threat_fail_closed to be false") ==
+            std::string::npos) {
+        return false;
+    }
+
+    return true;
+}
+
+}
+
+namespace prometheus_praxis_foundation_extensions {
+
+struct FoundationStageSummary {
+    std::string stage;
+    bool passed{};
+    double score{};
+    std::string detail;
+};
+
+bool IsFoundationStageSummaryValid(
+    const FoundationStageSummary& stage) {
+    return IsStableKey(stage.stage) &&
+           std::isfinite(stage.score) &&
+           stage.score >= 0.0 &&
+           stage.score <= 1.0 &&
+           !stage.detail.empty() &&
+           stage.detail.find_first_of("\r\n") ==
+               std::string::npos;
+}
+
+std::string FormatFoundationStageScore(
+    double score) {
+    if (!std::isfinite(score) ||
+        score < 0.0 ||
+        score > 1.0) {
+        throw std::invalid_argument(
+            "foundation stage score must lie in [0,1]");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << std::fixed << std::setprecision(6) << score;
+    return output.str();
+}
+
+bool IsFoundationStageSummaryLineValid(
+    std::string_view line,
+    std::size_t maximum_columns = 119U) {
+    return !line.empty() &&
+           line.size() <= maximum_columns &&
+           line.find_first_of("\r\n") ==
+               std::string_view::npos;
+}
+
+std::string BuildFoundationStageSummaryLine(
+    const FoundationStageSummary& stage) {
+    if (!IsFoundationStageSummaryValid(stage)) {
+        throw std::invalid_argument(
+            "foundation stage summary is invalid");
+    }
+
+    const std::string line =
+        stage.stage +
+        " status=" +
+        (stage.passed ? "pass" : "fail") +
+        " score=" +
+        FormatFoundationStageScore(stage.score) +
+        " detail=" +
+        stage.detail;
+
+    if (!IsFoundationStageSummaryLineValid(line)) {
+        throw std::length_error(
+            "foundation stage summary line exceeds width limit");
+    }
+
+    return line;
+}
+
+std::vector<FoundationStageSummary> SummarizeFoundationStages(
+    const FoundationReport& report) {
+    const std::vector<std::string> report_failures =
+        ValidateFoundationReport(report);
+
+    const bool report_metrics_valid =
+        IsFoundationReportUnitIntervalValueValid(
+            report.maximum_risk_of_harm) &&
+        IsFoundationReportUnitIntervalValueValid(
+            report.knowledge_factor) &&
+        IsFoundationReportUnitIntervalValueValid(
+            report.eco_impact_value);
+
+    const double knowledge_score =
+        IsFoundationReportUnitIntervalValueValid(
+            report.knowledge_factor)
+            ? report.knowledge_factor
+            : 0.0;
+
+    const double impact_score =
+        IsFoundationReportUnitIntervalValueValid(
+            report.eco_impact_value)
+            ? report.eco_impact_value
+            : 0.0;
+
+    const double risk_score =
+        IsFoundationReportUnitIntervalValueValid(
+            report.maximum_risk_of_harm)
+            ? 1.0 - report.maximum_risk_of_harm
+            : 0.0;
+
+    const bool private_heat_passed =
+        report.private_heat_accepted;
+
+    const bool threat_passed =
+        !report.threat_fail_closed;
+
+    const bool water_passed =
+        report.water_biodiversity_allowed &&
+        report.water_biodiversity_invariant_holds;
+
+    const bool authorization_passed =
+        report.authorization_accepted;
+
+    const bool invasive_passed =
+        report.invasive_control_safe;
+
+    const bool irrigation_passed =
+        report.irrigation_robustly_feasible;
+
+    std::vector<FoundationStageSummary> stages{
+        {
+            "private_heat",
+            private_heat_passed,
+            private_heat_passed ? knowledge_score : 0.0,
+            private_heat_passed
+                ? "private heat evidence accepted"
+                : "private heat evidence was not accepted"
+        },
+        {
+            "threat_containment",
+            threat_passed,
+            threat_passed ? risk_score : 0.0,
+            threat_passed
+                ? "no fail_closed threat state is active"
+                : "threat assessment entered fail_closed state"
+        },
+        {
+            "water_biodiversity",
+            water_passed,
+            water_passed ? impact_score : 0.0,
+            water_passed
+                ? "water and biodiversity conditions accepted"
+                : "water or biodiversity condition was not accepted"
+        },
+        {
+            "authorization",
+            authorization_passed,
+            authorization_passed ? knowledge_score : 0.0,
+            authorization_passed
+                ? "proof checked authorization accepted"
+                : "proof checked authorization was not accepted"
+        },
+        {
+            "invasive_control",
+            invasive_passed,
+            invasive_passed ? impact_score : 0.0,
+            invasive_passed
+                ? "invasive control candidate is safe"
+                : "invasive control candidate is not safe"
+        },
+        {
+            "irrigation",
+            irrigation_passed,
+            irrigation_passed ? risk_score : 0.0,
+            irrigation_passed
+                ? "robust irrigation schedule is feasible"
+                : "robust irrigation schedule is not feasible"
+        }
+    };
+
+    if (!report_metrics_valid ||
+        !report_failures.empty() && report.foundation_safe) {
+        for (auto& stage : stages) {
+            if (stage.detail.size() + 29U <= 119U) {
+                stage.detail += "; report metrics require review";
+            }
+        }
+    }
+
+    for (const auto& stage : stages) {
+        if (!IsFoundationStageSummaryValid(stage)) {
+            throw std::logic_error(
+                "generated foundation stage summary is invalid");
+        }
+    }
+
+    return stages;
+}
+
+std::string FormatFoundationStageSummary(
+    const std::vector<FoundationStageSummary>& stages) {
+    if (stages.empty()) {
+        throw std::invalid_argument(
+            "foundation stage summary collection must not be empty");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+
+    output << "foundation_stage_summary\n";
+
+    for (const auto& stage : stages) {
+        const std::string line =
+            BuildFoundationStageSummaryLine(stage);
+
+        output << line << '\n';
+    }
+
+    const std::string summary = output.str();
+
+    if (!IsUsageLineWidthValid(summary, 119U)) {
+        throw std::length_error(
+            "foundation stage summary exceeds line width limit");
+    }
+
+    return summary;
+}
+
+bool FoundationStageSummarySelfTest() {
+    const FoundationReport safe_report{
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        0.20,
+        0.90,
+        0.80,
+        true
+    };
+
+    const std::vector<FoundationStageSummary> safe_stages =
+        SummarizeFoundationStages(safe_report);
+
+    if (safe_stages.size() != 6U ||
+        safe_stages[0].stage != "private_heat" ||
+        !safe_stages[0].passed ||
+        safe_stages[1].stage != "threat_containment" ||
+        !safe_stages[1].passed ||
+        safe_stages[2].stage != "water_biodiversity" ||
+        !safe_stages[2].passed ||
+        safe_stages[3].stage != "authorization" ||
+        !safe_stages[3].passed ||
+        safe_stages[4].stage != "invasive_control" ||
+        !safe_stages[4].passed ||
+        safe_stages[5].stage != "irrigation" ||
+        !safe_stages[5].passed) {
+        return false;
+    }
+
+    for (const auto& stage : safe_stages) {
+        if (!IsFoundationStageSummaryValid(stage) ||
+            !IsFoundationStageSummaryLineValid(
+                BuildFoundationStageSummaryLine(stage))) {
+            return false;
+        }
+    }
+
+    const std::string safe_summary =
+        FormatFoundationStageSummary(safe_stages);
+
+    if (safe_summary.find("foundation_stage_summary") ==
+            std::string::npos ||
+        safe_summary.find(
+            "private_heat status=pass score=0.900000") ==
+            std::string::npos ||
+        safe_summary.find(
+            "threat_containment status=pass score=0.800000") ==
+            std::string::npos ||
+        safe_summary.find(
+            "water_biodiversity status=pass score=0.800000") ==
+            std::string::npos ||
+        !IsUsageLineWidthValid(safe_summary, 119U)) {
+        return false;
+    }
+
+    FoundationReport blocked_report = safe_report;
+    blocked_report.threat_fail_closed = true;
+    blocked_report.water_biodiversity_invariant_holds = false;
+    blocked_report.invasive_control_safe = false;
+    blocked_report.foundation_safe = false;
+
+    const std::vector<FoundationStageSummary> blocked_stages =
+        SummarizeFoundationStages(blocked_report);
+
+    if (blocked_stages.size() != 6U ||
+        blocked_stages[1].passed ||
+        blocked_stages[2].passed ||
+        blocked_stages[4].passed ||
+        blocked_stages[0].score != 0.90 ||
+        blocked_stages[1].score != 0.0 ||
+        blocked_stages[2].score != 0.0 ||
+        blocked_stages[4].score != 0.0) {
+        return false;
+    }
+
+    const std::string blocked_summary =
+        FormatFoundationStageSummary(blocked_stages);
+
+    if (blocked_summary.find(
+            "threat_containment status=fail score=0.000000") ==
+            std::string::npos ||
+        blocked_summary.find(
+            "water_biodiversity status=fail score=0.000000") ==
+            std::string::npos ||
+        blocked_summary.find(
+            "invasive_control status=fail score=0.000000") ==
+            std::string::npos) {
+        return false;
+    }
+
+    const FoundationStageSummary invalid_stage{
+        "Invalid-Stage",
+        true,
+        0.50,
+        "invalid name"
+    };
+
+    if (IsFoundationStageSummaryValid(invalid_stage)) {
+        return false;
+    }
+
+    try {
+        static_cast<void>(
+            FormatFoundationStageSummary({}));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    try {
+        static_cast<void>(
+            BuildFoundationStageSummaryLine(invalid_stage));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    const FoundationStageSummary oversized_stage{
+        "large_stage",
+        true,
+        0.50,
+        std::string(100U, 'x')
+    };
+
+    try {
+        static_cast<void>(
+            BuildFoundationStageSummaryLine(oversized_stage));
+        return false;
+    } catch (const std::length_error&) {
+    }
+
+    return true;
+}
+
+}
+
+// Roadmap v2: append-only integration guidance begins.
+// Priority 1: preserve the established FoundationReport JSON schema.
+// Priority 1: preserve current command-line behavior by default.
+// Priority 1: retain existing exit-code meanings.
+// Priority 1: compile the complete translation unit under C++20.
+// Priority 1: keep all new diagnostics deterministic.
+// Priority 1: avoid external network actions from diagnostics.
+// Priority 1: treat all external identifiers as inert input data.
+// Priority 1: validate every ecological score before aggregation.
+// Priority 1: keep risk-of-harm values within the unit interval.
+// Priority 1: retain the 0.30 risk corridor where existing policy requires it.
+// Priority 1: distinguish diagnostic failure from runtime failure.
+// Priority 1: make failure details available without weakening validation.
+// Priority 1: do not hide a failed self-test behind aggregate output.
+// Priority 2: use CanonicalExtensionRegistry for new self-test registration.
+// Priority 2: retain the legacy extension registry during transition.
+// Priority 2: do not mutate legacy registry storage from new objects.
+// Priority 2: map each canonical descriptor to one stable lower_snake_case name.
+// Priority 2: require each canonical descriptor to own a non-null self-test pointer.
+// Priority 2: require each canonical descriptor to declare a non-empty purpose.
+// Priority 2: reject duplicate canonical descriptor names.
+// Priority 2: keep registry iteration in insertion order.
+// Priority 2: register only symbols declared before registry construction.
+// Priority 2: add newly appended self-tests only after their declarations.
+// Priority 2: test the registry independently of the command-line entry point.
+// Priority 2: emit individual canonical test outcomes.
+// Priority 2: emit an aggregate canonical test outcome.
+// Priority 2: preserve the aggregate output key for existing automation.
+// Priority 2: avoid boolean short-circuiting when reporting independent test results.
+// Priority 2: execute every registered test even if an earlier test fails.
+// Priority 2: record a clear detail field for each completed test.
+// Priority 2: reserve runtime-failure exit code for exceptions or invalid runner state.
+// Priority 2: reserve safety-blocked exit code for completed tests with failures.
+// Priority 2: return success only if every registered test passes.
+// Main integration: add a future --foundation-all-self-tests command branch.
+// Main integration: leave existing --foundation-self-check behavior unchanged.
+// Main integration: leave existing --foundation-extension-self-test behavior unchanged.
+// Main integration: route the new branch to RunAllKnownExtensionSelfTestsAndExit.
+// Main integration: update usage output after the new branch is implemented.
+// Main integration: add an integration test for the exact new command name.
+// Main integration: assert that the all-self-tests output includes every test key.
+// Main integration: assert that the final aggregate result is emitted last.
+// Main integration: maintain one line per stable key-value record.
+// Main integration: keep output parsable by basic line-oriented tools.
+// Main integration: do not emit secret values or private environmental inputs.
+// Main integration: direct human-readable detail to stable diagnostic fields.
+// Main integration: make command output locale-independent.
+// Main integration: use the classic locale for numeric serialization.
+// Main integration: keep numeric precision consistent with existing report output.
+// Main integration: document command exit states in user-facing usage text.
+// Registry migration: add descriptors for verified existing self-tests first.
+// Registry migration: compare legacy and canonical test outcomes during transition.
+// Registry migration: investigate differences before removing legacy checks.
+// Registry migration: avoid a silent replacement of legacy registry semantics.
+// Registry migration: verify name and purpose metadata in unit tests.
+// Registry migration: prefer direct function pointers for local synchronous tests.
+// Registry migration: do not introduce dynamic loading for self-test discovery.
+// Registry migration: do not add global mutable state for test registration.
+// Registry migration: construct canonical registries locally for deterministic runs.
+// Registry migration: retain read-only descriptor access through Extensions.
+// Registry migration: keep duplicate detection explicit and covered by regression tests.
+// Registry migration: keep diagnostics_only true for diagnostic extension entries.
+// Object strategy: use ObjectMarkerRegistry instead of comment scanning.
+// Object strategy: register positive numeric object identifiers.
+// Object strategy: require non-empty identifier-safe object titles.
+// Object strategy: reject duplicate object numbers.
+// Object strategy: use sorted marker output for deterministic review.
+// Object strategy: use IsSequential only when numbering must begin at one.
+// Object strategy: use ordering checks for append-only ranges beginning after prior objects.
+// Object strategy: record object metadata in tests where traceability matters.
+// Object strategy: do not make compilation depend on human comment markers.
+// Object strategy: retain comments for reader orientation only.
+// Object strategy: permit future object registries to start from known append ranges.
+// Object strategy: avoid changing historical object numbers.
+// Object strategy: keep object titles concise and identifier-safe.
+// Source audit: prefer symbol presence checks over source-comment checks.
+// Source audit: treat symbol counts as diagnostics rather than proof of semantics.
+// Source audit: keep required symbol lists unique and identifier-safe.
+// Source audit: add a required symbol only after its API is stable.
+// Source audit: retain the existing consistency audit until migration is confirmed.
+// Source audit: do not fail production behavior solely because a comment is absent.
+// Source audit: use source audits in diagnostic and maintenance workflows.
+// Source audit: distinguish a missing symbol from a symbol with multiple references.
+// Source audit: preserve deterministic ordering in source-audit results.
+// Source audit: use escaped and bounded explanation output.
+// Path strategy: normalize repository-relative paths to generic separators.
+// Path strategy: accept native and generic separators at input boundaries.
+// Path strategy: reject empty paths.
+// Path strategy: reject absolute paths.
+// Path strategy: reject drive-qualified paths.
+// Path strategy: reject path traversal segments.
+// Path strategy: reject control characters in repository paths.
+// Path strategy: use std::filesystem lexical normalization only for local path handling.
+// Path strategy: do not access filesystem contents merely to normalize strings.
+// Path strategy: keep normalized paths repository-relative.
+// Path strategy: validate configured paths before use in reporting.
+// Governance strategy: use GovernancePolicyAliasRegistry for diagnostic aliases.
+// Governance strategy: validate aliases and canonical names as stable identifiers.
+// Governance strategy: reject alias collisions before storing a new record.
+// Governance strategy: retain canonical policy names as the source of authority.
+// Governance strategy: use aliases only to improve operator-facing clarity.
+// Governance strategy: keep alias resolution read-only after registration.
+// Governance strategy: list aliases in sorted order for deterministic output.
+// Governance strategy: do not permit aliases to replace policy validation.
+// Governance strategy: report active state explicitly in diagnostic output.
+// Governance strategy: add policy aliases only with an associated review record.
+// Fixed-point strategy: centralize conversion behavior in one utility surface.
+// Fixed-point strategy: validate scales before conversion.
+// Fixed-point strategy: reject non-finite source values.
+// Fixed-point strategy: make rounding mode explicit.
+// Fixed-point strategy: preserve fixed-point ranges before casting.
+// Fixed-point strategy: use explanation helpers for audit output.
+// Fixed-point strategy: avoid duplicate scale literals across new modules.
+// Fixed-point strategy: align new scale use with established ppf constants when available.
+// Risk strategy: maintain named sources for every aggregated risk value.
+// Risk strategy: require each source name to be lower_snake_case.
+// Risk strategy: reject invalid or duplicated sourced risks.
+// Risk strategy: use maximum risk as the governing safety value.
+// Risk strategy: keep weighted risk as a transparent supplementary diagnostic.
+// Risk strategy: do not substitute weighted risk for maximum risk in safety gating.
+// Risk strategy: preserve input provenance in explanation output.
+// Score strategy: validate knowledge and eco-impact values before averaging.
+// Score strategy: keep score aggregation separate from safety acceptance.
+// Score strategy: record stage weights explicitly when weighted means are introduced.
+// Score strategy: avoid division by zero in weighted calculations.
+// Score strategy: preserve unit-interval expectations for all public scores.
+// Report strategy: validate FoundationReport before serialization or comparison.
+// Report strategy: keep validation results machine-readable.
+// Report strategy: compare report doubles with explicit finite tolerances.
+// Report strategy: compare boolean gates exactly.
+// Report strategy: retain descriptive per-field difference messages.
+// Report strategy: treat non-finite report metrics as validation failures.
+// Report strategy: derive foundation safety from its documented stage conditions.
+// Report strategy: reconcile any legacy semantic disagreement before changing gates.
+// Report strategy: do not serialize invalid non-finite numeric values as JSON.
+// Summary strategy: present exactly six core stage entries in stable order.
+// Summary strategy: use pass or fail rather than ambiguous status terms.
+// Summary strategy: cap each human-readable summary line at the established width.
+// Summary strategy: use fixed precision for stage scores.
+// Summary strategy: avoid multiline detail strings.
+// Summary strategy: keep summary formatting separate from decision computation.
+// JSON strategy: preserve field order for regression stability.
+// JSON strategy: use json_string for all externally visible strings.
+// JSON strategy: use json_double only after finite-value validation.
+// JSON strategy: keep registry serialization read-only.
+// JSON strategy: serialize canonical descriptors in registry iteration order.
+// JSON strategy: serialize run results in execution order.
+// JSON strategy: avoid locale-dependent number formatting.
+// Header strategy: every header must include what it directly uses.
+// Header strategy: add numeric support inside any header using std::accumulate.
+// Header strategy: remove dependence on incidental include order.
+// Header strategy: compile headers in isolated smoke-test translation units.
+// Header strategy: eliminate duplicate includes during routine cleanup only.
+// Header strategy: avoid broad namespace imports in public headers.
+// Testing strategy: compile with C++20 and strict warnings.
+// Testing strategy: run extension tests independently and as an aggregate.
+// Testing strategy: add regression cases for every corrected failure mode.
+// Testing strategy: preserve successful legacy self-check behavior.
+// Testing strategy: test exception handling paths in adapters.
+// Testing strategy: test empty registries and invalid descriptors.
+// Testing strategy: test escaping with quotes, slashes, and control characters.
+// Testing strategy: test report validation at risk threshold boundaries.
+// Testing strategy: test path normalization for slash variations and unsafe paths.
+// Testing strategy: test alias collisions and unresolved aliases.
+// Compatibility guarantee: do not rename existing FoundationReport JSON fields.
+// Compatibility guarantee: do not change existing schema defaults without versioning.
+// Compatibility guarantee: do not alter existing command names without an alias period.
+// Compatibility guarantee: do not change established platform exit values.
+// Compatibility guarantee: do not remove legacy self-tests before canonical parity is verified.
+// Compatibility guarantee: do not change ecological safety thresholds without policy review.
+// Compatibility guarantee: do not silently broaden accepted risk ranges.
+// Compatibility guarantee: do not replace fail-closed behavior with permissive fallback.
+// Compatibility guarantee: do not rely on external proprietary dependencies.
+// Compatibility guarantee: keep all appended logic standard-library based.
+// Delivery sequence: compile after each appended object.
+// Delivery sequence: run the focused self-test for each appended object.
+// Delivery sequence: register a new object only after its self-test is available.
+// Delivery sequence: integrate command dispatch after registry behavior is stable.
+// Delivery sequence: run full canonical diagnostics before final release review.
+// Delivery sequence: record unresolved legacy-test divergence as an explicit issue.
+// Delivery sequence: prefer small, verifiable changes over broad rewrites.
+// End of additional roadmap comments.
