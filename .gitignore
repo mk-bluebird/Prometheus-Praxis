@@ -1,1 +1,6 @@
-Nothing needs to be added to .gitignore since only a single C++ source file was added without any build artifacts, dependencies, or temporary files.
+```
+# Compiled and build artifacts
+*.o
+*.obj
+*.out
+```
