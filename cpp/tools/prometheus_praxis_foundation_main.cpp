@@ -14857,3 +14857,1805 @@ bool CheckedFixedPointArithmeticSelfTest() {
 }
 
 }
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+struct RiskThresholdProfile {
+    double maximum_risk_of_harm{};
+    double preferred_risk_of_harm{};
+    std::int32_t maximum_risk_fixed{};
+    std::int32_t preferred_risk_fixed{};
+    std::vector<double> stage_weights;
+};
+
+bool IsRiskThresholdUnitInterval(
+    double value) {
+    return std::isfinite(value) &&
+           value >= 0.0 &&
+           value <= 1.0;
+}
+
+bool IsRiskThresholdFixedPointValid(
+    std::int32_t value) {
+    return value >= 0 &&
+           value <= foundation_risk_fixed_scale;
+}
+
+bool AreRiskThresholdStageWeightsValid(
+    const std::vector<double>& weights) {
+    if (weights.empty()) {
+        return false;
+    }
+
+    double sum = 0.0;
+
+    for (const double weight : weights) {
+        if (!std::isfinite(weight) || weight < 0.0) {
+            return false;
+        }
+
+        sum += weight;
+    }
+
+    return std::isfinite(sum) &&
+           sum > 0.0;
+}
+
+double SumRiskThresholdStageWeights(
+    const std::vector<double>& weights) {
+    if (!AreRiskThresholdStageWeightsValid(weights)) {
+        throw std::invalid_argument(
+            "risk threshold stage weights are invalid");
+    }
+
+    double sum = 0.0;
+
+    for (const double weight : weights) {
+        sum += weight;
+    }
+
+    return sum;
+}
+
+bool IsRiskThresholdProfileValid(
+    const RiskThresholdProfile& profile) {
+    if (!IsRiskThresholdUnitInterval(
+            profile.maximum_risk_of_harm) ||
+        !IsRiskThresholdUnitInterval(
+            profile.preferred_risk_of_harm) ||
+        !IsRiskThresholdFixedPointValid(
+            profile.maximum_risk_fixed) ||
+        !IsRiskThresholdFixedPointValid(
+            profile.preferred_risk_fixed) ||
+        !AreRiskThresholdStageWeightsValid(
+            profile.stage_weights)) {
+        return false;
+    }
+
+    if (profile.preferred_risk_of_harm >
+            profile.maximum_risk_of_harm ||
+        profile.preferred_risk_fixed >
+            profile.maximum_risk_fixed) {
+        return false;
+    }
+
+    const std::int32_t expected_maximum =
+        RiskOfHarmToFixed(profile.maximum_risk_of_harm);
+
+    const std::int32_t expected_preferred =
+        RiskOfHarmToFixed(profile.preferred_risk_of_harm);
+
+    return expected_maximum == profile.maximum_risk_fixed &&
+           expected_preferred == profile.preferred_risk_fixed;
+}
+
+RiskThresholdProfile DefaultRiskThresholdProfile() {
+    RiskThresholdProfile profile{
+        0.30,
+        0.20,
+        foundation_risk_fixed_limit,
+        200'000,
+        {1.0, 1.0, 1.0, 1.0, 1.0, 1.0}
+    };
+
+    if (!IsRiskThresholdProfileValid(profile)) {
+        throw std::logic_error(
+            "default risk threshold profile is invalid");
+    }
+
+    return profile;
+}
+
+double NormalizedRiskThresholdStageWeight(
+    const RiskThresholdProfile& profile,
+    std::size_t index) {
+    if (!IsRiskThresholdProfileValid(profile) ||
+        index >= profile.stage_weights.size()) {
+        throw std::invalid_argument(
+            "risk threshold stage weight request is invalid");
+    }
+
+    return profile.stage_weights[index] /
+           SumRiskThresholdStageWeights(profile.stage_weights);
+}
+
+bool IsRiskWithinMaximumThreshold(
+    const RiskThresholdProfile& profile,
+    double risk_of_harm) {
+    if (!IsRiskThresholdProfileValid(profile) ||
+        !IsRiskThresholdUnitInterval(risk_of_harm)) {
+        return false;
+    }
+
+    return risk_of_harm <= profile.maximum_risk_of_harm;
+}
+
+bool IsRiskWithinPreferredThreshold(
+    const RiskThresholdProfile& profile,
+    double risk_of_harm) {
+    if (!IsRiskThresholdProfileValid(profile) ||
+        !IsRiskThresholdUnitInterval(risk_of_harm)) {
+        return false;
+    }
+
+    return risk_of_harm <= profile.preferred_risk_of_harm;
+}
+
+std::string ExplainRiskThresholdProfile(
+    const RiskThresholdProfile& profile) {
+    if (!IsRiskThresholdProfileValid(profile)) {
+        throw std::invalid_argument(
+            "risk threshold profile is invalid");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << std::fixed << std::setprecision(6);
+
+    output << "risk_threshold_profile\n";
+    output << "maximum_risk_of_harm="
+           << profile.maximum_risk_of_harm
+           << '\n';
+    output << "preferred_risk_of_harm="
+           << profile.preferred_risk_of_harm
+           << '\n';
+    output << "maximum_risk_fixed="
+           << profile.maximum_risk_fixed
+           << '\n';
+    output << "preferred_risk_fixed="
+           << profile.preferred_risk_fixed
+           << '\n';
+    output << "stage_weight_count="
+           << profile.stage_weights.size()
+           << '\n';
+    output << "stage_weight_sum="
+           << SumRiskThresholdStageWeights(
+                  profile.stage_weights)
+           << '\n';
+
+    for (std::size_t index = 0U;
+         index < profile.stage_weights.size();
+         ++index) {
+        output << "stage_weight_" << index << '='
+               << profile.stage_weights[index]
+               << '\n';
+        output << "stage_weight_" << index
+               << "_normalized="
+               << NormalizedRiskThresholdStageWeight(
+                      profile,
+                      index)
+               << '\n';
+    }
+
+    return output.str();
+}
+
+bool RiskThresholdProfileSelfTest() {
+    const RiskThresholdProfile profile =
+        DefaultRiskThresholdProfile();
+
+    if (!IsRiskThresholdProfileValid(profile) ||
+        std::abs(profile.maximum_risk_of_harm - 0.30) >
+            1e-12 ||
+        std::abs(profile.preferred_risk_of_harm - 0.20) >
+            1e-12 ||
+        profile.maximum_risk_fixed !=
+            foundation_risk_fixed_limit ||
+        profile.preferred_risk_fixed != 200'000 ||
+        profile.stage_weights.size() != 6U ||
+        std::abs(
+            SumRiskThresholdStageWeights(
+                profile.stage_weights) - 6.0) >
+            1e-12) {
+        return false;
+    }
+
+    for (std::size_t index = 0U;
+         index < profile.stage_weights.size();
+         ++index) {
+        if (std::abs(
+                NormalizedRiskThresholdStageWeight(
+                    profile,
+                    index) - (1.0 / 6.0)) >
+                1e-12) {
+            return false;
+        }
+    }
+
+    if (!IsRiskWithinMaximumThreshold(profile, 0.30) ||
+        IsRiskWithinMaximumThreshold(profile, 0.300001) ||
+        !IsRiskWithinPreferredThreshold(profile, 0.20) ||
+        IsRiskWithinPreferredThreshold(profile, 0.21) ||
+        IsRiskWithinMaximumThreshold(profile, -0.01) ||
+        IsRiskWithinPreferredThreshold(profile, 1.01)) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainRiskThresholdProfile(profile);
+
+    if (explanation.find("risk_threshold_profile") ==
+            std::string::npos ||
+        explanation.find("maximum_risk_of_harm=0.300000") ==
+            std::string::npos ||
+        explanation.find("preferred_risk_of_harm=0.200000") ==
+            std::string::npos ||
+        explanation.find("maximum_risk_fixed=300000") ==
+            std::string::npos ||
+        explanation.find("stage_weight_count=6") ==
+            std::string::npos) {
+        return false;
+    }
+
+    RiskThresholdProfile invalid_profile = profile;
+    invalid_profile.preferred_risk_of_harm = 0.31;
+
+    if (IsRiskThresholdProfileValid(invalid_profile)) {
+        return false;
+    }
+
+    invalid_profile = profile;
+    invalid_profile.maximum_risk_fixed = 300'001;
+
+    if (IsRiskThresholdProfileValid(invalid_profile)) {
+        return false;
+    }
+
+    invalid_profile = profile;
+    invalid_profile.stage_weights.clear();
+
+    if (IsRiskThresholdProfileValid(invalid_profile)) {
+        return false;
+    }
+
+    invalid_profile = profile;
+    invalid_profile.stage_weights[0] = -0.01;
+
+    if (IsRiskThresholdProfileValid(invalid_profile)) {
+        return false;
+    }
+
+    try {
+        static_cast<void>(
+            NormalizedRiskThresholdStageWeight(
+                profile,
+                profile.stage_weights.size()));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    return true;
+}
+
+}
+
+namespace prometheus_praxis_foundation_extensions {
+
+enum class NumericFormatStyle {
+    Fixed,
+    Scientific,
+    Percentage
+};
+
+bool IsNumericFormattingPrecisionValid(
+    std::size_t precision) {
+    return precision <= 15U;
+}
+
+bool IsNumericFormattingValueValid(
+    double value) {
+    return std::isfinite(value);
+}
+
+std::string_view NumericFormatStyleName(
+    NumericFormatStyle style) {
+    switch (style) {
+        case NumericFormatStyle::Fixed:
+            return "fixed";
+        case NumericFormatStyle::Scientific:
+            return "scientific";
+        case NumericFormatStyle::Percentage:
+            return "percentage";
+    }
+
+    throw std::invalid_argument(
+        "numeric format style is unrecognized");
+}
+
+std::string FormatNumericFixed(
+    double value,
+    std::size_t precision = 6U) {
+    if (!IsNumericFormattingValueValid(value) ||
+        !IsNumericFormattingPrecisionValid(precision)) {
+        throw std::invalid_argument(
+            "fixed numeric formatting request is invalid");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << std::fixed
+           << std::setprecision(
+                  static_cast<int>(precision))
+           << value;
+
+    return output.str();
+}
+
+std::string FormatNumericScientific(
+    double value,
+    std::size_t precision = 6U) {
+    if (!IsNumericFormattingValueValid(value) ||
+        !IsNumericFormattingPrecisionValid(precision)) {
+        throw std::invalid_argument(
+            "scientific numeric formatting request is invalid");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << std::scientific
+           << std::setprecision(
+                  static_cast<int>(precision))
+           << value;
+
+    return output.str();
+}
+
+std::string FormatNumericPercentage(
+    double ratio,
+    std::size_t precision = 2U) {
+    if (!IsNumericFormattingValueValid(ratio) ||
+        !IsNumericFormattingPrecisionValid(precision)) {
+        throw std::invalid_argument(
+            "percentage numeric formatting request is invalid");
+    }
+
+    const double percentage = ratio * 100.0;
+
+    if (!IsNumericFormattingValueValid(percentage)) {
+        throw std::invalid_argument(
+            "percentage numeric formatting result is invalid");
+    }
+
+    return FormatNumericFixed(percentage, precision) + "%";
+}
+
+std::string FormatNumericValue(
+    double value,
+    NumericFormatStyle style,
+    std::size_t precision = 6U) {
+    switch (style) {
+        case NumericFormatStyle::Fixed:
+            return FormatNumericFixed(value, precision);
+        case NumericFormatStyle::Scientific:
+            return FormatNumericScientific(value, precision);
+        case NumericFormatStyle::Percentage:
+            return FormatNumericPercentage(value, precision);
+    }
+
+    throw std::invalid_argument(
+        "numeric format style is unrecognized");
+}
+
+bool IsFormattedNumericStringValid(
+    std::string_view text,
+    NumericFormatStyle style) {
+    if (text.empty() ||
+        text.find_first_of("\r\n") !=
+            std::string_view::npos) {
+        return false;
+    }
+
+    const bool has_percent_suffix =
+        !text.empty() && text.back() == '%';
+
+    if (style == NumericFormatStyle::Percentage) {
+        return has_percent_suffix &&
+               text.size() > 1U;
+    }
+
+    return !has_percent_suffix;
+}
+
+std::string ExplainNumericFormattingPolicy(
+    double value,
+    std::size_t precision) {
+    if (!IsNumericFormattingValueValid(value) ||
+        !IsNumericFormattingPrecisionValid(precision)) {
+        throw std::invalid_argument(
+            "numeric formatting policy explanation request is invalid");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+
+    const std::string fixed =
+        FormatNumericFixed(value, precision);
+    const std::string scientific =
+        FormatNumericScientific(value, precision);
+    const std::string percentage =
+        FormatNumericPercentage(value, precision);
+
+    output << "numeric_formatting_policy\n";
+    output << "precision=" << precision << '\n';
+    output << "fixed=" << fixed << '\n';
+    output << "scientific=" << scientific << '\n';
+    output << "percentage=" << percentage << '\n';
+
+    return output.str();
+}
+
+bool NumericFormattingPolicySelfTest() {
+    const double value = 0.125;
+
+    const std::string fixed_default =
+        FormatNumericFixed(value);
+
+    const std::string fixed_three =
+        FormatNumericFixed(value, 3U);
+
+    const std::string scientific_three =
+        FormatNumericScientific(value, 3U);
+
+    const std::string percentage_two =
+        FormatNumericPercentage(value, 2U);
+
+    if (fixed_default != "0.125000" ||
+        fixed_three != "0.125" ||
+        scientific_three != "1.250e-01" ||
+        percentage_two != "12.50%") {
+        return false;
+    }
+
+    if (FormatNumericValue(
+            value,
+            NumericFormatStyle::Fixed,
+            2U) != "0.12" ||
+        FormatNumericValue(
+            value,
+            NumericFormatStyle::Scientific,
+            2U) != "1.25e-01" ||
+        FormatNumericValue(
+            value,
+            NumericFormatStyle::Percentage,
+            1U) != "12.5%") {
+        return false;
+    }
+
+    if (NumericFormatStyleName(
+            NumericFormatStyle::Fixed) != "fixed" ||
+        NumericFormatStyleName(
+            NumericFormatStyle::Scientific) !=
+                "scientific" ||
+        NumericFormatStyleName(
+            NumericFormatStyle::Percentage) !=
+                "percentage") {
+        return false;
+    }
+
+    if (!IsFormattedNumericStringValid(
+            fixed_default,
+            NumericFormatStyle::Fixed) ||
+        !IsFormattedNumericStringValid(
+            scientific_three,
+            NumericFormatStyle::Scientific) ||
+        !IsFormattedNumericStringValid(
+            percentage_two,
+            NumericFormatStyle::Percentage) ||
+        IsFormattedNumericStringValid(
+            percentage_two,
+            NumericFormatStyle::Fixed) ||
+        IsFormattedNumericStringValid(
+            fixed_default,
+            NumericFormatStyle::Percentage) ||
+        IsFormattedNumericStringValid(
+            "",
+            NumericFormatStyle::Fixed) ||
+        IsFormattedNumericStringValid(
+            "0.125\n",
+            NumericFormatStyle::Fixed)) {
+        return false;
+    }
+
+    const std::string negative_fixed =
+        FormatNumericFixed(-2.5, 1U);
+
+    const std::string large_scientific =
+        FormatNumericScientific(1'250'000.0, 2U);
+
+    const std::string whole_percentage =
+        FormatNumericPercentage(1.0, 0U);
+
+    if (negative_fixed != "-2.5" ||
+        large_scientific != "1.25e+06" ||
+        whole_percentage != "100%") {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainNumericFormattingPolicy(value, 3U);
+
+    if (explanation.find(
+            "numeric_formatting_policy") ==
+            std::string::npos ||
+        explanation.find("precision=3") ==
+            std::string::npos ||
+        explanation.find("fixed=0.125") ==
+            std::string::npos ||
+        explanation.find("scientific=1.250e-01") ==
+            std::string::npos ||
+        explanation.find("percentage=12.500%") ==
+            std::string::npos) {
+        return false;
+    }
+
+    const std::vector<double> invalid_values{
+        std::numeric_limits<double>::infinity(),
+        -std::numeric_limits<double>::infinity(),
+        std::numeric_limits<double>::quiet_NaN()
+    };
+
+    for (const double invalid_value : invalid_values) {
+        try {
+            static_cast<void>(
+                FormatNumericFixed(invalid_value));
+            return false;
+        } catch (const std::invalid_argument&) {
+        }
+
+        try {
+            static_cast<void>(
+                FormatNumericScientific(invalid_value));
+            return false;
+        } catch (const std::invalid_argument&) {
+        }
+
+        try {
+            static_cast<void>(
+                FormatNumericPercentage(invalid_value));
+            return false;
+        } catch (const std::invalid_argument&) {
+        }
+    }
+
+    try {
+        static_cast<void>(
+            FormatNumericFixed(value, 16U));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    try {
+        static_cast<void>(
+            ExplainNumericFormattingPolicy(value, 16U));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    return true;
+}
+
+}
+
+namespace prometheus_praxis_foundation_extensions {
+
+struct WaterBiodiversityPolicyVerification {
+    bool structurally_valid{};
+    bool water_compliant{};
+    bool biodiversity_compliant{};
+    bool invariant_holds{};
+    bool allowed{};
+    std::vector<std::string> reasons;
+};
+
+void AddWaterBiodiversityPolicyReason(
+    WaterBiodiversityPolicyVerification& verification,
+    bool condition,
+    std::string_view reason) {
+    if (!condition) {
+        verification.reasons.emplace_back(reason);
+    }
+}
+
+bool IsWaterBiodiversityPolicyVerificationValid(
+    const WaterBiodiversityPolicyVerification& verification) {
+    if (verification.allowed != verification.reasons.empty()) {
+        return false;
+    }
+
+    if (verification.allowed) {
+        return verification.structurally_valid &&
+               verification.water_compliant &&
+               verification.biodiversity_compliant &&
+               verification.invariant_holds;
+    }
+
+    return !verification.reasons.empty();
+}
+
+WaterBiodiversityPolicyVerification
+VerifyCrossShardWaterBiodiversityPolicy(
+    const eco_restoration::WaterAllocation& water,
+    const eco_restoration::BiodiversityIndex& biodiversity) {
+    WaterBiodiversityPolicyVerification verification;
+
+    verification.structurally_valid =
+        IsWaterAllocationStructurallyValid(water) &&
+        IsBiodiversityIndexValid(biodiversity);
+
+    AddWaterBiodiversityPolicyReason(
+        verification,
+        verification.structurally_valid,
+        "water allocation or biodiversity index is structurally invalid");
+
+    if (!verification.structurally_valid) {
+        verification.allowed = false;
+        return verification;
+    }
+
+    const eco_restoration::CrossShardDecision decision =
+        eco_restoration::evaluate_water_biodiversity(
+            water,
+            biodiversity);
+
+    verification.water_compliant =
+        decision.water_compliant;
+
+    verification.biodiversity_compliant =
+        decision.biodiversity_compliant;
+
+    verification.invariant_holds =
+        eco_restoration::required_cross_shard_unsat(decision);
+
+    AddWaterBiodiversityPolicyReason(
+        verification,
+        verification.water_compliant,
+        "water allocation does not preserve permitted and ecological reserve limits");
+
+    AddWaterBiodiversityPolicyReason(
+        verification,
+        verification.biodiversity_compliant,
+        "biodiversity quality is below the required minimum");
+
+    AddWaterBiodiversityPolicyReason(
+        verification,
+        verification.invariant_holds,
+        "cross-shard biodiversity authorization invariant failed");
+
+    AddWaterBiodiversityPolicyReason(
+        verification,
+        decision.allow,
+        "cross-shard policy denied the requested allocation");
+
+    verification.allowed =
+        verification.reasons.empty();
+
+    return verification;
+}
+
+std::string ExplainCrossShardWaterBiodiversityPolicy(
+    const WaterBiodiversityPolicyVerification& verification) {
+    if (!IsWaterBiodiversityPolicyVerificationValid(
+            verification)) {
+        throw std::invalid_argument(
+            "water biodiversity policy verification is invalid");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+
+    output << "cross_shard_water_biodiversity_policy\n";
+    output << "structurally_valid="
+           << (verification.structurally_valid ? "true" : "false")
+           << '\n';
+    output << "water_compliant="
+           << (verification.water_compliant ? "true" : "false")
+           << '\n';
+    output << "biodiversity_compliant="
+           << (verification.biodiversity_compliant
+                   ? "true"
+                   : "false")
+           << '\n';
+    output << "invariant_holds="
+           << (verification.invariant_holds ? "true" : "false")
+           << '\n';
+    output << "allowed="
+           << (verification.allowed ? "true" : "false")
+           << '\n';
+    output << "reason_count="
+           << verification.reasons.size()
+           << '\n';
+
+    for (std::size_t index = 0U;
+         index < verification.reasons.size();
+         ++index) {
+        output << "reason_" << index << '='
+               << verification.reasons[index]
+               << '\n';
+    }
+
+    return output.str();
+}
+
+bool CrossShardWaterBiodiversityPolicyVerifierSelfTest() {
+    const eco_restoration::WaterAllocation safe_water =
+        MakeWaterAllocation();
+
+    const eco_restoration::BiodiversityIndex safe_biodiversity =
+        MakeBiodiversityIndex();
+
+    const WaterBiodiversityPolicyVerification safe =
+        VerifyCrossShardWaterBiodiversityPolicy(
+            safe_water,
+            safe_biodiversity);
+
+    if (!safe.structurally_valid ||
+        !safe.water_compliant ||
+        !safe.biodiversity_compliant ||
+        !safe.invariant_holds ||
+        !safe.allowed ||
+        !safe.reasons.empty() ||
+        !IsWaterBiodiversityPolicyVerificationValid(safe)) {
+        return false;
+    }
+
+    const std::string safe_explanation =
+        ExplainCrossShardWaterBiodiversityPolicy(safe);
+
+    if (safe_explanation.find(
+            "cross_shard_water_biodiversity_policy") ==
+            std::string::npos ||
+        safe_explanation.find("allowed=true") ==
+            std::string::npos ||
+        safe_explanation.find("reason_count=0") ==
+            std::string::npos) {
+        return false;
+    }
+
+    const WaterBiodiversityPolicyVerification reserve_failure =
+        VerifyCrossShardWaterBiodiversityPolicy(
+            MakeWaterAllocationViolatingReserve(),
+            safe_biodiversity);
+
+    if (!reserve_failure.structurally_valid ||
+        reserve_failure.water_compliant ||
+        reserve_failure.allowed ||
+        reserve_failure.reasons.empty() ||
+        !IsWaterBiodiversityPolicyVerificationValid(
+            reserve_failure)) {
+        return false;
+    }
+
+    if (std::find(
+            reserve_failure.reasons.begin(),
+            reserve_failure.reasons.end(),
+            "water allocation does not preserve permitted and ecological reserve limits") ==
+        reserve_failure.reasons.end()) {
+        return false;
+    }
+
+    const eco_restoration::BiodiversityIndex low_biodiversity =
+        MakeBiodiversityIndex(500'000, 600'000);
+
+    const WaterBiodiversityPolicyVerification biodiversity_failure =
+        VerifyCrossShardWaterBiodiversityPolicy(
+            safe_water,
+            low_biodiversity);
+
+    if (!biodiversity_failure.structurally_valid ||
+        biodiversity_failure.biodiversity_compliant ||
+        biodiversity_failure.allowed ||
+        !biodiversity_failure.invariant_holds ||
+        biodiversity_failure.reasons.empty()) {
+        return false;
+    }
+
+    const eco_restoration::WaterAllocation invalid_water{
+        -1,
+        1'000,
+        200
+    };
+
+    const WaterBiodiversityPolicyVerification invalid =
+        VerifyCrossShardWaterBiodiversityPolicy(
+            invalid_water,
+            safe_biodiversity);
+
+    if (invalid.structurally_valid ||
+        invalid.allowed ||
+        invalid.reasons.size() != 1U ||
+        !IsWaterBiodiversityPolicyVerificationValid(invalid)) {
+        return false;
+    }
+
+    return true;
+}
+
+}
+
+namespace prometheus_praxis_foundation_extensions {
+
+struct WaterRightsStakeholderScenario {
+    std::string stakeholder;
+    std::int64_t minimum_allocation_ml{};
+    std::int64_t maximum_allocation_ml{};
+    std::int64_t allocated_ml{};
+    double utility_weight{};
+};
+
+bool IsWaterRightsStakeholderNameValid(
+    std::string_view stakeholder) {
+    return IsStableKey(stakeholder);
+}
+
+bool IsWaterRightsStakeholderScenarioValid(
+    const WaterRightsStakeholderScenario& scenario) {
+    return IsWaterRightsStakeholderNameValid(
+               scenario.stakeholder) &&
+           scenario.minimum_allocation_ml >= 0 &&
+           scenario.maximum_allocation_ml >=
+               scenario.minimum_allocation_ml &&
+           scenario.allocated_ml >=
+               scenario.minimum_allocation_ml &&
+           scenario.allocated_ml <=
+               scenario.maximum_allocation_ml &&
+           std::isfinite(scenario.utility_weight) &&
+           scenario.utility_weight > 0.0;
+}
+
+std::int64_t WaterRightsAllocationRangeMl(
+    const WaterRightsStakeholderScenario& scenario) {
+    if (!IsWaterRightsStakeholderScenarioValid(scenario)) {
+        throw std::invalid_argument(
+            "water rights stakeholder scenario is invalid");
+    }
+
+    return scenario.maximum_allocation_ml -
+           scenario.minimum_allocation_ml;
+}
+
+double WaterRightsAllocationSatisfaction(
+    const WaterRightsStakeholderScenario& scenario) {
+    if (!IsWaterRightsStakeholderScenarioValid(scenario)) {
+        throw std::invalid_argument(
+            "water rights stakeholder scenario is invalid");
+    }
+
+    const std::int64_t range =
+        WaterRightsAllocationRangeMl(scenario);
+
+    if (range == 0) {
+        return 1.0;
+    }
+
+    return static_cast<double>(
+               scenario.allocated_ml -
+               scenario.minimum_allocation_ml) /
+           static_cast<double>(range);
+}
+
+double WaterRightsStakeholderUtility(
+    const WaterRightsStakeholderScenario& scenario) {
+    return scenario.utility_weight *
+           WaterRightsAllocationSatisfaction(scenario);
+}
+
+bool AreWaterRightsStakeholderScenariosValid(
+    const std::vector<WaterRightsStakeholderScenario>& scenarios) {
+    if (scenarios.empty()) {
+        return false;
+    }
+
+    for (std::size_t left = 0U;
+         left < scenarios.size();
+         ++left) {
+        if (!IsWaterRightsStakeholderScenarioValid(
+                scenarios[left])) {
+            return false;
+        }
+
+        for (std::size_t right = left + 1U;
+             right < scenarios.size();
+             ++right) {
+            if (scenarios[left].stakeholder ==
+                scenarios[right].stakeholder) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+std::int64_t TotalWaterRightsAllocatedMl(
+    const std::vector<WaterRightsStakeholderScenario>& scenarios) {
+    if (!AreWaterRightsStakeholderScenariosValid(scenarios)) {
+        throw std::invalid_argument(
+            "water rights stakeholder set is invalid");
+    }
+
+    std::int64_t total = 0;
+
+    for (const auto& scenario : scenarios) {
+        total = AddFixedChecked(
+            total,
+            scenario.allocated_ml);
+    }
+
+    return total;
+}
+
+std::int64_t TotalWaterRightsMinimumMl(
+    const std::vector<WaterRightsStakeholderScenario>& scenarios) {
+    if (!AreWaterRightsStakeholderScenariosValid(scenarios)) {
+        throw std::invalid_argument(
+            "water rights stakeholder set is invalid");
+    }
+
+    std::int64_t total = 0;
+
+    for (const auto& scenario : scenarios) {
+        total = AddFixedChecked(
+            total,
+            scenario.minimum_allocation_ml);
+    }
+
+    return total;
+}
+
+std::int64_t TotalWaterRightsMaximumMl(
+    const std::vector<WaterRightsStakeholderScenario>& scenarios) {
+    if (!AreWaterRightsStakeholderScenariosValid(scenarios)) {
+        throw std::invalid_argument(
+            "water rights stakeholder set is invalid");
+    }
+
+    std::int64_t total = 0;
+
+    for (const auto& scenario : scenarios) {
+        total = AddFixedChecked(
+            total,
+            scenario.maximum_allocation_ml);
+    }
+
+    return total;
+}
+
+double TotalWaterRightsUtility(
+    const std::vector<WaterRightsStakeholderScenario>& scenarios) {
+    if (!AreWaterRightsStakeholderScenariosValid(scenarios)) {
+        throw std::invalid_argument(
+            "water rights stakeholder set is invalid");
+    }
+
+    double utility = 0.0;
+
+    for (const auto& scenario : scenarios) {
+        utility += WaterRightsStakeholderUtility(scenario);
+    }
+
+    if (!std::isfinite(utility)) {
+        throw std::runtime_error(
+            "water rights utility aggregation is nonfinite");
+    }
+
+    return utility;
+}
+
+std::vector<WaterRightsStakeholderScenario>
+BuildDeterministicWaterRightsScenario() {
+    const std::vector<WaterRightsStakeholderScenario> scenarios{
+        {
+            "ecological_reserve",
+            400'000,
+            500'000,
+            450'000,
+            2.00
+        },
+        {
+            "community_gardens",
+            100'000,
+            250'000,
+            175'000,
+            1.25
+        },
+        {
+            "native_habitat",
+            150'000,
+            300'000,
+            225'000,
+            1.75
+        },
+        {
+            "recycling_facility",
+            50'000,
+            150'000,
+            100'000,
+            1.00
+        }
+    };
+
+    if (!AreWaterRightsStakeholderScenariosValid(scenarios)) {
+        throw std::logic_error(
+            "deterministic water rights scenario is invalid");
+    }
+
+    return scenarios;
+}
+
+std::string ExplainWaterRightsStakeholderScenario(
+    const std::vector<WaterRightsStakeholderScenario>& scenarios) {
+    if (!AreWaterRightsStakeholderScenariosValid(scenarios)) {
+        throw std::invalid_argument(
+            "water rights stakeholder set is invalid");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << std::fixed << std::setprecision(6);
+
+    output << "water_rights_multi_stakeholder_scenario\n";
+    output << "stakeholder_count=" << scenarios.size() << '\n';
+    output << "total_minimum_ml="
+           << TotalWaterRightsMinimumMl(scenarios)
+           << '\n';
+    output << "total_allocated_ml="
+           << TotalWaterRightsAllocatedMl(scenarios)
+           << '\n';
+    output << "total_maximum_ml="
+           << TotalWaterRightsMaximumMl(scenarios)
+           << '\n';
+    output << "total_utility="
+           << TotalWaterRightsUtility(scenarios)
+           << '\n';
+
+    for (std::size_t index = 0U;
+         index < scenarios.size();
+         ++index) {
+        const auto& scenario = scenarios[index];
+
+        output << "stakeholder_" << index << "_name="
+               << scenario.stakeholder << '\n';
+        output << "stakeholder_" << index << "_minimum_ml="
+               << scenario.minimum_allocation_ml << '\n';
+        output << "stakeholder_" << index << "_allocated_ml="
+               << scenario.allocated_ml << '\n';
+        output << "stakeholder_" << index << "_maximum_ml="
+               << scenario.maximum_allocation_ml << '\n';
+        output << "stakeholder_" << index << "_satisfaction="
+               << WaterRightsAllocationSatisfaction(scenario)
+               << '\n';
+        output << "stakeholder_" << index << "_utility="
+               << WaterRightsStakeholderUtility(scenario)
+               << '\n';
+    }
+
+    return output.str();
+}
+
+bool WaterRightsMultiStakeholderScenarioBuilderSelfTest() {
+    const auto scenarios =
+        BuildDeterministicWaterRightsScenario();
+
+    if (scenarios.size() != 4U ||
+        !AreWaterRightsStakeholderScenariosValid(scenarios) ||
+        TotalWaterRightsMinimumMl(scenarios) != 700'000 ||
+        TotalWaterRightsAllocatedMl(scenarios) != 950'000 ||
+        TotalWaterRightsMaximumMl(scenarios) != 1'200'000 ||
+        std::abs(TotalWaterRightsUtility(scenarios) - 3.0) >
+            1e-12) {
+        return false;
+    }
+
+    for (const auto& scenario : scenarios) {
+        if (WaterRightsAllocationRangeMl(scenario) <= 0 ||
+            std::abs(
+                WaterRightsAllocationSatisfaction(scenario) -
+                0.5) > 1e-12) {
+            return false;
+        }
+    }
+
+    const std::string explanation =
+        ExplainWaterRightsStakeholderScenario(scenarios);
+
+    if (explanation.find(
+            "water_rights_multi_stakeholder_scenario") ==
+            std::string::npos ||
+        explanation.find("stakeholder_count=4") ==
+            std::string::npos ||
+        explanation.find("total_minimum_ml=700000") ==
+            std::string::npos ||
+        explanation.find("total_allocated_ml=950000") ==
+            std::string::npos ||
+        explanation.find(
+            "stakeholder_0_name=ecological_reserve") ==
+            std::string::npos ||
+        explanation.find(
+            "stakeholder_3_name=recycling_facility") ==
+            std::string::npos) {
+        return false;
+    }
+
+    auto invalid_minimum = scenarios;
+    invalid_minimum[0].minimum_allocation_ml = -1;
+
+    if (AreWaterRightsStakeholderScenariosValid(
+            invalid_minimum)) {
+        return false;
+    }
+
+    auto invalid_bounds = scenarios;
+    invalid_bounds[1].allocated_ml =
+        invalid_bounds[1].maximum_allocation_ml + 1;
+
+    if (AreWaterRightsStakeholderScenariosValid(
+            invalid_bounds)) {
+        return false;
+    }
+
+    auto duplicate_stakeholder = scenarios;
+    duplicate_stakeholder[3].stakeholder =
+        duplicate_stakeholder[0].stakeholder;
+
+    if (AreWaterRightsStakeholderScenariosValid(
+            duplicate_stakeholder)) {
+        return false;
+    }
+
+    const std::vector<WaterRightsStakeholderScenario> empty;
+
+    if (AreWaterRightsStakeholderScenariosValid(empty)) {
+        return false;
+    }
+
+    return true;
+}
+
+}
+
+namespace prometheus_praxis_foundation_extensions {
+
+struct GovernanceDecisionTrail {
+    std::string decision_identifier;
+    std::string policy_identifier;
+    std::string action_identifier;
+    bool authorized{};
+    std::int32_t risk_of_harm_fixed{};
+    std::uint64_t sequence{};
+    std::uint64_t evaluated_at_s{};
+    std::string rationale;
+};
+
+bool IsGovernanceDecisionTrailTextValid(
+    std::string_view value) {
+    return !value.empty() &&
+           value.find_first_of("\r\n") ==
+               std::string_view::npos;
+}
+
+bool IsGovernanceDecisionTrailIdentifierValid(
+    std::string_view identifier) {
+    return IsStableKey(identifier);
+}
+
+bool IsGovernanceDecisionTrailValid(
+    const GovernanceDecisionTrail& trail) {
+    return IsGovernanceDecisionTrailIdentifierValid(
+               trail.decision_identifier) &&
+           IsGovernanceDecisionTrailIdentifierValid(
+               trail.policy_identifier) &&
+           IsGovernanceDecisionTrailIdentifierValid(
+               trail.action_identifier) &&
+           trail.sequence > 0U &&
+           trail.risk_of_harm_fixed >= 0 &&
+           trail.risk_of_harm_fixed <=
+               foundation_risk_fixed_scale &&
+           IsGovernanceDecisionTrailTextValid(
+               trail.rationale);
+}
+
+std::string GovernanceDecisionTrailAuthorizationState(
+    const GovernanceDecisionTrail& trail) {
+    if (!IsGovernanceDecisionTrailValid(trail)) {
+        throw std::invalid_argument(
+            "governance decision trail is invalid");
+    }
+
+    return trail.authorized
+        ? "authorized"
+        : "denied";
+}
+
+double GovernanceDecisionTrailRiskOfHarm(
+    const GovernanceDecisionTrail& trail) {
+    if (!IsGovernanceDecisionTrailValid(trail)) {
+        throw std::invalid_argument(
+            "governance decision trail is invalid");
+    }
+
+    return RiskOfHarmFromFixed(
+        trail.risk_of_harm_fixed);
+}
+
+bool GovernanceDecisionTrailWithinSafetyCorridor(
+    const GovernanceDecisionTrail& trail) {
+    if (!IsGovernanceDecisionTrailValid(trail)) {
+        return false;
+    }
+
+    return trail.risk_of_harm_fixed <=
+           foundation_risk_fixed_limit;
+}
+
+void WriteGovernanceDecisionTrailKeyValue(
+    std::ostream& output,
+    const GovernanceDecisionTrail& trail) {
+    if (!IsGovernanceDecisionTrailValid(trail)) {
+        throw std::invalid_argument(
+            "governance decision trail is invalid");
+    }
+
+    EmitKeyValue(
+        output,
+        "decision_identifier",
+        trail.decision_identifier);
+
+    EmitKeyValue(
+        output,
+        "policy_identifier",
+        trail.policy_identifier);
+
+    EmitKeyValue(
+        output,
+        "action_identifier",
+        trail.action_identifier);
+
+    EmitKeyValue(
+        output,
+        "authorization_state",
+        GovernanceDecisionTrailAuthorizationState(trail));
+
+    EmitKeyValue(
+        output,
+        "authorized",
+        trail.authorized);
+
+    EmitKeyValue(
+        output,
+        "risk_of_harm_fixed",
+        static_cast<long long>(
+            trail.risk_of_harm_fixed));
+
+    EmitKeyValue(
+        output,
+        "risk_of_harm",
+        GovernanceDecisionTrailRiskOfHarm(trail));
+
+    EmitKeyValue(
+        output,
+        "within_safety_corridor",
+        GovernanceDecisionTrailWithinSafetyCorridor(trail));
+
+    EmitKeyValue(
+        output,
+        "sequence",
+        static_cast<unsigned long long>(
+            trail.sequence));
+
+    EmitKeyValue(
+        output,
+        "evaluated_at_s",
+        static_cast<unsigned long long>(
+            trail.evaluated_at_s));
+
+    EmitKeyValue(
+        output,
+        "rationale",
+        trail.rationale);
+}
+
+std::string SerializeGovernanceDecisionTrailKeyValue(
+    const GovernanceDecisionTrail& trail) {
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+
+    WriteGovernanceDecisionTrailKeyValue(output, trail);
+    return output.str();
+}
+
+std::string SerializeGovernanceDecisionTrailJson(
+    const GovernanceDecisionTrail& trail) {
+    if (!IsGovernanceDecisionTrailValid(trail)) {
+        throw std::invalid_argument(
+            "governance decision trail is invalid");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+
+    output << "{";
+
+    output << "\"decision_identifier\":";
+    json_string(output, trail.decision_identifier);
+
+    output << ",\"policy_identifier\":";
+    json_string(output, trail.policy_identifier);
+
+    output << ",\"action_identifier\":";
+    json_string(output, trail.action_identifier);
+
+    output << ",\"authorization_state\":";
+    json_string(
+        output,
+        GovernanceDecisionTrailAuthorizationState(trail));
+
+    output << ",\"authorized\":"
+           << (trail.authorized ? "true" : "false");
+
+    output << ",\"risk_of_harm_fixed\":"
+           << trail.risk_of_harm_fixed;
+
+    output << ",\"risk_of_harm\":";
+    json_double(
+        output,
+        GovernanceDecisionTrailRiskOfHarm(trail));
+
+    output << ",\"within_safety_corridor\":"
+           << (GovernanceDecisionTrailWithinSafetyCorridor(trail)
+                   ? "true"
+                   : "false");
+
+    output << ",\"sequence\":"
+           << trail.sequence;
+
+    output << ",\"evaluated_at_s\":"
+           << trail.evaluated_at_s;
+
+    output << ",\"rationale\":";
+    json_string(output, trail.rationale);
+
+    output << "}";
+    return output.str();
+}
+
+std::string ExplainGovernanceDecisionTrail(
+    const GovernanceDecisionTrail& trail) {
+    if (!IsGovernanceDecisionTrailValid(trail)) {
+        throw std::invalid_argument(
+            "governance decision trail is invalid");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+
+    output << "governance_decision_trail\n";
+    output << SerializeGovernanceDecisionTrailKeyValue(trail);
+    output << "json="
+           << SerializeGovernanceDecisionTrailJson(trail)
+           << '\n';
+
+    return output.str();
+}
+
+bool GovernanceDecisionTrailSerializerSelfTest() {
+    const GovernanceDecisionTrail authorized{
+        "water_review_001",
+        "water_biodiversity_policy_v1",
+        "diagnostic_review",
+        true,
+        200'000,
+        7U,
+        1'700'000'000U,
+        "ecological reserve and biodiversity conditions accepted"
+    };
+
+    if (!IsGovernanceDecisionTrailValid(authorized) ||
+        GovernanceDecisionTrailAuthorizationState(authorized) !=
+            "authorized" ||
+        !GovernanceDecisionTrailWithinSafetyCorridor(authorized) ||
+        std::abs(
+            GovernanceDecisionTrailRiskOfHarm(authorized) -
+            0.20) > 1e-12) {
+        return false;
+    }
+
+    const std::string key_value =
+        SerializeGovernanceDecisionTrailKeyValue(authorized);
+
+    const std::string expected_key_value =
+        "decision_identifier=water_review_001\n"
+        "policy_identifier=water_biodiversity_policy_v1\n"
+        "action_identifier=diagnostic_review\n"
+        "authorization_state=authorized\n"
+        "authorized=true\n"
+        "risk_of_harm_fixed=200000\n"
+        "risk_of_harm=0.200000\n"
+        "within_safety_corridor=true\n"
+        "sequence=7\n"
+        "evaluated_at_s=1700000000\n"
+        "rationale=ecological reserve and biodiversity conditions accepted\n";
+
+    if (key_value != expected_key_value) {
+        return false;
+    }
+
+    const std::string json =
+        SerializeGovernanceDecisionTrailJson(authorized);
+
+    const std::string expected_json =
+        "{\"decision_identifier\":\"water_review_001\","
+        "\"policy_identifier\":\"water_biodiversity_policy_v1\","
+        "\"action_identifier\":\"diagnostic_review\","
+        "\"authorization_state\":\"authorized\","
+        "\"authorized\":true,"
+        "\"risk_of_harm_fixed\":200000,"
+        "\"risk_of_harm\":0.200000,"
+        "\"within_safety_corridor\":true,"
+        "\"sequence\":7,"
+        "\"evaluated_at_s\":1700000000,"
+        "\"rationale\":\"ecological reserve and biodiversity conditions accepted\"}";
+
+    if (json != expected_json) {
+        return false;
+    }
+
+    GovernanceDecisionTrail denied = authorized;
+    denied.decision_identifier = "water_review_002";
+    denied.authorized = false;
+    denied.risk_of_harm_fixed = 300'001;
+    denied.sequence = 8U;
+    denied.rationale = "risk exceeds corridor";
+
+    if (GovernanceDecisionTrailAuthorizationState(denied) !=
+            "denied" ||
+        GovernanceDecisionTrailWithinSafetyCorridor(denied) ||
+        std::abs(
+            GovernanceDecisionTrailRiskOfHarm(denied) -
+            0.300001) > 1e-12) {
+        return false;
+    }
+
+    const std::string denied_json =
+        SerializeGovernanceDecisionTrailJson(denied);
+
+    if (denied_json.find(
+            "\"authorization_state\":\"denied\"") ==
+            std::string::npos ||
+        denied_json.find(
+            "\"within_safety_corridor\":false") ==
+            std::string::npos ||
+        denied_json.find(
+            "\"risk_of_harm\":0.300001") ==
+            std::string::npos) {
+        return false;
+    }
+
+    GovernanceDecisionTrail invalid = authorized;
+    invalid.decision_identifier = "Invalid-Identifier";
+
+    if (IsGovernanceDecisionTrailValid(invalid)) {
+        return false;
+    }
+
+    invalid = authorized;
+    invalid.sequence = 0U;
+
+    if (IsGovernanceDecisionTrailValid(invalid)) {
+        return false;
+    }
+
+    invalid = authorized;
+    invalid.risk_of_harm_fixed = -1;
+
+    if (IsGovernanceDecisionTrailValid(invalid)) {
+        return false;
+    }
+
+    invalid = authorized;
+    invalid.rationale = "invalid\nrationale";
+
+    if (IsGovernanceDecisionTrailValid(invalid)) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainGovernanceDecisionTrail(authorized);
+
+    if (explanation.find("governance_decision_trail") ==
+            std::string::npos ||
+        explanation.find(
+            "decision_identifier=water_review_001") ==
+            std::string::npos ||
+        explanation.find("risk_of_harm=0.200000") ==
+            std::string::npos ||
+        explanation.find("json={\"decision_identifier\"") ==
+            std::string::npos) {
+        return false;
+    }
+
+    return true;
+}
+
+}
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+class PrivateHeatProofPlanBuilderV2 {
+public:
+    PrivateHeatProofPlanBuilderV2()
+        : plan_(MakePrivateHeatProofPlan()) {
+    }
+
+    PrivateHeatProofPlanBuilderV2& SetCorridorCellCount(
+        std::size_t corridor_cell_count) {
+        plan_.corridor_cell_count = corridor_cell_count;
+        return *this;
+    }
+
+    PrivateHeatProofPlanBuilderV2& SetH3Resolution(
+        std::uint8_t h3_resolution) {
+        plan_.h3_resolution = h3_resolution;
+        return *this;
+    }
+
+    PrivateHeatProofPlanBuilderV2& SetFixedPointScale(
+        std::int64_t fixed_point_scale) {
+        plan_.fixed_point_scale = fixed_point_scale;
+        return *this;
+    }
+
+    PrivateHeatProofPlanBuilderV2& SetHeatCriticalFixed(
+        std::int64_t heat_critical_fixed) {
+        plan_.heat_critical_fixed = heat_critical_fixed;
+        return *this;
+    }
+
+    PrivateHeatProofPlanBuilderV2& SetUncertaintyMarginFixed(
+        std::int64_t uncertainty_margin_fixed) {
+        plan_.uncertainty_margin_fixed =
+            uncertainty_margin_fixed;
+        return *this;
+    }
+
+    PrivateHeatProofPlanBuilderV2& SetProofTargetBytes(
+        std::size_t proof_target_bytes) {
+        plan_.proof_target_bytes = proof_target_bytes;
+        return *this;
+    }
+
+    PrivateHeatProofPlanBuilderV2& ApplyOverrides(
+        const PrivateHeatProofPlanOverrides& overrides) {
+        if (overrides.corridor_cell_count.has_value()) {
+            SetCorridorCellCount(
+                *overrides.corridor_cell_count);
+        }
+
+        if (overrides.h3_resolution.has_value()) {
+            SetH3Resolution(*overrides.h3_resolution);
+        }
+
+        if (overrides.fixed_point_scale.has_value()) {
+            SetFixedPointScale(*overrides.fixed_point_scale);
+        }
+
+        if (overrides.heat_critical_fixed.has_value()) {
+            SetHeatCriticalFixed(
+                *overrides.heat_critical_fixed);
+        }
+
+        if (overrides.uncertainty_margin_fixed.has_value()) {
+            SetUncertaintyMarginFixed(
+                *overrides.uncertainty_margin_fixed);
+        }
+
+        if (overrides.proof_target_bytes.has_value()) {
+            SetProofTargetBytes(
+                *overrides.proof_target_bytes);
+        }
+
+        return *this;
+    }
+
+    eco_restoration::PrivateHeatProofPlan Build() const {
+        ValidatePrivateHeatProofPlan(plan_);
+        return plan_;
+    }
+
+    const eco_restoration::PrivateHeatProofPlan& Preview() const noexcept {
+        return plan_;
+    }
+
+private:
+    eco_restoration::PrivateHeatProofPlan plan_;
+};
+
+bool PrivateHeatProofPlanV2Equals(
+    const eco_restoration::PrivateHeatProofPlan& left,
+    const eco_restoration::PrivateHeatProofPlan& right) {
+    return left.corridor_cell_count ==
+               right.corridor_cell_count &&
+           left.h3_resolution ==
+               right.h3_resolution &&
+           left.fixed_point_scale ==
+               right.fixed_point_scale &&
+           left.heat_critical_fixed ==
+               right.heat_critical_fixed &&
+           left.uncertainty_margin_fixed ==
+               right.uncertainty_margin_fixed &&
+           left.proof_target_bytes ==
+               right.proof_target_bytes;
+}
+
+std::string ExplainPrivateHeatProofPlanV2(
+    const eco_restoration::PrivateHeatProofPlan& plan) {
+    ValidatePrivateHeatProofPlan(plan);
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+
+    output << "private_heat_proof_plan_v2\n";
+    output << "corridor_cell_count="
+           << plan.corridor_cell_count << '\n';
+    output << "h3_resolution="
+           << static_cast<unsigned int>(plan.h3_resolution)
+           << '\n';
+    output << "fixed_point_scale="
+           << plan.fixed_point_scale << '\n';
+    output << "heat_critical_fixed="
+           << plan.heat_critical_fixed << '\n';
+    output << "uncertainty_margin_fixed="
+           << plan.uncertainty_margin_fixed << '\n';
+    output << "proof_target_bytes="
+           << plan.proof_target_bytes << '\n';
+
+    return output.str();
+}
+
+bool PrivateHeatProofPlanBuilderV2SelfTest() {
+    const eco_restoration::PrivateHeatProofPlan defaults =
+        PrivateHeatProofPlanBuilderV2().Build();
+
+    const eco_restoration::PrivateHeatProofPlan expected_defaults =
+        MakePrivateHeatProofPlan();
+
+    if (!PrivateHeatProofPlanV2Equals(
+            defaults,
+            expected_defaults)) {
+        return false;
+    }
+
+    PrivateHeatProofPlanBuilderV2 builder;
+
+    const eco_restoration::PrivateHeatProofPlan customized =
+        builder
+            .SetCorridorCellCount(384U)
+            .SetH3Resolution(
+                static_cast<std::uint8_t>(11U))
+            .SetFixedPointScale(100)
+            .SetHeatCriticalFixed(5'400)
+            .SetUncertaintyMarginFixed(180)
+            .SetProofTargetBytes(32U * 1024U)
+            .Build();
+
+    if (customized.corridor_cell_count != 384U ||
+        customized.h3_resolution != 11U ||
+        customized.fixed_point_scale != 100 ||
+        customized.heat_critical_fixed != 5'400 ||
+        customized.uncertainty_margin_fixed != 180 ||
+        customized.proof_target_bytes != 32U * 1024U) {
+        return false;
+    }
+
+    const PrivateHeatProofPlanOverrides overrides{
+        512U,
+        static_cast<std::uint8_t>(9U),
+        1'000,
+        75'000,
+        5'000,
+        48U * 1024U
+    };
+
+    const eco_restoration::PrivateHeatProofPlan overridden =
+        PrivateHeatProofPlanBuilderV2()
+            .ApplyOverrides(overrides)
+            .Build();
+
+    const eco_restoration::PrivateHeatProofPlan expected_overridden =
+        MakePrivateHeatProofPlan(overrides);
+
+    if (!PrivateHeatProofPlanV2Equals(
+            overridden,
+            expected_overridden)) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainPrivateHeatProofPlanV2(customized);
+
+    if (explanation.find(
+            "private_heat_proof_plan_v2") ==
+            std::string::npos ||
+        explanation.find("corridor_cell_count=384") ==
+            std::string::npos ||
+        explanation.find("h3_resolution=11") ==
+            std::string::npos ||
+        explanation.find("fixed_point_scale=100") ==
+            std::string::npos ||
+        explanation.find("proof_target_bytes=32768") ==
+            std::string::npos) {
+        return false;
+    }
+
+    PrivateHeatProofPlanBuilderV2 invalid_builder;
+    invalid_builder.SetCorridorCellCount(0U);
+
+    try {
+        static_cast<void>(invalid_builder.Build());
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    invalid_builder = PrivateHeatProofPlanBuilderV2();
+    invalid_builder.SetH3Resolution(
+        static_cast<std::uint8_t>(16U));
+
+    try {
+        static_cast<void>(invalid_builder.Build());
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    invalid_builder = PrivateHeatProofPlanBuilderV2();
+    invalid_builder.SetFixedPointScale(0);
+
+    try {
+        static_cast<void>(invalid_builder.Build());
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    invalid_builder = PrivateHeatProofPlanBuilderV2();
+    invalid_builder.SetHeatCriticalFixed(100);
+    invalid_builder.SetUncertaintyMarginFixed(101);
+
+    try {
+        static_cast<void>(invalid_builder.Build());
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    invalid_builder = PrivateHeatProofPlanBuilderV2();
+    invalid_builder.SetProofTargetBytes(0U);
+
+    try {
+        static_cast<void>(invalid_builder.Build());
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    return true;
+}
+
+}
