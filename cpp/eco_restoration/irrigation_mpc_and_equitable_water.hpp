@@ -6,27 +6,12 @@
 #include <cstddef>
 #include <functional>
 #include <limits>
+#include <numeric>
 #include <stdexcept>
 #include <vector>
 
 namespace eco_restoration {
 
-/*
-For rainfall scenario xi, root-zone moisture evolves as:
-theta_(t+1)=theta_t+u_t+rain_t(xi)-ET_t-deep_drainage(theta_t).
-
-Choose a receding-horizon schedule u_0,...,u_(T-1) minimizing expected:
-sum_t c_u*u_t^2+c_s*max(0,theta_min-theta_t)^2.
-
-Robust horizon constraints must hold for every retained rainfall scenario:
-0<=u_t<=u_max,
-theta_min<=theta_t<=theta_max,
-theta_T in [theta_terminal_min,theta_terminal_max].
-
-The terminal interval is a robust control-invariant moisture set. It prevents a
-short-horizon optimizer from conserving water by leaving roots too dry at the
-end of its planning horizon.
-*/
 struct RainfallScenario {
     double probability{};
     std::vector<double> rainfall_mm;
@@ -54,56 +39,175 @@ struct IrrigationMpcResult {
     double eco_impact_value{};
 };
 
-inline double next_soil_moisture(double moisture_mm, double irrigation_mm,
-                                 double rainfall_mm,
-                                 const IrrigationDynamics& dynamics) {
-    const double excess = std::max(0.0, moisture_mm - dynamics.moisture_max_mm);
-    return moisture_mm + irrigation_mm + rainfall_mm -
-           dynamics.evapotranspiration_mm_per_step -
-           dynamics.drainage_fraction * excess;
+inline bool is_finite_nonnegative(double value) {
+    return std::isfinite(value) && value >= 0.0;
+}
+
+inline void validate_irrigation_dynamics(
+    const IrrigationDynamics& dynamics) {
+    if (!std::isfinite(dynamics.initial_moisture_mm) ||
+        !is_finite_nonnegative(
+            dynamics.evapotranspiration_mm_per_step) ||
+        !is_finite_nonnegative(dynamics.drainage_fraction) ||
+        dynamics.drainage_fraction > 1.0 ||
+        !std::isfinite(dynamics.moisture_min_mm) ||
+        !std::isfinite(dynamics.moisture_max_mm) ||
+        !std::isfinite(dynamics.terminal_min_mm) ||
+        !std::isfinite(dynamics.terminal_max_mm) ||
+        !is_finite_nonnegative(
+            dynamics.irrigation_max_mm_per_step) ||
+        !is_finite_nonnegative(dynamics.irrigation_cost) ||
+        !is_finite_nonnegative(dynamics.stress_cost) ||
+        dynamics.moisture_min_mm > dynamics.moisture_max_mm ||
+        dynamics.terminal_min_mm > dynamics.terminal_max_mm ||
+        dynamics.terminal_min_mm < dynamics.moisture_min_mm ||
+        dynamics.terminal_max_mm > dynamics.moisture_max_mm) {
+        throw std::invalid_argument("invalid irrigation dynamics");
+    }
+}
+
+inline void validate_rainfall_scenarios(
+    const std::vector<RainfallScenario>& scenarios,
+    std::size_t horizon) {
+    if (scenarios.empty() || horizon == 0U) {
+        throw std::invalid_argument(
+            "irrigation scenarios and horizon must be non-empty");
+    }
+
+    double probability_sum = 0.0;
+
+    for (const auto& scenario : scenarios) {
+        if (!std::isfinite(scenario.probability) ||
+            scenario.probability < 0.0 ||
+            scenario.rainfall_mm.size() != horizon) {
+            throw std::invalid_argument(
+                "invalid rainfall scenario");
+        }
+
+        for (const double rainfall_mm : scenario.rainfall_mm) {
+            if (!std::isfinite(rainfall_mm) ||
+                rainfall_mm < 0.0) {
+                throw std::invalid_argument(
+                    "rainfall values must be finite and nonnegative");
+            }
+        }
+
+        probability_sum += scenario.probability;
+    }
+
+    constexpr double probability_tolerance = 1e-9;
+
+    if (!std::isfinite(probability_sum) ||
+        std::abs(probability_sum - 1.0) >
+            probability_tolerance) {
+        throw std::invalid_argument(
+            "rainfall scenario probabilities must sum to one");
+    }
+}
+
+inline double next_soil_moisture(
+    double moisture_mm,
+    double irrigation_mm,
+    double rainfall_mm,
+    const IrrigationDynamics& dynamics) {
+    if (!std::isfinite(moisture_mm) ||
+        !std::isfinite(irrigation_mm) ||
+        !std::isfinite(rainfall_mm)) {
+        throw std::invalid_argument(
+            "soil moisture inputs must be finite");
+    }
+
+    const double excess = std::max(
+        0.0,
+        moisture_mm - dynamics.moisture_max_mm);
+
+    const double next_moisture =
+        moisture_mm +
+        irrigation_mm +
+        rainfall_mm -
+        dynamics.evapotranspiration_mm_per_step -
+        dynamics.drainage_fraction * excess;
+
+    if (!std::isfinite(next_moisture)) {
+        throw std::runtime_error(
+            "soil moisture update is non-finite");
+    }
+
+    return next_moisture;
 }
 
 inline IrrigationMpcResult select_robust_irrigation_schedule(
     const std::vector<std::vector<double>>& candidate_schedules,
     const std::vector<RainfallScenario>& scenarios,
     const IrrigationDynamics& dynamics) {
-
-    if (candidate_schedules.empty() || scenarios.empty() ||
-        dynamics.moisture_min_mm > dynamics.moisture_max_mm ||
-        dynamics.terminal_min_mm > dynamics.terminal_max_mm ||
-        dynamics.irrigation_max_mm_per_step < 0.0) {
-        throw std::invalid_argument("invalid irrigation MPC inputs");
+    if (candidate_schedules.empty()) {
+        throw std::invalid_argument(
+            "candidate irrigation schedules must not be empty");
     }
+
+    validate_irrigation_dynamics(dynamics);
+
+    const std::size_t horizon =
+        candidate_schedules.front().size();
+
+    if (horizon == 0U) {
+        throw std::invalid_argument(
+            "candidate irrigation schedule horizon must be positive");
+    }
+
+    validate_rainfall_scenarios(scenarios, horizon);
 
     IrrigationMpcResult best;
     best.expected_cost = std::numeric_limits<double>::infinity();
 
     for (const auto& schedule : candidate_schedules) {
-        if (schedule.empty()) continue;
+        if (schedule.size() != horizon) {
+            throw std::invalid_argument(
+                "candidate schedules must share one horizon");
+        }
+
         bool feasible = true;
         double expected_cost = 0.0;
-        double worst_terminal = std::numeric_limits<double>::infinity();
+        double worst_terminal_moisture =
+            std::numeric_limits<double>::infinity();
 
         for (const auto& scenario : scenarios) {
-            if (scenario.rainfall_mm.size() != schedule.size() ||
-                scenario.probability < 0.0) {
-                throw std::invalid_argument("rainfall scenario dimensions differ");
-            }
-
             double moisture = dynamics.initial_moisture_mm;
             double scenario_cost = 0.0;
-            for (std::size_t step = 0; step < schedule.size(); ++step) {
-                const double irrigation = schedule[step];
-                if (irrigation < 0.0 ||
-                    irrigation > dynamics.irrigation_max_mm_per_step) {
+
+            for (std::size_t step = 0U;
+                 step < schedule.size();
+                 ++step) {
+                const double irrigation_mm = schedule[step];
+
+                if (!std::isfinite(irrigation_mm) ||
+                    irrigation_mm < 0.0 ||
+                    irrigation_mm >
+                        dynamics.irrigation_max_mm_per_step) {
                     feasible = false;
                     break;
                 }
-                scenario_cost += dynamics.irrigation_cost * irrigation * irrigation;
-                scenario_cost += dynamics.stress_cost *
-                    std::pow(std::max(0.0, dynamics.moisture_min_mm - moisture), 2.0);
+
+                const double moisture_deficit = std::max(
+                    0.0,
+                    dynamics.moisture_min_mm - moisture);
+
+                scenario_cost +=
+                    dynamics.irrigation_cost *
+                    irrigation_mm *
+                    irrigation_mm;
+
+                scenario_cost +=
+                    dynamics.stress_cost *
+                    moisture_deficit *
+                    moisture_deficit;
+
                 moisture = next_soil_moisture(
-                    moisture, irrigation, scenario.rainfall_mm[step], dynamics);
+                    moisture,
+                    irrigation_mm,
+                    scenario.rainfall_mm[step],
+                    dynamics);
+
                 if (moisture < dynamics.moisture_min_mm ||
                     moisture > dynamics.moisture_max_mm) {
                     feasible = false;
@@ -111,40 +215,60 @@ inline IrrigationMpcResult select_robust_irrigation_schedule(
                 }
             }
 
-            if (!feasible || moisture < dynamics.terminal_min_mm ||
+            if (!feasible ||
+                moisture < dynamics.terminal_min_mm ||
                 moisture > dynamics.terminal_max_mm) {
                 feasible = false;
                 break;
             }
-            expected_cost += scenario.probability * scenario_cost;
-            worst_terminal = std::min(worst_terminal, moisture);
+
+            expected_cost +=
+                scenario.probability * scenario_cost;
+
+            worst_terminal_moisture = std::min(
+                worst_terminal_moisture,
+                moisture);
         }
 
-        if (feasible && expected_cost < best.expected_cost) {
-            const double water_total = std::accumulate(schedule.begin(), schedule.end(), 0.0);
-            const double possible_total = dynamics.irrigation_max_mm_per_step *
-                static_cast<double>(schedule.size());
-            const double conservation = 1.0 - water_total / std::max(possible_total, 1e-9);
-            best = {schedule, expected_cost, worst_terminal, true,
-                    std::clamp(0.80 + 0.20 * conservation, 0.0, 1.0),
-                    std::clamp(0.55 + 0.45 * conservation, 0.0, 1.0)};
+        if (!feasible ||
+            !std::isfinite(expected_cost) ||
+            !std::isfinite(worst_terminal_moisture) ||
+            expected_cost >= best.expected_cost) {
+            continue;
         }
+
+        const double water_total = std::accumulate(
+            schedule.begin(),
+            schedule.end(),
+            0.0);
+
+        const double possible_total =
+            dynamics.irrigation_max_mm_per_step *
+            static_cast<double>(schedule.size());
+
+        const double conservation =
+            possible_total > 0.0
+                ? 1.0 - water_total / possible_total
+                : (water_total == 0.0 ? 1.0 : 0.0);
+
+        best.schedule_mm = schedule;
+        best.expected_cost = expected_cost;
+        best.worst_case_terminal_moisture_mm =
+            worst_terminal_moisture;
+        best.robustly_feasible = true;
+        best.knowledge_factor = std::clamp(
+            0.80 + 0.20 * conservation,
+            0.0,
+            1.0);
+        best.eco_impact_value = std::clamp(
+            0.55 + 0.45 * conservation,
+            0.0,
+            1.0);
     }
+
     return best;
 }
 
-/*
-For stakeholder allocations w_i, maximize sum_i U_i(w_i), subject to:
-sum_i w_i<=available_water,
-w_i>=minimum_allocation_i,
-max_(i,j)|U_i(w_i)-U_j(w_j)|<=equity_tolerance.
-
-The fair-efficiency tradeoff is the utility gap:
-Delta(epsilon)=U_unconstrained-U_equity(epsilon).
-As epsilon decreases, the feasible set contracts. Report Delta along with
-minimum-service compliance; do not claim an allocation is equitable merely
-because its aggregate utility is high.
-*/
 struct WaterStakeholder {
     double minimum_allocation_mm{};
     double maximum_allocation_mm{};
@@ -160,42 +284,112 @@ struct EquitableAllocationResult {
     double eco_impact_value{};
 };
 
+inline void validate_water_stakeholder(
+    const WaterStakeholder& stakeholder) {
+    if (!std::isfinite(stakeholder.minimum_allocation_mm) ||
+        !std::isfinite(stakeholder.maximum_allocation_mm) ||
+        stakeholder.minimum_allocation_mm < 0.0 ||
+        stakeholder.maximum_allocation_mm <
+            stakeholder.minimum_allocation_mm ||
+        !stakeholder.utility) {
+        throw std::invalid_argument(
+            "invalid water stakeholder");
+    }
+}
+
 inline EquitableAllocationResult evaluate_water_allocation(
     const std::vector<double>& allocation_mm,
     const std::vector<WaterStakeholder>& stakeholders,
-    double available_water_mm, double equity_tolerance) {
-
-    if (allocation_mm.size() != stakeholders.size() || stakeholders.empty() ||
-        available_water_mm < 0.0 || equity_tolerance < 0.0) {
-        throw std::invalid_argument("invalid water-allocation inputs");
+    double available_water_mm,
+    double equity_tolerance) {
+    if (stakeholders.empty() ||
+        allocation_mm.size() != stakeholders.size() ||
+        !is_finite_nonnegative(available_water_mm) ||
+        !is_finite_nonnegative(equity_tolerance)) {
+        throw std::invalid_argument(
+            "invalid water allocation inputs");
     }
 
     double total_water = 0.0;
     double total_utility = 0.0;
-    double minimum_utility = std::numeric_limits<double>::infinity();
-    double maximum_utility = -std::numeric_limits<double>::infinity();
+    double minimum_utility =
+        std::numeric_limits<double>::infinity();
+    double maximum_utility =
+        -std::numeric_limits<double>::infinity();
 
-    for (std::size_t i = 0; i < stakeholders.size(); ++i) {
-        const auto& stakeholder = stakeholders[i];
-        if (!stakeholder.utility || allocation_mm[i] < stakeholder.minimum_allocation_mm ||
-            allocation_mm[i] > stakeholder.maximum_allocation_mm) {
-            throw std::invalid_argument("allocation violates stakeholder bounds");
+    for (std::size_t index = 0U;
+         index < stakeholders.size();
+         ++index) {
+        const WaterStakeholder& stakeholder =
+            stakeholders[index];
+
+        const double allocation = allocation_mm[index];
+
+        validate_water_stakeholder(stakeholder);
+
+        if (!std::isfinite(allocation) ||
+            allocation < stakeholder.minimum_allocation_mm ||
+            allocation > stakeholder.maximum_allocation_mm) {
+            throw std::invalid_argument(
+                "allocation violates stakeholder bounds");
         }
-        const double utility = stakeholder.utility(allocation_mm[i]);
-        total_water += allocation_mm[i];
+
+        const double utility =
+            stakeholder.utility(allocation);
+
+        if (!std::isfinite(utility)) {
+            throw std::invalid_argument(
+                "stakeholder utility must be finite");
+        }
+
+        total_water += allocation;
         total_utility += utility;
-        minimum_utility = std::min(minimum_utility, utility);
-        maximum_utility = std::max(maximum_utility, utility);
+        minimum_utility = std::min(
+            minimum_utility,
+            utility);
+        maximum_utility = std::max(
+            maximum_utility,
+            utility);
     }
 
-    const double gap = maximum_utility - minimum_utility;
-    const bool equitable = total_water <= available_water_mm && gap <= equity_tolerance;
-    const double knowledge = std::clamp(
-        1.0 - gap / std::max(1.0, equity_tolerance + 1.0), 0.0, 1.0);
-    const double impact = equitable
-        ? std::clamp(total_utility / (std::abs(total_utility) + 1.0), 0.0, 1.0)
+    if (!std::isfinite(total_water) ||
+        !std::isfinite(total_utility)) {
+        throw std::runtime_error(
+            "water allocation aggregation is non-finite");
+    }
+
+    const double utility_gap =
+        maximum_utility - minimum_utility;
+
+    const bool equitable =
+        total_water <= available_water_mm &&
+        utility_gap <= equity_tolerance;
+
+    const double normalized_gap =
+        utility_gap /
+        std::max(1.0, equity_tolerance + 1.0);
+
+    const double knowledge_factor = std::clamp(
+        1.0 - normalized_gap,
+        0.0,
+        1.0);
+
+    const double eco_impact_value = equitable
+        ? std::clamp(
+            total_utility /
+                (std::abs(total_utility) + 1.0),
+            0.0,
+            1.0)
         : 0.0;
-    return {allocation_mm, total_utility, gap, equitable, knowledge, impact};
+
+    return {
+        allocation_mm,
+        total_utility,
+        utility_gap,
+        equitable,
+        knowledge_factor,
+        eco_impact_value
+    };
 }
 
-}  // namespace eco_restoration
+}
