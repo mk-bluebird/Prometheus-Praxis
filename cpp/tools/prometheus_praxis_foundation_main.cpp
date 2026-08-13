@@ -2861,3 +2861,1515 @@ bool InvasiveControlCandidateFixtureSelfTest() {
 }
 
 }  // namespace prometheus_praxis_foundation_extensions
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+struct SafeInvasiveControlSelectionResult {
+    eco_restoration::StochasticControlDecision decision;
+    bool selected{};
+    bool used_fallback{};
+    std::vector<std::string> failure_reasons;
+};
+
+void AddInvasiveControlSelectionFailure(
+    SafeInvasiveControlSelectionResult& result,
+    bool condition,
+    std::string_view reason) {
+    if (!condition) {
+        result.failure_reasons.emplace_back(reason);
+    }
+}
+
+eco_restoration::StochasticControlDecision MakeInvasiveControlFallback(
+    const eco_restoration::StochasticPopulationModel& model) {
+    ValidateStochasticPopulationModel(model);
+    return {
+        0.0,
+        std::numeric_limits<double>::infinity(),
+        model.current_abundance,
+        PopulationDiffusionVariance(model),
+        false,
+        0.0,
+        0.0
+    };
+}
+
+SafeInvasiveControlSelectionResult SelectSafeInvasiveControlWrapper(
+    const eco_restoration::StochasticPopulationModel& model,
+    const std::vector<eco_restoration::InvasiveControlCandidate>& candidates) {
+    SafeInvasiveControlSelectionResult result;
+    result.decision = MakeInvasiveControlFallback(model);
+    result.used_fallback = true;
+
+    AddInvasiveControlSelectionFailure(
+        result,
+        !candidates.empty(),
+        "no invasive-control candidates were supplied");
+
+    if (candidates.empty()) {
+        return result;
+    }
+
+    std::size_t structurally_valid_count = 0U;
+    std::size_t safe_count = 0U;
+
+    for (const auto& candidate : candidates) {
+        if (!IsInvasiveControlCandidateValid(candidate)) {
+            continue;
+        }
+
+        ++structurally_valid_count;
+        if (IsSafeInvasiveControlCandidate(model, candidate)) {
+            ++safe_count;
+        }
+    }
+
+    AddInvasiveControlSelectionFailure(
+        result,
+        structurally_valid_count == candidates.size(),
+        "one or more invasive-control candidates had invalid values");
+
+    AddInvasiveControlSelectionFailure(
+        result,
+        safe_count > 0U,
+        "no invasive-control candidate satisfied benefit, risk, and state corridors");
+
+    if (!result.failure_reasons.empty()) {
+        return result;
+    }
+
+    result.decision =
+        eco_restoration::select_safe_stochastic_invasive_control(
+            model,
+            candidates);
+
+    AddInvasiveControlSelectionFailure(
+        result,
+        result.decision.safe,
+        "HJB selection did not return a safe invasive-control decision");
+
+    if (!result.failure_reasons.empty()) {
+        result.decision = MakeInvasiveControlFallback(model);
+        return result;
+    }
+
+    const double selected_risk =
+        SelectedInvasiveRiskOfHarm(candidates, result.decision);
+
+    AddInvasiveControlSelectionFailure(
+        result,
+        selected_risk <= 0.30,
+        "selected invasive-control candidate exceeded the 0.30 risk corridor");
+
+    if (!result.failure_reasons.empty()) {
+        result.decision = MakeInvasiveControlFallback(model);
+        return result;
+    }
+
+    result.selected = true;
+    result.used_fallback = false;
+    return result;
+}
+
+bool IsSafeInvasiveControlSelectionResultValid(
+    const SafeInvasiveControlSelectionResult& result) {
+    if (result.selected) {
+        return result.decision.safe &&
+               !result.used_fallback &&
+               result.failure_reasons.empty();
+    }
+
+    return !result.decision.safe &&
+           result.used_fallback &&
+           !result.failure_reasons.empty();
+}
+
+std::string ExplainSafeInvasiveControlSelection(
+    const SafeInvasiveControlSelectionResult& result) {
+    if (!IsSafeInvasiveControlSelectionResultValid(result)) {
+        throw std::invalid_argument("safe invasive-control selection result is invalid");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << std::fixed << std::setprecision(6);
+    output << "safe_invasive_control_selection\n";
+    output << "selected=" << (result.selected ? "true" : "false") << '\n';
+    output << "used_fallback="
+           << (result.used_fallback ? "true" : "false") << '\n';
+    output << "treatment_intensity="
+           << result.decision.treatment_intensity << '\n';
+    output << "hjb_value="
+           << result.decision.hamilton_jacobi_bellman_value << '\n';
+    output << "expected_next_abundance="
+           << result.decision.expected_next_abundance << '\n';
+    output << "decision_safe="
+           << (result.decision.safe ? "true" : "false") << '\n';
+    output << "failure_reason_count="
+           << result.failure_reasons.size() << '\n';
+
+    for (std::size_t index = 0U;
+         index < result.failure_reasons.size();
+         ++index) {
+        output << "failure_reason_" << index << '='
+               << result.failure_reasons[index] << '\n';
+    }
+
+    return output.str();
+}
+
+bool SafeInvasiveControlSelectionWrapperSelfTest() {
+    const auto model = MakeStochasticPopulationModel();
+    const auto candidates = MakeInvasiveControlCandidates();
+
+    const auto selected = SelectSafeInvasiveControlWrapper(
+        model,
+        candidates);
+
+    if (!selected.selected ||
+        selected.used_fallback ||
+        !selected.decision.safe ||
+        !selected.failure_reasons.empty() ||
+        !IsSafeInvasiveControlSelectionResultValid(selected)) {
+        return false;
+    }
+
+    const std::vector<eco_restoration::InvasiveControlCandidate> unsafe_only{
+        {0.20, 12.0, 10.0, 0.20},
+        {0.30, 10.0, 12.0, 0.31},
+        {0.40, 15.0, 13.0, 0.35}
+    };
+
+    const auto fallback = SelectSafeInvasiveControlWrapper(
+        model,
+        unsafe_only);
+
+    if (fallback.selected ||
+        !fallback.used_fallback ||
+        fallback.decision.safe ||
+        fallback.failure_reasons.empty() ||
+        !IsSafeInvasiveControlSelectionResultValid(fallback)) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainSafeInvasiveControlSelection(fallback);
+
+    if (explanation.find("selected=false") == std::string::npos ||
+        explanation.find("used_fallback=true") == std::string::npos ||
+        explanation.find("failure_reason_count=1") == std::string::npos) {
+        return false;
+    }
+
+    const auto empty = SelectSafeInvasiveControlWrapper(model, {});
+    return !empty.selected &&
+           empty.used_fallback &&
+           !empty.failure_reasons.empty();
+}
+
+}  // namespace prometheus_praxis_foundation_extensions
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+struct AnchorAuditAppendResult {
+    eco_restoration::AnchorAuditDecision decision;
+    bool input_accepted{};
+    bool caught_validation_error{};
+    std::vector<std::string> failure_reasons;
+};
+
+void AddAnchorAuditFailure(
+    AnchorAuditAppendResult& result,
+    bool condition,
+    std::string_view reason) {
+    if (!condition) {
+        result.failure_reasons.emplace_back(reason);
+    }
+}
+
+AnchorAuditAppendResult AppendAnchorAuditRecordSafely(
+    eco_restoration::HexAnchorAuditStore& store,
+    const eco_restoration::AnchorAuditRecord& record) {
+    AnchorAuditAppendResult result;
+
+    try {
+        result.decision = store.append(record);
+        result.input_accepted = result.decision.accepted;
+
+        AddAnchorAuditFailure(
+            result,
+            result.decision.invariant_holds,
+            "anchor audit safety invariant did not hold");
+
+        AddAnchorAuditFailure(
+            result,
+            result.decision.accepted,
+            "anchor audit record was not accepted");
+
+        return result;
+    } catch (const std::invalid_argument& error) {
+        result.caught_validation_error = true;
+        result.failure_reasons.emplace_back(error.what());
+        return result;
+    } catch (const std::exception& error) {
+        result.caught_validation_error = true;
+        result.failure_reasons.emplace_back(error.what());
+        return result;
+    }
+}
+
+bool IsAnchorAuditAppendResultValid(
+    const AnchorAuditAppendResult& result) {
+    if (result.caught_validation_error) {
+        return !result.input_accepted &&
+               !result.failure_reasons.empty();
+    }
+
+    if (result.input_accepted) {
+        return result.decision.accepted &&
+               result.decision.invariant_holds &&
+               result.failure_reasons.empty();
+    }
+
+    return !result.decision.accepted &&
+           !result.failure_reasons.empty();
+}
+
+std::string ExplainAnchorAuditAppendResult(
+    const AnchorAuditAppendResult& result) {
+    if (!IsAnchorAuditAppendResultValid(result)) {
+        throw std::invalid_argument("anchor audit append result is invalid");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << std::fixed << std::setprecision(6);
+    output << "anchor_audit_append\n";
+    output << "input_accepted="
+           << (result.input_accepted ? "true" : "false") << '\n';
+    output << "caught_validation_error="
+           << (result.caught_validation_error ? "true" : "false") << '\n';
+    output << "invariant_holds="
+           << (result.decision.invariant_holds ? "true" : "false") << '\n';
+    output << "knowledge_factor="
+           << result.decision.knowledge_factor << '\n';
+    output << "eco_impact_value="
+           << result.decision.eco_impact_value << '\n';
+    output << "failure_reason_count="
+           << result.failure_reasons.size() << '\n';
+
+    for (std::size_t index = 0U;
+         index < result.failure_reasons.size();
+         ++index) {
+        output << "failure_reason_" << index << '='
+               << result.failure_reasons[index] << '\n';
+    }
+
+    return output.str();
+}
+
+eco_restoration::AnchorAuditRecord MakeAnchorAuditRecord(
+    std::uint64_t sequence,
+    std::string previous_reference,
+    std::string anchor_reference,
+    std::int32_t risk_of_harm_fixed,
+    bool allow) {
+    return {
+        sequence,
+        std::move(previous_reference),
+        std::move(anchor_reference),
+        0x8928308280fffffULL,
+        4580,
+        risk_of_harm_fixed,
+        true,
+        allow
+    };
+}
+
+bool AnchorAuditStoreIntegrationSelfTest() {
+    eco_restoration::HexAnchorAuditStore store;
+
+    const auto first = AppendAnchorAuditRecordSafely(
+        store,
+        MakeAnchorAuditRecord(
+            1U,
+            "",
+            "phoenix_anchor_001",
+            180'000,
+            true));
+
+    if (!first.input_accepted ||
+        first.caught_validation_error ||
+        !first.decision.invariant_holds ||
+        !IsAnchorAuditAppendResultValid(first) ||
+        store.records().size() != 1U) {
+        return false;
+    }
+
+    const auto second = AppendAnchorAuditRecordSafely(
+        store,
+        MakeAnchorAuditRecord(
+            2U,
+            "phoenix_anchor_001",
+            "phoenix_anchor_002",
+            220'000,
+            true));
+
+    if (!second.input_accepted ||
+        second.caught_validation_error ||
+        store.records().size() != 2U) {
+        return false;
+    }
+
+    const auto invalid_sequence = AppendAnchorAuditRecordSafely(
+        store,
+        MakeAnchorAuditRecord(
+            4U,
+            "phoenix_anchor_002",
+            "phoenix_anchor_004",
+            180'000,
+            true));
+
+    if (invalid_sequence.input_accepted ||
+        !invalid_sequence.caught_validation_error ||
+        invalid_sequence.failure_reasons.empty() ||
+        store.records().size() != 2U) {
+        return false;
+    }
+
+    const auto invalid_predecessor = AppendAnchorAuditRecordSafely(
+        store,
+        MakeAnchorAuditRecord(
+            3U,
+            "incorrect_predecessor",
+            "phoenix_anchor_003",
+            180'000,
+            true));
+
+    if (invalid_predecessor.input_accepted ||
+        !invalid_predecessor.caught_validation_error ||
+        store.records().size() != 2U) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainAnchorAuditAppendResult(invalid_predecessor);
+
+    return explanation.find("input_accepted=false") != std::string::npos &&
+           explanation.find("caught_validation_error=true") !=
+               std::string::npos;
+}
+
+}  // namespace prometheus_praxis_foundation_extensions
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+constexpr std::uint64_t default_anchor_sequence = 1U;
+constexpr std::uint64_t default_anchor_cell_id = 617700169958293503ULL;
+constexpr std::int32_t default_anchor_heat_index_fixed = 4580;
+constexpr std::int32_t default_anchor_safe_risk_fixed = 180'000;
+constexpr std::int32_t default_anchor_unsafe_risk_fixed = 300'001;
+
+bool IsAnchorAuditRecordStructurallyValid(
+    const eco_restoration::AnchorAuditRecord& record) {
+    return record.sequence > 0U &&
+           !record.anchor_reference.empty() &&
+           record.risk_of_harm_fixed >= 0 &&
+           record.risk_of_harm_fixed <=
+               eco_restoration::unit_interval_scale;
+}
+
+bool AnchorAuditRecordHasValidPredecessorShape(
+    const eco_restoration::AnchorAuditRecord& record) {
+    if (record.sequence == 1U) {
+        return record.previous_reference.empty();
+    }
+    return !record.previous_reference.empty();
+}
+
+bool AnchorAuditRecordIsSafe(
+    const eco_restoration::AnchorAuditRecord& record) {
+    return IsAnchorAuditRecordStructurallyValid(record) &&
+           AnchorAuditRecordHasValidPredecessorShape(record) &&
+           record.externally_verified_commitment &&
+           record.risk_of_harm_fixed <=
+               eco_restoration::risk_of_harm_limit_fixed;
+}
+
+eco_restoration::AnchorAuditRecord MakeValidAnchorAuditRecord(
+    std::uint64_t sequence = default_anchor_sequence,
+    std::string previous_reference = {},
+    std::string anchor_reference = "phoenix_anchor_001") {
+    if (sequence == 0U) {
+        throw std::invalid_argument("anchor sequence must be positive");
+    }
+
+    if (sequence == 1U) {
+        previous_reference.clear();
+    } else if (previous_reference.empty()) {
+        throw std::invalid_argument(
+            "noninitial anchor records require a predecessor reference");
+    }
+
+    eco_restoration::AnchorAuditRecord record{
+        sequence,
+        std::move(previous_reference),
+        std::move(anchor_reference),
+        default_anchor_cell_id,
+        default_anchor_heat_index_fixed,
+        default_anchor_safe_risk_fixed,
+        true,
+        true
+    };
+
+    if (!AnchorAuditRecordIsSafe(record)) {
+        throw std::runtime_error("valid anchor fixture did not satisfy safety invariants");
+    }
+
+    return record;
+}
+
+eco_restoration::AnchorAuditRecord MakeUnsafeAnchorAuditRecord(
+    std::uint64_t sequence = default_anchor_sequence,
+    std::string previous_reference = {},
+    std::string anchor_reference = "phoenix_anchor_unsafe_001") {
+    if (sequence == 0U) {
+        throw std::invalid_argument("anchor sequence must be positive");
+    }
+
+    if (sequence == 1U) {
+        previous_reference.clear();
+    } else if (previous_reference.empty()) {
+        throw std::invalid_argument(
+            "noninitial anchor records require a predecessor reference");
+    }
+
+    eco_restoration::AnchorAuditRecord record{
+        sequence,
+        std::move(previous_reference),
+        std::move(anchor_reference),
+        default_anchor_cell_id,
+        default_anchor_heat_index_fixed,
+        default_anchor_unsafe_risk_fixed,
+        true,
+        true
+    };
+
+    if (!IsAnchorAuditRecordStructurallyValid(record) ||
+        record.risk_of_harm_fixed <=
+            eco_restoration::risk_of_harm_limit_fixed ||
+        !record.allow) {
+        throw std::runtime_error(
+            "unsafe anchor fixture must expose a risk-and-allow invariant violation");
+    }
+
+    return record;
+}
+
+std::string ExplainAnchorAuditRecord(
+    const eco_restoration::AnchorAuditRecord& record) {
+    if (!IsAnchorAuditRecordStructurallyValid(record)) {
+        throw std::invalid_argument("anchor audit record is structurally invalid");
+    }
+
+    std::ostringstream output;
+    output << "anchor_audit_record\n";
+    output << "sequence=" << record.sequence << '\n';
+    output << "has_predecessor="
+           << (!record.previous_reference.empty() ? "true" : "false") << '\n';
+    output << "anchor_reference=" << record.anchor_reference << '\n';
+    output << "h3_cell_id=" << record.h3_cell_id << '\n';
+    output << "heat_index_fixed=" << record.heat_index_fixed << '\n';
+    output << "risk_of_harm_fixed=" << record.risk_of_harm_fixed << '\n';
+    output << "risk_of_harm="
+           << RiskOfHarmFromFixed(record.risk_of_harm_fixed) << '\n';
+    output << "externally_verified="
+           << (record.externally_verified_commitment ? "true" : "false") << '\n';
+    output << "allow=" << (record.allow ? "true" : "false") << '\n';
+    output << "safe=" << (AnchorAuditRecordIsSafe(record) ? "true" : "false") << '\n';
+    return output.str();
+}
+
+bool AnchorAuditRecordFixtureSelfTest() {
+    const auto valid = MakeValidAnchorAuditRecord();
+
+    if (!IsAnchorAuditRecordStructurallyValid(valid) ||
+        !AnchorAuditRecordHasValidPredecessorShape(valid) ||
+        !AnchorAuditRecordIsSafe(valid) ||
+        valid.risk_of_harm_fixed != default_anchor_safe_risk_fixed) {
+        return false;
+    }
+
+    const auto unsafe = MakeUnsafeAnchorAuditRecord();
+
+    if (!IsAnchorAuditRecordStructurallyValid(unsafe) ||
+        AnchorAuditRecordIsSafe(unsafe) ||
+        unsafe.risk_of_harm_fixed != default_anchor_unsafe_risk_fixed ||
+        !unsafe.allow) {
+        return false;
+    }
+
+    const auto chained = MakeValidAnchorAuditRecord(
+        2U,
+        "phoenix_anchor_001",
+        "phoenix_anchor_002");
+
+    if (!AnchorAuditRecordHasValidPredecessorShape(chained) ||
+        !AnchorAuditRecordIsSafe(chained)) {
+        return false;
+    }
+
+    const std::string explanation = ExplainAnchorAuditRecord(unsafe);
+
+    if (explanation.find("risk_of_harm_fixed=300001") ==
+            std::string::npos ||
+        explanation.find("safe=false") == std::string::npos) {
+        return false;
+    }
+
+    try {
+        static_cast<void>(MakeValidAnchorAuditRecord(
+            2U,
+            "",
+            "phoenix_anchor_002"));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    return true;
+}
+
+}  // namespace prometheus_praxis_foundation_extensions
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+constexpr double default_initial_moisture_mm = 15.0;
+constexpr double default_evapotranspiration_mm = 3.0;
+constexpr double default_drainage_fraction = 0.10;
+constexpr double default_moisture_minimum_mm = 10.0;
+constexpr double default_moisture_maximum_mm = 30.0;
+constexpr double default_terminal_minimum_mm = 12.0;
+constexpr double default_terminal_maximum_mm = 25.0;
+constexpr double default_irrigation_maximum_mm = 8.0;
+constexpr double default_irrigation_cost = 0.10;
+constexpr double default_stress_cost = 0.50;
+
+bool IsIrrigationDynamicsFinite(
+    const eco_restoration::IrrigationDynamics& dynamics) {
+    return std::isfinite(dynamics.initial_moisture_mm) &&
+           std::isfinite(dynamics.evapotranspiration_mm_per_step) &&
+           std::isfinite(dynamics.drainage_fraction) &&
+           std::isfinite(dynamics.moisture_min_mm) &&
+           std::isfinite(dynamics.moisture_max_mm) &&
+           std::isfinite(dynamics.terminal_min_mm) &&
+           std::isfinite(dynamics.terminal_max_mm) &&
+           std::isfinite(dynamics.irrigation_max_mm_per_step) &&
+           std::isfinite(dynamics.irrigation_cost) &&
+           std::isfinite(dynamics.stress_cost);
+}
+
+void ValidateIrrigationDynamics(
+    const eco_restoration::IrrigationDynamics& dynamics) {
+    if (!IsIrrigationDynamicsFinite(dynamics)) {
+        throw std::invalid_argument("irrigation dynamics values must be finite");
+    }
+
+    if (dynamics.evapotranspiration_mm_per_step < 0.0 ||
+        dynamics.drainage_fraction < 0.0 ||
+        dynamics.drainage_fraction > 1.0 ||
+        dynamics.irrigation_max_mm_per_step < 0.0 ||
+        dynamics.irrigation_cost < 0.0 ||
+        dynamics.stress_cost < 0.0) {
+        throw std::invalid_argument(
+            "irrigation losses, limits, and costs must be nonnegative");
+    }
+
+    if (dynamics.moisture_min_mm > dynamics.moisture_max_mm) {
+        throw std::invalid_argument(
+            "irrigation moisture minimum must not exceed maximum");
+    }
+
+    if (dynamics.initial_moisture_mm < dynamics.moisture_min_mm ||
+        dynamics.initial_moisture_mm > dynamics.moisture_max_mm) {
+        throw std::invalid_argument(
+            "initial moisture must lie within moisture bounds");
+    }
+
+    if (dynamics.terminal_min_mm > dynamics.terminal_max_mm) {
+        throw std::invalid_argument(
+            "terminal moisture minimum must not exceed maximum");
+    }
+
+    if (dynamics.terminal_min_mm < dynamics.moisture_min_mm ||
+        dynamics.terminal_max_mm > dynamics.moisture_max_mm) {
+        throw std::invalid_argument(
+            "terminal moisture bounds must lie within moisture bounds");
+    }
+}
+
+bool IsIrrigationDynamicsValid(
+    const eco_restoration::IrrigationDynamics& dynamics) {
+    try {
+        ValidateIrrigationDynamics(dynamics);
+        return true;
+    } catch (const std::invalid_argument&) {
+        return false;
+    }
+}
+
+eco_restoration::IrrigationDynamics MakeIrrigationDynamics() {
+    const eco_restoration::IrrigationDynamics dynamics{
+        default_initial_moisture_mm,
+        default_evapotranspiration_mm,
+        default_drainage_fraction,
+        default_moisture_minimum_mm,
+        default_moisture_maximum_mm,
+        default_terminal_minimum_mm,
+        default_terminal_maximum_mm,
+        default_irrigation_maximum_mm,
+        default_irrigation_cost,
+        default_stress_cost
+    };
+
+    ValidateIrrigationDynamics(dynamics);
+    return dynamics;
+}
+
+std::string ExplainIrrigationDynamics(
+    const eco_restoration::IrrigationDynamics& dynamics) {
+    ValidateIrrigationDynamics(dynamics);
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << std::fixed << std::setprecision(6);
+    output << "irrigation_dynamics\n";
+    output << "initial_moisture_mm=" << dynamics.initial_moisture_mm << '\n';
+    output << "evapotranspiration_mm_per_step="
+           << dynamics.evapotranspiration_mm_per_step << '\n';
+    output << "drainage_fraction="
+           << dynamics.drainage_fraction << '\n';
+    output << "moisture_min_mm=" << dynamics.moisture_min_mm << '\n';
+    output << "moisture_max_mm=" << dynamics.moisture_max_mm << '\n';
+    output << "terminal_min_mm=" << dynamics.terminal_min_mm << '\n';
+    output << "terminal_max_mm=" << dynamics.terminal_max_mm << '\n';
+    output << "irrigation_max_mm_per_step="
+           << dynamics.irrigation_max_mm_per_step << '\n';
+    output << "irrigation_cost=" << dynamics.irrigation_cost << '\n';
+    output << "stress_cost=" << dynamics.stress_cost << '\n';
+    return output.str();
+}
+
+bool IrrigationDynamicsFixtureSelfTest() {
+    const auto defaults = MakeIrrigationDynamics();
+
+    if (!IsIrrigationDynamicsValid(defaults) ||
+        defaults.initial_moisture_mm != default_initial_moisture_mm ||
+        defaults.moisture_min_mm != default_moisture_minimum_mm ||
+        defaults.moisture_max_mm != default_moisture_maximum_mm ||
+        defaults.terminal_min_mm != default_terminal_minimum_mm ||
+        defaults.terminal_max_mm != default_terminal_maximum_mm ||
+        defaults.irrigation_max_mm_per_step != default_irrigation_maximum_mm) {
+        return false;
+    }
+
+    const std::string explanation = ExplainIrrigationDynamics(defaults);
+
+    if (explanation.find("moisture_min_mm=10.000000") ==
+            std::string::npos ||
+        explanation.find("terminal_max_mm=25.000000") ==
+            std::string::npos) {
+        return false;
+    }
+
+    auto invalid_moisture = defaults;
+    invalid_moisture.moisture_min_mm = 31.0;
+
+    if (IsIrrigationDynamicsValid(invalid_moisture)) {
+        return false;
+    }
+
+    auto invalid_terminal = defaults;
+    invalid_terminal.terminal_min_mm = 26.0;
+    invalid_terminal.terminal_max_mm = 25.0;
+
+    if (IsIrrigationDynamicsValid(invalid_terminal)) {
+        return false;
+    }
+
+    auto invalid_limit = defaults;
+    invalid_limit.irrigation_max_mm_per_step = -0.01;
+
+    if (IsIrrigationDynamicsValid(invalid_limit)) {
+        return false;
+    }
+
+    return true;
+}
+
+}  // namespace prometheus_praxis_foundation_extensions
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+constexpr std::size_t default_irrigation_horizon_steps = 3U;
+constexpr double rainfall_probability_tolerance = 1e-12;
+
+bool IsRainfallScenarioValid(
+    const eco_restoration::RainfallScenario& scenario,
+    std::size_t expected_horizon) {
+    if (!std::isfinite(scenario.probability) ||
+        scenario.probability < 0.0 ||
+        scenario.probability > 1.0 ||
+        scenario.rainfall_mm.size() != expected_horizon) {
+        return false;
+    }
+
+    for (const double rainfall : scenario.rainfall_mm) {
+        if (!std::isfinite(rainfall) || rainfall < 0.0) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void ValidateRainfallScenarios(
+    const std::vector<eco_restoration::RainfallScenario>& scenarios,
+    std::size_t expected_horizon) {
+    if (expected_horizon == 0U) {
+        throw std::invalid_argument("rainfall scenario horizon must be positive");
+    }
+
+    if (scenarios.size() < 2U) {
+        throw std::invalid_argument("at least two rainfall scenarios are required");
+    }
+
+    double probability_sum = 0.0;
+    for (const auto& scenario : scenarios) {
+        if (!IsRainfallScenarioValid(scenario, expected_horizon)) {
+            throw std::invalid_argument(
+                "rainfall scenario probability or horizon values are invalid");
+        }
+        probability_sum += scenario.probability;
+    }
+
+    if (std::abs(probability_sum - 1.0) > rainfall_probability_tolerance) {
+        throw std::invalid_argument(
+            "rainfall scenario probabilities must sum to one");
+    }
+}
+
+bool RainfallScenariosAreValid(
+    const std::vector<eco_restoration::RainfallScenario>& scenarios,
+    std::size_t expected_horizon) {
+    try {
+        ValidateRainfallScenarios(scenarios, expected_horizon);
+        return true;
+    } catch (const std::invalid_argument&) {
+        return false;
+    }
+}
+
+std::vector<eco_restoration::RainfallScenario> MakeRainfallScenarios(
+    std::size_t horizon_steps = default_irrigation_horizon_steps) {
+    if (horizon_steps != default_irrigation_horizon_steps) {
+        throw std::invalid_argument(
+            "default rainfall fixture supports the three-step irrigation horizon");
+    }
+
+    const std::vector<eco_restoration::RainfallScenario> scenarios{
+        {
+            0.60,
+            {2.0, 1.5, 3.0}
+        },
+        {
+            0.40,
+            {0.5, 0.0, 1.0}
+        }
+    };
+
+    ValidateRainfallScenarios(scenarios, horizon_steps);
+    return scenarios;
+}
+
+double TotalRainfallMm(
+    const eco_restoration::RainfallScenario& scenario) {
+    if (!std::isfinite(scenario.probability) ||
+        scenario.probability < 0.0 ||
+        scenario.probability > 1.0) {
+        throw std::invalid_argument("rainfall scenario probability is invalid");
+    }
+
+    double total = 0.0;
+    for (const double rainfall : scenario.rainfall_mm) {
+        if (!std::isfinite(rainfall) || rainfall < 0.0) {
+            throw std::invalid_argument("rainfall values must be finite and nonnegative");
+        }
+        total += rainfall;
+    }
+    return total;
+}
+
+double ExpectedRainfallMm(
+    const std::vector<eco_restoration::RainfallScenario>& scenarios,
+    std::size_t expected_horizon) {
+    ValidateRainfallScenarios(scenarios, expected_horizon);
+
+    double expected_total = 0.0;
+    for (const auto& scenario : scenarios) {
+        expected_total += scenario.probability * TotalRainfallMm(scenario);
+    }
+    return expected_total;
+}
+
+std::string ExplainRainfallScenarios(
+    const std::vector<eco_restoration::RainfallScenario>& scenarios,
+    std::size_t expected_horizon) {
+    ValidateRainfallScenarios(scenarios, expected_horizon);
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << std::fixed << std::setprecision(6);
+    output << "rainfall_scenarios\n";
+    output << "scenario_count=" << scenarios.size() << '\n';
+    output << "horizon_steps=" << expected_horizon << '\n';
+
+    for (std::size_t index = 0U; index < scenarios.size(); ++index) {
+        const auto& scenario = scenarios[index];
+        output << "scenario_" << index << "_probability="
+               << scenario.probability << '\n';
+        output << "scenario_" << index << "_total_rainfall_mm="
+               << TotalRainfallMm(scenario) << '\n';
+    }
+
+    output << "expected_rainfall_mm="
+           << ExpectedRainfallMm(scenarios, expected_horizon) << '\n';
+    return output.str();
+}
+
+bool RainfallScenarioFixtureSelfTest() {
+    const auto scenarios = MakeRainfallScenarios();
+
+    if (!RainfallScenariosAreValid(
+            scenarios,
+            default_irrigation_horizon_steps) ||
+        scenarios.size() != 2U ||
+        std::abs(scenarios[0].probability + scenarios[1].probability - 1.0) >
+            rainfall_probability_tolerance ||
+        std::abs(TotalRainfallMm(scenarios[0]) - 6.5) > 1e-12 ||
+        std::abs(TotalRainfallMm(scenarios[1]) - 1.5) > 1e-12 ||
+        std::abs(ExpectedRainfallMm(
+                     scenarios,
+                     default_irrigation_horizon_steps) - 4.5) > 1e-12) {
+        return false;
+    }
+
+    const std::string explanation = ExplainRainfallScenarios(
+        scenarios,
+        default_irrigation_horizon_steps);
+
+    if (explanation.find("scenario_count=2") == std::string::npos ||
+        explanation.find("horizon_steps=3") == std::string::npos ||
+        explanation.find("expected_rainfall_mm=4.500000") ==
+            std::string::npos) {
+        return false;
+    }
+
+    auto invalid_sum = scenarios;
+    invalid_sum[1].probability = 0.30;
+
+    if (RainfallScenariosAreValid(
+            invalid_sum,
+            default_irrigation_horizon_steps)) {
+        return false;
+    }
+
+    auto invalid_length = scenarios;
+    invalid_length[0].rainfall_mm.pop_back();
+
+    if (RainfallScenariosAreValid(
+            invalid_length,
+            default_irrigation_horizon_steps)) {
+        return false;
+    }
+
+    return true;
+}
+
+}  // namespace prometheus_praxis_foundation_extensions
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+using IrrigationSchedule = std::vector<double>;
+using IrrigationScheduleSet = std::vector<IrrigationSchedule>;
+
+bool IsIrrigationScheduleValid(
+    const IrrigationSchedule& schedule,
+    std::size_t expected_horizon,
+    const eco_restoration::IrrigationDynamics& dynamics) {
+    if (schedule.size() != expected_horizon) return false;
+
+    for (const double irrigation : schedule) {
+        if (!std::isfinite(irrigation) ||
+            irrigation < 0.0 ||
+            irrigation > dynamics.irrigation_max_mm_per_step) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void ValidateIrrigationCandidateSchedules(
+    const IrrigationScheduleSet& schedules,
+    std::size_t expected_horizon,
+    const eco_restoration::IrrigationDynamics& dynamics) {
+    ValidateIrrigationDynamics(dynamics);
+
+    if (expected_horizon == 0U) {
+        throw std::invalid_argument("irrigation schedule horizon must be positive");
+    }
+
+    if (schedules.size() < 3U) {
+        throw std::invalid_argument(
+            "at least three irrigation candidate schedules are required");
+    }
+
+    for (const auto& schedule : schedules) {
+        if (!IsIrrigationScheduleValid(
+                schedule,
+                expected_horizon,
+                dynamics)) {
+            throw std::invalid_argument(
+                "irrigation candidate has invalid horizon or water limit");
+        }
+    }
+}
+
+double TotalIrrigationMm(
+    const IrrigationSchedule& schedule) {
+    double total = 0.0;
+    for (const double irrigation : schedule) {
+        if (!std::isfinite(irrigation) || irrigation < 0.0) {
+            throw std::invalid_argument(
+                "irrigation schedule values must be finite and nonnegative");
+        }
+        total += irrigation;
+    }
+    return total;
+}
+
+bool HasConservativeIrrigationSchedule(
+    const IrrigationScheduleSet& schedules) {
+    if (schedules.empty()) return false;
+
+    double minimum_total = std::numeric_limits<double>::infinity();
+    double maximum_total = 0.0;
+
+    for (const auto& schedule : schedules) {
+        const double total = TotalIrrigationMm(schedule);
+        minimum_total = std::min(minimum_total, total);
+        maximum_total = std::max(maximum_total, total);
+    }
+
+    return minimum_total < maximum_total;
+}
+
+IrrigationScheduleSet MakeIrrigationCandidateSchedules(
+    const eco_restoration::IrrigationDynamics& dynamics,
+    std::size_t horizon_steps = default_irrigation_horizon_steps) {
+    ValidateIrrigationDynamics(dynamics);
+
+    if (horizon_steps != default_irrigation_horizon_steps) {
+        throw std::invalid_argument(
+            "default irrigation fixture supports the three-step horizon");
+    }
+
+    const IrrigationScheduleSet schedules{
+        {4.0, 3.0, 4.0},
+        {5.0, 4.0, 5.0},
+        {3.0, 2.0, 3.0}
+    };
+
+    ValidateIrrigationCandidateSchedules(
+        schedules,
+        horizon_steps,
+        dynamics);
+
+    if (!HasConservativeIrrigationSchedule(schedules)) {
+        throw std::runtime_error(
+            "irrigation fixture must contain a conservative schedule");
+    }
+
+    return schedules;
+}
+
+std::string ExplainIrrigationCandidateSchedules(
+    const IrrigationScheduleSet& schedules,
+    std::size_t expected_horizon,
+    const eco_restoration::IrrigationDynamics& dynamics) {
+    ValidateIrrigationCandidateSchedules(
+        schedules,
+        expected_horizon,
+        dynamics);
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << std::fixed << std::setprecision(6);
+    output << "irrigation_candidate_schedules\n";
+    output << "schedule_count=" << schedules.size() << '\n';
+    output << "horizon_steps=" << expected_horizon << '\n';
+
+    for (std::size_t index = 0U; index < schedules.size(); ++index) {
+        output << "schedule_" << index << "_total_irrigation_mm="
+               << TotalIrrigationMm(schedules[index]) << '\n';
+    }
+
+    output << "has_conservative_schedule="
+           << (HasConservativeIrrigationSchedule(schedules)
+               ? "true" : "false")
+           << '\n';
+    return output.str();
+}
+
+bool IrrigationCandidateScheduleFixtureSelfTest() {
+    const auto dynamics = MakeIrrigationDynamics();
+    const auto schedules = MakeIrrigationCandidateSchedules(dynamics);
+    const auto rainfall = MakeRainfallScenarios();
+
+    if (schedules.size() != 3U ||
+        !HasConservativeIrrigationSchedule(schedules) ||
+        std::abs(TotalIrrigationMm(schedules[0]) - 11.0) > 1e-12 ||
+        std::abs(TotalIrrigationMm(schedules[1]) - 14.0) > 1e-12 ||
+        std::abs(TotalIrrigationMm(schedules[2]) - 8.0) > 1e-12) {
+        return false;
+    }
+
+    const auto result =
+        eco_restoration::select_robust_irrigation_schedule(
+            schedules,
+            rainfall,
+            dynamics);
+
+    if (!result.robustly_feasible) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainIrrigationCandidateSchedules(
+            schedules,
+            default_irrigation_horizon_steps,
+            dynamics);
+
+    if (explanation.find("schedule_count=3") == std::string::npos ||
+        explanation.find("schedule_2_total_irrigation_mm=8.000000") ==
+            std::string::npos ||
+        explanation.find("has_conservative_schedule=true") ==
+            std::string::npos) {
+        return false;
+    }
+
+    auto invalid_limit = schedules;
+    invalid_limit[0][0] =
+        dynamics.irrigation_max_mm_per_step + 0.01;
+
+    try {
+        ValidateIrrigationCandidateSchedules(
+            invalid_limit,
+            default_irrigation_horizon_steps,
+            dynamics);
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    auto invalid_horizon = schedules;
+    invalid_horizon[1].pop_back();
+
+    try {
+        ValidateIrrigationCandidateSchedules(
+            invalid_horizon,
+            default_irrigation_horizon_steps,
+            dynamics);
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    return true;
+}
+
+}  // namespace prometheus_praxis_foundation_extensions
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+bool IsRobustIrrigationResultValid(
+    const eco_restoration::IrrigationMpcResult& result) {
+    if (!std::isfinite(result.expected_cost) ||
+        !std::isfinite(result.worst_case_terminal_moisture_mm) ||
+        !IsUnitIntervalScore(result.knowledge_factor) ||
+        !IsUnitIntervalScore(result.eco_impact_value)) {
+        return false;
+    }
+
+    if (result.robustly_feasible && result.schedule_mm.empty()) {
+        return false;
+    }
+
+    for (const double irrigation : result.schedule_mm) {
+        if (!std::isfinite(irrigation) || irrigation < 0.0) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+double MaximumScheduleIrrigationMm(
+    const eco_restoration::IrrigationMpcResult& result) {
+    if (!IsRobustIrrigationResultValid(result) ||
+        result.schedule_mm.empty()) {
+        throw std::invalid_argument(
+            "irrigation result must contain a valid selected schedule");
+    }
+
+    return *std::max_element(
+        result.schedule_mm.begin(),
+        result.schedule_mm.end());
+}
+
+std::string IrrigationResultStatus(
+    const eco_restoration::IrrigationMpcResult& result) {
+    if (!IsRobustIrrigationResultValid(result)) {
+        return "invalid";
+    }
+
+    if (result.robustly_feasible) {
+        return "robustly_feasible";
+    }
+
+    if (result.schedule_mm.empty()) {
+        return "no_feasible_schedule";
+    }
+
+    return "candidate_not_robust";
+}
+
+std::string ExplainIrrigationResult(
+    const eco_restoration::IrrigationMpcResult& result) {
+    if (!IsRobustIrrigationResultValid(result)) {
+        throw std::invalid_argument("irrigation result is invalid");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << std::fixed << std::setprecision(6);
+    output << "robust_irrigation_result\n";
+    output << "status=" << IrrigationResultStatus(result) << '\n';
+    output << "robustly_feasible="
+           << (result.robustly_feasible ? "true" : "false") << '\n';
+    output << "selected_schedule_steps="
+           << result.schedule_mm.size() << '\n';
+
+    for (std::size_t index = 0U;
+         index < result.schedule_mm.size();
+         ++index) {
+        output << "selected_schedule_step_" << index << "_mm="
+               << result.schedule_mm[index] << '\n';
+    }
+
+    if (!result.schedule_mm.empty()) {
+        output << "selected_schedule_total_mm="
+               << TotalIrrigationMm(result.schedule_mm) << '\n';
+        output << "selected_schedule_peak_mm="
+               << MaximumScheduleIrrigationMm(result) << '\n';
+    }
+
+    output << "expected_cost=" << result.expected_cost << '\n';
+    output << "worst_terminal_moisture_mm="
+           << result.worst_case_terminal_moisture_mm << '\n';
+    output << "knowledge_factor="
+           << result.knowledge_factor << '\n';
+    output << "eco_impact_value="
+           << result.eco_impact_value << '\n';
+
+    return output.str();
+}
+
+bool IrrigationResultMatchesHorizon(
+    const eco_restoration::IrrigationMpcResult& result,
+    std::size_t expected_horizon) {
+    return IsRobustIrrigationResultValid(result) &&
+           result.schedule_mm.size() == expected_horizon;
+}
+
+bool IrrigationResultExplainerSelfTest() {
+    const auto dynamics = MakeIrrigationDynamics();
+    const auto rainfall = MakeRainfallScenarios();
+    const auto candidates = MakeIrrigationCandidateSchedules(dynamics);
+
+    const auto result =
+        eco_restoration::select_robust_irrigation_schedule(
+            candidates,
+            rainfall,
+            dynamics);
+
+    if (!result.robustly_feasible ||
+        !IrrigationResultMatchesHorizon(
+            result,
+            default_irrigation_horizon_steps) ||
+        std::abs(TotalIrrigationMm(result.schedule_mm) - 8.0) > 1e-12 ||
+        std::abs(MaximumScheduleIrrigationMm(result) - 3.0) > 1e-12) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainIrrigationResult(result);
+
+    if (explanation.find("status=robustly_feasible") ==
+            std::string::npos ||
+        explanation.find("robustly_feasible=true") ==
+            std::string::npos ||
+        explanation.find("selected_schedule_steps=3") ==
+            std::string::npos ||
+        explanation.find("selected_schedule_total_mm=8.000000") ==
+            std::string::npos ||
+        explanation.find("worst_terminal_moisture_mm=") ==
+            std::string::npos) {
+        return false;
+    }
+
+    eco_restoration::IrrigationMpcResult invalid = result;
+    invalid.expected_cost =
+        std::numeric_limits<double>::infinity();
+
+    if (IsRobustIrrigationResultValid(invalid)) {
+        return false;
+    }
+
+    try {
+        static_cast<void>(ExplainIrrigationResult(invalid));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    return true;
+}
+
+}  // namespace prometheus_praxis_foundation_extensions
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+constexpr double default_available_water_mm = 90.0;
+constexpr double default_equity_tolerance = 0.01;
+
+double AgriculturalWaterUtility(double allocation_mm) {
+    return allocation_mm < 0.0 ? -std::numeric_limits<double>::infinity()
+                               : std::sqrt(allocation_mm);
+}
+
+double MunicipalWaterUtility(double allocation_mm) {
+    return allocation_mm < 0.0 ? -std::numeric_limits<double>::infinity()
+                               : std::sqrt(allocation_mm);
+}
+
+double EcologicalWaterUtility(double allocation_mm) {
+    return allocation_mm < 0.0 ? -std::numeric_limits<double>::infinity()
+                               : std::sqrt(allocation_mm);
+}
+
+std::vector<eco_restoration::WaterStakeholder>
+MakeEquitableWaterStakeholders() {
+    const std::vector<eco_restoration::WaterStakeholder> stakeholders{
+        {10.0, 40.0, AgriculturalWaterUtility},
+        {10.0, 40.0, MunicipalWaterUtility},
+        {10.0, 40.0, EcologicalWaterUtility}
+    };
+
+    for (const auto& stakeholder : stakeholders) {
+        if (!stakeholder.utility ||
+            stakeholder.minimum_allocation_mm < 0.0 ||
+            stakeholder.maximum_allocation_mm <
+                stakeholder.minimum_allocation_mm) {
+            throw std::runtime_error("equitable water stakeholder fixture is invalid");
+        }
+    }
+
+    return stakeholders;
+}
+
+std::vector<double> MakeEquitableWaterAllocation() {
+    return {30.0, 30.0, 30.0};
+}
+
+struct EquitableWaterAllocationEvaluation {
+    eco_restoration::EquitableAllocationResult result;
+    bool evaluated{};
+    bool inequality_within_tolerance{};
+    std::vector<std::string> failure_reasons;
+};
+
+double UtilityInequalityGap(
+    const std::vector<eco_restoration::WaterStakeholder>& stakeholders,
+    const std::vector<double>& allocation_mm) {
+    if (stakeholders.size() != allocation_mm.size() ||
+        stakeholders.empty()) {
+        throw std::invalid_argument(
+            "stakeholder and allocation vectors must have equal nonzero length");
+    }
+
+    double minimum_utility = std::numeric_limits<double>::infinity();
+    double maximum_utility = -std::numeric_limits<double>::infinity();
+
+    for (std::size_t index = 0U; index < stakeholders.size(); ++index) {
+        const double utility = stakeholders[index].utility(allocation_mm[index]);
+        if (!std::isfinite(utility)) {
+            throw std::invalid_argument("stakeholder utility must be finite");
+        }
+        minimum_utility = std::min(minimum_utility, utility);
+        maximum_utility = std::max(maximum_utility, utility);
+    }
+
+    return maximum_utility - minimum_utility;
+}
+
+EquitableWaterAllocationEvaluation EvaluateEquitableWaterAllocation(
+    const std::vector<double>& allocation_mm = MakeEquitableWaterAllocation(),
+    double available_water_mm = default_available_water_mm,
+    double equity_tolerance = default_equity_tolerance) {
+    EquitableWaterAllocationEvaluation evaluation;
+    const auto stakeholders = MakeEquitableWaterStakeholders();
+
+    try {
+        evaluation.result = eco_restoration::evaluate_water_allocation(
+            allocation_mm,
+            stakeholders,
+            available_water_mm,
+            equity_tolerance);
+        evaluation.evaluated = true;
+
+        const double gap = UtilityInequalityGap(
+            stakeholders,
+            allocation_mm);
+
+        evaluation.inequality_within_tolerance =
+            gap <= equity_tolerance;
+
+        if (!evaluation.result.equitable) {
+            evaluation.failure_reasons.emplace_back(
+                "water allocation did not satisfy the equity constraint");
+        }
+
+        if (!evaluation.inequality_within_tolerance) {
+            evaluation.failure_reasons.emplace_back(
+                "utility inequality gap exceeded the configured tolerance");
+        }
+
+        if (evaluation.result.utility_gap > equity_tolerance) {
+            evaluation.failure_reasons.emplace_back(
+                "reported utility gap exceeded the configured tolerance");
+        }
+    } catch (const std::exception& error) {
+        evaluation.failure_reasons.emplace_back(error.what());
+    }
+
+    return evaluation;
+}
+
+bool IsEquitableWaterAllocationEvaluationValid(
+    const EquitableWaterAllocationEvaluation& evaluation) {
+    if (!evaluation.evaluated) {
+        return !evaluation.failure_reasons.empty();
+    }
+
+    if (evaluation.result.equitable) {
+        return evaluation.inequality_within_tolerance &&
+               evaluation.failure_reasons.empty();
+    }
+
+    return !evaluation.failure_reasons.empty();
+}
+
+std::string ExplainEquitableWaterAllocation(
+    const EquitableWaterAllocationEvaluation& evaluation) {
+    if (!IsEquitableWaterAllocationEvaluationValid(evaluation)) {
+        throw std::invalid_argument(
+            "equitable water allocation evaluation is invalid");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+    output << std::fixed << std::setprecision(6);
+    output << "equitable_water_allocation\n";
+    output << "evaluated="
+           << (evaluation.evaluated ? "true" : "false") << '\n';
+    output << "equitable="
+           << (evaluation.result.equitable ? "true" : "false") << '\n';
+    output << "inequality_within_tolerance="
+           << (evaluation.inequality_within_tolerance ? "true" : "false")
+           << '\n';
+    output << "total_utility="
+           << evaluation.result.total_utility << '\n';
+    output << "utility_gap="
+           << evaluation.result.utility_gap << '\n';
+    output << "failure_reason_count="
+           << evaluation.failure_reasons.size() << '\n';
+
+    for (std::size_t index = 0U;
+         index < evaluation.failure_reasons.size();
+         ++index) {
+        output << "failure_reason_" << index << '='
+               << evaluation.failure_reasons[index] << '\n';
+    }
+
+    return output.str();
+}
+
+bool EquitableWaterAllocationEvaluatorSelfTest() {
+    const auto accepted = EvaluateEquitableWaterAllocation();
+
+    if (!accepted.evaluated ||
+        !accepted.result.equitable ||
+        !accepted.inequality_within_tolerance ||
+        !accepted.failure_reasons.empty() ||
+        !IsEquitableWaterAllocationEvaluationValid(accepted) ||
+        std::abs(accepted.result.utility_gap) > 1e-12) {
+        return false;
+    }
+
+    const auto unequal = EvaluateEquitableWaterAllocation(
+        {40.0, 30.0, 20.0});
+
+    if (!unequal.evaluated ||
+        unequal.result.equitable ||
+        unequal.inequality_within_tolerance ||
+        unequal.failure_reasons.empty()) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainEquitableWaterAllocation(unequal);
+
+    if (explanation.find("equitable=false") == std::string::npos ||
+        explanation.find("inequality_within_tolerance=false") ==
+            std::string::npos ||
+        explanation.find("utility_gap=") == std::string::npos) {
+        return false;
+    }
+
+    const auto invalid = EvaluateEquitableWaterAllocation(
+        {30.0, 30.0},
+        default_available_water_mm,
+        default_equity_tolerance);
+
+    return !invalid.evaluated &&
+           !invalid.failure_reasons.empty() &&
+           IsEquitableWaterAllocationEvaluationValid(invalid);
+}
+
+}  // namespace prometheus_praxis_foundation_extensions
