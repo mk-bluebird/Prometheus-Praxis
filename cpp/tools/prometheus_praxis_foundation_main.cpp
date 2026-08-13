@@ -12343,3 +12343,2517 @@ bool FoundationStageSummarySelfTest() {
 // Delivery sequence: record unresolved legacy-test divergence as an explicit issue.
 // Delivery sequence: prefer small, verifiable changes over broad rewrites.
 // End of additional roadmap comments.
+
+namespace prometheus_praxis_foundation_extensions {
+
+struct SelfTestLedgerEntry {
+    std::string name;
+    bool (*callback)();
+    std::string_view category;
+    bool registered_in_canonical_registry{};
+};
+
+bool IsSelfTestLedgerEntryValid(
+    const SelfTestLedgerEntry& entry) {
+    return IsStableKey(entry.name) &&
+           entry.callback != nullptr &&
+           !entry.category.empty();
+}
+
+bool IsSelfTestLedgerUnique(
+    const std::vector<SelfTestLedgerEntry>& entries) {
+    for (std::size_t left = 0U; left < entries.size(); ++left) {
+        if (!IsSelfTestLedgerEntryValid(entries[left])) {
+            return false;
+        }
+
+        for (std::size_t right = left + 1U;
+             right < entries.size();
+             ++right) {
+            if (entries[left].name == entries[right].name) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+bool LedgerFixturePasses() {
+    return true;
+}
+
+bool LedgerFixtureFails() {
+    return false;
+}
+
+std::vector<SelfTestLedgerEntry> DiscoverSelfTests() {
+    std::vector<SelfTestLedgerEntry> entries{
+        {
+            "extension_registry",
+            &extension_registry_self_test,
+            "legacy_registry",
+            true
+        },
+        {
+            "foundation_report_json",
+            &foundation_report_json_self_test,
+            "report_serialization",
+            true
+        },
+        {
+            "emit_key_value",
+            &EmitKeyValueSelfTest,
+            "stable_output",
+            true
+        },
+        {
+            "build_usage_message",
+            &BuildUsageMessageSelfTest,
+            "command_line",
+            true
+        },
+        {
+            "foundation_exit_code",
+            &FoundationExitCodeSelfTest,
+            "process_contract",
+            true
+        },
+        {
+            "private_heat_proof_plan",
+            &PrivateHeatProofPlanSelfTest,
+            "private_heat",
+            true
+        },
+        {
+            "foundation_safety_verdict",
+            &FoundationSafetyVerdictSelfTest,
+            "foundation_safety",
+            true
+        },
+        {
+            "canonical_extension_registry",
+            &CanonicalExtensionRegistrySelfTest,
+            "canonical_registry",
+            true
+        },
+        {
+            "known_extension_registry",
+            &BuildKnownExtensionRegistrySelfTest,
+            "canonical_registry",
+            false
+        },
+        {
+            "extension_runner_adapter",
+            &RunAllKnownExtensionSelfTestsAndExitSelfTest,
+            "execution_adapter",
+            false
+        },
+        {
+            "canonical_symbol_audit",
+            &CanonicalSymbolAuditSelfTest,
+            "source_audit",
+            false
+        },
+        {
+            "object_marker_registry",
+            &ObjectMarkerRegistrySelfTest,
+            "section_ledger",
+            false
+        },
+        {
+            "sourced_risk_of_harm",
+            &SourcedRiskOfHarmSelfTest,
+            "risk_aggregation",
+            false
+        },
+        {
+            "foundation_report_comparison",
+            &FoundationReportComparisonSelfTest,
+            "report_validation",
+            false
+        },
+        {
+            "foundation_report_validation",
+            &ValidateFoundationReportSelfTest,
+            "report_validation",
+            false
+        },
+        {
+            "foundation_stage_summary",
+            &FoundationStageSummarySelfTest,
+            "reporting",
+            false
+        }
+    };
+
+    if (!IsSelfTestLedgerUnique(entries)) {
+        throw std::logic_error(
+            "self-test discovery ledger contains invalid entries");
+    }
+
+    return entries;
+}
+
+std::vector<SelfTestLedgerEntry> DiscoverUnregisteredSelfTests(
+    const std::vector<SelfTestLedgerEntry>& entries) {
+    if (!IsSelfTestLedgerUnique(entries)) {
+        throw std::invalid_argument(
+            "self-test discovery ledger input is invalid");
+    }
+
+    std::vector<SelfTestLedgerEntry> gaps;
+
+    for (const auto& entry : entries) {
+        if (!entry.registered_in_canonical_registry) {
+            gaps.push_back(entry);
+        }
+    }
+
+    return gaps;
+}
+
+bool LedgerContainsSelfTest(
+    const std::vector<SelfTestLedgerEntry>& entries,
+    std::string_view name) {
+    return std::any_of(
+        entries.begin(),
+        entries.end(),
+        [name](const SelfTestLedgerEntry& entry) {
+            return entry.name == name;
+        });
+}
+
+std::string ExplainSelfTestDiscoveryLedger(
+    const std::vector<SelfTestLedgerEntry>& entries) {
+    if (!IsSelfTestLedgerUnique(entries)) {
+        throw std::invalid_argument(
+            "self-test discovery ledger input is invalid");
+    }
+
+    const std::vector<SelfTestLedgerEntry> gaps =
+        DiscoverUnregisteredSelfTests(entries);
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+
+    output << "self_test_discovery_ledger\n";
+    output << "discovered_count=" << entries.size() << '\n';
+    output << "registered_count="
+           << entries.size() - gaps.size()
+           << '\n';
+    output << "unregistered_count=" << gaps.size() << '\n';
+
+    for (std::size_t index = 0U;
+         index < entries.size();
+         ++index) {
+        const auto& entry = entries[index];
+
+        output << "entry_" << index << "_name="
+               << entry.name << '\n';
+        output << "entry_" << index << "_category="
+               << entry.category << '\n';
+        output << "entry_" << index << "_registered="
+               << (entry.registered_in_canonical_registry
+                       ? "true"
+                       : "false")
+               << '\n';
+    }
+
+    return output.str();
+}
+
+bool CompleteSelfTestDiscoveryLedgerSelfTest() {
+    const std::vector<SelfTestLedgerEntry> fixture{
+        {"fixture_pass", &LedgerFixturePasses, "fixture", true},
+        {"fixture_fail", &LedgerFixtureFails, "fixture", false}
+    };
+
+    if (!IsSelfTestLedgerUnique(fixture) ||
+        !fixture[0].callback() ||
+        fixture[1].callback()) {
+        return false;
+    }
+
+    const std::vector<SelfTestLedgerEntry> fixture_gaps =
+        DiscoverUnregisteredSelfTests(fixture);
+
+    if (fixture_gaps.size() != 1U ||
+        fixture_gaps.front().name != "fixture_fail" ||
+        !LedgerContainsSelfTest(fixture, "fixture_pass") ||
+        LedgerContainsSelfTest(fixture, "not_present")) {
+        return false;
+    }
+
+    const std::vector<SelfTestLedgerEntry> entries =
+        DiscoverSelfTests();
+
+    if (entries.empty() ||
+        !IsSelfTestLedgerUnique(entries) ||
+        !LedgerContainsSelfTest(
+            entries,
+            "extension_registry") ||
+        !LedgerContainsSelfTest(
+            entries,
+            "foundation_report_validation") ||
+        !LedgerContainsSelfTest(
+            entries,
+            "foundation_stage_summary")) {
+        return false;
+    }
+
+    for (const auto& entry : entries) {
+        if (!IsSelfTestLedgerEntryValid(entry)) {
+            return false;
+        }
+    }
+
+    const std::string explanation =
+        ExplainSelfTestDiscoveryLedger(entries);
+
+    if (explanation.find("self_test_discovery_ledger") ==
+            std::string::npos ||
+        explanation.find("discovered_count=") ==
+            std::string::npos ||
+        explanation.find("registered_count=") ==
+            std::string::npos ||
+        explanation.find("unregistered_count=") ==
+            std::string::npos ||
+        explanation.find(
+            "entry_0_name=extension_registry") ==
+            std::string::npos) {
+        return false;
+    }
+
+    const std::vector<SelfTestLedgerEntry> invalid_name{
+        {"Invalid-Name", &LedgerFixturePasses, "fixture", false}
+    };
+
+    const std::vector<SelfTestLedgerEntry> duplicate_names{
+        {"fixture", &LedgerFixturePasses, "fixture", false},
+        {"fixture", &LedgerFixtureFails, "fixture", false}
+    };
+
+    const std::vector<SelfTestLedgerEntry> missing_callback{
+        {"fixture", nullptr, "fixture", false}
+    };
+
+    if (IsSelfTestLedgerUnique(invalid_name) ||
+        IsSelfTestLedgerUnique(duplicate_names) ||
+        IsSelfTestLedgerUnique(missing_callback)) {
+        return false;
+    }
+
+    return true;
+}
+
+}
+
+// File: cpp/tools/prometheus_praxis_foundation_main.cpp
+namespace prometheus_praxis_foundation_extensions {
+
+struct BoundedSelfTestCacheEntry {
+    CanonicalExtensionRunResult result;
+    std::size_t insertion_sequence{};
+};
+
+bool IsCanonicalExtensionRunResultValid(
+    const CanonicalExtensionRunResult& result) {
+    return IsStableKey(result.name) &&
+           !result.detail.empty() &&
+           result.detail.find_first_of("\r\n") ==
+               std::string::npos;
+}
+
+class BoundedSelfTestResultCache {
+public:
+    explicit BoundedSelfTestResultCache(
+        std::size_t maximum_entries)
+        : maximum_entries_(maximum_entries) {
+        if (maximum_entries_ == 0U) {
+            throw std::invalid_argument(
+                "self-test cache capacity must be positive");
+        }
+    }
+
+    bool Store(
+        std::string_view name,
+        bool passed,
+        std::string_view detail) {
+        const CanonicalExtensionRunResult result{
+            std::string(name),
+            passed,
+            std::string(detail)
+        };
+
+        if (!IsCanonicalExtensionRunResultValid(result) ||
+            entries_.find(result.name) != entries_.end()) {
+            return false;
+        }
+
+        while (entries_.size() >= maximum_entries_) {
+            EvictOldest();
+        }
+
+        entries_.emplace(
+            result.name,
+            BoundedSelfTestCacheEntry{
+                result,
+                next_insertion_sequence_
+            });
+
+        ++next_insertion_sequence_;
+        return true;
+    }
+
+    std::optional<CanonicalExtensionRunResult> Lookup(
+        std::string_view name) const {
+        const auto iterator =
+            entries_.find(std::string(name));
+
+        if (iterator == entries_.end()) {
+            return std::nullopt;
+        }
+
+        return iterator->second.result;
+    }
+
+    void Clear() {
+        entries_.clear();
+        next_insertion_sequence_ = 0U;
+    }
+
+    std::size_t Size() const noexcept {
+        return entries_.size();
+    }
+
+    std::size_t Capacity() const noexcept {
+        return maximum_entries_;
+    }
+
+    bool Empty() const noexcept {
+        return entries_.empty();
+    }
+
+    std::size_t TotalPassed() const {
+        std::size_t passed = 0U;
+
+        for (const auto& [name, entry] : entries_) {
+            static_cast<void>(name);
+
+            if (entry.result.passed) {
+                ++passed;
+            }
+        }
+
+        return passed;
+    }
+
+    std::size_t TotalFailed() const {
+        return Size() - TotalPassed();
+    }
+
+    std::vector<CanonicalExtensionRunResult> Results() const {
+        std::vector<BoundedSelfTestCacheEntry> ordered_entries;
+        ordered_entries.reserve(entries_.size());
+
+        for (const auto& [name, entry] : entries_) {
+            static_cast<void>(name);
+            ordered_entries.push_back(entry);
+        }
+
+        std::sort(
+            ordered_entries.begin(),
+            ordered_entries.end(),
+            [](const BoundedSelfTestCacheEntry& left,
+               const BoundedSelfTestCacheEntry& right) {
+                return left.insertion_sequence <
+                       right.insertion_sequence;
+            });
+
+        std::vector<CanonicalExtensionRunResult> results;
+        results.reserve(ordered_entries.size());
+
+        for (const auto& entry : ordered_entries) {
+            results.push_back(entry.result);
+        }
+
+        return results;
+    }
+
+private:
+    void EvictOldest() {
+        if (entries_.empty()) {
+            throw std::logic_error(
+                "cannot evict from an empty self-test cache");
+        }
+
+        auto oldest = entries_.begin();
+
+        for (auto iterator = entries_.begin();
+             iterator != entries_.end();
+             ++iterator) {
+            if (iterator->second.insertion_sequence <
+                oldest->second.insertion_sequence) {
+                oldest = iterator;
+            }
+        }
+
+        entries_.erase(oldest);
+    }
+
+    std::map<std::string, BoundedSelfTestCacheEntry> entries_;
+    std::size_t maximum_entries_{};
+    std::size_t next_insertion_sequence_{};
+};
+
+bool IsBoundedSelfTestResultCacheValid(
+    const BoundedSelfTestResultCache& cache) {
+    if (cache.Capacity() == 0U ||
+        cache.Size() > cache.Capacity() ||
+        cache.TotalPassed() + cache.TotalFailed() !=
+            cache.Size()) {
+        return false;
+    }
+
+    const std::vector<CanonicalExtensionRunResult> results =
+        cache.Results();
+
+    if (results.size() != cache.Size()) {
+        return false;
+    }
+
+    for (std::size_t left = 0U;
+         left < results.size();
+         ++left) {
+        if (!IsCanonicalExtensionRunResultValid(results[left])) {
+            return false;
+        }
+
+        for (std::size_t right = left + 1U;
+             right < results.size();
+             ++right) {
+            if (results[left].name == results[right].name) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+std::string ExplainBoundedSelfTestResultCache(
+    const BoundedSelfTestResultCache& cache) {
+    if (!IsBoundedSelfTestResultCacheValid(cache)) {
+        throw std::invalid_argument(
+            "bounded self-test result cache is invalid");
+    }
+
+    const std::vector<CanonicalExtensionRunResult> results =
+        cache.Results();
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+
+    output << "bounded_self_test_result_cache\n";
+    output << "capacity=" << cache.Capacity() << '\n';
+    output << "size=" << cache.Size() << '\n';
+    output << "total_passed=" << cache.TotalPassed() << '\n';
+    output << "total_failed=" << cache.TotalFailed() << '\n';
+
+    for (std::size_t index = 0U;
+         index < results.size();
+         ++index) {
+        output << "result_" << index << "_name="
+               << results[index].name << '\n';
+        output << "result_" << index << "_passed="
+               << (results[index].passed ? "true" : "false")
+               << '\n';
+        output << "result_" << index << "_detail="
+               << results[index].detail << '\n';
+    }
+
+    return output.str();
+}
+
+bool BoundedSelfTestResultCacheSelfTest() {
+    try {
+        static_cast<void>(BoundedSelfTestResultCache(0U));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    BoundedSelfTestResultCache empty_cache(2U);
+
+    if (!empty_cache.Empty() ||
+        empty_cache.Size() != 0U ||
+        empty_cache.TotalPassed() != 0U ||
+        empty_cache.TotalFailed() != 0U ||
+        empty_cache.Lookup("not_present").has_value() ||
+        !IsBoundedSelfTestResultCacheValid(empty_cache)) {
+        return false;
+    }
+
+    BoundedSelfTestResultCache cache(2U);
+
+    if (!cache.Store("first_test", true, "passed") ||
+        !cache.Store("second_test", false, "failed") ||
+        cache.Store("first_test", false, "duplicate") ||
+        cache.Size() != 2U ||
+        cache.TotalPassed() != 1U ||
+        cache.TotalFailed() != 1U ||
+        !IsBoundedSelfTestResultCacheValid(cache)) {
+        return false;
+    }
+
+    const auto first = cache.Lookup("first_test");
+    const auto second = cache.Lookup("second_test");
+
+    if (!first.has_value() ||
+        !second.has_value() ||
+        !first->passed ||
+        second->passed ||
+        first->detail != "passed" ||
+        second->detail != "failed") {
+        return false;
+    }
+
+    if (!cache.Store("third_test", true, "passed_after_eviction") ||
+        cache.Size() != 2U ||
+        cache.Lookup("first_test").has_value() ||
+        !cache.Lookup("second_test").has_value() ||
+        !cache.Lookup("third_test").has_value() ||
+        cache.TotalPassed() != 1U ||
+        cache.TotalFailed() != 1U) {
+        return false;
+    }
+
+    const std::vector<CanonicalExtensionRunResult> results =
+        cache.Results();
+
+    if (results.size() != 2U ||
+        results[0].name != "second_test" ||
+        results[1].name != "third_test") {
+        return false;
+    }
+
+    if (cache.Store("Invalid-Name", true, "invalid") ||
+        cache.Store("", true, "empty") ||
+        cache.Store("valid_name", true, "") ||
+        cache.Store("line_break", true, "invalid\ndetail") ||
+        cache.Size() != 2U) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainBoundedSelfTestResultCache(cache);
+
+    if (explanation.find(
+            "bounded_self_test_result_cache") ==
+            std::string::npos ||
+        explanation.find("capacity=2") ==
+            std::string::npos ||
+        explanation.find("size=2") ==
+            std::string::npos ||
+        explanation.find("total_passed=1") ==
+            std::string::npos ||
+        explanation.find("total_failed=1") ==
+            std::string::npos ||
+        explanation.find("result_0_name=second_test") ==
+            std::string::npos ||
+        explanation.find("result_1_name=third_test") ==
+            std::string::npos) {
+        return false;
+    }
+
+    cache.Clear();
+
+    return cache.Empty() &&
+           cache.Size() == 0U &&
+           cache.TotalPassed() == 0U &&
+           cache.TotalFailed() == 0U &&
+           cache.Results().empty() &&
+           IsBoundedSelfTestResultCacheValid(cache);
+}
+
+}
+
+namespace prometheus_praxis_foundation_extensions {
+
+struct FoundationSectionLedgerEntry {
+    std::string identifier;
+    std::string responsibility;
+    bool self_tested{};
+    bool registered{};
+    std::size_t append_order{};
+};
+
+bool IsFoundationSectionLedgerEntryValid(
+    const FoundationSectionLedgerEntry& entry) {
+    return IsStableKey(entry.identifier) &&
+           !entry.responsibility.empty() &&
+           entry.responsibility.find_first_of("\r\n") ==
+               std::string::npos &&
+           entry.append_order > 0U;
+}
+
+class FoundationSectionLedgerRegistry {
+public:
+    bool Register(
+        std::string_view identifier,
+        std::string_view responsibility,
+        bool self_tested,
+        bool registered) {
+        FoundationSectionLedgerEntry entry{
+            std::string(identifier),
+            std::string(responsibility),
+            self_tested,
+            registered,
+            next_append_order_
+        };
+
+        if (!IsFoundationSectionLedgerEntryValid(entry) ||
+            ContainsIdentifier(entry.identifier)) {
+            return false;
+        }
+
+        entries_.push_back(std::move(entry));
+        ++next_append_order_;
+        return true;
+    }
+
+    bool ContainsIdentifier(
+        std::string_view identifier) const {
+        return std::any_of(
+            entries_.begin(),
+            entries_.end(),
+            [identifier](const FoundationSectionLedgerEntry& entry) {
+                return entry.identifier == identifier;
+            });
+    }
+
+    std::optional<FoundationSectionLedgerEntry> Lookup(
+        std::string_view identifier) const {
+        const auto iterator = std::find_if(
+            entries_.begin(),
+            entries_.end(),
+            [identifier](const FoundationSectionLedgerEntry& entry) {
+                return entry.identifier == identifier;
+            });
+
+        if (iterator == entries_.end()) {
+            return std::nullopt;
+        }
+
+        return *iterator;
+    }
+
+    const std::vector<FoundationSectionLedgerEntry>& Entries() const noexcept {
+        return entries_;
+    }
+
+    std::size_t Size() const noexcept {
+        return entries_.size();
+    }
+
+    bool Empty() const noexcept {
+        return entries_.empty();
+    }
+
+    bool IsAppendOrdered() const {
+        if (entries_.empty()) {
+            return false;
+        }
+
+        for (std::size_t index = 0U;
+             index < entries_.size();
+             ++index) {
+            if (!IsFoundationSectionLedgerEntryValid(entries_[index]) ||
+                entries_[index].append_order != index + 1U) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool AllSelfTestedSectionsRegistered() const {
+        for (const auto& entry : entries_) {
+            if (entry.self_tested && !entry.registered) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    std::size_t RegisteredCount() const {
+        return static_cast<std::size_t>(
+            std::count_if(
+                entries_.begin(),
+                entries_.end(),
+                [](const FoundationSectionLedgerEntry& entry) {
+                    return entry.registered;
+                }));
+    }
+
+    std::size_t SelfTestedCount() const {
+        return static_cast<std::size_t>(
+            std::count_if(
+                entries_.begin(),
+                entries_.end(),
+                [](const FoundationSectionLedgerEntry& entry) {
+                    return entry.self_tested;
+                }));
+    }
+
+private:
+    std::vector<FoundationSectionLedgerEntry> entries_;
+    std::size_t next_append_order_{1U};
+};
+
+bool FoundationSectionLedgerEntriesAreUnique(
+    const std::vector<FoundationSectionLedgerEntry>& entries) {
+    for (std::size_t left = 0U;
+         left < entries.size();
+         ++left) {
+        if (!IsFoundationSectionLedgerEntryValid(entries[left])) {
+            return false;
+        }
+
+        for (std::size_t right = left + 1U;
+             right < entries.size();
+             ++right) {
+            if (entries[left].identifier ==
+                entries[right].identifier) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+bool IsFoundationSectionLedgerRegistryValid(
+    const FoundationSectionLedgerRegistry& registry) {
+    if (registry.Empty() ||
+        !registry.IsAppendOrdered() ||
+        !FoundationSectionLedgerEntriesAreUnique(
+            registry.Entries()) ||
+        !registry.AllSelfTestedSectionsRegistered() ||
+        registry.RegisteredCount() > registry.Size() ||
+        registry.SelfTestedCount() > registry.Size()) {
+        return false;
+    }
+
+    return true;
+}
+
+std::string ExplainFoundationSectionLedger(
+    const FoundationSectionLedgerRegistry& registry) {
+    if (!IsFoundationSectionLedgerRegistryValid(registry)) {
+        throw std::invalid_argument(
+            "foundation section ledger registry is invalid");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+
+    output << "{";
+    output << "\"ledger\":\"foundation_section_ledger_v1\",";
+    output << "\"entry_count\":" << registry.Size() << ",";
+    output << "\"registered_count\":"
+           << registry.RegisteredCount() << ",";
+    output << "\"self_tested_count\":"
+           << registry.SelfTestedCount() << ",";
+    output << "\"append_ordered\":"
+           << (registry.IsAppendOrdered() ? "true" : "false")
+           << ",";
+    output << "\"entries\":[";
+
+    const auto& entries = registry.Entries();
+
+    for (std::size_t index = 0U;
+         index < entries.size();
+         ++index) {
+        if (index != 0U) {
+            output << ',';
+        }
+
+        const auto& entry = entries[index];
+
+        output << "{";
+        output << "\"identifier\":";
+        json_string(output, entry.identifier);
+        output << ",\"responsibility\":";
+        json_string(output, entry.responsibility);
+        output << ",\"self_tested\":"
+               << (entry.self_tested ? "true" : "false");
+        output << ",\"registered\":"
+               << (entry.registered ? "true" : "false");
+        output << ",\"append_order\":"
+               << entry.append_order;
+        output << "}";
+    }
+
+    output << "]}";
+    return output.str();
+}
+
+bool FoundationSectionLedgerSelfTest() {
+    FoundationSectionLedgerRegistry empty_registry;
+
+    if (!empty_registry.Empty() ||
+        empty_registry.Size() != 0U ||
+        empty_registry.IsAppendOrdered() ||
+        !empty_registry.AllSelfTestedSectionsRegistered() ||
+        IsFoundationSectionLedgerRegistryValid(empty_registry) ||
+        empty_registry.Lookup("missing").has_value()) {
+        return false;
+    }
+
+    FoundationSectionLedgerRegistry registry;
+
+    if (!registry.Register(
+            "foundation_report",
+            "construct and serialize the foundation report",
+            true,
+            true) ||
+        !registry.Register(
+            "canonical_registry",
+            "register and execute extension self-tests",
+            true,
+            true) ||
+        !registry.Register(
+            "path_normalization",
+            "normalize repository-relative diagnostic paths",
+            false,
+            false) ||
+        registry.Empty() ||
+        registry.Size() != 3U ||
+        !registry.IsAppendOrdered() ||
+        !registry.AllSelfTestedSectionsRegistered() ||
+        registry.RegisteredCount() != 2U ||
+        registry.SelfTestedCount() != 2U ||
+        !IsFoundationSectionLedgerRegistryValid(registry)) {
+        return false;
+    }
+
+    const auto report_entry =
+        registry.Lookup("foundation_report");
+    const auto registry_entry =
+        registry.Lookup("canonical_registry");
+    const auto path_entry =
+        registry.Lookup("path_normalization");
+
+    if (!report_entry.has_value() ||
+        !registry_entry.has_value() ||
+        !path_entry.has_value() ||
+        report_entry->append_order != 1U ||
+        registry_entry->append_order != 2U ||
+        path_entry->append_order != 3U ||
+        !report_entry->self_tested ||
+        !report_entry->registered ||
+        !registry_entry->self_tested ||
+        !registry_entry->registered ||
+        path_entry->self_tested ||
+        path_entry->registered) {
+        return false;
+    }
+
+    if (registry.Register(
+            "foundation_report",
+            "duplicate sections must be rejected",
+            true,
+            true) ||
+        registry.Register(
+            "Invalid-Section",
+            "invalid identifier must be rejected",
+            true,
+            true) ||
+        registry.Register(
+            "invalid_section",
+            "",
+            true,
+            true) ||
+        registry.Size() != 3U) {
+        return false;
+    }
+
+    FoundationSectionLedgerRegistry unregistered_test_registry;
+
+    if (!unregistered_test_registry.Register(
+            "self_test_gap",
+            "represent a discovered but unregistered self-test",
+            true,
+            false) ||
+        unregistered_test_registry.AllSelfTestedSectionsRegistered() ||
+        IsFoundationSectionLedgerRegistryValid(
+            unregistered_test_registry)) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainFoundationSectionLedger(registry);
+
+    if (explanation.find(
+            "\"ledger\":\"foundation_section_ledger_v1\"") ==
+            std::string::npos ||
+        explanation.find("\"entry_count\":3") ==
+            std::string::npos ||
+        explanation.find("\"registered_count\":2") ==
+            std::string::npos ||
+        explanation.find("\"self_tested_count\":2") ==
+            std::string::npos ||
+        explanation.find("\"append_ordered\":true") ==
+            std::string::npos ||
+        explanation.find(
+            "\"identifier\":\"foundation_report\"") ==
+            std::string::npos ||
+        explanation.find(
+            "\"identifier\":\"path_normalization\"") ==
+            std::string::npos ||
+        explanation.find("\"append_order\":3") ==
+            std::string::npos) {
+        return false;
+    }
+
+    const std::vector<FoundationSectionLedgerEntry> entries =
+        registry.Entries();
+
+    if (entries.size() != 3U ||
+        !FoundationSectionLedgerEntriesAreUnique(entries) ||
+        entries.front().identifier != "foundation_report" ||
+        entries.back().identifier != "path_normalization") {
+        return false;
+    }
+
+    return true;
+}
+
+}
+
+namespace prometheus_praxis_foundation_extensions {
+
+enum class CanonicalSymbolKind {
+    Struct,
+    Class,
+    Enum,
+    Namespace,
+    Function
+};
+
+struct CanonicalSymbolInventoryEntry {
+    std::string name;
+    CanonicalSymbolKind kind{};
+    std::size_t occurrences{};
+};
+
+std::string_view CanonicalSymbolKindName(
+    CanonicalSymbolKind kind) {
+    switch (kind) {
+        case CanonicalSymbolKind::Struct:
+            return "struct";
+        case CanonicalSymbolKind::Class:
+            return "class";
+        case CanonicalSymbolKind::Enum:
+            return "enum";
+        case CanonicalSymbolKind::Namespace:
+            return "namespace";
+        case CanonicalSymbolKind::Function:
+            return "function";
+    }
+
+    throw std::invalid_argument(
+        "canonical symbol kind is unrecognized");
+}
+
+bool IsCanonicalSymbolInventoryNameValid(
+    std::string_view name) {
+    if (name.empty()) {
+        return false;
+    }
+
+    const char first = name.front();
+
+    if (!((first >= 'A' && first <= 'Z') ||
+          (first >= 'a' && first <= 'z') ||
+          first == '_')) {
+        return false;
+    }
+
+    for (const char character : name) {
+        const bool upper =
+            character >= 'A' && character <= 'Z';
+        const bool lower =
+            character >= 'a' && character <= 'z';
+        const bool digit =
+            character >= '0' && character <= '9';
+
+        if (!upper && !lower && !digit &&
+            character != '_') {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool IsCanonicalSymbolInventoryEntryValid(
+    const CanonicalSymbolInventoryEntry& entry) {
+    return IsCanonicalSymbolInventoryNameValid(entry.name) &&
+           entry.occurrences > 0U;
+}
+
+bool IsCanonicalSymbolBoundary(
+    std::string_view source,
+    std::size_t position) {
+    if (position >= source.size()) {
+        return true;
+    }
+
+    const char character = source[position];
+
+    return !((character >= 'A' && character <= 'Z') ||
+             (character >= 'a' && character <= 'z') ||
+             (character >= '0' && character <= '9') ||
+             character == '_');
+}
+
+std::size_t CountCanonicalDeclarationOccurrences(
+    std::string_view source,
+    std::string_view declaration_prefix,
+    std::string_view symbol_name) {
+    if (declaration_prefix.empty() ||
+        !IsCanonicalSymbolInventoryNameValid(symbol_name)) {
+        throw std::invalid_argument(
+            "canonical declaration query is invalid");
+    }
+
+    const std::string query =
+        std::string(declaration_prefix) +
+        std::string(symbol_name);
+
+    std::size_t occurrences = 0U;
+    std::size_t position = 0U;
+
+    while (position < source.size()) {
+        const std::size_t found =
+            source.find(query, position);
+
+        if (found == std::string_view::npos) {
+            break;
+        }
+
+        const std::size_t after_name =
+            found + query.size();
+
+        if (IsCanonicalSymbolBoundary(source, after_name)) {
+            ++occurrences;
+        }
+
+        position = found + query.size();
+    }
+
+    return occurrences;
+}
+
+std::size_t CountCanonicalFunctionOccurrences(
+    std::string_view source,
+    std::string_view function_name) {
+    if (!IsCanonicalSymbolInventoryNameValid(function_name)) {
+        throw std::invalid_argument(
+            "canonical function name is invalid");
+    }
+
+    const std::string query =
+        std::string(function_name) + "(";
+
+    std::size_t occurrences = 0U;
+    std::size_t position = 0U;
+
+    while (position < source.size()) {
+        const std::size_t found =
+            source.find(query, position);
+
+        if (found == std::string_view::npos) {
+            break;
+        }
+
+        const bool left_boundary =
+            found == 0U ||
+            IsCanonicalSymbolBoundary(source, found - 1U);
+
+        if (left_boundary) {
+            ++occurrences;
+        }
+
+        position = found + query.size();
+    }
+
+    return occurrences;
+}
+
+std::vector<CanonicalSymbolInventoryEntry>
+ExtractCanonicalSymbols(
+    std::string_view source) {
+    struct SymbolPattern {
+        std::string_view name;
+        CanonicalSymbolKind kind;
+        std::string_view declaration_prefix;
+        bool function_pattern;
+    };
+
+    constexpr SymbolPattern patterns[]{
+        {
+            "FoundationReport",
+            CanonicalSymbolKind::Struct,
+            "struct ",
+            false
+        },
+        {
+            "FoundationInputs",
+            CanonicalSymbolKind::Struct,
+            "struct ",
+            false
+        },
+        {
+            "FoundationOutputs",
+            CanonicalSymbolKind::Struct,
+            "struct ",
+            false
+        },
+        {
+            "CanonicalExtensionRegistry",
+            CanonicalSymbolKind::Class,
+            "class ",
+            false
+        },
+        {
+            "FoundationSectionLedgerRegistry",
+            CanonicalSymbolKind::Class,
+            "class ",
+            false
+        },
+        {
+            "CanonicalSymbolKind",
+            CanonicalSymbolKind::Enum,
+            "enum class ",
+            false
+        },
+        {
+            "prometheus_praxis_foundation_extensions",
+            CanonicalSymbolKind::Namespace,
+            "namespace ",
+            false
+        },
+        {
+            "RunCanonicalExtensionSelfTests",
+            CanonicalSymbolKind::Function,
+            "",
+            true
+        },
+        {
+            "BuildKnownExtensionRegistry",
+            CanonicalSymbolKind::Function,
+            "",
+            true
+        },
+        {
+            "ValidateFoundationReport",
+            CanonicalSymbolKind::Function,
+            "",
+            true
+        },
+        {
+            "ExtractCanonicalSymbols",
+            CanonicalSymbolKind::Function,
+            "",
+            true
+        }
+    };
+
+    std::vector<CanonicalSymbolInventoryEntry> inventory;
+    inventory.reserve(std::size(patterns));
+
+    for (const SymbolPattern& pattern : patterns) {
+        const std::size_t occurrences =
+            pattern.function_pattern
+                ? CountCanonicalFunctionOccurrences(
+                      source,
+                      pattern.name)
+                : CountCanonicalDeclarationOccurrences(
+                      source,
+                      pattern.declaration_prefix,
+                      pattern.name);
+
+        if (occurrences > 0U) {
+            inventory.push_back({
+                std::string(pattern.name),
+                pattern.kind,
+                occurrences
+            });
+        }
+    }
+
+    return inventory;
+}
+
+bool IsCanonicalSymbolInventoryValid(
+    const std::vector<CanonicalSymbolInventoryEntry>& inventory) {
+    for (std::size_t left = 0U;
+         left < inventory.size();
+         ++left) {
+        if (!IsCanonicalSymbolInventoryEntryValid(
+                inventory[left])) {
+            return false;
+        }
+
+        for (std::size_t right = left + 1U;
+             right < inventory.size();
+             ++right) {
+            if (inventory[left].name ==
+                    inventory[right].name ||
+                inventory[left].kind ==
+                    inventory[right].kind &&
+                inventory[left].name ==
+                    inventory[right].name) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+std::optional<CanonicalSymbolInventoryEntry>
+FindCanonicalSymbolInventoryEntry(
+    const std::vector<CanonicalSymbolInventoryEntry>& inventory,
+    std::string_view name) {
+    const auto iterator = std::find_if(
+        inventory.begin(),
+        inventory.end(),
+        [name](const CanonicalSymbolInventoryEntry& entry) {
+            return entry.name == name;
+        });
+
+    if (iterator == inventory.end()) {
+        return std::nullopt;
+    }
+
+    return *iterator;
+}
+
+std::string ExplainCanonicalSymbolInventory(
+    const std::vector<CanonicalSymbolInventoryEntry>& inventory) {
+    if (!IsCanonicalSymbolInventoryValid(inventory)) {
+        throw std::invalid_argument(
+            "canonical symbol inventory is invalid");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+
+    output << "canonical_symbol_inventory_v2\n";
+    output << "symbol_count=" << inventory.size() << '\n';
+
+    for (std::size_t index = 0U;
+         index < inventory.size();
+         ++index) {
+        const auto& entry = inventory[index];
+
+        output << "symbol_" << index << "_name="
+               << entry.name << '\n';
+        output << "symbol_" << index << "_kind="
+               << CanonicalSymbolKindName(entry.kind)
+               << '\n';
+        output << "symbol_" << index << "_occurrences="
+               << entry.occurrences << '\n';
+    }
+
+    return output.str();
+}
+
+bool CanonicalSymbolInventoryV2SelfTest() {
+    const std::string partial_source =
+        "namespace prometheus_praxis_foundation_extensions {\n"
+        "struct FoundationReport {};\n"
+        "class CanonicalExtensionRegistry {};\n"
+        "enum class CanonicalSymbolKind { Struct };\n"
+        "void RunCanonicalExtensionSelfTests() {}\n"
+        "bool ValidateFoundationReport() { return true; }\n"
+        "void RunCanonicalExtensionSelfTests() {}\n"
+        "}\n";
+
+    const std::vector<CanonicalSymbolInventoryEntry> inventory =
+        ExtractCanonicalSymbols(partial_source);
+
+    if (!IsCanonicalSymbolInventoryValid(inventory) ||
+        inventory.size() != 6U) {
+        return false;
+    }
+
+    const auto report =
+        FindCanonicalSymbolInventoryEntry(
+            inventory,
+            "FoundationReport");
+
+    const auto registry =
+        FindCanonicalSymbolInventoryEntry(
+            inventory,
+            "CanonicalExtensionRegistry");
+
+    const auto namespace_entry =
+        FindCanonicalSymbolInventoryEntry(
+            inventory,
+            "prometheus_praxis_foundation_extensions");
+
+    const auto runner =
+        FindCanonicalSymbolInventoryEntry(
+            inventory,
+            "RunCanonicalExtensionSelfTests");
+
+    const auto validator =
+        FindCanonicalSymbolInventoryEntry(
+            inventory,
+            "ValidateFoundationReport");
+
+    if (!report.has_value() ||
+        !registry.has_value() ||
+        !namespace_entry.has_value() ||
+        !runner.has_value() ||
+        !validator.has_value() ||
+        report->kind != CanonicalSymbolKind::Struct ||
+        report->occurrences != 1U ||
+        registry->kind != CanonicalSymbolKind::Class ||
+        registry->occurrences != 1U ||
+        namespace_entry->kind !=
+            CanonicalSymbolKind::Namespace ||
+        namespace_entry->occurrences != 1U ||
+        runner->kind != CanonicalSymbolKind::Function ||
+        runner->occurrences != 2U ||
+        validator->occurrences != 1U ||
+        FindCanonicalSymbolInventoryEntry(
+            inventory,
+            "FoundationInputs").has_value()) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainCanonicalSymbolInventory(inventory);
+
+    if (explanation.find(
+            "canonical_symbol_inventory_v2") ==
+            std::string::npos ||
+        explanation.find("symbol_count=6") ==
+            std::string::npos ||
+        explanation.find(
+            "symbol_0_name=FoundationReport") ==
+            std::string::npos ||
+        explanation.find(
+            "symbol_3_name=prometheus_praxis_foundation_extensions") ==
+            std::string::npos ||
+        explanation.find(
+            "symbol_4_name=RunCanonicalExtensionSelfTests") ==
+            std::string::npos ||
+        explanation.find(
+            "symbol_4_occurrences=2") ==
+            std::string::npos) {
+        return false;
+    }
+
+    if (CountCanonicalDeclarationOccurrences(
+            partial_source,
+            "struct ",
+            "FoundationReport") != 1U ||
+        CountCanonicalDeclarationOccurrences(
+            partial_source,
+            "struct ",
+            "Foundation") != 0U ||
+        CountCanonicalFunctionOccurrences(
+            partial_source,
+            "RunCanonicalExtensionSelfTests") != 2U) {
+        return false;
+    }
+
+    try {
+        static_cast<void>(
+            CountCanonicalDeclarationOccurrences(
+                partial_source,
+                "",
+                "FoundationReport"));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    try {
+        static_cast<void>(
+            CountCanonicalFunctionOccurrences(
+                partial_source,
+                "Invalid-Function"));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    return true;
+}
+
+}
+
+namespace prometheus_praxis_foundation_extensions {
+
+struct SourceBoundaryAudit {
+    bool namespace_balanced{};
+    bool braces_balanced{};
+    bool no_negative_brace_depth{};
+    bool has_target_namespace{};
+    std::size_t target_namespace_open_count{};
+    std::size_t target_namespace_close_count{};
+    std::size_t file_marker_count{};
+    std::size_t maximum_brace_depth{};
+    std::vector<std::string> anomalies;
+};
+
+bool IsSourceBoundaryAuditValid(
+    const SourceBoundaryAudit& audit) {
+    const bool structurally_clean =
+        audit.namespace_balanced &&
+        audit.braces_balanced &&
+        audit.no_negative_brace_depth &&
+        audit.has_target_namespace &&
+        audit.anomalies.empty();
+
+    return structurally_clean ||
+           !audit.anomalies.empty();
+}
+
+bool IsSourceBoundaryIdentifierCharacter(
+    char character) {
+    return (character >= 'A' && character <= 'Z') ||
+           (character >= 'a' && character <= 'z') ||
+           (character >= '0' && character <= '9') ||
+           character == '_';
+}
+
+bool SourceBoundaryHasTokenAt(
+    std::string_view source,
+    std::size_t position,
+    std::string_view token) {
+    if (token.empty() ||
+        position > source.size() ||
+        token.size() > source.size() - position ||
+        source.substr(position, token.size()) != token) {
+        return false;
+    }
+
+    const bool left_boundary =
+        position == 0U ||
+        !IsSourceBoundaryIdentifierCharacter(
+            source[position - 1U]);
+
+    const std::size_t after = position + token.size();
+
+    const bool right_boundary =
+        after == source.size() ||
+        !IsSourceBoundaryIdentifierCharacter(source[after]);
+
+    return left_boundary && right_boundary;
+}
+
+std::size_t CountSourceBoundaryTokenOccurrences(
+    std::string_view source,
+    std::string_view token) {
+    if (token.empty()) {
+        throw std::invalid_argument(
+            "source boundary token must not be empty");
+    }
+
+    std::size_t count = 0U;
+    std::size_t position = 0U;
+
+    while (position < source.size()) {
+        const std::size_t found =
+            source.find(token, position);
+
+        if (found == std::string_view::npos) {
+            break;
+        }
+
+        if (SourceBoundaryHasTokenAt(source, found, token)) {
+            ++count;
+        }
+
+        position = found + token.size();
+    }
+
+    return count;
+}
+
+SourceBoundaryAudit AnalyzeSourceSectionBoundaries(
+    std::string_view source) {
+    SourceBoundaryAudit audit;
+    constexpr std::string_view target_namespace =
+        "prometheus_praxis_foundation_extensions";
+
+    audit.target_namespace_open_count =
+        CountSourceBoundaryTokenOccurrences(
+            source,
+            target_namespace);
+
+    audit.has_target_namespace =
+        audit.target_namespace_open_count > 0U;
+
+    std::size_t brace_depth = 0U;
+    bool in_line_comment = false;
+    bool in_block_comment = false;
+    bool in_string = false;
+    bool in_character = false;
+    bool escaped = false;
+
+    for (std::size_t index = 0U;
+         index < source.size();
+         ++index) {
+        const char current = source[index];
+        const char next =
+            index + 1U < source.size()
+                ? source[index + 1U]
+                : '\0';
+
+        if (in_line_comment) {
+            if (current == '\n') {
+                in_line_comment = false;
+            }
+            continue;
+        }
+
+        if (in_block_comment) {
+            if (current == '*' && next == '/') {
+                in_block_comment = false;
+                ++index;
+            }
+            continue;
+        }
+
+        if (in_string) {
+            if (!escaped && current == '"') {
+                in_string = false;
+            }
+
+            escaped = !escaped && current == '\\';
+            if (current != '\\') {
+                escaped = false;
+            }
+            continue;
+        }
+
+        if (in_character) {
+            if (!escaped && current == '\'') {
+                in_character = false;
+            }
+
+            escaped = !escaped && current == '\\';
+            if (current != '\\') {
+                escaped = false;
+            }
+            continue;
+        }
+
+        if (current == '/' && next == '/') {
+            in_line_comment = true;
+            ++index;
+            continue;
+        }
+
+        if (current == '/' && next == '*') {
+            in_block_comment = true;
+            ++index;
+            continue;
+        }
+
+        if (current == '"') {
+            in_string = true;
+            escaped = false;
+            continue;
+        }
+
+        if (current == '\'') {
+            in_character = true;
+            escaped = false;
+            continue;
+        }
+
+        if (current == '{') {
+            ++brace_depth;
+            audit.maximum_brace_depth = std::max(
+                audit.maximum_brace_depth,
+                brace_depth);
+            continue;
+        }
+
+        if (current == '}') {
+            if (brace_depth == 0U) {
+                audit.no_negative_brace_depth = false;
+                audit.anomalies.emplace_back(
+                    "closing brace appears without matching opening brace");
+            } else {
+                --brace_depth;
+                ++audit.target_namespace_close_count;
+            }
+        }
+    }
+
+    if (in_block_comment) {
+        audit.anomalies.emplace_back(
+            "unterminated block comment");
+    }
+
+    if (in_string) {
+        audit.anomalies.emplace_back(
+            "unterminated string literal");
+    }
+
+    if (in_character) {
+        audit.anomalies.emplace_back(
+            "unterminated character literal");
+    }
+
+    if (brace_depth != 0U) {
+        audit.anomalies.emplace_back(
+            "opening brace remains unmatched");
+    }
+
+    audit.braces_balanced =
+        brace_depth == 0U &&
+        audit.no_negative_brace_depth;
+
+    if (!audit.has_target_namespace) {
+        audit.anomalies.emplace_back(
+            "target namespace is not present");
+    }
+
+    audit.namespace_balanced =
+        audit.has_target_namespace &&
+        audit.braces_balanced;
+
+    audit.file_marker_count =
+        CountSourceOccurrences(source, "// File:");
+
+    if (audit.file_marker_count > 1U) {
+        audit.anomalies.emplace_back(
+            "multiple file markers are present");
+    }
+
+    if (audit.no_negative_brace_depth &&
+        brace_depth == 0U &&
+        !in_block_comment &&
+        !in_string &&
+        !in_character) {
+        if (audit.anomalies.empty() ||
+            audit.anomalies.front() ==
+                "target namespace is not present" ||
+            audit.anomalies.front() ==
+                "multiple file markers are present") {
+            audit.no_negative_brace_depth = true;
+        }
+    }
+
+    return audit;
+}
+
+std::string ExplainSourceSectionBoundaryAudit(
+    const SourceBoundaryAudit& audit) {
+    if (!IsSourceBoundaryAuditValid(audit)) {
+        throw std::invalid_argument(
+            "source boundary audit is inconsistent");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+
+    output << "source_section_boundary_audit\n";
+    output << "namespace_balanced="
+           << (audit.namespace_balanced ? "true" : "false")
+           << '\n';
+    output << "braces_balanced="
+           << (audit.braces_balanced ? "true" : "false")
+           << '\n';
+    output << "no_negative_brace_depth="
+           << (audit.no_negative_brace_depth ? "true" : "false")
+           << '\n';
+    output << "has_target_namespace="
+           << (audit.has_target_namespace ? "true" : "false")
+           << '\n';
+    output << "target_namespace_open_count="
+           << audit.target_namespace_open_count
+           << '\n';
+    output << "target_namespace_close_count="
+           << audit.target_namespace_close_count
+           << '\n';
+    output << "file_marker_count="
+           << audit.file_marker_count
+           << '\n';
+    output << "maximum_brace_depth="
+           << audit.maximum_brace_depth
+           << '\n';
+    output << "anomaly_count="
+           << audit.anomalies.size()
+           << '\n';
+
+    for (std::size_t index = 0U;
+         index < audit.anomalies.size();
+         ++index) {
+        output << "anomaly_" << index << '='
+               << audit.anomalies[index]
+               << '\n';
+    }
+
+    return output.str();
+}
+
+bool SourceSectionBoundaryAnalyzerSelfTest() {
+    const std::string valid_source =
+        "// File: cpp/tools/foundation.cpp\n"
+        "namespace prometheus_praxis_foundation_extensions {\n"
+        "bool valid() {\n"
+        "  const char brace = '{';\n"
+        "  const char quote = '\\'';\n"
+        "  const char* text = \"not a } brace\";\n"
+        "  return brace == '{' && quote == '\\'';\n"
+        "}\n"
+        "}\n";
+
+    const SourceBoundaryAudit valid_audit =
+        AnalyzeSourceSectionBoundaries(valid_source);
+
+    if (!valid_audit.namespace_balanced ||
+        !valid_audit.braces_balanced ||
+        !valid_audit.no_negative_brace_depth ||
+        !valid_audit.has_target_namespace ||
+        valid_audit.target_namespace_open_count != 1U ||
+        valid_audit.file_marker_count != 1U ||
+        valid_audit.maximum_brace_depth != 2U ||
+        !valid_audit.anomalies.empty() ||
+        !IsSourceBoundaryAuditValid(valid_audit)) {
+        return false;
+    }
+
+    const std::string malformed_source =
+        "// File: first.cpp\n"
+        "// File: second.cpp\n"
+        "namespace prometheus_praxis_foundation_extensions {\n"
+        "bool invalid() {\n"
+        "}\n";
+
+    const SourceBoundaryAudit malformed_audit =
+        AnalyzeSourceSectionBoundaries(malformed_source);
+
+    if (malformed_audit.namespace_balanced ||
+        malformed_audit.braces_balanced ||
+        malformed_audit.anomalies.size() < 2U ||
+        malformed_audit.file_marker_count != 2U ||
+        IsSourceBoundaryAuditValid(malformed_audit)) {
+        return false;
+    }
+
+    const std::string unmatched_close_source =
+        "namespace prometheus_praxis_foundation_extensions {\n"
+        "}\n"
+        "}\n";
+
+    const SourceBoundaryAudit unmatched_close_audit =
+        AnalyzeSourceSectionBoundaries(
+            unmatched_close_source);
+
+    if (unmatched_close_audit.braces_balanced ||
+        unmatched_close_audit.no_negative_brace_depth ||
+        unmatched_close_audit.anomalies.empty()) {
+        return false;
+    }
+
+    const std::string missing_namespace_source =
+        "struct Independent {};\n";
+
+    const SourceBoundaryAudit missing_namespace_audit =
+        AnalyzeSourceSectionBoundaries(
+            missing_namespace_source);
+
+    if (missing_namespace_audit.has_target_namespace ||
+        missing_namespace_audit.namespace_balanced ||
+        missing_namespace_audit.anomalies.empty()) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainSourceSectionBoundaryAudit(valid_audit);
+
+    if (explanation.find(
+            "source_section_boundary_audit") ==
+            std::string::npos ||
+        explanation.find("namespace_balanced=true") ==
+            std::string::npos ||
+        explanation.find("braces_balanced=true") ==
+            std::string::npos ||
+        explanation.find("file_marker_count=1") ==
+            std::string::npos ||
+        explanation.find("anomaly_count=0") ==
+            std::string::npos) {
+        return false;
+    }
+
+    if (CountSourceBoundaryTokenOccurrences(
+            valid_source,
+            "prometheus_praxis_foundation_extensions") !=
+            1U) {
+        return false;
+    }
+
+    try {
+        static_cast<void>(
+            CountSourceBoundaryTokenOccurrences(
+                valid_source,
+                ""));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    return true;
+}
+
+}
+
+namespace prometheus_praxis_foundation_extensions {
+
+struct HeaderSelfSufficiencyRequirement {
+    std::string header_path;
+    std::string required_include;
+    std::string identifier;
+    std::string purpose;
+    bool required{};
+};
+
+bool IsHeaderSelfSufficiencyIdentifierValid(
+    std::string_view identifier) {
+    return IsStableKey(identifier);
+}
+
+bool IsHeaderSelfSufficiencyPathValid(
+    std::string_view path) {
+    if (path.empty() ||
+        path.find('\\') != std::string_view::npos ||
+        path.front() == '/' ||
+        path.find("..") != std::string_view::npos) {
+        return false;
+    }
+
+    if (path.find_first_of("\r\n\t") !=
+        std::string_view::npos) {
+        return false;
+    }
+
+    return path.ends_with(".hpp");
+}
+
+bool IsRequiredStandardIncludeValid(
+    std::string_view include) {
+    if (include.size() < 3U ||
+        include.front() != '<' ||
+        include.back() != '>') {
+        return false;
+    }
+
+    for (std::size_t index = 1U;
+         index + 1U < include.size();
+         ++index) {
+        const char character = include[index];
+        const bool lower =
+            character >= 'a' && character <= 'z';
+        const bool digit =
+            character >= '0' && character <= '9';
+
+        if (!lower && !digit && character != '_') {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool IsHeaderSelfSufficiencyRequirementValid(
+    const HeaderSelfSufficiencyRequirement& requirement) {
+    return IsHeaderSelfSufficiencyPathValid(
+               requirement.header_path) &&
+           IsRequiredStandardIncludeValid(
+               requirement.required_include) &&
+           IsHeaderSelfSufficiencyIdentifierValid(
+               requirement.identifier) &&
+           !requirement.purpose.empty() &&
+           requirement.purpose.find_first_of("\r\n") ==
+               std::string::npos;
+}
+
+const std::vector<HeaderSelfSufficiencyRequirement>&
+HeaderSelfSufficiencyRequirements() {
+    static const std::vector<HeaderSelfSufficiencyRequirement>
+        requirements{
+            {
+                "cpp/eco_restoration/"
+                "irrigation_mpc_and_equitable_water.hpp",
+                "<numeric>",
+                "irrigation_accumulate",
+                "provide std::accumulate directly for irrigation "
+                "schedule aggregation",
+                true
+            },
+            {
+                "cpp/eco_restoration/"
+                "private_heat_membership_threat_model.hpp",
+                "<cstdint>",
+                "private_heat_fixed_width",
+                "provide fixed-width integer types used by private "
+                "heat proof planning",
+                true
+            },
+            {
+                "cpp/eco_restoration/"
+                "water_biodiversity_and_actuation_authorization.hpp",
+                "<string>",
+                "water_authorization_strings",
+                "provide standard string declarations used by "
+                "authorization evidence",
+                true
+            },
+            {
+                "cpp/eco_restoration/"
+                "stochastic_invasive_and_anchor_audit.hpp",
+                "<vector>",
+                "invasive_audit_vectors",
+                "provide vector declarations used by candidate "
+                "and audit collections",
+                true
+            }
+        };
+
+    return requirements;
+}
+
+bool HeaderSelfSufficiencyRequirementsAreValid(
+    const std::vector<HeaderSelfSufficiencyRequirement>&
+        requirements) {
+    if (requirements.empty()) {
+        return false;
+    }
+
+    for (std::size_t left = 0U;
+         left < requirements.size();
+         ++left) {
+        if (!IsHeaderSelfSufficiencyRequirementValid(
+                requirements[left])) {
+            return false;
+        }
+
+        for (std::size_t right = left + 1U;
+             right < requirements.size();
+             ++right) {
+            if (requirements[left].identifier ==
+                    requirements[right].identifier ||
+                requirements[left].header_path ==
+                    requirements[right].header_path &&
+                requirements[left].required_include ==
+                    requirements[right].required_include) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+std::optional<HeaderSelfSufficiencyRequirement>
+FindHeaderSelfSufficiencyRequirement(
+    std::string_view identifier) {
+    const auto& requirements =
+        HeaderSelfSufficiencyRequirements();
+
+    const auto iterator = std::find_if(
+        requirements.begin(),
+        requirements.end(),
+        [identifier](
+            const HeaderSelfSufficiencyRequirement& requirement) {
+            return requirement.identifier == identifier;
+        });
+
+    if (iterator == requirements.end()) {
+        return std::nullopt;
+    }
+
+    return *iterator;
+}
+
+std::vector<HeaderSelfSufficiencyRequirement>
+RequiredHeaderSelfSufficiencyRequirements() {
+    std::vector<HeaderSelfSufficiencyRequirement> required;
+
+    for (const auto& requirement :
+         HeaderSelfSufficiencyRequirements()) {
+        if (requirement.required) {
+            required.push_back(requirement);
+        }
+    }
+
+    return required;
+}
+
+std::string ExplainHeaderSelfSufficiencyConfig() {
+    const auto& requirements =
+        HeaderSelfSufficiencyRequirements();
+
+    if (!HeaderSelfSufficiencyRequirementsAreValid(
+            requirements)) {
+        throw std::logic_error(
+            "header self-sufficiency configuration is invalid");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+
+    output << "{";
+    output << "\"policy\":\"header_self_sufficiency_v1\",";
+    output << "\"requirement_count\":"
+           << requirements.size() << ",";
+    output << "\"requirements\":[";
+
+    for (std::size_t index = 0U;
+         index < requirements.size();
+         ++index) {
+        if (index != 0U) {
+            output << ',';
+        }
+
+        const auto& requirement = requirements[index];
+
+        output << "{";
+        output << "\"header_path\":";
+        json_string(output, requirement.header_path);
+        output << ",\"required_include\":";
+        json_string(output, requirement.required_include);
+        output << ",\"identifier\":";
+        json_string(output, requirement.identifier);
+        output << ",\"purpose\":";
+        json_string(output, requirement.purpose);
+        output << ",\"required\":"
+               << (requirement.required ? "true" : "false");
+        output << "}";
+    }
+
+    output << "]}";
+    return output.str();
+}
+
+bool HeaderSelfSufficiencyConfigSelfTest() {
+    const auto& requirements =
+        HeaderSelfSufficiencyRequirements();
+
+    if (requirements.size() != 4U ||
+        !HeaderSelfSufficiencyRequirementsAreValid(
+            requirements)) {
+        return false;
+    }
+
+    const auto irrigation =
+        FindHeaderSelfSufficiencyRequirement(
+            "irrigation_accumulate");
+
+    if (!irrigation.has_value() ||
+        irrigation->header_path !=
+            "cpp/eco_restoration/"
+            "irrigation_mpc_and_equitable_water.hpp" ||
+        irrigation->required_include != "<numeric>" ||
+        !irrigation->required ||
+        irrigation->purpose.find("std::accumulate") ==
+            std::string::npos) {
+        return false;
+    }
+
+    const auto missing =
+        FindHeaderSelfSufficiencyRequirement(
+            "not_a_policy");
+
+    if (missing.has_value()) {
+        return false;
+    }
+
+    const std::vector<HeaderSelfSufficiencyRequirement>
+        required_requirements =
+            RequiredHeaderSelfSufficiencyRequirements();
+
+    if (required_requirements.size() != requirements.size()) {
+        return false;
+    }
+
+    for (const auto& requirement : requirements) {
+        if (!IsHeaderSelfSufficiencyRequirementValid(
+                requirement) ||
+            !IsHeaderSelfSufficiencyIdentifierValid(
+                requirement.identifier) ||
+            !IsHeaderSelfSufficiencyPathValid(
+                requirement.header_path) ||
+            !IsRequiredStandardIncludeValid(
+                requirement.required_include)) {
+            return false;
+        }
+    }
+
+    const std::string explanation =
+        ExplainHeaderSelfSufficiencyConfig();
+
+    if (explanation.find(
+            "\"policy\":\"header_self_sufficiency_v1\"") ==
+            std::string::npos ||
+        explanation.find("\"requirement_count\":4") ==
+            std::string::npos ||
+        explanation.find(
+            "\"identifier\":\"irrigation_accumulate\"") ==
+            std::string::npos ||
+        explanation.find(
+            "\"required_include\":\"<numeric>\"") ==
+            std::string::npos ||
+        explanation.find(
+            "irrigation_mpc_and_equitable_water.hpp") ==
+            std::string::npos) {
+        return false;
+    }
+
+    const HeaderSelfSufficiencyRequirement invalid_path{
+        "../unsafe.hpp",
+        "<numeric>",
+        "unsafe_header",
+        "invalid relative traversal",
+        true
+    };
+
+    const HeaderSelfSufficiencyRequirement invalid_include{
+        "cpp/eco_restoration/safe.hpp",
+        "numeric",
+        "unsafe_include",
+        "missing standard include delimiters",
+        true
+    };
+
+    const HeaderSelfSufficiencyRequirement invalid_identifier{
+        "cpp/eco_restoration/safe.hpp",
+        "<numeric>",
+        "Unsafe-Identifier",
+        "invalid identifier",
+        true
+    };
+
+    const HeaderSelfSufficiencyRequirement invalid_purpose{
+        "cpp/eco_restoration/safe.hpp",
+        "<numeric>",
+        "safe_identifier",
+        "",
+        true
+    };
+
+    if (IsHeaderSelfSufficiencyRequirementValid(
+            invalid_path) ||
+        IsHeaderSelfSufficiencyRequirementValid(
+            invalid_include) ||
+        IsHeaderSelfSufficiencyRequirementValid(
+            invalid_identifier) ||
+        IsHeaderSelfSufficiencyRequirementValid(
+            invalid_purpose)) {
+        return false;
+    }
+
+    const std::vector<HeaderSelfSufficiencyRequirement>
+        duplicate_requirements{
+            {
+                "cpp/eco_restoration/example.hpp",
+                "<vector>",
+                "example_vectors",
+                "first declaration",
+                true
+            },
+            {
+                "cpp/eco_restoration/example.hpp",
+                "<vector>",
+                "example_vectors_2",
+                "duplicate header include declaration",
+                true
+            }
+        };
+
+    if (HeaderSelfSufficiencyRequirementsAreValid(
+            duplicate_requirements)) {
+        return false;
+    }
+
+    return true;
+}
+
+}
+
+namespace prometheus_praxis_foundation_extensions {
+
+bool IsFixedPointScaleValid(
+    std::int64_t scale) {
+    return scale > 0;
+}
+
+std::int64_t AddFixedChecked(
+    std::int64_t left,
+    std::int64_t right) {
+    if (right > 0 &&
+        left > std::numeric_limits<std::int64_t>::max() - right) {
+        throw std::overflow_error(
+            "fixed-point addition exceeds int64 maximum");
+    }
+
+    if (right < 0 &&
+        left < std::numeric_limits<std::int64_t>::min() - right) {
+        throw std::underflow_error(
+            "fixed-point addition exceeds int64 minimum");
+    }
+
+    return left + right;
+}
+
+std::int64_t SubFixedChecked(
+    std::int64_t left,
+    std::int64_t right) {
+    if (right < 0 &&
+        left > std::numeric_limits<std::int64_t>::max() + right) {
+        throw std::overflow_error(
+            "fixed-point subtraction exceeds int64 maximum");
+    }
+
+    if (right > 0 &&
+        left < std::numeric_limits<std::int64_t>::min() + right) {
+        throw std::underflow_error(
+            "fixed-point subtraction exceeds int64 minimum");
+    }
+
+    return left - right;
+}
+
+std::int64_t MulFixedChecked(
+    std::int64_t left,
+    std::int64_t right) {
+    if (left == 0 || right == 0) {
+        return 0;
+    }
+
+    if (left == -1 &&
+        right == std::numeric_limits<std::int64_t>::min()) {
+        throw std::overflow_error(
+            "fixed-point multiplication exceeds int64 range");
+    }
+
+    if (right == -1 &&
+        left == std::numeric_limits<std::int64_t>::min()) {
+        throw std::overflow_error(
+            "fixed-point multiplication exceeds int64 range");
+    }
+
+    const bool positive_result =
+        (left > 0) == (right > 0);
+
+    if (positive_result) {
+        if (left > 0) {
+            if (left >
+                std::numeric_limits<std::int64_t>::max() / right) {
+                throw std::overflow_error(
+                    "fixed-point multiplication exceeds int64 maximum");
+            }
+        } else {
+            if (left <
+                std::numeric_limits<std::int64_t>::max() / right) {
+                throw std::overflow_error(
+                    "fixed-point multiplication exceeds int64 maximum");
+            }
+        }
+    } else if (left > 0) {
+        if (right <
+            std::numeric_limits<std::int64_t>::min() / left) {
+            throw std::underflow_error(
+                "fixed-point multiplication exceeds int64 minimum");
+        }
+    } else if (left <
+        std::numeric_limits<std::int64_t>::min() / right) {
+        throw std::underflow_error(
+            "fixed-point multiplication exceeds int64 minimum");
+    }
+
+    return left * right;
+}
+
+std::int64_t DivFixedChecked(
+    std::int64_t numerator,
+    std::int64_t denominator) {
+    if (denominator == 0) {
+        throw std::invalid_argument(
+            "fixed-point division denominator must not be zero");
+    }
+
+    if (numerator == std::numeric_limits<std::int64_t>::min() &&
+        denominator == -1) {
+        throw std::overflow_error(
+            "fixed-point division exceeds int64 maximum");
+    }
+
+    return numerator / denominator;
+}
+
+std::int64_t MulFixedScaledChecked(
+    std::int64_t left,
+    std::int64_t right,
+    std::int64_t scale) {
+    if (!IsFixedPointScaleValid(scale)) {
+        throw std::invalid_argument(
+            "fixed-point scale must be positive");
+    }
+
+    return DivFixedChecked(
+        MulFixedChecked(left, right),
+        scale);
+}
+
+std::int64_t DivFixedScaledChecked(
+    std::int64_t numerator,
+    std::int64_t denominator,
+    std::int64_t scale) {
+    if (!IsFixedPointScaleValid(scale)) {
+        throw std::invalid_argument(
+            "fixed-point scale must be positive");
+    }
+
+    return DivFixedChecked(
+        MulFixedChecked(numerator, scale),
+        denominator);
+}
+
+std::string ExplainCheckedFixedPointOperation(
+    std::string_view operation,
+    std::int64_t left,
+    std::int64_t right,
+    std::int64_t result) {
+    if (!IsStableKey(operation)) {
+        throw std::invalid_argument(
+            "fixed-point operation identifier is invalid");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+
+    output << "checked_fixed_point_operation\n";
+    output << "operation=" << operation << '\n';
+    output << "left=" << left << '\n';
+    output << "right=" << right << '\n';
+    output << "result=" << result << '\n';
+
+    return output.str();
+}
+
+bool CheckedFixedPointArithmeticSelfTest() {
+    const std::int64_t maximum =
+        std::numeric_limits<std::int64_t>::max();
+    const std::int64_t minimum =
+        std::numeric_limits<std::int64_t>::min();
+
+    if (AddFixedChecked(7, 5) != 12 ||
+        AddFixedChecked(-7, 5) != -2 ||
+        AddFixedChecked(maximum - 1, 1) != maximum ||
+        SubFixedChecked(7, 5) != 2 ||
+        SubFixedChecked(-7, 5) != -12 ||
+        SubFixedChecked(minimum + 1, 1) != minimum ||
+        MulFixedChecked(7, -5) != -35 ||
+        MulFixedChecked(-7, -5) != 35 ||
+        MulFixedChecked(maximum, 1) != maximum ||
+        DivFixedChecked(21, 3) != 7 ||
+        DivFixedChecked(-21, 3) != -7 ||
+        MulFixedScaledChecked(500'000, 500'000, 1'000'000) !=
+            250'000 ||
+        DivFixedScaledChecked(250'000, 500'000, 1'000'000) !=
+            500'000) {
+        return false;
+    }
+
+    try {
+        static_cast<void>(AddFixedChecked(maximum, 1));
+        return false;
+    } catch (const std::overflow_error&) {
+    }
+
+    try {
+        static_cast<void>(AddFixedChecked(minimum, -1));
+        return false;
+    } catch (const std::underflow_error&) {
+    }
+
+    try {
+        static_cast<void>(SubFixedChecked(maximum, -1));
+        return false;
+    } catch (const std::overflow_error&) {
+    }
+
+    try {
+        static_cast<void>(SubFixedChecked(minimum, 1));
+        return false;
+    } catch (const std::underflow_error&) {
+    }
+
+    try {
+        static_cast<void>(MulFixedChecked(maximum, 2));
+        return false;
+    } catch (const std::overflow_error&) {
+    }
+
+    try {
+        static_cast<void>(MulFixedChecked(minimum, 2));
+        return false;
+    } catch (const std::underflow_error&) {
+    }
+
+    try {
+        static_cast<void>(MulFixedChecked(minimum, -1));
+        return false;
+    } catch (const std::overflow_error&) {
+    }
+
+    try {
+        static_cast<void>(DivFixedChecked(1, 0));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    try {
+        static_cast<void>(DivFixedChecked(minimum, -1));
+        return false;
+    } catch (const std::overflow_error&) {
+    }
+
+    try {
+        static_cast<void>(MulFixedScaledChecked(1, 1, 0));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    const std::string explanation =
+        ExplainCheckedFixedPointOperation(
+            "scaled_multiplication",
+            500'000,
+            500'000,
+            250'000);
+
+    return explanation.find(
+               "checked_fixed_point_operation") !=
+               std::string::npos &&
+           explanation.find(
+               "operation=scaled_multiplication") !=
+               std::string::npos &&
+           explanation.find("result=250000") !=
+               std::string::npos;
+}
+
+}
