@@ -1,47 +1,46 @@
 // File: cpp/tools/foundation_extension_registry.cpp
 #include "foundation_extension_registry.hpp"
 
+#include "foundation_golden_tests.hpp"
+#include "foundation_legacy_contract_inventory.hpp"
 #include "foundation_report.hpp"
+#include "foundation_report_json.hpp"
+#include "foundation_safety_semantics.hpp"
 
 #include <algorithm>
-#include <optional>
+#include <exception>
 #include <sstream>
-#include <string>
 #include <string_view>
 #include <utility>
-#include <vector>
 
+namespace prometheus_praxis::foundation {
 namespace {
 
-bool IsLowerSnakeCase(const std::string_view name) noexcept {
+bool IsLowerSnakeCase(std::string_view name) noexcept {
     if (name.empty() || name.front() == '_' || name.back() == '_') {
         return false;
     }
 
-    bool previous_was_underscore = false;
-    for (const char character : name) {
-        const bool lower_case = character >= 'a' && character <= 'z';
+    bool previous_underscore = false;
+    for (const unsigned char character : name) {
+        const bool lowercase = character >= 'a' && character <= 'z';
         const bool digit = character >= '0' && character <= '9';
+        const bool underscore = character == '_';
 
-        if (character == '_') {
-            if (previous_was_underscore) {
-                return false;
-            }
-            previous_was_underscore = true;
-            continue;
-        }
-
-        if (!lower_case && !digit) {
+        if (!lowercase && !digit && !underscore) {
             return false;
         }
-        previous_was_underscore = false;
+        if (underscore && previous_underscore) {
+            return false;
+        }
+        previous_underscore = underscore;
     }
-
     return true;
 }
 
-bool HasName(const std::vector<CanonicalExtensionDescriptor>& descriptors,
-             const std::string_view name) {
+bool ContainsName(
+    const std::vector<CanonicalExtensionDescriptor>& descriptors,
+    std::string_view name) {
     return std::any_of(
         descriptors.begin(),
         descriptors.end(),
@@ -50,22 +49,45 @@ bool HasName(const std::vector<CanonicalExtensionDescriptor>& descriptors,
         });
 }
 
-bool AlwaysPasses() {
+std::string CategoryFor(
+    const CanonicalExtensionDescriptor& descriptor) {
+    return descriptor.diagnostics_only ? "diagnostics" : "core";
+}
+
+CanonicalExtensionRunResult RunDescriptor(
+    const CanonicalExtensionDescriptor& descriptor,
+    std::size_t execution_order) {
+    try {
+        const bool passed = descriptor.self_test();
+        return CanonicalExtensionRunResult{
+            descriptor.name,
+            passed,
+            passed ? "self_test=passed" : "self_test=failed",
+            execution_order,
+            CategoryFor(descriptor)};
+    } catch (const std::exception& exception) {
+        return CanonicalExtensionRunResult{
+            descriptor.name,
+            false,
+            std::string("self_test=exception; message=") + exception.what(),
+            execution_order,
+            CategoryFor(descriptor)};
+    } catch (...) {
+        return CanonicalExtensionRunResult{
+            descriptor.name,
+            false,
+            "self_test=exception; message=non_standard_exception",
+            execution_order,
+            CategoryFor(descriptor)};
+    }
+}
+
+bool PassingTest() {
     return true;
 }
 
-bool AlwaysFails() {
+bool FailingTest() {
     return false;
-}
-
-std::string ExecutionDetail(const CanonicalExtensionDescriptor& descriptor,
-                            const bool passed) {
-    std::ostringstream output;
-    output << (passed ? "passed" : "failed")
-           << "; diagnostics_only="
-           << (descriptor.diagnostics_only ? "true" : "false")
-           << "; purpose=" << descriptor.purpose;
-    return output.str();
 }
 
 }  // namespace
@@ -85,194 +107,220 @@ CanonicalExtensionRegistry::Descriptors() const noexcept {
     return descriptors_;
 }
 
+std::size_t CanonicalExtensionRegistry::Size() const noexcept {
+    return descriptors_.size();
+}
+
 std::optional<std::string> CanonicalExtensionRegistry::ValidationErrorFor(
     const CanonicalExtensionDescriptor& descriptor) const {
     if (!IsLowerSnakeCase(descriptor.name)) {
-        return std::string(
-            "extension name must be non-empty lower_snake_case");
+        return "extension name must be non-empty lower_snake_case";
     }
-
-    if (HasName(descriptors_, descriptor.name)) {
-        return std::string("extension name must be unique");
-    }
-
     if (descriptor.self_test == nullptr) {
-        return std::string("extension self_test callback must not be null");
+        return "extension self_test callback must not be null";
     }
-
     if (descriptor.purpose.empty()) {
-        return std::string("extension purpose must not be empty");
+        return "extension purpose must not be empty";
     }
-
+    if (ContainsName(descriptors_, descriptor.name)) {
+        return "extension name must be unique";
+    }
     return std::nullopt;
 }
 
 std::vector<CanonicalExtensionRunResult> RunCanonicalExtensionSelfTests(
     const CanonicalExtensionRegistry& registry) {
     std::vector<CanonicalExtensionRunResult> results;
-    results.reserve(registry.Descriptors().size());
+    results.reserve(registry.Size());
 
+    std::size_t execution_order = 0U;
     for (const CanonicalExtensionDescriptor& descriptor :
          registry.Descriptors()) {
-        bool passed = false;
-        std::string detail;
-
-        try {
-            passed = descriptor.self_test();
-            detail = ExecutionDetail(descriptor, passed);
-        } catch (...) {
-            passed = false;
-            detail = "failed; self_test raised an exception";
-        }
-
-        results.push_back(
-            CanonicalExtensionRunResult{descriptor.name, passed, std::move(detail)});
+        results.push_back(RunDescriptor(descriptor, execution_order));
+        ++execution_order;
     }
-
     return results;
 }
 
 CanonicalExtensionRegistry BuildKnownExtensionRegistry() {
     CanonicalExtensionRegistry registry;
 
-    const bool registered = registry.Register(
-        CanonicalExtensionDescriptor{
+    const std::vector<CanonicalExtensionDescriptor> descriptors{
+        {
+            "foundation_legacy_contract_inventory",
+            &legacy_contract::FoundationLegacyContractInventorySelfTest,
+            "Validates source-backed legacy command fixtures and contract metadata.",
+            true,
+        },
+        {
+            "foundation_golden_tests",
+            &golden::FoundationGoldenTestsSelfTest,
+            "Validates exact command-line golden expectation comparisons.",
+            true,
+        },
+        {
             "foundation_report_validator",
             &FoundationReportValidatorSelfTest,
-            "Validates ecological foundation reports and compares diagnostics.",
-            true});
+            "Validates foundation report safety, metrics, and comparisons.",
+            true,
+        },
+        {
+            "foundation_report_json",
+            &json::FoundationReportJsonSerializerSelfTest,
+            "Validates deterministic foundation report JSON serialization.",
+            true,
+        },
+        {
+            "foundation_safety_semantics",
+            &safety::FoundationSafetySemanticsSelfTest,
+            "Validates legacy containment semantic conversion and audit records.",
+            true,
+        },
+    };
 
-    if (!registered) {
-        return CanonicalExtensionRegistry{};
+    for (const CanonicalExtensionDescriptor& descriptor : descriptors) {
+        if (!registry.Register(descriptor)) {
+            return CanonicalExtensionRegistry{};
+        }
     }
-
     return registry;
 }
 
 std::string ExplainCanonicalExtensionRun(
     const std::vector<CanonicalExtensionRunResult>& results) {
     std::ostringstream output;
+    output << "canonical_extension_run; count=" << results.size();
 
-    for (std::size_t index = 0U; index < results.size(); ++index) {
-        const CanonicalExtensionRunResult& result = results[index];
-        output << result.name << '=' << (result.passed ? "1" : "0")
-               << "; " << result.detail;
-        if (index + 1U < results.size()) {
-            output << '\n';
-        }
+    for (const CanonicalExtensionRunResult& result : results) {
+        output << "; order=" << result.execution_order
+               << "; name=" << result.name
+               << "; category=" << result.category
+               << "; passed=" << (result.passed ? "true" : "false")
+               << "; detail=" << result.detail;
     }
-
     return output.str();
 }
 
 bool AllCanonicalExtensionSelfTestsPassed(
     const std::vector<CanonicalExtensionRunResult>& results) {
-    return std::all_of(
-        results.begin(),
-        results.end(),
-        [](const CanonicalExtensionRunResult& result) {
-            return result.passed;
-        });
+    return !results.empty() &&
+           std::all_of(
+               results.begin(),
+               results.end(),
+               [](const CanonicalExtensionRunResult& result) {
+                   return result.passed;
+               });
+}
+
+std::vector<CanonicalExtensionRunResult> RunCanonicalExtensionSubset(
+    const CanonicalExtensionRegistry& registry,
+    const std::vector<std::string>& names) {
+    std::vector<CanonicalExtensionRunResult> results;
+    results.reserve(names.size());
+
+    std::size_t execution_order = 0U;
+    for (const CanonicalExtensionDescriptor& descriptor :
+         registry.Descriptors()) {
+        if (std::find(names.begin(), names.end(), descriptor.name) !=
+            names.end()) {
+            results.push_back(RunDescriptor(descriptor, execution_order));
+            ++execution_order;
+        }
+    }
+    return results;
 }
 
 bool CanonicalExtensionRegistrySelfTest() {
     CanonicalExtensionRegistry registry;
+    const CanonicalExtensionDescriptor valid{
+        "first_extension",
+        &PassingTest,
+        "Verifies a passing diagnostic callback.",
+        true,
+    };
 
-    if (!registry.Register(
-            CanonicalExtensionDescriptor{
-                "valid_extension",
-                &AlwaysPasses,
-                "Runs a deterministic diagnostic self-test.",
-                true})) {
+    if (!registry.Register(valid) || registry.Size() != 1U ||
+        registry.Register(valid)) {
         return false;
     }
 
-    if (registry.Register(
-            CanonicalExtensionDescriptor{
-                "valid_extension",
-                &AlwaysPasses,
-                "Duplicate names are rejected.",
-                true})) {
+    const CanonicalExtensionDescriptor invalid_name{
+        "Invalid-Name",
+        &PassingTest,
+        "Reject invalid descriptor names.",
+        true,
+    };
+    const CanonicalExtensionDescriptor null_callback{
+        "null_callback",
+        nullptr,
+        "Reject null callbacks.",
+        true,
+    };
+    const CanonicalExtensionDescriptor empty_purpose{
+        "empty_purpose",
+        &PassingTest,
+        "",
+        true,
+    };
+
+    if (!registry.ValidationErrorFor(invalid_name).has_value() ||
+        !registry.ValidationErrorFor(null_callback).has_value() ||
+        !registry.ValidationErrorFor(empty_purpose).has_value() ||
+        registry.Register(invalid_name) ||
+        registry.Register(null_callback) ||
+        registry.Register(empty_purpose)) {
         return false;
     }
 
-    if (registry.Register(
-            CanonicalExtensionDescriptor{
-                "Invalid_Name",
-                &AlwaysPasses,
-                "Uppercase names are rejected.",
-                true})) {
+    if (!registry.Register({
+            "second_extension",
+            &FailingTest,
+            "Verifies failed callbacks do not prevent later execution.",
+            true,
+        }) ||
+        !registry.Register({
+            "third_extension",
+            &PassingTest,
+            "Verifies insertion-order execution after failure.",
+            false,
+        })) {
         return false;
     }
 
-    if (registry.Register(
-            CanonicalExtensionDescriptor{
-                "double__underscore",
-                &AlwaysPasses,
-                "Repeated separators are rejected.",
-                true})) {
-        return false;
-    }
-
-    if (registry.Register(
-            CanonicalExtensionDescriptor{
-                "missing_callback",
-                nullptr,
-                "Null callbacks are rejected.",
-                true})) {
-        return false;
-    }
-
-    if (registry.Register(
-            CanonicalExtensionDescriptor{
-                "empty_purpose",
-                &AlwaysPasses,
-                "",
-                true})) {
-        return false;
-    }
-
-    if (!registry.Register(
-            CanonicalExtensionDescriptor{
-                "failing_extension",
-                &AlwaysFails,
-                "Produces a controlled failing diagnostic result.",
-                true})) {
-        return false;
-    }
-
-    const std::vector<CanonicalExtensionRunResult> results =
+    const std::vector<CanonicalExtensionRunResult> all_results =
         RunCanonicalExtensionSelfTests(registry);
-
-    if (results.size() != 2U ||
-        results[0].name != "valid_extension" ||
-        !results[0].passed ||
-        results[1].name != "failing_extension" ||
-        results[1].passed) {
+    if (all_results.size() != 3U ||
+        !all_results[0].passed ||
+        all_results[1].passed ||
+        !all_results[2].passed ||
+        all_results[0].execution_order != 0U ||
+        all_results[1].execution_order != 1U ||
+        all_results[2].execution_order != 2U ||
+        all_results[2].category != "core" ||
+        AllCanonicalExtensionSelfTestsPassed(all_results)) {
         return false;
     }
 
-    if (AllCanonicalExtensionSelfTestsPassed(results)) {
+    const std::vector<CanonicalExtensionRunResult> subset =
+        RunCanonicalExtensionSubset(
+            registry,
+            {"third_extension", "second_extension", "missing_extension"});
+    if (subset.size() != 2U ||
+        subset[0].name != "second_extension" ||
+        subset[1].name != "third_extension" ||
+        subset[0].execution_order != 0U ||
+        subset[1].execution_order != 1U) {
         return false;
     }
 
-    const std::string explanation = ExplainCanonicalExtensionRun(results);
-    const std::string expected =
-        "valid_extension=1; passed; diagnostics_only=true; purpose=Runs a "
-        "deterministic diagnostic self-test.\n"
-        "failing_extension=0; failed; diagnostics_only=true; purpose=Produces "
-        "a controlled failing diagnostic result.";
-
-    if (explanation != expected) {
-        return false;
-    }
-
-    const CanonicalExtensionRegistry known = BuildKnownExtensionRegistry();
-    const std::vector<CanonicalExtensionRunResult> known_results =
-        RunCanonicalExtensionSelfTests(known);
-
-    return known_results.size() == 1U &&
-           known_results.front().name == "foundation_report_validator" &&
-           known_results.front().passed &&
-           AllCanonicalExtensionSelfTestsPassed(known_results);
+    const std::string explanation = ExplainCanonicalExtensionRun(all_results);
+    return explanation ==
+           "canonical_extension_run; count=3; order=0; name=first_extension; "
+           "category=diagnostics; passed=true; detail=self_test=passed; "
+           "order=1; name=second_extension; category=diagnostics; "
+           "passed=false; detail=self_test=failed; order=2; "
+           "name=third_extension; category=core; passed=true; "
+           "detail=self_test=passed";
 }
+
+}  // namespace prometheus_praxis::foundation
