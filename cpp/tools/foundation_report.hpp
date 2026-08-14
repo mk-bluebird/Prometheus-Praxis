@@ -4,6 +4,12 @@
 #include <string>
 #include <vector>
 
+namespace prometheus_praxis::foundation {
+
+inline constexpr double kFoundationMinimumScore = 0.0;
+inline constexpr double kFoundationMaximumScore = 1.0;
+inline constexpr double kFoundationMaximumSafeRiskOfHarm = 0.30;
+
 struct FoundationReport {
     bool private_heat_accepted{};
     bool threat_fail_closed{};
@@ -18,22 +24,45 @@ struct FoundationReport {
     bool foundation_safe{};
 };
 
-struct FoundationReportDiff {
-    std::vector<std::string> differences;
-    bool identical{};
-};
-
 struct FoundationReportValidation {
     bool valid{};
     std::vector<std::string> reasons;
 };
 
-inline constexpr double kFoundationMaximumSafeRiskOfHarm = 0.30;
+struct FoundationReportDiff {
+    std::vector<std::string> differences;
+    bool identical{};
+};
+
+class FoundationReportBuilder {
+public:
+    FoundationReportBuilder() = default;
+
+    FoundationReportBuilder& SetPrivateHeat(bool accepted);
+    FoundationReportBuilder& SetContainmentBlocked(bool blocked);
+    FoundationReportBuilder& SetWaterAllowed(bool allowed);
+    FoundationReportBuilder& SetWaterInvariant(bool holds);
+    FoundationReportBuilder& SetAuthorizationAccepted(bool accepted);
+    FoundationReportBuilder& SetInvasiveSafe(bool safe);
+    FoundationReportBuilder& SetIrrigationFeasible(bool feasible);
+
+    FoundationReportBuilder& SetScores(
+        double maximum_risk_of_harm,
+        double knowledge_factor,
+        double eco_impact_value);
+
+    FoundationReport Build() const;
+
+private:
+    FoundationReport report_{};
+};
 
 FoundationReportValidation ValidateFoundationReport(
     const FoundationReport& report);
 
 bool IsFoundationReportValid(const FoundationReport& report);
+
+bool DerivedFoundationSafe(const FoundationReport& report);
 
 std::string ExplainFoundationReportValidation(
     const FoundationReport& report);
@@ -47,3 +76,5 @@ std::string ExplainFoundationReportDiff(
     const FoundationReportDiff& diff);
 
 bool FoundationReportValidatorSelfTest();
+
+}  // namespace prometheus_praxis::foundation
