@@ -1,123 +1,239 @@
 // File: cpp/tools/foundation_report.cpp
 #include "foundation_report.hpp"
 
-#include <algorithm>
 #include <cmath>
+#include <iomanip>
 #include <limits>
-#include <optional>
 #include <sstream>
 #include <string>
-#include <vector>
+#include <string_view>
+#include <utility>
 
+namespace prometheus_praxis::foundation {
 namespace {
 
 constexpr double kMinimumScore = 0.0;
 constexpr double kMaximumScore = 1.0;
+constexpr double kMaximumSafeRiskOfHarm = 0.30;
 
-bool IsFiniteUnitInterval(const double value) noexcept {
-    return std::isfinite(value) && value >= kMinimumScore &&
+bool IsFiniteUnitInterval(double value) noexcept {
+    return std::isfinite(value) &&
+           value >= kMinimumScore &&
            value <= kMaximumScore;
 }
 
-bool AreEqual(const double left, const double right,
-              const double tolerance) noexcept {
-    return std::fabs(left - right) <= tolerance;
+bool IsFiniteNonNegative(double value) noexcept {
+    return std::isfinite(value) && value >= 0.0;
 }
 
-bool DerivedFoundationSafe(const FoundationReport& report) noexcept {
+bool ThreatFailClosedBlocksThreats(const FoundationReport& report) noexcept {
+    return report.threat_fail_closed;
+}
+
+bool HasAllSafeConditions(const FoundationReport& report) noexcept {
     return report.private_heat_accepted &&
-           !report.threat_fail_closed &&
+           ThreatFailClosedBlocksThreats(report) &&
            report.water_biodiversity_allowed &&
            report.water_biodiversity_invariant_holds &&
            report.authorization_accepted &&
            report.invasive_control_safe &&
-           report.irrigation_robustly_feasible &&
-           std::isfinite(report.maximum_risk_of_harm) &&
-           report.maximum_risk_of_harm <= kFoundationMaximumSafeRiskOfHarm;
+           report.irrigation_robustly_feasible;
 }
 
-void AddDifference(FoundationReportDiff& diff, const bool differs,
-                   const std::string& field_name) {
-    if (differs) {
-        diff.differences.push_back(field_name);
+std::string BooleanText(bool value) {
+    return value ? "true" : "false";
+}
+
+std::string FormatDouble(double value) {
+    if (std::isnan(value)) {
+        return "nan";
+    }
+    if (std::isinf(value)) {
+        return value > 0.0 ? "infinity" : "-infinity";
+    }
+
+    std::ostringstream output;
+    output << std::setprecision(17) << value;
+    return output.str();
+}
+
+void AddDifference(
+    FoundationReportDiff& diff,
+    std::string_view field,
+    bool left,
+    bool right) {
+    if (left != right) {
+        diff.differences.emplace_back(
+            std::string(field) + " differs; left=" + BooleanText(left) +
+            "; right=" + BooleanText(right));
     }
 }
 
-void AddBooleanFailure(std::vector<std::string>& reasons, const bool condition,
-                       const char* reason) {
-    if (!condition) {
-        reasons.emplace_back(reason);
-    }
-}
-
-void AddMetricFailure(std::vector<std::string>& reasons, const double value,
-                      const char* name) {
-    if (!std::isfinite(value)) {
-        reasons.emplace_back(std::string(name) + " must be finite");
+void AddMetricDifference(
+    FoundationReportDiff& diff,
+    std::string_view field,
+    double left,
+    double right,
+    double tolerance) {
+    if (!std::isfinite(left) || !std::isfinite(right)) {
+        if (std::isnan(left) || std::isnan(right) || left != right) {
+            diff.differences.emplace_back(
+                std::string(field) + " non-finite comparison; left=" +
+                FormatDouble(left) + "; right=" + FormatDouble(right));
+        }
         return;
     }
+
+    if (std::fabs(left - right) > tolerance) {
+        diff.differences.emplace_back(
+            std::string(field) + " differs; left=" + FormatDouble(left) +
+            "; right=" + FormatDouble(right) +
+            "; tolerance=" + FormatDouble(tolerance));
+    }
+}
+
+void AddMetricValidation(
+    FoundationReportValidation& validation,
+    std::string_view field,
+    double value) {
+    if (!std::isfinite(value)) {
+        validation.reasons.emplace_back(
+            std::string(field) + " must be finite");
+        return;
+    }
+
     if (value < kMinimumScore || value > kMaximumScore) {
-        reasons.emplace_back(std::string(name) + " must be in [0,1]");
+        validation.reasons.emplace_back(
+            std::string(field) + " must be within [0,1]");
     }
 }
 
 }  // namespace
 
+FoundationReportBuilder& FoundationReportBuilder::SetPrivateHeat(bool accepted) {
+    report.private_heat_accepted = accepted;
+    return *this;
+}
+
+FoundationReportBuilder& FoundationReportBuilder::SetContainmentBlocked(bool blocked) {
+    report.threat_fail_closed = blocked;
+    return *this;
+}
+
+FoundationReportBuilder& FoundationReportBuilder::SetWaterAllowed(bool allowed) {
+    report.water_biodiversity_allowed = allowed;
+    return *this;
+}
+
+FoundationReportBuilder& FoundationReportBuilder::SetWaterInvariant(bool holds) {
+    report.water_biodiversity_invariant_holds = holds;
+    return *this;
+}
+
+FoundationReportBuilder& FoundationReportBuilder::SetAuthorizationAccepted(bool accepted) {
+    report.authorization_accepted = accepted;
+    return *this;
+}
+
+FoundationReportBuilder& FoundationReportBuilder::SetInvasiveSafe(bool safe) {
+    report.invasive_control_safe = safe;
+    return *this;
+}
+
+FoundationReportBuilder& FoundationReportBuilder::SetIrrigationFeasible(bool feasible) {
+    report.irrigation_robustly_feasible = feasible;
+    return *this;
+}
+
+FoundationReportBuilder& FoundationReportBuilder::SetScores(
+    double risk,
+    double knowledge,
+    double impact) {
+    report.maximum_risk_of_harm = risk;
+    report.knowledge_factor = knowledge;
+    report.eco_impact_value = impact;
+    return *this;
+}
+
+FoundationReport FoundationReportBuilder::Build() {
+    report.foundation_safe = DerivedFoundationSafe(report);
+    return report;
+}
+
+bool DerivedFoundationSafe(const FoundationReport& report) {
+    return IsFiniteUnitInterval(report.maximum_risk_of_harm) &&
+           IsFiniteUnitInterval(report.knowledge_factor) &&
+           IsFiniteUnitInterval(report.eco_impact_value) &&
+           report.maximum_risk_of_harm <= kMaximumSafeRiskOfHarm &&
+           HasAllSafeConditions(report);
+}
+
 FoundationReportValidation ValidateFoundationReport(
     const FoundationReport& report) {
-    FoundationReportValidation result{};
+    FoundationReportValidation validation;
 
-    AddMetricFailure(
-        result.reasons, report.maximum_risk_of_harm, "maximum_risk_of_harm");
-    AddMetricFailure(result.reasons, report.knowledge_factor, "knowledge_factor");
-    AddMetricFailure(result.reasons, report.eco_impact_value, "eco_impact_value");
+    AddMetricValidation(
+        validation,
+        "maximum_risk_of_harm",
+        report.maximum_risk_of_harm);
+    AddMetricValidation(
+        validation,
+        "knowledge_factor",
+        report.knowledge_factor);
+    AddMetricValidation(
+        validation,
+        "eco_impact_value",
+        report.eco_impact_value);
 
     const bool derived_safe = DerivedFoundationSafe(report);
-
     if (report.foundation_safe != derived_safe) {
-        result.reasons.emplace_back(
-            "foundation_safe does not match the derived safety decision");
+        validation.reasons.emplace_back(
+            "foundation_safe does not equal DerivedFoundationSafe");
     }
 
-    if (report.foundation_safe) {
+    if (!derived_safe) {
         if (!report.private_heat_accepted) {
-            result.reasons.emplace_back("private heat stage was not accepted");
+            validation.reasons.emplace_back(
+                "unsafe: private heat was not accepted");
         }
-        if (report.threat_fail_closed) {
-            result.reasons.emplace_back(
-                "threat_fail_closed is true; its public semantics require "
-                "source-backed reconciliation before exposure");
+        if (!ThreatFailClosedBlocksThreats(report)) {
+            validation.reasons.emplace_back(
+                "unsafe: threat handling is not fail-closed");
         }
         if (!report.water_biodiversity_allowed) {
-            result.reasons.emplace_back(
-                "water biodiversity stage was not allowed");
+            validation.reasons.emplace_back(
+                "unsafe: water biodiversity activity is not allowed");
         }
         if (!report.water_biodiversity_invariant_holds) {
-            result.reasons.emplace_back(
-                "water biodiversity invariant does not hold");
+            validation.reasons.emplace_back(
+                "unsafe: water biodiversity invariant does not hold");
         }
         if (!report.authorization_accepted) {
-            result.reasons.emplace_back("authorization stage was not accepted");
+            validation.reasons.emplace_back(
+                "unsafe: authorization was not accepted");
         }
         if (!report.invasive_control_safe) {
-            result.reasons.emplace_back("invasive control stage is not safe");
+            validation.reasons.emplace_back(
+                "unsafe: invasive control is not safe");
         }
         if (!report.irrigation_robustly_feasible) {
-            result.reasons.emplace_back(
-                "irrigation schedule is not robustly feasible");
+            validation.reasons.emplace_back(
+                "unsafe: irrigation is not robustly feasible");
         }
         if (std::isfinite(report.maximum_risk_of_harm) &&
-            report.maximum_risk_of_harm > kFoundationMaximumSafeRiskOfHarm) {
-            result.reasons.emplace_back(
-                "maximum_risk_of_harm exceeds the safe threshold");
+            report.maximum_risk_of_harm > kMaximumSafeRiskOfHarm) {
+            validation.reasons.emplace_back(
+                "unsafe: maximum_risk_of_harm exceeds 0.30");
         }
-    } else if (derived_safe) {
-        result.reasons.emplace_back(
-            "foundation_safe is false despite all safe-stage conditions");
     }
 
-    result.valid = result.reasons.empty();
-    return result;
+    validation.valid =
+        IsFiniteUnitInterval(report.maximum_risk_of_harm) &&
+        IsFiniteUnitInterval(report.knowledge_factor) &&
+        IsFiniteUnitInterval(report.eco_impact_value) &&
+        report.foundation_safe == derived_safe;
+
+    return validation;
 }
 
 bool IsFoundationReportValid(const FoundationReport& report) {
@@ -126,118 +242,160 @@ bool IsFoundationReportValid(const FoundationReport& report) {
 
 std::string ExplainFoundationReportValidation(
     const FoundationReport& report) {
-    const FoundationReportValidation validation = ValidateFoundationReport(report);
+    const FoundationReportValidation validation =
+        ValidateFoundationReport(report);
 
     std::ostringstream output;
-    if (validation.valid) {
-        output << "FoundationReport validation passed.";
-        return output.str();
+    output << "foundation_report="
+           << (validation.valid ? "valid" : "invalid")
+           << "; derived_safe="
+           << BooleanText(DerivedFoundationSafe(report))
+           << "; declared_safe="
+           << BooleanText(report.foundation_safe);
+
+    for (const std::string& reason : validation.reasons) {
+        output << "; reason=" << reason;
     }
 
-    output << "FoundationReport validation failed:";
-    for (const std::string& reason : validation.reasons) {
-        output << '\n' << "- " << reason;
-    }
     return output.str();
 }
 
 FoundationReportDiff CompareFoundationReports(
     const FoundationReport& left,
     const FoundationReport& right,
-    const double tolerance) {
-    FoundationReportDiff result{};
+    double tolerance) {
+    FoundationReportDiff diff;
 
-    if (!std::isfinite(tolerance) || tolerance < 0.0) {
-        result.differences.emplace_back(
-            "comparison tolerance must be finite and non-negative");
-        result.identical = false;
-        return result;
+    if (!IsFiniteNonNegative(tolerance)) {
+        diff.differences.emplace_back(
+            "comparison tolerance must be finite and non-negative; value=" +
+            FormatDouble(tolerance));
+        diff.identical = false;
+        return diff;
     }
 
     AddDifference(
-        result, left.private_heat_accepted != right.private_heat_accepted,
-        "private_heat_accepted");
+        diff,
+        "private_heat_accepted",
+        left.private_heat_accepted,
+        right.private_heat_accepted);
     AddDifference(
-        result, left.threat_fail_closed != right.threat_fail_closed,
-        "threat_fail_closed");
+        diff,
+        "threat_fail_closed",
+        left.threat_fail_closed,
+        right.threat_fail_closed);
     AddDifference(
-        result,
-        left.water_biodiversity_allowed != right.water_biodiversity_allowed,
-        "water_biodiversity_allowed");
+        diff,
+        "water_biodiversity_allowed",
+        left.water_biodiversity_allowed,
+        right.water_biodiversity_allowed);
     AddDifference(
-        result,
-        left.water_biodiversity_invariant_holds !=
-            right.water_biodiversity_invariant_holds,
-        "water_biodiversity_invariant_holds");
+        diff,
+        "water_biodiversity_invariant_holds",
+        left.water_biodiversity_invariant_holds,
+        right.water_biodiversity_invariant_holds);
     AddDifference(
-        result, left.authorization_accepted != right.authorization_accepted,
-        "authorization_accepted");
+        diff,
+        "authorization_accepted",
+        left.authorization_accepted,
+        right.authorization_accepted);
     AddDifference(
-        result, left.invasive_control_safe != right.invasive_control_safe,
-        "invasive_control_safe");
+        diff,
+        "invasive_control_safe",
+        left.invasive_control_safe,
+        right.invasive_control_safe);
     AddDifference(
-        result,
-        left.irrigation_robustly_feasible !=
-            right.irrigation_robustly_feasible,
-        "irrigation_robustly_feasible");
+        diff,
+        "irrigation_robustly_feasible",
+        left.irrigation_robustly_feasible,
+        right.irrigation_robustly_feasible);
+    AddMetricDifference(
+        diff,
+        "maximum_risk_of_harm",
+        left.maximum_risk_of_harm,
+        right.maximum_risk_of_harm,
+        tolerance);
+    AddMetricDifference(
+        diff,
+        "knowledge_factor",
+        left.knowledge_factor,
+        right.knowledge_factor,
+        tolerance);
+    AddMetricDifference(
+        diff,
+        "eco_impact_value",
+        left.eco_impact_value,
+        right.eco_impact_value,
+        tolerance);
     AddDifference(
-        result,
-        !std::isfinite(left.maximum_risk_of_harm) ||
-            !std::isfinite(right.maximum_risk_of_harm) ||
-            !AreEqual(
-                left.maximum_risk_of_harm,
-                right.maximum_risk_of_harm,
-                tolerance),
-        "maximum_risk_of_harm");
-    AddDifference(
-        result,
-        !std::isfinite(left.knowledge_factor) ||
-            !std::isfinite(right.knowledge_factor) ||
-            !AreEqual(left.knowledge_factor, right.knowledge_factor, tolerance),
-        "knowledge_factor");
-    AddDifference(
-        result,
-        !std::isfinite(left.eco_impact_value) ||
-            !std::isfinite(right.eco_impact_value) ||
-            !AreEqual(
-                left.eco_impact_value,
-                right.eco_impact_value,
-                tolerance),
-        "eco_impact_value");
-    AddDifference(
-        result, left.foundation_safe != right.foundation_safe,
-        "foundation_safe");
+        diff,
+        "foundation_safe",
+        left.foundation_safe,
+        right.foundation_safe);
 
-    result.identical = result.differences.empty();
-    return result;
+    diff.identical = diff.differences.empty();
+    return diff;
 }
 
-std::string ExplainFoundationReportDiff(const FoundationReportDiff& diff) {
-    if (diff.identical && diff.differences.empty()) {
-        return "FoundationReport values are identical within the supplied tolerance.";
+std::string ExplainFoundationReportDiff(
+    const FoundationReportDiff& diff) {
+    if (diff.identical) {
+        return "foundation reports are identical";
     }
 
     std::ostringstream output;
-    output << "FoundationReport differences:";
+    output << "foundation reports differ; count="
+           << diff.differences.size();
+
     for (const std::string& difference : diff.differences) {
-        output << '\n' << "- " << difference;
+        output << "; difference=" << difference;
     }
+
     return output.str();
 }
 
 bool FoundationReportValidatorSelfTest() {
-    const FoundationReport safe{
-        true, false, true, true, true, true, true,
-        0.25, 0.90, 0.85, true};
+    const FoundationReport safe =
+        FoundationReportBuilder{}
+            .SetPrivateHeat(true)
+            .SetContainmentBlocked(true)
+            .SetWaterAllowed(true)
+            .SetWaterInvariant(true)
+            .SetAuthorizationAccepted(true)
+            .SetInvasiveSafe(true)
+            .SetIrrigationFeasible(true)
+            .SetScores(0.25, 0.90, 0.85)
+            .Build();
 
-    if (!IsFoundationReportValid(safe)) {
+    if (!safe.foundation_safe ||
+        !IsFoundationReportValid(safe) ||
+        !ValidateFoundationReport(safe).reasons.empty()) {
         return false;
     }
 
-    FoundationReport unsafe = safe;
-    unsafe.maximum_risk_of_harm = 0.31;
-    unsafe.foundation_safe = false;
-    if (!IsFoundationReportValid(unsafe)) {
+    FoundationReport unsafe_risk = safe;
+    unsafe_risk.maximum_risk_of_harm = 0.31;
+    unsafe_risk.foundation_safe = false;
+    const FoundationReportValidation unsafe_risk_validation =
+        ValidateFoundationReport(unsafe_risk);
+    if (!unsafe_risk_validation.valid ||
+        DerivedFoundationSafe(unsafe_risk) ||
+        unsafe_risk_validation.reasons.empty()) {
+        return false;
+    }
+
+    FoundationReport non_finite = safe;
+    non_finite.knowledge_factor =
+        std::numeric_limits<double>::quiet_NaN();
+    non_finite.foundation_safe = false;
+    if (IsFoundationReportValid(non_finite)) {
+        return false;
+    }
+
+    FoundationReport invalid_range = safe;
+    invalid_range.maximum_risk_of_harm = -0.01;
+    invalid_range.foundation_safe = false;
+    if (IsFoundationReportValid(invalid_range)) {
         return false;
     }
 
@@ -247,39 +405,34 @@ bool FoundationReportValidatorSelfTest() {
         return false;
     }
 
-    FoundationReport nonfinite = safe;
-    nonfinite.knowledge_factor = std::numeric_limits<double>::quiet_NaN();
-    if (IsFoundationReportValid(nonfinite)) {
-        return false;
-    }
-
-    FoundationReport invalid_risk = safe;
-    invalid_risk.maximum_risk_of_harm = -0.01;
-    invalid_risk.foundation_safe = false;
-    if (IsFoundationReportValid(invalid_risk)) {
+    const FoundationReportDiff exact =
+        CompareFoundationReports(safe, safe, 0.0);
+    if (!exact.identical || !exact.differences.empty()) {
         return false;
     }
 
     FoundationReport nearby = safe;
-    nearby.knowledge_factor = safe.knowledge_factor + 0.0005;
-    if (!CompareFoundationReports(safe, nearby, 0.001).identical) {
-        return false;
-    }
-    if (CompareFoundationReports(safe, nearby, 0.0001).identical) {
+    nearby.knowledge_factor += 0.0005;
+    if (!CompareFoundationReports(safe, nearby, 0.001).identical ||
+        CompareFoundationReports(safe, nearby, 0.0001).identical) {
         return false;
     }
 
     FoundationReport nan_comparison = safe;
     nan_comparison.eco_impact_value =
         std::numeric_limits<double>::quiet_NaN();
-    if (CompareFoundationReports(safe, nan_comparison, 0.01).identical) {
+    const FoundationReportDiff nan_diff =
+        CompareFoundationReports(safe, nan_comparison, 0.0);
+    if (nan_diff.identical || nan_diff.differences.empty()) {
         return false;
     }
 
-    if (CompareFoundationReports(
-            safe, safe, -0.01).identical) {
-        return false;
-    }
-
-    return true;
+    const FoundationReportDiff invalid_tolerance =
+        CompareFoundationReports(safe, safe, -0.01);
+    return !invalid_tolerance.identical &&
+           !invalid_tolerance.differences.empty() &&
+           ExplainFoundationReportDiff(nan_diff).find(
+               "non-finite comparison") != std::string::npos;
 }
+
+}  // namespace prometheus_praxis::foundation
