@@ -3,38 +3,38 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <limits>
+#include <set>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
+namespace prometheus_praxis::foundation::authorization {
 namespace {
 
 constexpr std::int32_t kMinimumRiskOfHarmFixed = 0;
 constexpr std::int32_t kMaximumRiskOfHarmFixed = 1000000;
 
-bool IsLowerSnakeCase(const std::string& value) noexcept {
+bool IsLowerSnakeCase(std::string_view value) noexcept {
     if (value.empty() || value.front() == '_' || value.back() == '_') {
         return false;
     }
 
     bool previous_underscore = false;
-    for (const char character : value) {
-        const bool lower_case = character >= 'a' && character <= 'z';
+    for (const unsigned char character : value) {
+        const bool lowercase = character >= 'a' && character <= 'z';
         const bool digit = character >= '0' && character <= '9';
+        const bool underscore = character == '_';
 
-        if (character == '_') {
-            if (previous_underscore) {
-                return false;
-            }
-            previous_underscore = true;
-            continue;
-        }
-
-        if (!lower_case && !digit) {
+        if (!lowercase && !digit && !underscore) {
             return false;
         }
-        previous_underscore = false;
+        if (underscore && previous_underscore) {
+            return false;
+        }
+        previous_underscore = underscore;
     }
 
     return true;
@@ -52,7 +52,7 @@ bool IsEntryStructurallyValid(
 
 bool HasSequence(
     const std::vector<AuthorizationSequenceLedgerEntry>& entries,
-    const std::uint64_t sequence) {
+    std::uint64_t sequence) noexcept {
     return std::any_of(
         entries.begin(),
         entries.end(),
@@ -63,9 +63,7 @@ bool HasSequence(
 
 std::vector<AuthorizationSequenceLedgerEntry> OrderedEntries(
     const AuthorizationEvidenceSequenceLedger& ledger) {
-    std::vector<AuthorizationSequenceLedgerEntry> ordered =
-        ledger.Entries();
-
+    std::vector<AuthorizationSequenceLedgerEntry> ordered = ledger.Entries();
     std::sort(
         ordered.begin(),
         ordered.end(),
@@ -73,8 +71,13 @@ std::vector<AuthorizationSequenceLedgerEntry> OrderedEntries(
            const AuthorizationSequenceLedgerEntry& right) {
             return left.sequence < right.sequence;
         });
-
     return ordered;
+}
+
+void AddReason(
+    AuthorizationEvidenceSequenceLedgerAudit& audit,
+    std::string reason) {
+    audit.reasons.push_back(std::move(reason));
 }
 
 }  // namespace
@@ -95,17 +98,37 @@ AuthorizationEvidenceSequenceLedger::Entries() const noexcept {
     return entries_;
 }
 
+std::size_t AuthorizationEvidenceSequenceLedger::Size() const noexcept {
+    return entries_.size();
+}
+
+std::optional<AuthorizationSequenceLedgerEntry>
+AuthorizationEvidenceSequenceLedger::Latest() const {
+    if (entries_.empty()) {
+        return std::nullopt;
+    }
+
+    const auto latest = std::max_element(
+        entries_.begin(),
+        entries_.end(),
+        [](const AuthorizationSequenceLedgerEntry& left,
+           const AuthorizationSequenceLedgerEntry& right) {
+            return left.sequence < right.sequence;
+        });
+
+    return *latest;
+}
+
 AuthorizationEvidenceSequenceLedgerAudit
 AuditAuthorizationEvidenceSequenceLedger(
     const AuthorizationEvidenceSequenceLedger& ledger,
-    const std::uint64_t observed_at_s) {
-    AuthorizationEvidenceSequenceLedgerAudit audit{};
+    std::uint64_t observed_at_s) {
+    AuthorizationEvidenceSequenceLedgerAudit audit;
     const std::vector<AuthorizationSequenceLedgerEntry> ordered =
         OrderedEntries(ledger);
 
     if (ordered.empty()) {
-        audit.reasons.emplace_back(
-            "authorization evidence ledger contains no accepted entries");
+        AddReason(audit, "ledger contains no accepted authorization evidence");
         return audit;
     }
 
@@ -114,45 +137,65 @@ AuditAuthorizationEvidenceSequenceLedger(
     audit.contiguous = true;
     audit.active_at_observation = true;
 
+    std::set<std::uint64_t> observed_sequences;
     std::uint64_t previous_sequence = 0U;
-    for (std::size_t index = 0U; index < ordered.size(); ++index) {
-        const AuthorizationSequenceLedgerEntry& entry = ordered[index];
+    bool first = true;
 
+    for (const AuthorizationSequenceLedgerEntry& entry : ordered) {
         if (!IsEntryStructurallyValid(entry)) {
             audit.structurally_valid = false;
-            audit.reasons.emplace_back(
-                "authorization evidence entry violates structural constraints");
+            AddReason(
+                audit,
+                "invalid entry at sequence " + std::to_string(entry.sequence));
         }
 
-        if (index > 0U) {
+        if (!observed_sequences.insert(entry.sequence).second) {
+            audit.monotonic = false;
+            audit.contiguous = false;
+            AddReason(
+                audit,
+                "duplicate sequence " + std::to_string(entry.sequence));
+        }
+
+        if (!first) {
             if (entry.sequence <= previous_sequence) {
                 audit.monotonic = false;
-                audit.reasons.emplace_back(
-                    "authorization evidence sequence is not strictly monotonic");
+                AddReason(
+                    audit,
+                    "sequence is not strictly increasing at " +
+                        std::to_string(entry.sequence));
             }
 
-            if (previous_sequence == UINT64_MAX ||
+            if (previous_sequence ==
+                    std::numeric_limits<std::uint64_t>::max() ||
                 entry.sequence != previous_sequence + 1U) {
                 audit.contiguous = false;
-                audit.reasons.emplace_back(
-                    "authorization evidence sequence contains a gap");
+                AddReason(
+                    audit,
+                    "sequence gap between " +
+                        std::to_string(previous_sequence) +
+                        " and " + std::to_string(entry.sequence));
             }
         }
 
         if (observed_at_s < entry.issue_time_s ||
             observed_at_s > entry.expiry_time_s) {
             audit.active_at_observation = false;
-            audit.reasons.emplace_back(
-                "authorization evidence is inactive at observation time");
+            AddReason(
+                audit,
+                "entry sequence " + std::to_string(entry.sequence) +
+                    " is inactive at observation time");
         }
 
         previous_sequence = entry.sequence;
+        first = false;
     }
 
-    audit.accepted = audit.structurally_valid &&
-                     audit.monotonic &&
-                     audit.contiguous &&
-                     audit.active_at_observation;
+    audit.accepted =
+        audit.structurally_valid &&
+        audit.monotonic &&
+        audit.contiguous &&
+        audit.active_at_observation;
     return audit;
 }
 
@@ -160,125 +203,172 @@ std::string ExplainAuthorizationEvidenceSequenceLedger(
     const AuthorizationEvidenceSequenceLedger& ledger,
     const AuthorizationEvidenceSequenceLedgerAudit& audit) {
     std::ostringstream output;
-    output << "authorization_evidence_entries=" << ledger.Entries().size()
-           << "\nstructurally_valid=" << (audit.structurally_valid ? "1" : "0")
-           << "\nmonotonic=" << (audit.monotonic ? "1" : "0")
-           << "\ncontiguous=" << (audit.contiguous ? "1" : "0")
-           << "\nactive_at_observation="
-           << (audit.active_at_observation ? "1" : "0")
-           << "\naccepted=" << (audit.accepted ? "1" : "0");
+    output << "authorization_evidence_sequence_ledger"
+           << "; entry_count=" << ledger.Size()
+           << "; structurally_valid="
+           << (audit.structurally_valid ? "true" : "false")
+           << "; monotonic=" << (audit.monotonic ? "true" : "false")
+           << "; contiguous=" << (audit.contiguous ? "true" : "false")
+           << "; active_at_observation="
+           << (audit.active_at_observation ? "true" : "false")
+           << "; accepted=" << (audit.accepted ? "true" : "false");
+
+    for (const AuthorizationSequenceLedgerEntry& entry : OrderedEntries(ledger)) {
+        output << "; sequence=" << entry.sequence
+               << "; issue_time_s=" << entry.issue_time_s
+               << "; expiry_time_s=" << entry.expiry_time_s
+               << "; action_identifier=" << entry.action_identifier
+               << "; policy_identifier=" << entry.policy_identifier
+               << "; risk_of_harm_fixed=" << entry.risk_of_harm_fixed;
+    }
 
     for (const std::string& reason : audit.reasons) {
-        output << "\nreason=" << reason;
+        output << "; reason=" << reason;
     }
 
     return output.str();
 }
 
-bool AuthorizationEvidenceSequenceLedgerSelfTest() {
-    AuthorizationEvidenceSequenceLedger clean;
+AuthorizationEvidenceSequenceLedger MergeLedgers(
+    const AuthorizationEvidenceSequenceLedger& left,
+    const AuthorizationEvidenceSequenceLedger& right) {
+    AuthorizationEvidenceSequenceLedger merged;
 
-    if (!clean.RecordAccepted(
-            AuthorizationSequenceLedgerEntry{
-                1U,
-                100U,
-                200U,
-                "water_quality_observation",
-                "ecological_water_reserve",
-                200000}) ||
-        !clean.RecordAccepted(
-            AuthorizationSequenceLedgerEntry{
-                2U,
-                100U,
-                200U,
-                "native_habitat_review",
-                "biodiversity_protection",
-                100000})) {
+    for (const AuthorizationSequenceLedgerEntry& entry : OrderedEntries(left)) {
+        static_cast<void>(merged.RecordAccepted(entry));
+    }
+
+    for (const AuthorizationSequenceLedgerEntry& entry : OrderedEntries(right)) {
+        static_cast<void>(merged.RecordAccepted(entry));
+    }
+
+    return merged;
+}
+
+bool AuthorizationEvidenceSequenceLedgerSelfTest() {
+    const AuthorizationSequenceLedgerEntry first{
+        1U,
+        100U,
+        200U,
+        "water_release",
+        "ecological_reserve_policy",
+        200000};
+
+    const AuthorizationSequenceLedgerEntry second{
+        2U,
+        110U,
+        210U,
+        "native_planting",
+        "habitat_regeneration_policy",
+        150000};
+
+    AuthorizationEvidenceSequenceLedger clean;
+    if (!clean.RecordAccepted(first) ||
+        !clean.RecordAccepted(second) ||
+        clean.Size() != 2U ||
+        clean.RecordAccepted(first)) {
+        return false;
+    }
+
+    const std::optional<AuthorizationSequenceLedgerEntry> latest = clean.Latest();
+    if (!latest.has_value() || latest->sequence != 2U) {
         return false;
     }
 
     const AuthorizationEvidenceSequenceLedgerAudit clean_audit =
         AuditAuthorizationEvidenceSequenceLedger(clean, 150U);
-
-    if (!clean_audit.accepted ||
-        !clean_audit.structurally_valid ||
+    if (!clean_audit.structurally_valid ||
         !clean_audit.monotonic ||
         !clean_audit.contiguous ||
-        !clean_audit.active_at_observation) {
-        return false;
-    }
-
-    if (clean.RecordAccepted(
-            AuthorizationSequenceLedgerEntry{
-                1U,
-                100U,
-                200U,
-                "duplicate_sequence",
-                "ecological_water_reserve",
-                100000})) {
+        !clean_audit.active_at_observation ||
+        !clean_audit.accepted ||
+        !clean_audit.reasons.empty()) {
         return false;
     }
 
     AuthorizationEvidenceSequenceLedger gap;
-    if (!gap.RecordAccepted(
-            AuthorizationSequenceLedgerEntry{
-                1U,
-                100U,
-                200U,
-                "water_quality_observation",
-                "ecological_water_reserve",
-                200000}) ||
-        !gap.RecordAccepted(
-            AuthorizationSequenceLedgerEntry{
-                3U,
-                100U,
-                200U,
-                "native_habitat_review",
-                "biodiversity_protection",
-                100000})) {
+    if (!gap.RecordAccepted(first) ||
+        !gap.RecordAccepted(AuthorizationSequenceLedgerEntry{
+            3U,
+            100U,
+            200U,
+            "soil_amendment",
+            "soil_health_policy",
+            100000})) {
         return false;
     }
 
     const AuthorizationEvidenceSequenceLedgerAudit gap_audit =
         AuditAuthorizationEvidenceSequenceLedger(gap, 150U);
-    if (gap_audit.accepted || gap_audit.contiguous) {
+    if (gap_audit.contiguous || gap_audit.accepted) {
+        return false;
+    }
+
+    AuthorizationEvidenceSequenceLedger expired;
+    if (!expired.RecordAccepted(first)) {
         return false;
     }
 
     const AuthorizationEvidenceSequenceLedgerAudit expired_audit =
-        AuditAuthorizationEvidenceSequenceLedger(clean, 201U);
-    if (expired_audit.accepted || expired_audit.active_at_observation) {
+        AuditAuthorizationEvidenceSequenceLedger(expired, 201U);
+    if (expired_audit.active_at_observation || expired_audit.accepted) {
         return false;
     }
 
     AuthorizationEvidenceSequenceLedger invalid;
-    if (invalid.RecordAccepted(
-            AuthorizationSequenceLedgerEntry{
-                0U,
-                100U,
-                200U,
-                "invalid_sequence",
-                "ecological_water_reserve",
-                100000}) ||
-        invalid.RecordAccepted(
-            AuthorizationSequenceLedgerEntry{
-                1U,
-                200U,
-                100U,
-                "invalid_window",
-                "ecological_water_reserve",
-                100000}) ||
-        invalid.RecordAccepted(
-            AuthorizationSequenceLedgerEntry{
-                1U,
-                100U,
-                200U,
-                "invalid_risk",
-                "ecological_water_reserve",
-                1000001})) {
+    if (invalid.RecordAccepted(AuthorizationSequenceLedgerEntry{
+            0U,
+            100U,
+            200U,
+            "invalid_sequence",
+            "ecological_reserve_policy",
+            100000}) ||
+        invalid.RecordAccepted(AuthorizationSequenceLedgerEntry{
+            1U,
+            200U,
+            100U,
+            "invalid_window",
+            "ecological_reserve_policy",
+            100000}) ||
+        invalid.RecordAccepted(AuthorizationSequenceLedgerEntry{
+            1U,
+            100U,
+            200U,
+            "invalid_risk",
+            "ecological_reserve_policy",
+            kMaximumRiskOfHarmFixed + 1})) {
         return false;
     }
 
-    return ExplainAuthorizationEvidenceSequenceLedger(clean, clean_audit).find(
-               "accepted=1") != std::string::npos;
+    AuthorizationEvidenceSequenceLedger right;
+    if (!right.RecordAccepted(AuthorizationSequenceLedgerEntry{
+            3U,
+            120U,
+            220U,
+            "soil_amendment",
+            "soil_health_policy",
+            100000}) ||
+        !right.RecordAccepted(second)) {
+        return false;
+    }
+
+    const AuthorizationEvidenceSequenceLedger merged =
+        MergeLedgers(clean, right);
+    if (merged.Size() != 3U) {
+        return false;
+    }
+
+    const AuthorizationEvidenceSequenceLedgerAudit merged_audit =
+        AuditAuthorizationEvidenceSequenceLedger(merged, 150U);
+    if (!merged_audit.accepted) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainAuthorizationEvidenceSequenceLedger(clean, clean_audit);
+    return explanation.find("entry_count=2") != std::string::npos &&
+           explanation.find("sequence=1") != std::string::npos &&
+           explanation.find("sequence=2") != std::string::npos;
 }
+
+}  // namespace prometheus_praxis::foundation::authorization
