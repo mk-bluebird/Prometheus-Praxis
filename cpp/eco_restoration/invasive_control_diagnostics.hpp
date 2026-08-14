@@ -1,11 +1,12 @@
 // File: cpp/eco_restoration/invasive_control_diagnostics.hpp
 #pragma once
 
-#include <optional>
 #include <string>
 #include <vector>
 
-namespace eco_restoration {
+namespace prometheus_praxis::eco_restoration {
+
+inline constexpr double kMaximumInvasiveControlRiskOfHarm = 0.30;
 
 struct InvasiveControlCandidate {
     double expected_benefit{};
@@ -14,11 +15,9 @@ struct InvasiveControlCandidate {
     double expected_next_abundance{};
 };
 
-}  // namespace eco_restoration
-
 struct IdentifiedInvasiveControlCandidate {
     std::string id;
-    eco_restoration::InvasiveControlCandidate candidate;
+    InvasiveControlCandidate candidate;
 };
 
 struct InvasiveTreatmentCostBenefitAudit {
@@ -34,18 +33,26 @@ struct InvasiveTreatmentCostBenefitAudit {
     std::vector<std::string> reasons;
 };
 
+struct IdentifiedInvasiveControlSelection {
+    bool selected{};
+    std::string selected_id;
+    std::string explanation;
+    std::vector<std::string> candidate_summaries;
+};
+
+double InvasiveTreatmentBenefitCostRatio(
+    const InvasiveControlCandidate& candidate) noexcept;
+
 InvasiveTreatmentCostBenefitAudit AuditInvasiveTreatmentCostBenefit(
     const IdentifiedInvasiveControlCandidate& identified_candidate);
 
-double InvasiveTreatmentBenefitCostRatio(
-    const eco_restoration::InvasiveControlCandidate& candidate);
-
-std::optional<IdentifiedInvasiveControlCandidate>
-SelectIdentifiedSafeInvasiveControl(
+IdentifiedInvasiveControlSelection SelectIdentifiedSafeInvasiveControl(
     const std::vector<IdentifiedInvasiveControlCandidate>& candidates);
 
 std::string ExplainStochasticHjbSelection(
     const std::vector<IdentifiedInvasiveControlCandidate>& candidates,
-    const std::optional<IdentifiedInvasiveControlCandidate>& selected);
+    const IdentifiedInvasiveControlSelection& selection);
 
 bool InvasiveControlDiagnosticsSelfTest();
+
+}  // namespace prometheus_praxis::eco_restoration
