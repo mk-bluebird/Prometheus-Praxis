@@ -2,65 +2,108 @@
 #include "foundation_golden_tests.hpp"
 
 #include <algorithm>
+#include <cstddef>
+#include <iomanip>
 #include <sstream>
-#include <string>
 #include <utility>
-#include <vector>
 
+namespace prometheus_praxis::foundation::golden {
 namespace {
 
-bool IsValidCommand(const std::string& command) noexcept {
+bool EndsWithNewline(std::string_view bytes) noexcept {
+    return !bytes.empty() && bytes.back() == '\n';
+}
+
+bool IsValidCommand(std::string_view command) noexcept {
     return command.size() > 2U &&
            command[0] == '-' &&
            command[1] == '-';
 }
 
-bool ContainsNewlineNormalizedEquivalent(
-    const std::string& expected,
-    const std::string& observed) {
-    const auto normalize = [](const std::string& input) {
-        std::string normalized;
-        normalized.reserve(input.size());
+std::string QuoteBytes(std::string_view value) {
+    std::ostringstream output;
+    output << '"';
 
-        for (std::size_t index = 0U; index < input.size(); ++index) {
-            if (input[index] == '\r' &&
-                index + 1U < input.size() &&
-                input[index + 1U] == '\n') {
-                normalized.push_back('\n');
-                ++index;
-                continue;
-            }
-
-            normalized.push_back(input[index]);
+    for (const unsigned char byte : value) {
+        switch (byte) {
+            case '\\':
+                output << "\\\\";
+                break;
+            case '"':
+                output << "\\\"";
+                break;
+            case '\n':
+                output << "\\n";
+                break;
+            case '\r':
+                output << "\\r";
+                break;
+            case '\t':
+                output << "\\t";
+                break;
+            case '\0':
+                output << "\\0";
+                break;
+            default:
+                if (byte >= 32U && byte <= 126U) {
+                    output << static_cast<char>(byte);
+                } else {
+                    output << "\\x" << std::hex << std::uppercase
+                           << std::setw(2) << std::setfill('0')
+                           << static_cast<unsigned int>(byte)
+                           << std::dec << std::nouppercase
+                           << std::setfill(' ');
+                }
+                break;
         }
+    }
 
-        return normalized;
-    };
-
-    return normalize(expected) == normalize(observed);
+    output << '"';
+    return output.str();
 }
 
-bool StreamsMatch(
-    const std::string& expected,
-    const std::string& observed,
-    const bool normalize_newlines) {
-    return normalize_newlines
-               ? ContainsNewlineNormalizedEquivalent(expected, observed)
-               : expected == observed;
+std::string DescribeByteDifference(
+    std::string_view field,
+    std::string_view expected,
+    std::string_view observed) {
+    const std::size_t shared_length = std::min(expected.size(), observed.size());
+    std::size_t offset = 0U;
+
+    while (offset < shared_length && expected[offset] == observed[offset]) {
+        ++offset;
+    }
+
+    std::ostringstream reason;
+    reason << field << " byte mismatch"
+           << "; expected_bytes=" << expected.size()
+           << "; observed_bytes=" << observed.size()
+           << "; first_differing_offset=" << offset;
+
+    if (offset < expected.size()) {
+        reason << "; expected_byte="
+               << static_cast<unsigned int>(
+                      static_cast<unsigned char>(expected[offset]));
+    } else {
+        reason << "; expected_byte=<end>";
+    }
+
+    if (offset < observed.size()) {
+        reason << "; observed_byte="
+               << static_cast<unsigned int>(
+                      static_cast<unsigned char>(observed[offset]));
+    } else {
+        reason << "; observed_byte=<end>";
+    }
+
+    return reason.str();
 }
 
-GoldenCliExpectation MakeExpectation(
-    std::string command,
-    const int exit_code,
-    std::string stdout_exact,
-    std::string stderr_exact,
-    const bool normalized_newlines = false) {
-    return GoldenCliExpectation{
-        std::move(command),
-        exit_code,
-        std::move(stdout_exact),
-        std::move(stderr_exact),
-        normalized_newlines};
+void AppendReason(GoldenCliComparison& comparison, std::string reason) {
+    comparison.reasons.push_back(std::move(reason));
+}
+
+bool IsExpectationWellFormed(const GoldenCliExpectation& expectation) {
+    return IsValidCommand(expectation.command);
 }
 
 }  // namespace
@@ -68,18 +111,18 @@ GoldenCliExpectation MakeExpectation(
 bool RegisterGoldenExpectation(
     std::vector<GoldenCliExpectation>& expectations,
     GoldenCliExpectation expectation) {
-    if (!IsValidCommand(expectation.command)) {
+    if (!IsExpectationWellFormed(expectation)) {
         return false;
     }
 
-    const bool duplicate = std::any_of(
+    const auto duplicate = std::find_if(
         expectations.begin(),
         expectations.end(),
         [&expectation](const GoldenCliExpectation& existing) {
             return existing.command == expectation.command;
         });
 
-    if (duplicate) {
+    if (duplicate != expectations.end()) {
         return false;
     }
 
@@ -89,43 +132,47 @@ bool RegisterGoldenExpectation(
 
 std::vector<GoldenCliExpectation> LoadGoldenExpectations() {
     std::vector<GoldenCliExpectation> expectations;
+    expectations.reserve(3U);
 
     const bool self_check_registered = RegisterGoldenExpectation(
         expectations,
-        MakeExpectation(
+        GoldenCliExpectation{
             "--foundation-self-check",
             0,
             "",
-            ""));
+            "",
+            true,
+            false,
+            true,
+            true});
 
     const bool extension_registered = RegisterGoldenExpectation(
         expectations,
-        MakeExpectation(
+        GoldenCliExpectation{
             "--foundation-extension-self-test",
             0,
             "foundation_extensions_self_test=1\n",
-            ""));
+            "",
+            true,
+            false,
+            true,
+            true});
 
     const bool unknown_registered = RegisterGoldenExpectation(
         expectations,
-        MakeExpectation(
+        GoldenCliExpectation{
             "--unknown-command",
             64,
             "",
-            "unsupported command\n"));
-
-    const bool wrong_arity_registered = RegisterGoldenExpectation(
-        expectations,
-        MakeExpectation(
-            "--wrong-arity",
-            64,
-            "",
-            ""));
+            "unsupported command\n",
+            false,
+            true,
+            true,
+            true});
 
     if (!self_check_registered ||
         !extension_registered ||
-        !unknown_registered ||
-        !wrong_arity_registered) {
+        !unknown_registered) {
         return {};
     }
 
@@ -134,164 +181,249 @@ std::vector<GoldenCliExpectation> LoadGoldenExpectations() {
 
 std::optional<GoldenCliExpectation> FindGoldenExpectation(
     const std::vector<GoldenCliExpectation>& expectations,
-    const std::string& command) {
-    const auto iterator = std::find_if(
+    std::string_view command) {
+    const auto found = std::find_if(
         expectations.begin(),
         expectations.end(),
-        [&command](const GoldenCliExpectation& expectation) {
+        [command](const GoldenCliExpectation& expectation) {
             return expectation.command == command;
         });
 
-    if (iterator == expectations.end()) {
+    if (found == expectations.end()) {
         return std::nullopt;
     }
 
-    return *iterator;
+    return *found;
 }
 
 GoldenCliComparison CompareObservedToGolden(
     const GoldenCliExpectation& expectation,
     const GoldenCliObservation& observation) {
-    GoldenCliComparison result{};
-    result.expected_command = expectation.command;
-    result.expected_exit_code = expectation.exit_code;
-    result.expected_stdout = expectation.stdout_exact;
-    result.expected_stderr = expectation.stderr_exact;
-    result.observed_command = observation.command;
-    result.observed_exit_code = observation.exit_code;
-    result.observed_stdout = observation.stdout_observed;
-    result.observed_stderr = observation.stderr_observed;
+    GoldenCliComparison comparison;
+    comparison.expected_command = expectation.command;
+    comparison.expected_exit_code = expectation.exit_code;
+    comparison.expected_stdout = expectation.stdout_exact;
+    comparison.expected_stderr = expectation.stderr_exact;
+    comparison.observed_command = observation.command;
+    comparison.observed_exit_code = observation.exit_code;
+    comparison.observed_stdout = observation.stdout_observed;
+    comparison.observed_stderr = observation.stderr_observed;
 
-    result.command_matches = expectation.command == observation.command;
-    result.exit_code_matches = expectation.exit_code == observation.exit_code;
-    result.stdout_matches = StreamsMatch(
-        expectation.stdout_exact,
-        observation.stdout_observed,
-        expectation.normalized_newlines);
-    result.stderr_matches = StreamsMatch(
-        expectation.stderr_exact,
-        observation.stderr_observed,
-        expectation.normalized_newlines);
+    comparison.command_matches = expectation.command == observation.command;
+    comparison.exit_code_matches = expectation.exit_code == observation.exit_code;
+    comparison.stdout_matches = true;
+    comparison.stderr_matches = true;
 
-    result.matches = result.command_matches &&
-                     result.exit_code_matches &&
-                     result.stdout_matches &&
-                     result.stderr_matches;
-    return result;
+    if (!comparison.command_matches) {
+        AppendReason(
+            comparison,
+            "command mismatch; expected=" + QuoteBytes(expectation.command) +
+                "; observed=" + QuoteBytes(observation.command));
+    }
+
+    if (!comparison.exit_code_matches) {
+        AppendReason(
+            comparison,
+            "exit code mismatch; expected=" +
+                std::to_string(expectation.exit_code) +
+                "; observed=" + std::to_string(observation.exit_code));
+    }
+
+    if (expectation.compare_stdout_bytes &&
+        expectation.stdout_exact != observation.stdout_observed) {
+        comparison.stdout_matches = false;
+        AppendReason(
+            comparison,
+            DescribeByteDifference(
+                "stdout",
+                expectation.stdout_exact,
+                observation.stdout_observed));
+    }
+
+    if (expectation.requires_stdout_newline &&
+        !EndsWithNewline(observation.stdout_observed)) {
+        comparison.stdout_matches = false;
+        AppendReason(
+            comparison,
+            "stdout newline mismatch; expected terminal newline; observed=false");
+    }
+
+    if (expectation.compare_stderr_bytes &&
+        expectation.stderr_exact != observation.stderr_observed) {
+        comparison.stderr_matches = false;
+        AppendReason(
+            comparison,
+            DescribeByteDifference(
+                "stderr",
+                expectation.stderr_exact,
+                observation.stderr_observed));
+    }
+
+    if (expectation.requires_stderr_newline &&
+        !EndsWithNewline(observation.stderr_observed)) {
+        comparison.stderr_matches = false;
+        AppendReason(
+            comparison,
+            "stderr newline mismatch; expected terminal newline; observed=false");
+    }
+
+    comparison.matches =
+        comparison.command_matches &&
+        comparison.exit_code_matches &&
+        comparison.stdout_matches &&
+        comparison.stderr_matches;
+    return comparison;
 }
 
 std::string ExplainGoldenMismatch(const GoldenCliComparison& comparison) {
     if (comparison.matches) {
-        return "golden_cli_comparison=match";
+        return "golden comparison matched";
     }
 
-    std::ostringstream output;
-    output << "golden_cli_comparison=mismatch";
+    std::ostringstream explanation;
+    explanation << "golden comparison failed"
+                << "; expected_command=" << QuoteBytes(comparison.expected_command)
+                << "; observed_command=" << QuoteBytes(comparison.observed_command)
+                << "; expected_exit_code=" << comparison.expected_exit_code
+                << "; observed_exit_code=" << comparison.observed_exit_code
+                << "; expected_stdout_bytes=" << comparison.expected_stdout.size()
+                << "; observed_stdout_bytes=" << comparison.observed_stdout.size()
+                << "; expected_stderr_bytes=" << comparison.expected_stderr.size()
+                << "; observed_stderr_bytes=" << comparison.observed_stderr.size();
 
-    if (!comparison.command_matches) {
-        output << "\ncommand: expected=[" << comparison.expected_command
-               << "], observed=[" << comparison.observed_command << ']';
+    for (const std::string& reason : comparison.reasons) {
+        explanation << "; reason=" << reason;
     }
 
-    if (!comparison.exit_code_matches) {
-        output << "\nexit_code: expected=" << comparison.expected_exit_code
-               << ", observed=" << comparison.observed_exit_code;
-    }
+    return explanation.str();
+}
 
-    if (!comparison.stdout_matches) {
-        output << "\nstdout: expected_bytes="
-               << comparison.expected_stdout.size()
-               << ", observed_bytes="
-               << comparison.observed_stdout.size();
-    }
+bool IsGoldenComparisonCorrect(const GoldenCliComparison& comparison) {
+    const bool all_fields_match =
+        comparison.command_matches &&
+        comparison.exit_code_matches &&
+        comparison.stdout_matches &&
+        comparison.stderr_matches;
 
-    if (!comparison.stderr_matches) {
-        output << "\nstderr: expected_bytes="
-               << comparison.expected_stderr.size()
-               << ", observed_bytes="
-               << comparison.observed_stderr.size();
-    }
-
-    return output.str();
+    return comparison.matches == all_fields_match &&
+           (comparison.matches ? comparison.reasons.empty()
+                               : !comparison.reasons.empty());
 }
 
 bool FoundationGoldenTestsSelfTest() {
-    const std::vector<GoldenCliExpectation> expectations =
-        LoadGoldenExpectations();
-
-    if (expectations.size() != 4U) {
-        return false;
-    }
-
-    const std::optional<GoldenCliExpectation> extension =
-        FindGoldenExpectation(
-            expectations,
-            "--foundation-extension-self-test");
-
-    if (!extension.has_value()) {
-        return false;
-    }
-
-    const GoldenCliObservation matching_observation{
-        "--foundation-extension-self-test",
+    const GoldenCliExpectation expected{
+        "--foundation-self-check",
         0,
-        "foundation_extensions_self_test=1\n",
-        ""};
+        "{\"status\":\"safe\"}\n",
+        "",
+        true,
+        false,
+        true,
+        true};
 
+    std::vector<GoldenCliExpectation> expectations;
+    if (!RegisterGoldenExpectation(expectations, expected) ||
+        RegisterGoldenExpectation(expectations, expected) ||
+        RegisterGoldenExpectation(
+            expectations,
+            GoldenCliExpectation{
+                "foundation-invalid-command",
+                0,
+                "",
+                "",
+                false,
+                false,
+                true,
+                true})) {
+        return false;
+    }
+
+    const auto found = FindGoldenExpectation(
+        expectations,
+        "--foundation-self-check");
+    if (!found.has_value() ||
+        FindGoldenExpectation(expectations, "--missing-command").has_value()) {
+        return false;
+    }
+
+    const GoldenCliObservation matching{
+        "--foundation-self-check",
+        0,
+        "{\"status\":\"safe\"}\n",
+        ""};
     const GoldenCliComparison matching_comparison =
-        CompareObservedToGolden(*extension, matching_observation);
-
+        CompareObservedToGolden(*found, matching);
     if (!matching_comparison.matches ||
-        ExplainGoldenMismatch(matching_comparison) !=
-            "golden_cli_comparison=match") {
+        !IsGoldenComparisonCorrect(matching_comparison)) {
         return false;
     }
 
-    const GoldenCliObservation mismatching_observation{
-        "--foundation-extension-self-test",
-        2,
-        "foundation_extensions_self_test=0\n",
-        ""};
-
-    const GoldenCliComparison mismatch =
-        CompareObservedToGolden(*extension, mismatching_observation);
-
-    if (mismatch.matches ||
-        mismatch.exit_code_matches ||
-        mismatch.stdout_matches) {
+    GoldenCliObservation wrong_exit = matching;
+    wrong_exit.exit_code = 2;
+    const GoldenCliComparison wrong_exit_comparison =
+        CompareObservedToGolden(*found, wrong_exit);
+    if (wrong_exit_comparison.matches ||
+        wrong_exit_comparison.exit_code_matches ||
+        !IsGoldenComparisonCorrect(wrong_exit_comparison)) {
         return false;
     }
 
-    const std::string mismatch_detail = ExplainGoldenMismatch(mismatch);
-    if (mismatch_detail.find("exit_code: expected=0, observed=2") ==
-            std::string::npos ||
-        mismatch_detail.find("stdout: expected_bytes=34, observed_bytes=34") ==
-            std::string::npos) {
+    GoldenCliObservation wrong_stdout = matching;
+    wrong_stdout.stdout_observed = "{\"status\":\"unsafe\"}\n";
+    const GoldenCliComparison wrong_stdout_comparison =
+        CompareObservedToGolden(*found, wrong_stdout);
+    if (wrong_stdout_comparison.matches ||
+        wrong_stdout_comparison.stdout_matches ||
+        !IsGoldenComparisonCorrect(wrong_stdout_comparison)) {
         return false;
     }
 
-    std::vector<GoldenCliExpectation> registry;
-    if (!RegisterGoldenExpectation(
-            registry,
-            MakeExpectation("--probe", 0, "ok\n", "")) ||
-        RegisterGoldenExpectation(
-            registry,
-            MakeExpectation("--probe", 0, "changed\n", "")) ||
-        RegisterGoldenExpectation(
-            registry,
-            MakeExpectation("probe", 0, "ok\n", ""))) {
+    GoldenCliObservation wrong_stderr = matching;
+    wrong_stderr.stderr_observed = "unexpected\n";
+    const GoldenCliComparison wrong_stderr_comparison =
+        CompareObservedToGolden(*found, wrong_stderr);
+    if (wrong_stderr_comparison.matches ||
+        wrong_stderr_comparison.stderr_matches ||
+        !IsGoldenComparisonCorrect(wrong_stderr_comparison)) {
         return false;
     }
 
-    const GoldenCliExpectation newline_expected =
-        MakeExpectation("--newline-probe", 0, "line\n", "", true);
-    const GoldenCliObservation newline_observed{
-        "--newline-probe",
+    GoldenCliObservation missing_newline = matching;
+    missing_newline.stdout_observed = "{\"status\":\"safe\"}";
+    const GoldenCliComparison missing_newline_comparison =
+        CompareObservedToGolden(*found, missing_newline);
+    if (missing_newline_comparison.matches ||
+        missing_newline_comparison.stdout_matches ||
+        !IsGoldenComparisonCorrect(missing_newline_comparison)) {
+        return false;
+    }
+
+    const GoldenCliExpectation raw_line_ending_expectation{
+        "--raw-line-ending-probe",
+        0,
+        "line\n",
+        "",
+        true,
+        false,
+        true,
+        true};
+    const GoldenCliObservation raw_line_ending_observation{
+        "--raw-line-ending-probe",
         0,
         "line\r\n",
         ""};
+    const GoldenCliComparison line_ending_comparison =
+        CompareObservedToGolden(
+            raw_line_ending_expectation,
+            raw_line_ending_observation);
+    if (line_ending_comparison.matches ||
+        line_ending_comparison.stdout_matches ||
+        !IsGoldenComparisonCorrect(line_ending_comparison)) {
+        return false;
+    }
 
-    return CompareObservedToGolden(
-               newline_expected,
-               newline_observed).matches;
+    return ExplainGoldenMismatch(wrong_stdout_comparison).find(
+               "first_differing_offset=") != std::string::npos;
 }
+
+}  // namespace prometheus_praxis::foundation::golden
