@@ -5,28 +5,23 @@
 #include <string>
 #include <vector>
 
-namespace eco_restoration {
+namespace prometheus_praxis::eco_restoration {
 
 struct RainfallScenario {
     double probability{};
-    std::vector<double> rainfall_by_horizon;
+    std::vector<double> rainfall;
 };
 
 struct IrrigationDynamics {
     double initial_moisture{};
     double minimum_moisture{};
     double maximum_moisture{};
-    double retention_factor{};
+    double evapotranspiration_per_step{};
 };
 
-struct TerminalMoistureScenarioResult {
-    std::size_t scenario_index{};
-    double probability{};
-    double terminal_moisture{};
-    bool within_bounds{};
-};
+}  // namespace prometheus_praxis::eco_restoration
 
-}  // namespace eco_restoration
+namespace prometheus_praxis::simulation {
 
 struct IrrigationDryRunStep {
     std::size_t scenario_index{};
@@ -38,6 +33,13 @@ struct IrrigationDryRunStep {
     bool within_bounds{};
 };
 
+struct TerminalMoistureScenarioResult {
+    std::size_t scenario_index{};
+    double probability{};
+    double terminal_moisture{};
+    bool within_bounds{};
+};
+
 struct TerminalMoistureSetAnalysis {
     bool valid{};
     bool all_within_bounds{};
@@ -45,7 +47,7 @@ struct TerminalMoistureSetAnalysis {
     double worst_case_terminal_moisture{};
     double minimum_terminal_moisture{};
     double maximum_terminal_moisture{};
-    std::vector<eco_restoration::TerminalMoistureScenarioResult> scenarios;
+    std::vector<TerminalMoistureScenarioResult> scenarios;
     std::vector<std::string> reasons;
 };
 
@@ -69,4 +71,9 @@ TerminalMoistureSetAnalysis AnalyzeTerminalMoistureSet(
 std::string ExplainIrrigationScheduleDryRun(
     const std::vector<IrrigationDryRunStep>& steps);
 
+std::string ExplainTerminalMoistureSetAnalysis(
+    const TerminalMoistureSetAnalysis& analysis);
+
 bool IrrigationScenarioDiagnosticsSelfTest();
+
+}  // namespace prometheus_praxis::simulation
