@@ -3,14 +3,20 @@
 
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
+
+namespace prometheus_praxis::foundation::golden {
 
 struct GoldenCliExpectation {
     std::string command;
     int exit_code{};
     std::string stdout_exact;
     std::string stderr_exact;
-    bool normalized_newlines{};
+    bool requires_stdout_newline{};
+    bool requires_stderr_newline{};
+    bool compare_stdout_bytes{true};
+    bool compare_stderr_bytes{true};
 };
 
 struct GoldenCliObservation {
@@ -34,22 +40,29 @@ struct GoldenCliComparison {
     int observed_exit_code{};
     std::string observed_stdout;
     std::string observed_stderr;
+    std::vector<std::string> reasons;
 };
 
-bool RegisterGoldenExpectation(
+[[nodiscard]] bool RegisterGoldenExpectation(
     std::vector<GoldenCliExpectation>& expectations,
     GoldenCliExpectation expectation);
 
-std::vector<GoldenCliExpectation> LoadGoldenExpectations();
+[[nodiscard]] std::vector<GoldenCliExpectation> LoadGoldenExpectations();
 
-std::optional<GoldenCliExpectation> FindGoldenExpectation(
+[[nodiscard]] std::optional<GoldenCliExpectation> FindGoldenExpectation(
     const std::vector<GoldenCliExpectation>& expectations,
-    const std::string& command);
+    std::string_view command);
 
-GoldenCliComparison CompareObservedToGolden(
+[[nodiscard]] GoldenCliComparison CompareObservedToGolden(
     const GoldenCliExpectation& expectation,
     const GoldenCliObservation& observation);
 
-std::string ExplainGoldenMismatch(const GoldenCliComparison& comparison);
+[[nodiscard]] std::string ExplainGoldenMismatch(
+    const GoldenCliComparison& comparison);
 
-bool FoundationGoldenTestsSelfTest();
+[[nodiscard]] bool IsGoldenComparisonCorrect(
+    const GoldenCliComparison& comparison);
+
+[[nodiscard]] bool FoundationGoldenTestsSelfTest();
+
+}  // namespace prometheus_praxis::foundation::golden
