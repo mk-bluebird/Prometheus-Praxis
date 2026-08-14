@@ -1,8 +1,11 @@
 // File: cpp/tools/header_self_sufficiency.hpp
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
+
+namespace prometheus_praxis::foundation::headers {
 
 struct HeaderIncludeRequirement {
     std::string header_path;
@@ -17,6 +20,12 @@ struct HeaderIncludePolicyValidation {
     std::vector<std::string> reasons;
 };
 
+struct HeaderIncludePolicySnapshot {
+    std::vector<HeaderIncludeRequirement> requirements;
+    std::uint32_t version{1U};
+    std::string generated_by;
+};
+
 std::vector<HeaderIncludeRequirement> HeaderSelfSufficiencyRequirements();
 
 HeaderIncludePolicyValidation ValidateHeaderIncludePolicy(
@@ -25,4 +34,9 @@ HeaderIncludePolicyValidation ValidateHeaderIncludePolicy(
 std::string ExplainHeaderIncludeRequirement(
     const HeaderIncludeRequirement& requirement);
 
+HeaderIncludePolicySnapshot SnapshotHeaderIncludePolicy(
+    const std::vector<HeaderIncludeRequirement>& requirements);
+
 bool HeaderSelfSufficiencyLinterSelfTest();
+
+}  // namespace prometheus_praxis::foundation::headers
