@@ -2,182 +2,221 @@
 #include "path_normalization.hpp"
 
 #include <cctype>
-#include <filesystem>
 #include <optional>
-#include <sstream>
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
+namespace prometheus_praxis::foundation::paths {
 namespace {
 
-bool ContainsControlCharacter(const std::string_view value) noexcept {
+bool IsControlCharacter(unsigned char value) noexcept {
+    return value < 0x20U || value == 0x7FU;
+}
+
+bool IsSeparator(char value) noexcept {
+    return value == '/' || value == '\\';
+}
+
+bool IsDriveQualified(std::string_view value) noexcept {
+    return value.size() >= 2U &&
+           std::isalpha(static_cast<unsigned char>(value[0])) != 0 &&
+           value[1] == ':';
+}
+
+bool HasUnsafeCharacter(std::string_view value) noexcept {
     for (const unsigned char character : value) {
-        if (character < 0x20U || character == 0x7fU) {
+        if (IsControlCharacter(character) || character == ':') {
             return true;
         }
     }
     return false;
 }
 
-bool IsDriveQualified(const std::string_view value) noexcept {
-    return value.size() >= 2U &&
-           ((value[0] >= 'A' && value[0] <= 'Z') ||
-            (value[0] >= 'a' && value[0] <= 'z')) &&
-           value[1] == ':';
-}
+bool IsValidComponent(std::string_view component) noexcept {
+    if (component.empty() || component == "." || component == "..") {
+        return false;
+    }
 
-bool IsAbsoluteInput(const std::string_view value) noexcept {
-    return !value.empty() &&
-           (value.front() == '/' || value.front() == '\\' ||
-            IsDriveQualified(value));
-}
-
-bool ContainsTraversalComponent(const std::string_view value) {
-    std::size_t begin = 0U;
-
-    while (begin <= value.size()) {
-        const std::size_t separator = value.find_first_of("/\\", begin);
-        const std::size_t end = separator == std::string_view::npos
-                                    ? value.size()
-                                    : separator;
-
-        const std::string_view component = value.substr(begin, end - begin);
-        if (component == "..") {
-            return true;
+    for (const unsigned char character : component) {
+        if (IsControlCharacter(character) ||
+            character == ':' ||
+            character == '/' ||
+            character == '\\') {
+            return false;
         }
+    }
+
+    return true;
+}
+
+std::vector<std::string> SplitNormalizedPath(std::string_view path) {
+    std::vector<std::string> components;
+    std::size_t start = 0U;
+
+    while (start < path.size()) {
+        const std::size_t separator = path.find('/', start);
+        const std::size_t end =
+            separator == std::string_view::npos ? path.size() : separator;
+
+        components.emplace_back(path.substr(start, end - start));
 
         if (separator == std::string_view::npos) {
             break;
         }
-        begin = separator + 1U;
+
+        start = separator + 1U;
     }
 
-    return false;
+    return components;
 }
 
-bool IsSafeRawPath(const std::string_view raw) {
-    return !raw.empty() &&
-           !ContainsControlCharacter(raw) &&
-           !IsAbsoluteInput(raw) &&
-           !ContainsTraversalComponent(raw);
-}
-
-std::string ToGenericSeparators(const std::string_view raw) {
-    std::string normalized;
-    normalized.reserve(raw.size());
-
-    bool prior_separator = false;
-    for (const char character : raw) {
-        const bool separator = character == '/' || character == '\\';
-        if (separator) {
-            if (!prior_separator) {
-                normalized.push_back('/');
-            }
-            prior_separator = true;
-        } else {
-            normalized.push_back(character);
-            prior_separator = false;
-        }
+std::string ExtractExtension(std::string_view filename) {
+    const std::size_t dot = filename.rfind('.');
+    if (dot == std::string_view::npos ||
+        dot == 0U ||
+        dot + 1U == filename.size()) {
+        return {};
     }
 
-    return normalized;
-}
-
-bool HasUnsafeNormalizedComponent(const std::filesystem::path& path) {
-    for (const std::filesystem::path& component : path) {
-        if (component.empty() || component == "." || component == "..") {
-            return true;
-        }
-    }
-    return false;
+    return std::string(filename.substr(dot));
 }
 
 }  // namespace
 
-std::optional<std::string> NormalizeRepositoryPath(const std::string_view raw) {
-    if (!IsSafeRawPath(raw)) {
+std::optional<std::string> NormalizeRepositoryPath(std::string_view raw) {
+    if (raw.empty() ||
+        IsSeparator(raw.front()) ||
+        IsSeparator(raw.back()) ||
+        IsDriveQualified(raw) ||
+        HasUnsafeCharacter(raw)) {
         return std::nullopt;
     }
 
-    const std::string generic_input = ToGenericSeparators(raw);
-    if (generic_input.empty() || generic_input.back() == '/') {
+    std::vector<std::string> components;
+    std::string current_component;
+    current_component.reserve(raw.size());
+
+    for (const char character : raw) {
+        if (IsSeparator(character)) {
+            if (!current_component.empty()) {
+                if (!IsValidComponent(current_component)) {
+                    return std::nullopt;
+                }
+
+                components.push_back(std::move(current_component));
+                current_component.clear();
+            }
+            continue;
+        }
+
+        current_component.push_back(character);
+    }
+
+    if (!IsValidComponent(current_component)) {
         return std::nullopt;
     }
 
-    const std::filesystem::path parsed{generic_input};
-    if (parsed.empty() || parsed.is_absolute() ||
-        HasUnsafeNormalizedComponent(parsed)) {
-        return std::nullopt;
-    }
-
-    const std::string normalized = parsed.lexically_normal().generic_string();
-    if (normalized.empty() ||
-        normalized == "." ||
-        normalized == ".." ||
-        normalized.back() == '/' ||
-        normalized.find('\\') != std::string::npos ||
-        ContainsTraversalComponent(normalized) ||
-        ContainsControlCharacter(normalized)) {
-        return std::nullopt;
-    }
-
-    return normalized;
+    components.push_back(std::move(current_component));
+    return JoinRepositoryPath(components);
 }
 
-bool IsRepositoryPathNormalized(const std::string_view path) {
+bool IsRepositoryPathNormalized(std::string_view path) {
     const std::optional<std::string> normalized =
         NormalizeRepositoryPath(path);
-
     return normalized.has_value() && *normalized == path;
 }
 
-std::string DescribeArtifactPathSeparatorStyle(const std::string_view path) {
-    const bool has_forward = path.find('/') != std::string_view::npos;
-    const bool has_backward = path.find('\\') != std::string_view::npos;
+std::string DescribeArtifactPathSeparatorStyle(std::string_view path) {
+    const bool contains_forward_slash =
+        path.find('/') != std::string_view::npos;
+    const bool contains_backslash =
+        path.find('\\') != std::string_view::npos;
 
-    if (has_forward && has_backward) {
+    if (contains_forward_slash && contains_backslash) {
         return "mixed";
     }
-    if (has_forward) {
+    if (contains_forward_slash) {
         return "forward_slash";
     }
-    if (has_backward) {
+    if (contains_backslash) {
         return "backslash";
     }
     return "none";
 }
 
-std::string ExplainPathNormalization(const std::string_view raw) {
-    std::ostringstream output;
-    output << "path_separator_style="
-           << DescribeArtifactPathSeparatorStyle(raw);
-
+std::string ExplainPathNormalization(std::string_view raw) {
     const std::optional<std::string> normalized =
         NormalizeRepositoryPath(raw);
 
     if (!normalized.has_value()) {
-        output << "; normalized=false";
-        return output.str();
+        return "repository_path=invalid; separator_style=" +
+               DescribeArtifactPathSeparatorStyle(raw);
     }
 
-    output << "; normalized=true; path=" << *normalized;
-    return output.str();
+    return "repository_path=valid; separator_style=" +
+           DescribeArtifactPathSeparatorStyle(raw) +
+           "; normalized=" + *normalized;
+}
+
+std::optional<NormalizedPathParts> DecomposeRepositoryPath(
+    std::string_view raw) {
+    const std::optional<std::string> normalized =
+        NormalizeRepositoryPath(raw);
+    if (!normalized.has_value()) {
+        return std::nullopt;
+    }
+
+    NormalizedPathParts parts;
+    parts.generic_path = *normalized;
+    parts.components = SplitNormalizedPath(parts.generic_path);
+    parts.repository_relative = true;
+
+    if (!parts.components.empty()) {
+        parts.filename = parts.components.back();
+        parts.extension = ExtractExtension(parts.filename);
+    }
+
+    return parts;
+}
+
+std::optional<std::string> JoinRepositoryPath(
+    const std::vector<std::string>& components) {
+    if (components.empty()) {
+        return std::nullopt;
+    }
+
+    std::string joined;
+    for (const std::string& component : components) {
+        if (!IsValidComponent(component)) {
+            return std::nullopt;
+        }
+
+        if (!joined.empty()) {
+            joined.push_back('/');
+        }
+
+        joined.append(component);
+    }
+
+    return joined;
 }
 
 bool PathNormalizationSelfTest() {
-    const std::optional<std::string> forward =
+    const auto forward =
         NormalizeRepositoryPath("cpp/tools/foundation_report.cpp");
-    const std::optional<std::string> backward =
+    const auto backslash =
         NormalizeRepositoryPath("cpp\\tools\\foundation_report.cpp");
-    const std::optional<std::string> repeated =
-        NormalizeRepositoryPath("cpp//tools///foundation_report.cpp");
+    const auto repeated =
+        NormalizeRepositoryPath("cpp///tools\\\\foundation_report.cpp");
 
     if (!forward.has_value() ||
-        !backward.has_value() ||
+        !backslash.has_value() ||
         !repeated.has_value() ||
         *forward != "cpp/tools/foundation_report.cpp" ||
-        *backward != "cpp/tools/foundation_report.cpp" ||
-        *repeated != "cpp/tools/foundation_report.cpp" ||
+        *backslash != *forward ||
+        *repeated != *forward ||
         !IsRepositoryPathNormalized(*forward) ||
         IsRepositoryPathNormalized("cpp\\tools\\foundation_report.cpp")) {
         return false;
@@ -188,10 +227,13 @@ bool PathNormalizationSelfTest() {
         "/cpp/tools/foundation_report.cpp",
         "\\cpp\\tools\\foundation_report.cpp",
         "C:\\cpp\\tools\\foundation_report.cpp",
+        "cpp:tools/foundation_report.cpp",
         "cpp/../tools/foundation_report.cpp",
+        "cpp/./tools/foundation_report.cpp",
         "../foundation_report.cpp",
         "cpp/tools/",
-        "cpp/\nfoundation_report.cpp"};
+        "cpp/tools/\nfoundation_report.cpp",
+        "cpp/tools/\x7ffoundation_report.cpp"};
 
     for (const std::string& path : unsafe_paths) {
         if (NormalizeRepositoryPath(path).has_value()) {
@@ -199,19 +241,41 @@ bool PathNormalizationSelfTest() {
         }
     }
 
-    if (DescribeArtifactPathSeparatorStyle("cpp/tools/file.cpp") !=
-            "forward_slash" ||
-        DescribeArtifactPathSeparatorStyle("cpp\\tools\\file.cpp") !=
-            "backslash" ||
-        DescribeArtifactPathSeparatorStyle("cpp/tools\\file.cpp") !=
-            "mixed" ||
-        DescribeArtifactPathSeparatorStyle("file.cpp") != "none") {
+    const auto parts =
+        DecomposeRepositoryPath("cpp\\tools\\foundation_report.cpp");
+    if (!parts.has_value() ||
+        parts->generic_path != "cpp/tools/foundation_report.cpp" ||
+        parts->components.size() != 3U ||
+        parts->components[0] != "cpp" ||
+        parts->components[1] != "tools" ||
+        parts->filename != "foundation_report.cpp" ||
+        parts->extension != ".cpp" ||
+        !parts->repository_relative) {
         return false;
     }
 
-    return ExplainPathNormalization("cpp\\tools\\file.cpp") ==
-               "path_separator_style=backslash; normalized=true; "
-               "path=cpp/tools/file.cpp" &&
+    const auto joined = JoinRepositoryPath(
+        {"cpp", "eco_restoration", "water_biodiversity_diagnostics.hpp"});
+    if (!joined.has_value() ||
+        *joined != "cpp/eco_restoration/water_biodiversity_diagnostics.hpp" ||
+        JoinRepositoryPath({"cpp", "..", "unsafe.cpp"}).has_value() ||
+        JoinRepositoryPath({"cpp", "tools/file.cpp"}).has_value() ||
+        JoinRepositoryPath({}).has_value()) {
+        return false;
+    }
+
+    return DescribeArtifactPathSeparatorStyle("cpp/tools/file.cpp") ==
+               "forward_slash" &&
+           DescribeArtifactPathSeparatorStyle("cpp\\tools\\file.cpp") ==
+               "backslash" &&
+           DescribeArtifactPathSeparatorStyle("cpp/tools\\file.cpp") ==
+               "mixed" &&
+           DescribeArtifactPathSeparatorStyle("file.cpp") == "none" &&
+           ExplainPathNormalization("cpp\\tools\\file.cpp") ==
+               "repository_path=valid; separator_style=backslash; "
+               "normalized=cpp/tools/file.cpp" &&
            ExplainPathNormalization("../unsafe.cpp") ==
-               "path_separator_style=forward_slash; normalized=false";
+               "repository_path=invalid; separator_style=forward_slash";
 }
+
+}  // namespace prometheus_praxis::foundation::paths
