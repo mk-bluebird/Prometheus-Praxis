@@ -1,6 +1,1 @@
-```
-# Compiled and build artifacts
-*.o
-*.obj
-*.out
-```
+Nothing needs to be added to .gitignore since the only change is adding a Python test file (.py), which is source code and should not be ignored.
