@@ -37,21 +37,27 @@ std::int32_t ppx_validate_foundation_report_v1(
     std::size_t output_capacity,
     std::size_t* required_output_bytes) noexcept;
 
+std::int32_t ppx_foundation_c_api_self_test_v1() noexcept;
+
 }  // extern "C"
 
 static_assert(std::is_standard_layout_v<PpxFoundationReportV1>);
 static_assert(std::is_trivially_copyable_v<PpxFoundationReportV1>);
-static_assert(sizeof(PpxFoundationReportV1) == 48);
-static_assert(alignof(PpxFoundationReportV1) == 8);
-static_assert(offsetof(PpxFoundationReportV1, abi_version) == 0);
-static_assert(offsetof(PpxFoundationReportV1, private_heat_accepted) == 4);
-static_assert(offsetof(PpxFoundationReportV1, threat_fail_closed) == 5);
-static_assert(offsetof(PpxFoundationReportV1, water_biodiversity_allowed) == 6);
-static_assert(offsetof(PpxFoundationReportV1, water_biodiversity_invariant_holds) == 7);
-static_assert(offsetof(PpxFoundationReportV1, authorization_accepted) == 8);
-static_assert(offsetof(PpxFoundationReportV1, invasive_control_safe) == 9);
-static_assert(offsetof(PpxFoundationReportV1, irrigation_robustly_feasible) == 10);
-static_assert(offsetof(PpxFoundationReportV1, maximum_risk_of_harm) == 16);
-static_assert(offsetof(PpxFoundationReportV1, knowledge_factor) == 24);
-static_assert(offsetof(PpxFoundationReportV1, eco_impact_value) == 32);
-static_assert(offsetof(PpxFoundationReportV1, foundation_safe) == 40);
+static_assert(sizeof(PpxFoundationReportV1) == 48U);
+static_assert(alignof(PpxFoundationReportV1) == 8U);
+
+static_assert(offsetof(PpxFoundationReportV1, abi_version) == 0U);
+static_assert(offsetof(PpxFoundationReportV1, private_heat_accepted) == 4U);
+static_assert(offsetof(PpxFoundationReportV1, threat_fail_closed) == 5U);
+static_assert(
+    offsetof(PpxFoundationReportV1, water_biodiversity_allowed) == 6U);
+static_assert(
+    offsetof(PpxFoundationReportV1, water_biodiversity_invariant_holds) == 7U);
+static_assert(offsetof(PpxFoundationReportV1, authorization_accepted) == 8U);
+static_assert(offsetof(PpxFoundationReportV1, invasive_control_safe) == 9U);
+static_assert(
+    offsetof(PpxFoundationReportV1, irrigation_robustly_feasible) == 10U);
+static_assert(offsetof(PpxFoundationReportV1, maximum_risk_of_harm) == 16U);
+static_assert(offsetof(PpxFoundationReportV1, knowledge_factor) == 24U);
+static_assert(offsetof(PpxFoundationReportV1, eco_impact_value) == 32U);
+static_assert(offsetof(PpxFoundationReportV1, foundation_safe) == 40U);
