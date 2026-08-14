@@ -89,7 +89,7 @@ Prometheus‑Praxis assumes the following sibling/related repos are present and 
 - `mk-bluebird/Prometheus-Praxis`
 - `mk-bluebird/Cyboquatics`
 - `mk-bluebird/Cybercore`
-- `mk-bluebird/Augmented-Citizen`
+- `mk-bluebird/Skynet`
 - `mk-bluebird/Nano-Tree`
 - `mk-bluebird/Data_Lake`
 - `mk-bluebird/BLE-Code`
