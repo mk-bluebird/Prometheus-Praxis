@@ -4,7 +4,10 @@
 #include <functional>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
+
+namespace prometheus_praxis::foundation::dispatch {
 
 enum class FoundationExitCode : int {
     Success = 0,
@@ -16,13 +19,13 @@ enum class FoundationExitCode : int {
 struct FoundationCommandDispatchResult {
     bool recognized{};
     bool executed{};
-    int platform_exit_code{};
+    int platform_exit_code{static_cast<int>(FoundationExitCode::RuntimeFailure)};
     std::string command;
     std::string detail;
 };
 
 using FoundationCommandHandler =
-    std::function<FoundationCommandDispatchResult(const std::string&)>;
+    std::function<FoundationCommandDispatchResult(std::string_view)>;
 
 struct FoundationCommandRecord {
     std::string command;
@@ -33,23 +36,36 @@ struct FoundationCommandRecord {
 
 int ToPlatformExitCode(FoundationExitCode code) noexcept;
 
+FoundationExitCode FoundationExitCodeFromPlatform(int code) noexcept;
+
+bool IsValidFoundationExitCode(int code) noexcept;
+
+std::string_view FoundationExitCodeName(FoundationExitCode code) noexcept;
+
+bool IsFoundationCommandNameValid(std::string_view command) noexcept;
+
+bool IsFoundationCommandRegistryValid(
+    const std::vector<FoundationCommandRecord>& registry) noexcept;
+
+bool IsFoundationCommandDispatchResultValid(
+    const FoundationCommandDispatchResult& result) noexcept;
+
 std::optional<FoundationCommandRecord> FindUnifiedFoundationCommand(
     const std::vector<FoundationCommandRecord>& registry,
-    const std::string& command);
+    std::string_view command);
 
 std::vector<FoundationCommandRecord> BuildUnifiedFoundationCommandRegistry();
 
 FoundationCommandDispatchResult DispatchUnifiedFoundationCommand(
     const std::vector<FoundationCommandRecord>& registry,
-    const std::string& command);
-
-bool IsFoundationCommandDispatchResultValid(
-    const FoundationCommandDispatchResult& result) noexcept;
+    std::string_view command);
 
 FoundationCommandDispatchResult RunFoundationExtensionSelfTestCommand(
-    const std::string& command);
+    std::string_view command);
 
 FoundationCommandDispatchResult RunFoundationAllSelfTestsCommand(
-    const std::string& command);
+    std::string_view command);
 
 bool FoundationCommandDispatcherSelfTest();
+
+}  // namespace prometheus_praxis::foundation::dispatch
