@@ -1,51 +1,37 @@
 // File: cpp/tools/header_self_sufficiency.cpp
 #include "header_self_sufficiency.hpp"
 
+#include "path_normalization.hpp"
+
+#include <algorithm>
+#include <cctype>
+#include <cstdint>
+#include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+namespace prometheus_praxis::foundation::headers {
 namespace {
 
-bool IsRepositoryHeaderPath(const std::string_view path) noexcept {
-    if (path.size() < 5U ||
-        path.front() == '/' ||
-        path.find('\\') != std::string_view::npos ||
-        path.find("..") != std::string_view::npos) {
-        return false;
-    }
+constexpr std::uint32_t kPolicyVersion = 1U;
+constexpr std::string_view kGeneratedBy =
+    "foundation_header_self_sufficiency_policy_v1";
 
-    return path.ends_with(".hpp");
-}
-
-bool IsSystemInclude(const std::string_view include_name) noexcept {
-    return include_name.size() > 2U &&
-           include_name.front() == '<' &&
-           include_name.back() == '>' &&
-           include_name.find('/') == std::string_view::npos &&
-           include_name.find('\\') == std::string_view::npos;
-}
-
-bool IsIdentifier(const std::string_view identifier) noexcept {
+bool IsCppIdentifier(std::string_view identifier) noexcept {
     if (identifier.empty()) {
         return false;
     }
 
-    const char first = identifier.front();
-    if (!((first >= 'A' && first <= 'Z') ||
-          (first >= 'a' && first <= 'z') ||
-          first == '_')) {
+    const unsigned char first = static_cast<unsigned char>(identifier.front());
+    if (std::isalpha(first) == 0 && first != '_') {
         return false;
     }
 
-    for (const char character : identifier) {
-        const bool alphabetic =
-            (character >= 'A' && character <= 'Z') ||
-            (character >= 'a' && character <= 'z');
-        const bool numeric = character >= '0' && character <= '9';
-
-        if (!alphabetic && !numeric && character != '_') {
+    for (const unsigned char character : identifier) {
+        if (std::isalnum(character) == 0 && character != '_') {
             return false;
         }
     }
@@ -53,104 +39,333 @@ bool IsIdentifier(const std::string_view identifier) noexcept {
     return true;
 }
 
-bool IsDuplicateRequirement(
-    const std::vector<HeaderIncludeRequirement>& requirements,
-    const std::size_t index) {
-    for (std::size_t other = 0U; other < requirements.size(); ++other) {
-        if (other == index) {
-            continue;
-        }
+bool IsNormalizedHeaderPath(std::string_view header_path) {
+    const std::optional<std::string> normalized =
+        paths::NormalizeRepositoryPath(header_path);
 
-        if (requirements[index].header_path == requirements[other].header_path &&
-            requirements[index].required_include ==
-                requirements[other].required_include &&
-            requirements[index].identifier == requirements[other].identifier) {
-            return true;
-        }
+    return normalized.has_value() &&
+           *normalized == header_path &&
+           header_path.ends_with(".hpp");
+}
+
+bool IsSystemInclude(std::string_view include) noexcept {
+    if (include.size() < 3U ||
+        include.front() != '<' ||
+        include.back() != '>') {
+        return false;
     }
 
-    return false;
+    const std::string_view header_name =
+        include.substr(1U, include.size() - 2U);
+
+    return !header_name.empty() &&
+           header_name.find_first_of("/\\\"' \t\r\n") ==
+               std::string_view::npos;
+}
+
+std::string RequirementKey(const HeaderIncludeRequirement& requirement) {
+    return requirement.header_path + '\n' +
+           requirement.required_include + '\n' +
+           requirement.identifier;
+}
+
+void AddReason(
+    HeaderIncludePolicyValidation& validation,
+    std::string reason) {
+    validation.reasons.push_back(std::move(reason));
+}
+
+HeaderIncludeRequirement MakeRequirement(
+    std::string header_path,
+    std::string required_include,
+    std::string identifier,
+    std::string purpose,
+    bool required = true) {
+    return HeaderIncludeRequirement{
+        std::move(header_path),
+        std::move(required_include),
+        std::move(identifier),
+        std::move(purpose),
+        required};
 }
 
 }  // namespace
 
 std::vector<HeaderIncludeRequirement> HeaderSelfSufficiencyRequirements() {
     return {
-        HeaderIncludeRequirement{
+        MakeRequirement(
+            "cpp/tools/foundation_legacy_contract_inventory.hpp",
+            "<optional>",
+            "std_optional",
+            "Owns direct declarations for optional contract lookups."),
+        MakeRequirement(
+            "cpp/tools/foundation_legacy_contract_inventory.hpp",
+            "<string>",
+            "std_string",
+            "Owns direct declarations for contract metadata text."),
+        MakeRequirement(
+            "cpp/tools/foundation_legacy_contract_inventory.hpp",
+            "<string_view>",
+            "std_string_view",
+            "Owns direct declarations for command lookup views."),
+        MakeRequirement(
+            "cpp/tools/foundation_legacy_contract_inventory.hpp",
+            "<vector>",
+            "std_vector",
+            "Owns direct declarations for contract collections."),
+        MakeRequirement(
             "cpp/tools/foundation_report.hpp",
             "<string>",
             "std_string",
-            "Owns report explanation and difference text.",
-            true},
-        HeaderIncludeRequirement{
+            "Owns report explanation and difference text."),
+        MakeRequirement(
             "cpp/tools/foundation_report.hpp",
             "<vector>",
             "std_vector",
-            "Owns report-difference and validation-reason collections.",
-            true},
-        HeaderIncludeRequirement{
+            "Owns report validation and difference collections."),
+        MakeRequirement(
+            "cpp/tools/foundation_report_json.hpp",
+            "<sstream>",
+            "std_ostringstream",
+            "Owns JSON writer stream declarations."),
+        MakeRequirement(
+            "cpp/tools/foundation_report_json.hpp",
+            "<string>",
+            "std_string",
+            "Owns serialized report document declarations."),
+        MakeRequirement(
+            "cpp/tools/foundation_report_json.hpp",
+            "<string_view>",
+            "std_string_view",
+            "Owns JSON string-view declarations."),
+        MakeRequirement(
+            "cpp/tools/foundation_extension_registry.hpp",
+            "<cstddef>",
+            "std_size_t",
+            "Owns extension execution-order declarations."),
+        MakeRequirement(
             "cpp/tools/foundation_extension_registry.hpp",
             "<optional>",
             "std_optional",
-            "Owns registry validation error results.",
-            true},
-        HeaderIncludeRequirement{
+            "Owns extension validation result declarations."),
+        MakeRequirement(
+            "cpp/tools/foundation_extension_registry.hpp",
+            "<string>",
+            "std_string",
+            "Owns extension names and diagnostic text."),
+        MakeRequirement(
+            "cpp/tools/foundation_extension_registry.hpp",
+            "<vector>",
+            "std_vector",
+            "Owns extension descriptor and result collections."),
+        MakeRequirement(
             "cpp/tools/foundation_command_dispatch.hpp",
             "<functional>",
             "std_function",
-            "Owns command-handler function objects.",
-            true},
-        HeaderIncludeRequirement{
+            "Owns command handler function objects."),
+        MakeRequirement(
+            "cpp/tools/foundation_command_dispatch.hpp",
+            "<optional>",
+            "std_optional",
+            "Owns command lookup results."),
+        MakeRequirement(
+            "cpp/tools/foundation_command_dispatch.hpp",
+            "<string>",
+            "std_string",
+            "Owns command records and dispatch details."),
+        MakeRequirement(
+            "cpp/tools/foundation_command_dispatch.hpp",
+            "<string_view>",
+            "std_string_view",
+            "Owns command lookup views."),
+        MakeRequirement(
+            "cpp/tools/foundation_command_dispatch.hpp",
+            "<vector>",
+            "std_vector",
+            "Owns command registry declarations."),
+        MakeRequirement(
             "cpp/eco_restoration/water_biodiversity_diagnostics.hpp",
             "<cstdint>",
             "std_int64_t",
-            "Owns millilitre allocation quantities.",
-            true},
-        HeaderIncludeRequirement{
+            "Owns millilitre water-budget quantity declarations."),
+        MakeRequirement(
+            "cpp/eco_restoration/water_biodiversity_diagnostics.hpp",
+            "<string>",
+            "std_string",
+            "Owns stakeholder identity and diagnostic text."),
+        MakeRequirement(
+            "cpp/eco_restoration/water_biodiversity_diagnostics.hpp",
+            "<vector>",
+            "std_vector",
+            "Owns stakeholder scenario collections."),
+        MakeRequirement(
+            "cpp/eco_restoration/invasive_control_diagnostics.hpp",
+            "<string>",
+            "std_string",
+            "Owns stable candidate identifiers and audit text."),
+        MakeRequirement(
+            "cpp/eco_restoration/invasive_control_diagnostics.hpp",
+            "<vector>",
+            "std_vector",
+            "Owns candidate and audit-summary collections."),
+        MakeRequirement(
+            "cpp/simulation/irrigation_scenario_diagnostics.hpp",
+            "<cstddef>",
+            "std_size_t",
+            "Owns scenario and horizon index declarations."),
+        MakeRequirement(
+            "cpp/simulation/irrigation_scenario_diagnostics.hpp",
+            "<string>",
+            "std_string",
+            "Owns irrigation diagnostic explanation text."),
+        MakeRequirement(
+            "cpp/simulation/irrigation_scenario_diagnostics.hpp",
+            "<vector>",
+            "std_vector",
+            "Owns rainfall and dry-run collections."),
+        MakeRequirement(
             "cpp/simulation/irrigation_scenario_diagnostics.hpp",
             "<numeric>",
             "std_accumulate",
-            "Owns probability aggregation without transitive includes.",
-            true}};
+            "Owns direct numeric aggregation support for irrigation analysis."),
+        MakeRequirement(
+            "cpp/tools/authorization_evidence_sequence_ledger.hpp",
+            "<cstddef>",
+            "std_size_t",
+            "Owns ledger size declarations."),
+        MakeRequirement(
+            "cpp/tools/authorization_evidence_sequence_ledger.hpp",
+            "<cstdint>",
+            "std_uint64_t",
+            "Owns evidence sequence and timestamp declarations."),
+        MakeRequirement(
+            "cpp/tools/authorization_evidence_sequence_ledger.hpp",
+            "<optional>",
+            "std_optional",
+            "Owns latest evidence lookup declarations."),
+        MakeRequirement(
+            "cpp/tools/authorization_evidence_sequence_ledger.hpp",
+            "<string>",
+            "std_string",
+            "Owns authorization identifier declarations."),
+        MakeRequirement(
+            "cpp/tools/authorization_evidence_sequence_ledger.hpp",
+            "<vector>",
+            "std_vector",
+            "Owns ordered authorization evidence collections."),
+        MakeRequirement(
+            "cpp/tools/proof_checked_dispatch_replay.hpp",
+            "<cstddef>",
+            "std_size_t",
+            "Owns indexed authorization replay results."),
+        MakeRequirement(
+            "cpp/tools/proof_checked_dispatch_replay.hpp",
+            "<cstdint>",
+            "std_uint64_t",
+            "Owns authorization replay evidence timestamps and sequences."),
+        MakeRequirement(
+            "cpp/tools/proof_checked_dispatch_replay.hpp",
+            "<string>",
+            "std_string",
+            "Owns replay outcome and diagnostic text."),
+        MakeRequirement(
+            "cpp/tools/proof_checked_dispatch_replay.hpp",
+            "<string_view>",
+            "std_string_view",
+            "Owns replay policy identifier views."),
+        MakeRequirement(
+            "cpp/tools/proof_checked_dispatch_replay.hpp",
+            "<vector>",
+            "std_vector",
+            "Owns replay record and result collections."),
+        MakeRequirement(
+            "cpp/tools/deterministic_scenario_library.hpp",
+            "<cstddef>",
+            "std_size_t",
+            "Owns deterministic fixture size declarations."),
+        MakeRequirement(
+            "cpp/tools/deterministic_scenario_library.hpp",
+            "<cstdint>",
+            "std_uint64_t",
+            "Owns deterministic generator seed and state declarations."),
+        MakeRequirement(
+            "cpp/tools/deterministic_scenario_library.hpp",
+            "<vector>",
+            "std_vector",
+            "Owns generated probability and rainfall collections."),
+        MakeRequirement(
+            "cpp/tools/path_normalization.hpp",
+            "<optional>",
+            "std_optional",
+            "Owns normalized path result declarations."),
+        MakeRequirement(
+            "cpp/tools/path_normalization.hpp",
+            "<string>",
+            "std_string",
+            "Owns normalized path text and decomposition fields."),
+        MakeRequirement(
+            "cpp/tools/path_normalization.hpp",
+            "<string_view>",
+            "std_string_view",
+            "Owns raw path input views."),
+        MakeRequirement(
+            "cpp/tools/path_normalization.hpp",
+            "<vector>",
+            "std_vector",
+            "Owns normalized path component collections."),
+        MakeRequirement(
+            "cpp/tools/header_self_sufficiency.hpp",
+            "<cstdint>",
+            "std_uint32_t",
+            "Owns header include policy version declarations."),
+        MakeRequirement(
+            "cpp/tools/header_self_sufficiency.hpp",
+            "<string>",
+            "std_string",
+            "Owns include policy fields and diagnostic text."),
+        MakeRequirement(
+            "cpp/tools/header_self_sufficiency.hpp",
+            "<vector>",
+            "std_vector",
+            "Owns include policy requirement collections."),
+    };
 }
 
 HeaderIncludePolicyValidation ValidateHeaderIncludePolicy(
     const std::vector<HeaderIncludeRequirement>& requirements) {
-    HeaderIncludePolicyValidation validation{true, {}};
+    HeaderIncludePolicyValidation validation;
+    std::set<std::string> unique_requirements;
 
     if (requirements.empty()) {
-        validation.valid = false;
-        validation.reasons.emplace_back(
+        AddReason(
+            validation,
             "header include policy must contain at least one requirement");
-        return validation;
     }
 
-    for (std::size_t index = 0U; index < requirements.size(); ++index) {
-        const HeaderIncludeRequirement& requirement = requirements[index];
+    for (const HeaderIncludeRequirement& requirement : requirements) {
+        const std::string label =
+            "header=" + requirement.header_path +
+            "; include=" + requirement.required_include +
+            "; identifier=" + requirement.identifier;
 
-        if (!IsRepositoryHeaderPath(requirement.header_path)) {
-            validation.reasons.emplace_back(
-                "header path must be a normalized repository-relative .hpp path");
+        if (!IsNormalizedHeaderPath(requirement.header_path)) {
+            AddReason(validation, "invalid header path; " + label);
         }
 
         if (!IsSystemInclude(requirement.required_include)) {
-            validation.reasons.emplace_back(
-                "required include must use a direct system-header form");
+            AddReason(validation, "invalid system include spelling; " + label);
         }
 
-        if (!IsIdentifier(requirement.identifier)) {
-            validation.reasons.emplace_back(
-                "requirement identifier must be a non-empty C++ identifier");
+        if (!IsCppIdentifier(requirement.identifier)) {
+            AddReason(validation, "invalid identifier; " + label);
         }
 
         if (requirement.purpose.empty()) {
-            validation.reasons.emplace_back(
-                "header include requirement purpose must not be empty");
+            AddReason(validation, "empty purpose; " + label);
         }
 
-        if (IsDuplicateRequirement(requirements, index)) {
-            validation.reasons.emplace_back(
-                "duplicate header include requirement is not permitted");
+        if (!unique_requirements.insert(RequirementKey(requirement)).second) {
+            AddReason(validation, "duplicate include policy; " + label);
         }
     }
 
@@ -160,30 +375,25 @@ HeaderIncludePolicyValidation ValidateHeaderIncludePolicy(
 
 std::string ExplainHeaderIncludeRequirement(
     const HeaderIncludeRequirement& requirement) {
-    std::string output;
-    output.reserve(
-        requirement.header_path.size() +
-        requirement.required_include.size() +
-        requirement.identifier.size() +
-        requirement.purpose.size() + 64U);
+    return "header_include_requirement"
+           "; header_path=" + requirement.header_path +
+           "; required_include=" + requirement.required_include +
+           "; identifier=" + requirement.identifier +
+           "; required=" + (requirement.required ? "true" : "false") +
+           "; purpose=" + requirement.purpose;
+}
 
-    output += "header_path=";
-    output += requirement.header_path;
-    output += "; required_include=";
-    output += requirement.required_include;
-    output += "; identifier=";
-    output += requirement.identifier;
-    output += "; required=";
-    output += requirement.required ? "true" : "false";
-    output += "; purpose=";
-    output += requirement.purpose;
-    return output;
+HeaderIncludePolicySnapshot SnapshotHeaderIncludePolicy(
+    const std::vector<HeaderIncludeRequirement>& requirements) {
+    return HeaderIncludePolicySnapshot{
+        requirements,
+        kPolicyVersion,
+        std::string(kGeneratedBy)};
 }
 
 bool HeaderSelfSufficiencyLinterSelfTest() {
     const std::vector<HeaderIncludeRequirement> requirements =
         HeaderSelfSufficiencyRequirements();
-
     const HeaderIncludePolicyValidation known_validation =
         ValidateHeaderIncludePolicy(requirements);
 
@@ -191,46 +401,67 @@ bool HeaderSelfSufficiencyLinterSelfTest() {
         return false;
     }
 
-    bool has_irrigation_numeric_requirement = false;
-    for (const HeaderIncludeRequirement& requirement : requirements) {
-        if (requirement.header_path ==
-                "cpp/simulation/irrigation_scenario_diagnostics.hpp" &&
-            requirement.required_include == "<numeric>" &&
-            requirement.identifier == "std_accumulate" &&
-            requirement.required) {
-            has_irrigation_numeric_requirement = true;
-        }
-    }
+    const auto numeric_requirement = std::find_if(
+        requirements.begin(),
+        requirements.end(),
+        [](const HeaderIncludeRequirement& requirement) {
+            return requirement.header_path ==
+                       "cpp/simulation/irrigation_scenario_diagnostics.hpp" &&
+                   requirement.required_include == "<numeric>" &&
+                   requirement.identifier == "std_accumulate" &&
+                   requirement.required;
+        });
 
-    if (!has_irrigation_numeric_requirement) {
-        return false;
-    }
-
-    const std::string explanation =
-        ExplainHeaderIncludeRequirement(requirements.front());
-    if (explanation.find("header_path=cpp/tools/foundation_report.hpp") != 0U) {
-        return false;
-    }
-
-    std::vector<HeaderIncludeRequirement> invalid_include = requirements;
-    invalid_include.push_back(
-        HeaderIncludeRequirement{
-            "cpp/tools/example.hpp",
-            "vector",
-            "std_vector",
-            "Invalid direct-include spelling.",
-            true});
-
-    if (ValidateHeaderIncludePolicy(invalid_include).valid) {
+    if (numeric_requirement == requirements.end()) {
         return false;
     }
 
     std::vector<HeaderIncludeRequirement> duplicate = requirements;
     duplicate.push_back(requirements.front());
-
     if (ValidateHeaderIncludePolicy(duplicate).valid) {
         return false;
     }
 
-    return true;
+    const HeaderIncludeRequirement invalid_include{
+        "cpp/tools/foundation_report.hpp",
+        "vector",
+        "std_vector",
+        "Rejects malformed include spelling.",
+        true};
+    if (ValidateHeaderIncludePolicy({invalid_include}).valid) {
+        return false;
+    }
+
+    const HeaderIncludeRequirement invalid_path{
+        "../foundation_report.hpp",
+        "<vector>",
+        "std_vector",
+        "Rejects unsafe repository paths.",
+        true};
+    if (ValidateHeaderIncludePolicy({invalid_path}).valid) {
+        return false;
+    }
+
+    const HeaderIncludeRequirement invalid_identifier{
+        "cpp/tools/foundation_report.hpp",
+        "<vector>",
+        "std-vector",
+        "Rejects malformed identifiers.",
+        true};
+    if (ValidateHeaderIncludePolicy({invalid_identifier}).valid) {
+        return false;
+    }
+
+    const HeaderIncludePolicySnapshot snapshot =
+        SnapshotHeaderIncludePolicy(requirements);
+    if (snapshot.version != kPolicyVersion ||
+        snapshot.generated_by != kGeneratedBy ||
+        snapshot.requirements.size() != requirements.size()) {
+        return false;
+    }
+
+    return ExplainHeaderIncludeRequirement(*numeric_requirement).find(
+               "required_include=<numeric>") != std::string::npos;
 }
+
+}  // namespace prometheus_praxis::foundation::headers
