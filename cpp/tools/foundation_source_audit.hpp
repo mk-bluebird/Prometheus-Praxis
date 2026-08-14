@@ -2,10 +2,11 @@
 #pragma once
 
 #include <cstddef>
-#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
+
+namespace prometheus_praxis::foundation::audit {
 
 struct SymbolAuditResult {
     std::string symbol;
@@ -21,17 +22,12 @@ struct FoundationSectionLedgerEntry {
     std::size_t append_order{};
 };
 
-std::vector<SymbolAuditResult> AuditCanonicalSymbols(
-    std::string_view source);
-
-bool SourceContainsAllCanonicalSymbols(std::string_view source);
-
-std::optional<std::string> NormalizeRepositoryPath(
-    std::string_view raw_path);
-
-bool IsRepositoryPathNormalized(std::string_view path);
-
-std::vector<std::string> HeaderSelfSufficiencyRequirements();
+struct ReverseDependencyViolation {
+    std::string source_path;
+    std::string target_path;
+    bool forbidden{true};
+    std::string evidence;
+};
 
 class FoundationSectionLedgerRegistry {
 public:
@@ -45,4 +41,20 @@ private:
     std::vector<FoundationSectionLedgerEntry> entries_;
 };
 
+std::vector<SymbolAuditResult> AuditCanonicalSymbols(
+    std::string_view source);
+
+bool SourceContainsAllCanonicalSymbols(std::string_view source);
+
+std::vector<ReverseDependencyViolation> DetectReverseDependencies(
+    std::string_view source,
+    std::string_view source_path,
+    std::string_view forbidden_include_prefix);
+
+std::string ExplainSourceAudit(
+    const std::vector<SymbolAuditResult>& symbols,
+    const std::vector<ReverseDependencyViolation>& violations);
+
 bool FoundationSourceAuditSelfTest();
+
+}  // namespace prometheus_praxis::foundation::audit
