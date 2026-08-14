@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+namespace prometheus_praxis::eco_restoration {
+
 struct WaterBiodiversityPolicyVerification {
     bool structurally_valid{};
     bool water_compliant{};
@@ -22,7 +24,16 @@ struct WaterRightsStakeholderScenario {
     double utility_weight{};
 };
 
-WaterBiodiversityPolicyVerification VerifyCrossShardWaterBiodiversityPolicy(
+struct WaterAllocationBudget {
+    std::int64_t available_water_ml{};
+    std::int64_t ecological_reserve_ml{};
+    std::int64_t allocated_water_ml{};
+    std::int64_t remaining_water_ml{};
+    bool balanced{};
+};
+
+[[nodiscard]] WaterBiodiversityPolicyVerification
+VerifyCrossShardWaterBiodiversityPolicy(
     std::int64_t available_water_ml,
     std::int64_t ecological_reserve_ml,
     std::int64_t allocated_water_ml,
@@ -30,7 +41,13 @@ WaterBiodiversityPolicyVerification VerifyCrossShardWaterBiodiversityPolicy(
     double minimum_biodiversity_index,
     bool required_cross_shard_unsat);
 
-WaterBiodiversityPolicyVerification EvaluateEquitableWaterAllocationDiagnostic(
+[[nodiscard]] WaterAllocationBudget ComputeWaterAllocationBudget(
+    std::int64_t available_water_ml,
+    std::int64_t ecological_reserve_ml,
+    std::int64_t allocated_water_ml);
+
+[[nodiscard]] WaterBiodiversityPolicyVerification
+EvaluateEquitableWaterAllocationDiagnostic(
     std::int64_t available_water_ml,
     std::int64_t ecological_reserve_ml,
     const std::vector<WaterRightsStakeholderScenario>& stakeholders,
@@ -38,10 +55,15 @@ WaterBiodiversityPolicyVerification EvaluateEquitableWaterAllocationDiagnostic(
     double minimum_biodiversity_index,
     bool required_cross_shard_unsat);
 
-std::vector<WaterRightsStakeholderScenario>
+[[nodiscard]] std::vector<WaterRightsStakeholderScenario>
 BuildDeterministicWaterRightsScenario();
 
-std::string ExplainWaterRightsStakeholderScenario(
+[[nodiscard]] std::string ExplainWaterRightsStakeholderScenario(
     const std::vector<WaterRightsStakeholderScenario>& stakeholders);
 
-bool WaterBiodiversityDiagnosticsSelfTest();
+[[nodiscard]] std::string ExplainWaterAllocationBudget(
+    const WaterAllocationBudget& budget);
+
+[[nodiscard]] bool WaterBiodiversityDiagnosticsSelfTest();
+
+}  // namespace prometheus_praxis::eco_restoration
