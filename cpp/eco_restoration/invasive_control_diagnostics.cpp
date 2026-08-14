@@ -1,99 +1,143 @@
 // File: cpp/eco_restoration/invasive_control_diagnostics.cpp
 #include "invasive_control_diagnostics.hpp"
 
-#include <algorithm>
 #include <cmath>
+#include <iomanip>
 #include <limits>
-#include <optional>
+#include <set>
 #include <sstream>
-#include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
+namespace prometheus_praxis::eco_restoration {
 namespace {
 
 constexpr double kMaximumRiskOfHarm = 0.30;
 
-bool IsFiniteNonNegative(const double value) noexcept {
-    return std::isfinite(value) && value >= 0.0;
-}
-
-bool IsLowerSnakeCase(const std::string& id) noexcept {
-    if (id.empty() || id.front() == '_' || id.back() == '_') {
+bool IsLowerSnakeCase(std::string_view identifier) noexcept {
+    if (identifier.empty() || identifier.front() == '_' ||
+        identifier.back() == '_') {
         return false;
     }
 
-    bool previous_was_underscore = false;
-    for (const char character : id) {
-        const bool lower_case = character >= 'a' && character <= 'z';
+    bool previous_underscore = false;
+    for (const unsigned char character : identifier) {
+        const bool lowercase = character >= 'a' && character <= 'z';
         const bool digit = character >= '0' && character <= '9';
+        const bool underscore = character == '_';
 
-        if (character == '_') {
-            if (previous_was_underscore) {
-                return false;
-            }
-            previous_was_underscore = true;
-            continue;
-        }
-
-        if (!lower_case && !digit) {
+        if (!lowercase && !digit && !underscore) {
             return false;
         }
-        previous_was_underscore = false;
+        if (underscore && previous_underscore) {
+            return false;
+        }
+        previous_underscore = underscore;
     }
 
     return true;
 }
 
-bool HasUniqueValidIds(
-    const std::vector<IdentifiedInvasiveControlCandidate>& candidates) {
-    for (std::size_t left = 0U; left < candidates.size(); ++left) {
-        if (!IsLowerSnakeCase(candidates[left].id)) {
-            return false;
-        }
-
-        for (std::size_t right = left + 1U; right < candidates.size();
-             ++right) {
-            if (candidates[left].id == candidates[right].id) {
-                return false;
-            }
-        }
-    }
-    return true;
+bool IsFiniteNonNegative(double value) noexcept {
+    return std::isfinite(value) && value >= 0.0;
 }
 
-bool CandidateIsStructurallyValid(
-    const eco_restoration::InvasiveControlCandidate& candidate) noexcept {
-    return IsFiniteNonNegative(candidate.expected_benefit) &&
+bool IsRiskWellFormed(double value) noexcept {
+    return std::isfinite(value) && value >= 0.0 && value <= 1.0;
+}
+
+bool IsStructurallyValidCandidate(
+    const IdentifiedInvasiveControlCandidate& identified_candidate) noexcept {
+    const InvasiveControlCandidate& candidate = identified_candidate.candidate;
+    return IsLowerSnakeCase(identified_candidate.id) &&
+           IsFiniteNonNegative(candidate.expected_benefit) &&
            IsFiniteNonNegative(candidate.treatment_cost) &&
-           IsFiniteNonNegative(candidate.risk_of_harm) &&
+           IsRiskWellFormed(candidate.risk_of_harm) &&
            IsFiniteNonNegative(candidate.expected_next_abundance);
 }
 
-bool IsSaferCandidate(
+std::string FormatDouble(double value) {
+    if (std::isnan(value)) {
+        return "nan";
+    }
+    if (std::isinf(value)) {
+        return value > 0.0 ? "infinity" : "-infinity";
+    }
+
+    std::ostringstream output;
+    output << std::fixed << std::setprecision(6) << value;
+    return output.str();
+}
+
+std::string BuildCandidateSummary(
+    const InvasiveTreatmentCostBenefitAudit& audit) {
+    std::ostringstream output;
+    output << "candidate=" << audit.candidate_id
+           << "; structurally_valid="
+           << (audit.structurally_valid ? "true" : "false")
+           << "; benefit_covers_cost="
+           << (audit.benefit_covers_cost ? "true" : "false")
+           << "; risk_within_corridor="
+           << (audit.risk_within_corridor ? "true" : "false")
+           << "; next_state_nonnegative="
+           << (audit.next_state_nonnegative ? "true" : "false")
+           << "; benefit_cost_ratio="
+           << FormatDouble(audit.benefit_cost_ratio)
+           << "; risk_margin=" << FormatDouble(audit.risk_margin)
+           << "; expected_next_abundance="
+           << FormatDouble(audit.expected_next_abundance)
+           << "; safe=" << (audit.safe ? "true" : "false");
+
+    for (const std::string& reason : audit.reasons) {
+        output << "; reason=" << reason;
+    }
+
+    return output.str();
+}
+
+bool IsBetterSelection(
     const InvasiveTreatmentCostBenefitAudit& candidate,
-    const InvasiveTreatmentCostBenefitAudit& current_best) noexcept {
-    if (candidate.benefit_cost_ratio != current_best.benefit_cost_ratio) {
-        return candidate.benefit_cost_ratio > current_best.benefit_cost_ratio;
+    const InvasiveTreatmentCostBenefitAudit& incumbent) noexcept {
+    if (candidate.benefit_cost_ratio != incumbent.benefit_cost_ratio) {
+        return candidate.benefit_cost_ratio > incumbent.benefit_cost_ratio;
     }
-    if (candidate.risk_of_harm != current_best.risk_of_harm) {
-        return candidate.risk_of_harm < current_best.risk_of_harm;
+    if (candidate.risk_margin != incumbent.risk_margin) {
+        return candidate.risk_margin > incumbent.risk_margin;
     }
-    return candidate.candidate_id < current_best.candidate_id;
+    if (candidate.expected_next_abundance != incumbent.expected_next_abundance) {
+        return candidate.expected_next_abundance < incumbent.expected_next_abundance;
+    }
+    return candidate.candidate_id < incumbent.candidate_id;
+}
+
+bool HasUniqueCandidateIds(
+    const std::vector<IdentifiedInvasiveControlCandidate>& candidates) {
+    std::set<std::string> identifiers;
+
+    for (const IdentifiedInvasiveControlCandidate& candidate : candidates) {
+        if (!IsLowerSnakeCase(candidate.id) ||
+            !identifiers.insert(candidate.id).second) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 }  // namespace
 
 double InvasiveTreatmentBenefitCostRatio(
-    const eco_restoration::InvasiveControlCandidate& candidate) {
-    if (!CandidateIsStructurallyValid(candidate)) {
+    const InvasiveControlCandidate& candidate) {
+    if (!IsFiniteNonNegative(candidate.expected_benefit) ||
+        !IsFiniteNonNegative(candidate.treatment_cost)) {
         return std::numeric_limits<double>::quiet_NaN();
     }
 
     if (candidate.treatment_cost == 0.0) {
-        return candidate.expected_benefit > 0.0
-                   ? std::numeric_limits<double>::infinity()
-                   : 1.0;
+        return candidate.expected_benefit == 0.0
+            ? 0.0
+            : std::numeric_limits<double>::infinity();
     }
 
     return candidate.expected_benefit / candidate.treatment_cost;
@@ -101,195 +145,210 @@ double InvasiveTreatmentBenefitCostRatio(
 
 InvasiveTreatmentCostBenefitAudit AuditInvasiveTreatmentCostBenefit(
     const IdentifiedInvasiveControlCandidate& identified_candidate) {
-    const eco_restoration::InvasiveControlCandidate& candidate =
-        identified_candidate.candidate;
+    const InvasiveControlCandidate& candidate = identified_candidate.candidate;
 
-    InvasiveTreatmentCostBenefitAudit audit{};
+    InvasiveTreatmentCostBenefitAudit audit;
     audit.candidate_id = identified_candidate.id;
+    audit.benefit_cost_ratio = InvasiveTreatmentBenefitCostRatio(candidate);
+    audit.risk_margin = kMaximumRiskOfHarm - candidate.risk_of_harm;
     audit.expected_next_abundance = candidate.expected_next_abundance;
+    audit.structurally_valid = IsStructurallyValidCandidate(identified_candidate);
 
     if (!IsLowerSnakeCase(identified_candidate.id)) {
         audit.reasons.emplace_back(
             "candidate id must be non-empty lower_snake_case");
     }
-
-    if (!CandidateIsStructurallyValid(candidate)) {
+    if (!IsFiniteNonNegative(candidate.expected_benefit)) {
         audit.reasons.emplace_back(
-            "candidate benefit, cost, risk, and next abundance must be finite "
-            "non-negative values");
+            "expected benefit must be finite and non-negative");
+    }
+    if (!IsFiniteNonNegative(candidate.treatment_cost)) {
+        audit.reasons.emplace_back(
+            "treatment cost must be finite and non-negative");
+    }
+    if (!IsRiskWellFormed(candidate.risk_of_harm)) {
+        audit.reasons.emplace_back(
+            "risk of harm must be finite and within [0,1]");
+    }
+    if (!IsFiniteNonNegative(candidate.expected_next_abundance)) {
+        audit.reasons.emplace_back(
+            "expected next abundance must be finite and non-negative");
     }
 
-    audit.structurally_valid = audit.reasons.empty();
-    if (!audit.structurally_valid) {
-        audit.benefit_cost_ratio =
-            std::numeric_limits<double>::quiet_NaN();
-        audit.risk_margin = std::numeric_limits<double>::quiet_NaN();
-        audit.safe = false;
-        return audit;
-    }
-
-    audit.benefit_cost_ratio = InvasiveTreatmentBenefitCostRatio(candidate);
-    audit.risk_margin = kMaximumRiskOfHarm - candidate.risk_of_harm;
     audit.benefit_covers_cost =
+        IsFiniteNonNegative(candidate.expected_benefit) &&
+        IsFiniteNonNegative(candidate.treatment_cost) &&
         candidate.expected_benefit >= candidate.treatment_cost;
-    audit.risk_within_corridor =
-        candidate.risk_of_harm <= kMaximumRiskOfHarm;
-    audit.next_state_nonnegative = candidate.expected_next_abundance >= 0.0;
-
     if (!audit.benefit_covers_cost) {
-        audit.reasons.emplace_back("expected benefit does not cover treatment cost");
-    }
-    if (!audit.risk_within_corridor) {
-        audit.reasons.emplace_back("risk of harm exceeds the 0.30 corridor");
-    }
-    if (!audit.next_state_nonnegative) {
-        audit.reasons.emplace_back("expected next abundance is negative");
+        audit.reasons.emplace_back(
+            "expected benefit does not cover treatment cost");
     }
 
-    audit.safe = audit.structurally_valid &&
-                 audit.benefit_covers_cost &&
-                 audit.risk_within_corridor &&
-                 audit.next_state_nonnegative;
+    audit.risk_within_corridor =
+        IsRiskWellFormed(candidate.risk_of_harm) &&
+        candidate.risk_of_harm <= kMaximumRiskOfHarm;
+    if (!audit.risk_within_corridor) {
+        audit.reasons.emplace_back(
+            "risk of harm exceeds the 0.30 ecological safety corridor");
+    }
+
+    audit.next_state_nonnegative =
+        IsFiniteNonNegative(candidate.expected_next_abundance);
+    if (!audit.next_state_nonnegative) {
+        audit.reasons.emplace_back(
+            "projected next abundance is negative or non-finite");
+    }
+
+    audit.safe =
+        audit.structurally_valid &&
+        audit.benefit_covers_cost &&
+        audit.risk_within_corridor &&
+        audit.next_state_nonnegative;
     return audit;
 }
 
-std::optional<IdentifiedInvasiveControlCandidate>
-SelectIdentifiedSafeInvasiveControl(
+IdentifiedInvasiveControlSelection SelectIdentifiedSafeInvasiveControl(
     const std::vector<IdentifiedInvasiveControlCandidate>& candidates) {
-    if (!HasUniqueValidIds(candidates)) {
-        return std::nullopt;
+    IdentifiedInvasiveControlSelection selection;
+    selection.candidate_summaries.reserve(candidates.size());
+
+    if (candidates.empty()) {
+        selection.explanation =
+            "invasive_control_selection=not_selected; reason=no_candidates";
+        return selection;
     }
 
-    std::optional<IdentifiedInvasiveControlCandidate> selected;
-    std::optional<InvasiveTreatmentCostBenefitAudit> selected_audit;
+    const bool identifiers_valid = HasUniqueCandidateIds(candidates);
+    std::vector<InvasiveTreatmentCostBenefitAudit> audits;
+    audits.reserve(candidates.size());
 
     for (const IdentifiedInvasiveControlCandidate& candidate : candidates) {
-        const InvasiveTreatmentCostBenefitAudit audit =
+        InvasiveTreatmentCostBenefitAudit audit =
             AuditInvasiveTreatmentCostBenefit(candidate);
 
-        if (!audit.safe) {
-            continue;
+        if (!identifiers_valid) {
+            audit.safe = false;
+            audit.reasons.emplace_back(
+                "selection requires unique lower_snake_case candidate ids");
         }
 
-        if (!selected_audit.has_value() ||
-            IsSaferCandidate(audit, *selected_audit)) {
-            selected = candidate;
-            selected_audit = audit;
+        selection.candidate_summaries.push_back(BuildCandidateSummary(audit));
+        audits.push_back(std::move(audit));
+    }
+
+    if (!identifiers_valid) {
+        selection.explanation =
+            "invasive_control_selection=not_selected; "
+            "reason=invalid_or_duplicate_candidate_id";
+        return selection;
+    }
+
+    const InvasiveTreatmentCostBenefitAudit* best = nullptr;
+    for (const InvasiveTreatmentCostBenefitAudit& audit : audits) {
+        if (audit.safe && (best == nullptr || IsBetterSelection(audit, *best))) {
+            best = &audit;
         }
     }
 
-    return selected;
+    if (best == nullptr) {
+        selection.explanation =
+            "invasive_control_selection=not_selected; reason=no_safe_candidate";
+        return selection;
+    }
+
+    selection.selected = true;
+    selection.selected_id = best->candidate_id;
+    selection.explanation =
+        "invasive_control_selection=selected; selected_id=" +
+        selection.selected_id +
+        "; benefit_cost_ratio=" + FormatDouble(best->benefit_cost_ratio) +
+        "; risk_margin=" + FormatDouble(best->risk_margin) +
+        "; expected_next_abundance=" +
+        FormatDouble(best->expected_next_abundance);
+    return selection;
 }
 
 std::string ExplainStochasticHjbSelection(
     const std::vector<IdentifiedInvasiveControlCandidate>& candidates,
-    const std::optional<IdentifiedInvasiveControlCandidate>& selected) {
+    const IdentifiedInvasiveControlSelection& selection) {
     std::ostringstream output;
-    output << "candidate_count=" << candidates.size();
+    output << "invasive_control_selection_audit"
+           << "; candidate_count=" << candidates.size()
+           << "; selected=" << (selection.selected ? "true" : "false")
+           << "; selected_id="
+           << (selection.selected ? selection.selected_id : "none")
+           << "; explanation=" << selection.explanation;
 
-    if (!HasUniqueValidIds(candidates)) {
-        output << "\nselection=none"
-               << "\nreason=candidate identifiers must be unique lower_snake_case";
-        return output.str();
+    for (const std::string& summary : selection.candidate_summaries) {
+        output << "; " << summary;
     }
 
-    for (const IdentifiedInvasiveControlCandidate& candidate : candidates) {
-        const InvasiveTreatmentCostBenefitAudit audit =
-            AuditInvasiveTreatmentCostBenefit(candidate);
-
-        output << '\n' << "candidate=" << candidate.id
-               << ", safe=" << (audit.safe ? "1" : "0")
-               << ", benefit_cost_ratio=" << audit.benefit_cost_ratio
-               << ", risk_margin=" << audit.risk_margin
-               << ", expected_next_abundance="
-               << audit.expected_next_abundance;
-    }
-
-    if (!selected.has_value()) {
-        output << "\nselection=none"
-               << "\nreason=no candidate satisfies benefit, risk, and next-state "
-                  "safety constraints";
-        return output.str();
-    }
-
-    output << "\nselection=" << selected->id
-           << "\nreason=selected by stable candidate identity after safety "
-              "filtering and deterministic benefit-cost ranking";
     return output.str();
 }
 
 bool InvasiveControlDiagnosticsSelfTest() {
-    const std::vector<IdentifiedInvasiveControlCandidate> candidates{
-        IdentifiedInvasiveControlCandidate{
-            "native_seedling_release",
-            eco_restoration::InvasiveControlCandidate{
-                120.0, 80.0, 0.20, 35.0}},
-        IdentifiedInvasiveControlCandidate{
-            "high_risk_removal",
-            eco_restoration::InvasiveControlCandidate{
-                200.0, 100.0, 0.35, 20.0}},
-        IdentifiedInvasiveControlCandidate{
-            "low_benefit_treatment",
-            eco_restoration::InvasiveControlCandidate{
-                30.0, 50.0, 0.10, 45.0}}};
+    const std::vector<IdentifiedInvasiveControlCandidate> valid_candidates{
+        {"manual_removal", {10.0, 5.0, 0.10, 30.0}},
+        {"targeted_cutting", {12.0, 6.0, 0.10, 20.0}},
+        {"native_competition", {9.0, 6.0, 0.20, 15.0}}};
 
-    const std::optional<IdentifiedInvasiveControlCandidate> selected =
-        SelectIdentifiedSafeInvasiveControl(candidates);
-
-    if (!selected.has_value() ||
-        selected->id != "native_seedling_release") {
+    const IdentifiedInvasiveControlSelection valid_selection =
+        SelectIdentifiedSafeInvasiveControl(valid_candidates);
+    if (!valid_selection.selected ||
+        valid_selection.selected_id != "targeted_cutting") {
         return false;
     }
 
-    const InvasiveTreatmentCostBenefitAudit audit =
-        AuditInvasiveTreatmentCostBenefit(*selected);
-    if (!audit.structurally_valid ||
-        !audit.safe ||
-        !audit.benefit_covers_cost ||
-        !audit.risk_within_corridor ||
-        !audit.next_state_nonnegative) {
+    const std::vector<IdentifiedInvasiveControlCandidate> no_safe{
+        {"high_risk_method", {20.0, 5.0, 0.31, 2.0}},
+        {"uneconomical_method", {2.0, 5.0, 0.10, 2.0}}};
+    if (SelectIdentifiedSafeInvasiveControl(no_safe).selected) {
         return false;
     }
 
-    const std::vector<IdentifiedInvasiveControlCandidate> unsafe{
-        IdentifiedInvasiveControlCandidate{
-            "unsafe_candidate",
-            eco_restoration::InvasiveControlCandidate{
-                10.0, 20.0, 0.40, 0.0}}};
-
-    if (SelectIdentifiedSafeInvasiveControl(unsafe).has_value()) {
+    const std::vector<IdentifiedInvasiveControlCandidate> duplicate{
+        {"manual_removal", {10.0, 5.0, 0.10, 20.0}},
+        {"manual_removal", {12.0, 6.0, 0.10, 18.0}}};
+    if (SelectIdentifiedSafeInvasiveControl(duplicate).selected) {
         return false;
     }
 
-    std::vector<IdentifiedInvasiveControlCandidate> duplicate_ids = candidates;
-    duplicate_ids.push_back(
-        IdentifiedInvasiveControlCandidate{
-            "native_seedling_release",
-            eco_restoration::InvasiveControlCandidate{
-                90.0, 30.0, 0.10, 10.0}});
-
-    if (SelectIdentifiedSafeInvasiveControl(duplicate_ids).has_value()) {
+    const IdentifiedInvasiveControlCandidate invalid_numeric{
+        "invalid_numeric",
+        {std::numeric_limits<double>::quiet_NaN(), 2.0, 0.10, 4.0}};
+    const InvasiveTreatmentCostBenefitAudit invalid_audit =
+        AuditInvasiveTreatmentCostBenefit(invalid_numeric);
+    if (invalid_audit.structurally_valid || invalid_audit.safe) {
         return false;
     }
 
-    const IdentifiedInvasiveControlCandidate invalid_candidate{
-        "invalid_candidate",
-        eco_restoration::InvasiveControlCandidate{
-            -1.0, 10.0, 0.10, 10.0}};
-
-    if (AuditInvasiveTreatmentCostBenefit(invalid_candidate).structurally_valid) {
-        return false;
-    }
-
-    const eco_restoration::InvasiveControlCandidate zero_cost{
-        10.0, 0.0, 0.10, 5.0};
-
+    const InvasiveControlCandidate zero_cost{1.0, 0.0, 0.10, 1.0};
     if (!std::isinf(InvasiveTreatmentBenefitCostRatio(zero_cost))) {
         return false;
     }
 
+    const std::vector<IdentifiedInvasiveControlCandidate> tied{
+        {"zeta_method", {10.0, 5.0, 0.10, 10.0}},
+        {"alpha_method", {10.0, 5.0, 0.10, 10.0}}};
+    const IdentifiedInvasiveControlSelection tie_selection =
+        SelectIdentifiedSafeInvasiveControl(tied);
+    if (!tie_selection.selected ||
+        tie_selection.selected_id != "alpha_method") {
+        return false;
+    }
+
+    const IdentifiedInvasiveControlSelection empty_selection =
+        SelectIdentifiedSafeInvasiveControl({});
+    if (empty_selection.selected ||
+        empty_selection.explanation.find("reason=no_candidates") ==
+            std::string::npos) {
+        return false;
+    }
+
     const std::string explanation =
-        ExplainStochasticHjbSelection(candidates, selected);
-    return explanation.find("selection=native_seedling_release") !=
+        ExplainStochasticHjbSelection(valid_candidates, valid_selection);
+    return explanation.find("selected_id=targeted_cutting") !=
            std::string::npos;
 }
+
+}  // namespace prometheus_praxis::eco_restoration
