@@ -1,208 +1,185 @@
 // File: cpp/tools/foundation_source_audit.cpp
 #include "foundation_source_audit.hpp"
 
+#include "path_normalization.hpp"
+
 #include <algorithm>
+#include <array>
 #include <cctype>
-#include <filesystem>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
+namespace prometheus_praxis::foundation::audit {
 namespace {
 
-const std::vector<std::string>& CanonicalSymbols() {
-    static const std::vector<std::string> symbols{
-        "FoundationReport",
-        "FoundationReportDiff",
-        "ValidateFoundationReport",
-        "CompareFoundationReports",
-        "IsFoundationReportValid",
-        "ExplainFoundationReportValidation",
-        "ExplainFoundationReportDiff",
-        "CanonicalExtensionDescriptor",
-        "CanonicalExtensionRegistry",
-        "RunCanonicalExtensionSelfTests",
-        "BuildKnownExtensionRegistry",
-        "FoundationExitCode",
-        "DispatchUnifiedFoundationCommand",
-        "BuildUnifiedFoundationCommandRegistry",
-        "NormalizeRepositoryPath"};
-    return symbols;
+constexpr std::array<std::string_view, 15U> kCanonicalSymbols{
+    "FoundationReport",
+    "FoundationReportDiff",
+    "ValidateFoundationReport",
+    "IsFoundationReportValid",
+    "DerivedFoundationSafe",
+    "CompareFoundationReports",
+    "ExplainFoundationReportValidation",
+    "ExplainFoundationReportDiff",
+    "FoundationReportBuilder",
+    "CanonicalExtensionDescriptor",
+    "CanonicalExtensionRegistry",
+    "RunCanonicalExtensionSelfTests",
+    "BuildKnownExtensionRegistry",
+    "FoundationExitCode",
+    "DispatchUnifiedFoundationCommand",
+};
+
+bool IsIdentifierStart(char character) noexcept {
+    const unsigned char value = static_cast<unsigned char>(character);
+    return std::isalpha(value) != 0 || character == '_';
 }
 
-bool IsValidSymbolName(const std::string_view symbol) noexcept {
-    if (symbol.empty()) {
+bool IsIdentifierCharacter(char character) noexcept {
+    const unsigned char value = static_cast<unsigned char>(character);
+    return std::isalnum(value) != 0 || character == '_';
+}
+
+bool IsValidIdentifier(std::string_view identifier) noexcept {
+    if (identifier.empty() || !IsIdentifierStart(identifier.front())) {
         return false;
     }
 
-    const unsigned char first = static_cast<unsigned char>(symbol.front());
-    if (!(std::isalpha(first) != 0 || symbol.front() == '_')) {
-        return false;
-    }
-
-    for (const char character : symbol) {
-        const unsigned char value = static_cast<unsigned char>(character);
-        if (std::isalnum(value) == 0 && character != '_') {
-            return false;
-        }
-    }
-
-    return true;
+    return std::all_of(
+        identifier.begin() + 1,
+        identifier.end(),
+        [](char character) { return IsIdentifierCharacter(character); });
 }
 
 bool CanonicalSymbolsAreValidAndUnique() {
-    const std::vector<std::string>& symbols = CanonicalSymbols();
+    std::set<std::string_view> unique_symbols;
 
-    for (std::size_t index = 0U; index < symbols.size(); ++index) {
-        if (!IsValidSymbolName(symbols[index])) {
+    for (const std::string_view symbol : kCanonicalSymbols) {
+        if (!IsValidIdentifier(symbol) || !unique_symbols.insert(symbol).second) {
             return false;
-        }
-        for (std::size_t other = index + 1U; other < symbols.size(); ++other) {
-            if (symbols[index] == symbols[other]) {
-                return false;
-            }
         }
     }
 
     return true;
 }
 
-std::size_t CountOccurrences(const std::string_view source,
-                             const std::string_view needle) {
-    if (needle.empty()) {
-        return 0U;
-    }
-
+std::size_t CountWholeIdentifierOccurrences(
+    std::string_view source,
+    std::string_view identifier) {
     std::size_t count = 0U;
     std::size_t position = 0U;
+
     while (position < source.size()) {
-        position = source.find(needle, position);
+        position = source.find(identifier, position);
         if (position == std::string_view::npos) {
             break;
         }
-        ++count;
-        position += needle.size();
+
+        const bool valid_left =
+            position == 0U || !IsIdentifierCharacter(source[position - 1U]);
+        const std::size_t end = position + identifier.size();
+        const bool valid_right =
+            end == source.size() || !IsIdentifierCharacter(source[end]);
+
+        if (valid_left && valid_right) {
+            ++count;
+        }
+
+        position = end;
     }
 
     return count;
 }
 
-bool IsRelativeGenericPath(const std::string_view path) {
-    if (path.empty() || path.front() == '/' || path.front() == '\\') {
-        return false;
+std::string Trim(std::string_view text) {
+    std::size_t first = 0U;
+    std::size_t last = text.size();
+
+    while (first < last &&
+           std::isspace(static_cast<unsigned char>(text[first])) != 0) {
+        ++first;
+    }
+    while (last > first &&
+           std::isspace(static_cast<unsigned char>(text[last - 1U])) != 0) {
+        --last;
     }
 
-    if (path.find('\\') != std::string_view::npos ||
-        path.find(':') != std::string_view::npos) {
-        return false;
-    }
+    return std::string(text.substr(first, last - first));
+}
 
-    const std::filesystem::path filesystem_path{std::string(path)};
-    if (filesystem_path.is_absolute()) {
-        return false;
-    }
+std::vector<std::string> ExtractQuotedIncludes(std::string_view source) {
+    std::vector<std::string> includes;
+    std::size_t line_start = 0U;
 
-    for (const std::filesystem::path& component : filesystem_path) {
-        if (component == "." || component == ".." || component.empty()) {
-            return false;
+    while (line_start < source.size()) {
+        const std::size_t line_end = source.find('\n', line_start);
+        const std::size_t end =
+            line_end == std::string_view::npos ? source.size() : line_end;
+        const std::string line = Trim(source.substr(line_start, end - line_start));
+
+        if (line.starts_with("#include")) {
+            const std::size_t opening_quote = line.find('"');
+            if (opening_quote != std::string::npos) {
+                const std::size_t closing_quote =
+                    line.find('"', opening_quote + 1U);
+                if (closing_quote != std::string::npos) {
+                    includes.emplace_back(
+                        line.substr(
+                            opening_quote + 1U,
+                            closing_quote - opening_quote - 1U));
+                }
+            }
         }
+
+        if (line_end == std::string_view::npos) {
+            break;
+        }
+        line_start = line_end + 1U;
     }
 
-    return true;
+    return includes;
+}
+
+bool IsPrefixPath(
+    std::string_view path,
+    std::string_view prefix) noexcept {
+    if (prefix.empty() || !path.starts_with(prefix)) {
+        return false;
+    }
+
+    return path.size() == prefix.size() ||
+           prefix.back() == '/' ||
+           path[prefix.size()] == '/';
+}
+
+std::optional<std::string> NormalizePath(std::string_view raw) {
+    return paths::NormalizeRepositoryPath(raw);
 }
 
 }  // namespace
 
-std::vector<SymbolAuditResult> AuditCanonicalSymbols(
-    const std::string_view source) {
-    std::vector<SymbolAuditResult> results;
-    results.reserve(CanonicalSymbols().size());
-
-    for (const std::string& symbol : CanonicalSymbols()) {
-        const std::size_t occurrences = CountOccurrences(source, symbol);
-        results.push_back(SymbolAuditResult{
-            symbol,
-            occurrences > 0U,
-            occurrences});
-    }
-
-    return results;
-}
-
-bool SourceContainsAllCanonicalSymbols(const std::string_view source) {
-    if (!CanonicalSymbolsAreValidAndUnique()) {
-        return false;
-    }
-
-    const std::vector<SymbolAuditResult> results =
-        AuditCanonicalSymbols(source);
-
-    return std::all_of(
-        results.begin(),
-        results.end(),
-        [](const SymbolAuditResult& result) {
-            return result.present;
-        });
-}
-
-std::optional<std::string> NormalizeRepositoryPath(
-    const std::string_view raw_path) {
-    if (!IsRelativeGenericPath(raw_path)) {
-        return std::nullopt;
-    }
-
-    const std::filesystem::path raw{std::string(raw_path)};
-    const std::filesystem::path normalized = raw.lexically_normal();
-    const std::string generic = normalized.generic_string();
-
-    if (!IsRelativeGenericPath(generic) || generic.empty()) {
-        return std::nullopt;
-    }
-
-    return generic;
-}
-
-bool IsRepositoryPathNormalized(const std::string_view path) {
-    const std::optional<std::string> normalized =
-        NormalizeRepositoryPath(path);
-
-    return normalized.has_value() && *normalized == path;
-}
-
-std::vector<std::string> HeaderSelfSufficiencyRequirements() {
-    return {
-        "<algorithm>",
-        "<cstddef>",
-        "<cmath>",
-        "<filesystem>",
-        "<functional>",
-        "<limits>",
-        "<numeric>",
-        "<optional>",
-        "<sstream>",
-        "<string>",
-        "<string_view>",
-        "<vector>"};
-}
-
 bool FoundationSectionLedgerRegistry::Append(
     FoundationSectionLedgerEntry entry) {
-    if (entry.identifier.empty() ||
+    if (!IsValidIdentifier(entry.identifier) ||
         entry.responsibility.empty() ||
-        entry.append_order != entries_.size() + 1U) {
+        entry.append_order != entries_.size()) {
         return false;
     }
 
-    const bool duplicate_identifier = std::any_of(
+    const auto duplicate = std::find_if(
         entries_.begin(),
         entries_.end(),
         [&entry](const FoundationSectionLedgerEntry& existing) {
-            return existing.identifier == entry.identifier;
+            return existing.identifier == entry.identifier ||
+                   existing.append_order == entry.append_order;
         });
 
-    if (duplicate_identifier) {
+    if (duplicate != entries_.end()) {
         return false;
     }
 
@@ -216,15 +193,112 @@ FoundationSectionLedgerRegistry::Entries() const noexcept {
 }
 
 bool FoundationSectionLedgerRegistry::IsSequential() const noexcept {
+    std::set<std::string> unique_identifiers;
+
     for (std::size_t index = 0U; index < entries_.size(); ++index) {
         const FoundationSectionLedgerEntry& entry = entries_[index];
-        if (entry.identifier.empty() ||
+        if (!IsValidIdentifier(entry.identifier) ||
             entry.responsibility.empty() ||
-            entry.append_order != index + 1U) {
+            entry.append_order != index ||
+            !unique_identifiers.insert(entry.identifier).second) {
             return false;
         }
     }
+
     return true;
+}
+
+std::vector<SymbolAuditResult> AuditCanonicalSymbols(
+    std::string_view source) {
+    std::vector<SymbolAuditResult> results;
+    results.reserve(kCanonicalSymbols.size());
+
+    for (const std::string_view symbol : kCanonicalSymbols) {
+        const std::size_t occurrences =
+            CountWholeIdentifierOccurrences(source, symbol);
+        results.push_back(SymbolAuditResult{
+            std::string(symbol),
+            occurrences > 0U,
+            occurrences});
+    }
+
+    return results;
+}
+
+bool SourceContainsAllCanonicalSymbols(std::string_view source) {
+    if (!CanonicalSymbolsAreValidAndUnique()) {
+        return false;
+    }
+
+    const std::vector<SymbolAuditResult> results =
+        AuditCanonicalSymbols(source);
+    return std::all_of(
+        results.begin(),
+        results.end(),
+        [](const SymbolAuditResult& result) {
+            return result.present;
+        });
+}
+
+std::vector<ReverseDependencyViolation> DetectReverseDependencies(
+    std::string_view source,
+    std::string_view tools_prefix,
+    std::string_view forbidden_include_prefix) {
+    std::vector<ReverseDependencyViolation> violations;
+    const std::optional<std::string> normalized_source =
+        NormalizePath(tools_prefix);
+    const std::optional<std::string> normalized_forbidden_prefix =
+        NormalizePath(forbidden_include_prefix);
+
+    if (!normalized_source.has_value() ||
+        !normalized_forbidden_prefix.has_value()) {
+        return violations;
+    }
+
+    if (!IsPrefixPath(*normalized_source, *normalized_forbidden_prefix)) {
+        return violations;
+    }
+
+    for (const std::string& include : ExtractQuotedIncludes(source)) {
+        const std::optional<std::string> normalized_include =
+            NormalizePath(include);
+        if (!normalized_include.has_value() ||
+            !IsPrefixPath(*normalized_include, *normalized_forbidden_prefix)) {
+            continue;
+        }
+
+        violations.push_back(ReverseDependencyViolation{
+            *normalized_source,
+            *normalized_include,
+            true,
+            "quoted include creates forbidden reverse dependency"});
+    }
+
+    return violations;
+}
+
+std::string ExplainSourceAudit(
+    const std::vector<SymbolAuditResult>& symbols,
+    const std::vector<ReverseDependencyViolation>& violations) {
+    std::ostringstream output;
+    output << "foundation_source_audit"
+           << "; canonical_symbol_count=" << symbols.size()
+           << "; reverse_dependency_violation_count=" << violations.size();
+
+    for (const SymbolAuditResult& result : symbols) {
+        output << "; symbol=" << result.symbol
+               << "; present=" << (result.present ? "true" : "false")
+               << "; occurrences=" << result.occurrences;
+    }
+
+    for (const ReverseDependencyViolation& violation : violations) {
+        output << "; source_path=" << violation.source_path
+               << "; target_path=" << violation.target_path
+               << "; forbidden=" << (violation.forbidden ? "true" : "false")
+               << "; evidence=" << violation.evidence;
+    }
+
+    return output.str();
 }
 
 bool FoundationSourceAuditSelfTest() {
@@ -233,102 +307,81 @@ bool FoundationSourceAuditSelfTest() {
     }
 
     std::ostringstream complete_source;
-    for (const std::string& symbol : CanonicalSymbols()) {
-        complete_source << symbol << '\n';
+    for (const std::string_view symbol : kCanonicalSymbols) {
+        complete_source << "void " << symbol << "();\n";
     }
 
-    if (!SourceContainsAllCanonicalSymbols(complete_source.str())) {
+    const std::vector<SymbolAuditResult> complete =
+        AuditCanonicalSymbols(complete_source.str());
+    if (!SourceContainsAllCanonicalSymbols(complete_source.str()) ||
+        !std::all_of(
+            complete.begin(),
+            complete.end(),
+            [](const SymbolAuditResult& result) {
+                return result.present && result.occurrences == 1U;
+            })) {
         return false;
     }
 
-    const std::string partial_source =
-        "FoundationReport\nValidateFoundationReport\n";
-    if (SourceContainsAllCanonicalSymbols(partial_source)) {
-        return false;
-    }
-
-    const std::vector<SymbolAuditResult> partial_results =
-        AuditCanonicalSymbols(partial_source);
-    const auto report_result = std::find_if(
-        partial_results.begin(),
-        partial_results.end(),
-        [](const SymbolAuditResult& result) {
-            return result.symbol == "FoundationReport";
-        });
-
-    if (report_result == partial_results.end() ||
-        !report_result->present ||
-        report_result->occurrences != 1U) {
-        return false;
-    }
-
-    const std::optional<std::string> valid_path =
-        NormalizeRepositoryPath("cpp/tools/foundation_report.cpp");
-    if (!valid_path.has_value() ||
-        *valid_path != "cpp/tools/foundation_report.cpp" ||
-        !IsRepositoryPathNormalized(*valid_path)) {
-        return false;
-    }
-
-    const std::vector<std::string> invalid_paths{
-        "",
-        "/cpp/tools/foundation_report.cpp",
-        "../foundation_report.cpp",
-        "cpp/../foundation_report.cpp",
-        "cpp\\tools\\foundation_report.cpp",
-        "C:/foundation_report.cpp"};
-
-    for (const std::string& path : invalid_paths) {
-        if (NormalizeRepositoryPath(path).has_value() ||
-            IsRepositoryPathNormalized(path)) {
-            return false;
-        }
-    }
-
-    const std::vector<std::string> requirements =
-        HeaderSelfSufficiencyRequirements();
-    if (std::find(
-            requirements.begin(),
-            requirements.end(),
-            "<numeric>") == requirements.end()) {
+    const std::vector<SymbolAuditResult> partial =
+        AuditCanonicalSymbols("FoundationReport FoundationReport");
+    if (partial.empty() ||
+        !partial.front().present ||
+        partial.front().occurrences != 2U ||
+        SourceContainsAllCanonicalSymbols("FoundationReport")) {
         return false;
     }
 
     FoundationSectionLedgerRegistry ledger;
-    if (!ledger.Append(
-            FoundationSectionLedgerEntry{
-                "foundation_report_validator",
-                "Validates foundation diagnostic reports.",
-                true,
-                true,
-                1U}) ||
-        !ledger.Append(
-            FoundationSectionLedgerEntry{
-                "canonical_extension_registry",
-                "Runs ordered diagnostic extension self-tests.",
-                true,
-                true,
-                2U}) ||
-        !ledger.IsSequential()) {
+    if (!ledger.Append(FoundationSectionLedgerEntry{
+            "report_validation",
+            "Owns report validation.",
+            true,
+            true,
+            0U}) ||
+        !ledger.Append(FoundationSectionLedgerEntry{
+            "json_serialization",
+            "Owns deterministic JSON serialization.",
+            true,
+            true,
+            1U}) ||
+        !ledger.IsSequential() ||
+        ledger.Append(FoundationSectionLedgerEntry{
+            "duplicate_order",
+            "Must be rejected.",
+            false,
+            false,
+            1U})) {
         return false;
     }
 
-    if (ledger.Append(
-            FoundationSectionLedgerEntry{
-                "foundation_report_validator",
-                "Duplicate identifiers are rejected.",
-                false,
-                false,
-                3U}) ||
-        ledger.Append(
-            FoundationSectionLedgerEntry{
-                "foundation_command_dispatcher",
-                "Out-of-order records are rejected.",
-                true,
-                false,
-                4U})) {
+    const std::vector<ReverseDependencyViolation> violations =
+        DetectReverseDependencies(
+            "#include \"cpp/tools/foundation_report.hpp\"\n"
+            "#include \"cpp/eco_restoration/soil_health.hpp\"\n",
+            "cpp/eco_restoration/water_biodiversity_diagnostics.cpp",
+            "cpp/tools");
+
+    if (violations.size() != 1U ||
+        violations.front().source_path !=
+            "cpp/eco_restoration/water_biodiversity_diagnostics.cpp" ||
+        violations.front().target_path !=
+            "cpp/tools/foundation_report.hpp") {
         return false;
     }
 
-    return ledger.Entries().size() == 2U;
+    const std::vector<ReverseDependencyViolation> allowed =
+        DetectReverseDependencies(
+            "#include \"cpp/eco_restoration/soil_health.hpp\"\n",
+            "cpp/tools/foundation_orchestrator.cpp",
+            "cpp/tools");
+
+    if (!allowed.empty()) {
+        return false;
+    }
+
+    return ExplainSourceAudit(complete, violations).find(
+               "reverse_dependency_violation_count=1") != std::string::npos;
 }
+
+}  // namespace prometheus_praxis::foundation::audit
