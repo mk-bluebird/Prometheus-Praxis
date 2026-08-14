@@ -19100,3 +19100,681 @@ bool ProofCheckedDispatchReplaySimulatorSelfTest() {
 }
 
 }
+
+namespace prometheus_praxis_foundation_extensions {
+
+struct FoundationReportJsonSchemaValidation {
+    bool valid{};
+    std::string schema_version;
+    std::vector<std::string> reasons;
+};
+
+const std::vector<std::string>& FoundationReportJsonFieldOrder() {
+    static const std::vector<std::string> fields{
+        "schema_version",
+        "private_heat_accepted",
+        "threat_fail_closed",
+        "water_biodiversity_allowed",
+        "water_biodiversity_invariant_holds",
+        "authorization_accepted",
+        "invasive_control_safe",
+        "irrigation_robustly_feasible",
+        "maximum_risk_of_harm",
+        "knowledge_factor",
+        "eco_impact_value",
+        "foundation_safe"
+    };
+
+    return fields;
+}
+
+bool IsFoundationReportJsonSchemaValidationValid(
+    const FoundationReportJsonSchemaValidation& validation) {
+    return validation.valid == validation.reasons.empty();
+}
+
+std::optional<std::string> ExtractQuotedJsonFieldValue(
+    std::string_view json,
+    std::string_view field) {
+    const std::string prefix =
+        "\"" + std::string(field) + "\":\"";
+
+    const std::size_t field_position =
+        json.find(prefix);
+
+    if (field_position == std::string_view::npos) {
+        return std::nullopt;
+    }
+
+    const std::size_t value_start =
+        field_position + prefix.size();
+
+    std::string value;
+    bool escaped = false;
+
+    for (std::size_t index = value_start;
+         index < json.size();
+         ++index) {
+        const char character = json[index];
+
+        if (!escaped && character == '"') {
+            return value;
+        }
+
+        if (!escaped && character == '\\') {
+            escaped = true;
+            value.push_back(character);
+            continue;
+        }
+
+        value.push_back(character);
+        escaped = false;
+    }
+
+    return std::nullopt;
+}
+
+void AddFoundationReportJsonSchemaReason(
+    FoundationReportJsonSchemaValidation& validation,
+    bool condition,
+    std::string_view reason) {
+    if (!condition) {
+        validation.reasons.emplace_back(reason);
+    }
+}
+
+FoundationReportJsonSchemaValidation
+ValidateFoundationReportJsonSchema(
+    std::string_view json,
+    std::string_view expected_schema_version =
+        "foundation_report_v1") {
+    FoundationReportJsonSchemaValidation validation;
+
+    AddFoundationReportJsonSchemaReason(
+        validation,
+        !json.empty(),
+        "foundation report JSON must not be empty");
+
+    AddFoundationReportJsonSchemaReason(
+        validation,
+        json.size() >= 2U &&
+            json.front() == '{' &&
+            json.back() == '}',
+        "foundation report JSON must be an object");
+
+    if (!validation.reasons.empty()) {
+        return validation;
+    }
+
+    const auto schema_version =
+        ExtractQuotedJsonFieldValue(
+            json,
+            "schema_version");
+
+    AddFoundationReportJsonSchemaReason(
+        validation,
+        schema_version.has_value(),
+        "foundation report JSON schema_version is missing or invalid");
+
+    if (schema_version.has_value()) {
+        validation.schema_version = *schema_version;
+
+        AddFoundationReportJsonSchemaReason(
+            validation,
+            validation.schema_version ==
+                expected_schema_version,
+            "foundation report JSON schema_version is incompatible");
+    }
+
+    std::size_t previous_position = 0U;
+
+    for (const std::string& field :
+         FoundationReportJsonFieldOrder()) {
+        const std::string key =
+            "\"" + field + "\":";
+
+        const std::size_t position =
+            json.find(key);
+
+        AddFoundationReportJsonSchemaReason(
+            validation,
+            position != std::string_view::npos,
+            "foundation report JSON required field is missing: " +
+                field);
+
+        if (position != std::string_view::npos) {
+            AddFoundationReportJsonSchemaReason(
+                validation,
+                position >= previous_position,
+                "foundation report JSON field order is invalid: " +
+                    field);
+
+            previous_position = position + key.size();
+        }
+    }
+
+    for (std::size_t left = 0U;
+         left < FoundationReportJsonFieldOrder().size();
+         ++left) {
+        const std::string key =
+            "\"" + FoundationReportJsonFieldOrder()[left] +
+            "\":";
+
+        const std::size_t first_position =
+            json.find(key);
+
+        const std::size_t duplicate_position =
+            first_position == std::string_view::npos
+                ? std::string_view::npos
+                : json.find(
+                    key,
+                    first_position + key.size());
+
+        AddFoundationReportJsonSchemaReason(
+            validation,
+            duplicate_position == std::string_view::npos,
+            "foundation report JSON field is duplicated: " +
+                FoundationReportJsonFieldOrder()[left]);
+    }
+
+    validation.valid = validation.reasons.empty();
+    return validation;
+}
+
+std::string ExplainFoundationReportJsonSchemaValidation(
+    const FoundationReportJsonSchemaValidation& validation) {
+    if (!IsFoundationReportJsonSchemaValidationValid(
+            validation)) {
+        throw std::invalid_argument(
+            "foundation report JSON schema validation is inconsistent");
+    }
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+
+    output << "foundation_report_json_schema_validation\n";
+    output << "valid="
+           << (validation.valid ? "true" : "false")
+           << '\n';
+    output << "schema_version="
+           << (validation.schema_version.empty()
+                   ? "none"
+                   : validation.schema_version)
+           << '\n';
+    output << "required_field_count="
+           << FoundationReportJsonFieldOrder().size()
+           << '\n';
+    output << "reason_count="
+           << validation.reasons.size()
+           << '\n';
+
+    for (std::size_t index = 0U;
+         index < validation.reasons.size();
+         ++index) {
+        output << "reason_" << index << '='
+               << validation.reasons[index] << '\n';
+    }
+
+    return output.str();
+}
+
+bool FoundationReportJsonSchemaValidatorSelfTest() {
+    const FoundationReport report{
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        0.125,
+        0.875,
+        0.625,
+        true
+    };
+
+    const std::string valid_json =
+        serialize_foundation_report_json(report);
+
+    const FoundationReportJsonSchemaValidation valid =
+        ValidateFoundationReportJsonSchema(valid_json);
+
+    if (!valid.valid ||
+        valid.schema_version != "foundation_report_v1" ||
+        !valid.reasons.empty() ||
+        !IsFoundationReportJsonSchemaValidationValid(valid)) {
+        return false;
+    }
+
+    const std::string explanation =
+        ExplainFoundationReportJsonSchemaValidation(valid);
+
+    if (explanation.find(
+            "foundation_report_json_schema_validation") ==
+            std::string::npos ||
+        explanation.find("valid=true") ==
+            std::string::npos ||
+        explanation.find(
+            "schema_version=foundation_report_v1") ==
+            std::string::npos ||
+        explanation.find("required_field_count=12") ==
+            std::string::npos ||
+        explanation.find("reason_count=0") ==
+            std::string::npos) {
+        return false;
+    }
+
+    const FoundationReportJsonSchemaValidation wrong_version =
+        ValidateFoundationReportJsonSchema(
+            valid_json,
+            "foundation_report_v2");
+
+    if (wrong_version.valid ||
+        wrong_version.reasons.size() != 1U ||
+        wrong_version.reasons.front() !=
+            "foundation report JSON schema_version is incompatible") {
+        return false;
+    }
+
+    const std::string missing_field =
+        "{\"schema_version\":\"foundation_report_v1\","
+        "\"private_heat_accepted\":true}";
+
+    const FoundationReportJsonSchemaValidation missing =
+        ValidateFoundationReportJsonSchema(missing_field);
+
+    if (missing.valid ||
+        missing.reasons.empty() ||
+        missing.schema_version != "foundation_report_v1") {
+        return false;
+    }
+
+    const std::string reordered =
+        "{\"schema_version\":\"foundation_report_v1\","
+        "\"threat_fail_closed\":false,"
+        "\"private_heat_accepted\":true,"
+        "\"water_biodiversity_allowed\":true,"
+        "\"water_biodiversity_invariant_holds\":true,"
+        "\"authorization_accepted\":true,"
+        "\"invasive_control_safe\":true,"
+        "\"irrigation_robustly_feasible\":true,"
+        "\"maximum_risk_of_harm\":0.125000,"
+        "\"knowledge_factor\":0.875000,"
+        "\"eco_impact_value\":0.625000,"
+        "\"foundation_safe\":true}";
+
+    const FoundationReportJsonSchemaValidation reordered_validation =
+        ValidateFoundationReportJsonSchema(reordered);
+
+    if (reordered_validation.valid ||
+        std::find(
+            reordered_validation.reasons.begin(),
+            reordered_validation.reasons.end(),
+            "foundation report JSON field order is invalid: private_heat_accepted") ==
+            reordered_validation.reasons.end()) {
+        return false;
+    }
+
+    const std::string duplicated =
+        valid_json.substr(0U, valid_json.size() - 1U) +
+        ",\"foundation_safe\":true}";
+
+    const FoundationReportJsonSchemaValidation duplicate =
+        ValidateFoundationReportJsonSchema(duplicated);
+
+    if (duplicate.valid ||
+        std::find(
+            duplicate.reasons.begin(),
+            duplicate.reasons.end(),
+            "foundation report JSON field is duplicated: foundation_safe") ==
+            duplicate.reasons.end()) {
+        return false;
+    }
+
+    const FoundationReportJsonSchemaValidation malformed =
+        ValidateFoundationReportJsonSchema("not_json");
+
+    if (malformed.valid ||
+        malformed.reasons.size() != 1U ||
+        malformed.reasons.front() !=
+            "foundation report JSON must be an object") {
+        return false;
+    }
+
+    return true;
+}
+
+}
+
+namespace prometheus_praxis_foundation_extensions {
+
+struct MarkdownTableColumn {
+    std::string header;
+    bool right_aligned{};
+};
+
+struct MarkdownTableRow {
+    std::vector<std::string> cells;
+};
+
+bool IsMarkdownTableCellValid(
+    std::string_view cell) {
+    return cell.find_first_of("\r\n") ==
+               std::string_view::npos &&
+           cell.find('|') == std::string_view::npos;
+}
+
+bool IsMarkdownTableColumnValid(
+    const MarkdownTableColumn& column) {
+    return !column.header.empty() &&
+           IsMarkdownTableCellValid(column.header);
+}
+
+bool IsMarkdownTableRowValid(
+    const MarkdownTableRow& row,
+    std::size_t expected_column_count) {
+    if (expected_column_count == 0U ||
+        row.cells.size() != expected_column_count) {
+        return false;
+    }
+
+    return std::all_of(
+        row.cells.begin(),
+        row.cells.end(),
+        [](const std::string& cell) {
+            return IsMarkdownTableCellValid(cell);
+        });
+}
+
+std::string TrimMarkdownTableCell(
+    std::string_view cell) {
+    std::size_t first = 0U;
+    std::size_t last = cell.size();
+
+    while (first < last &&
+           (cell[first] == ' ' || cell[first] == '\t')) {
+        ++first;
+    }
+
+    while (last > first &&
+           (cell[last - 1U] == ' ' || cell[last - 1U] == '\t')) {
+        --last;
+    }
+
+    return std::string(cell.substr(first, last - first));
+}
+
+std::vector<std::size_t> DetermineMarkdownColumnWidths(
+    const std::vector<MarkdownTableColumn>& columns,
+    const std::vector<MarkdownTableRow>& rows) {
+    if (columns.empty()) {
+        throw std::invalid_argument(
+            "markdown table must contain at least one column");
+    }
+
+    std::vector<std::size_t> widths;
+    widths.reserve(columns.size());
+
+    for (const auto& column : columns) {
+        if (!IsMarkdownTableColumnValid(column)) {
+            throw std::invalid_argument(
+                "markdown table column is invalid");
+        }
+
+        widths.push_back(std::max(
+            std::size_t{3U},
+            TrimMarkdownTableCell(column.header).size()));
+    }
+
+    for (const auto& row : rows) {
+        if (!IsMarkdownTableRowValid(row, columns.size())) {
+            throw std::invalid_argument(
+                "markdown table row is invalid");
+        }
+
+        for (std::size_t index = 0U;
+             index < row.cells.size();
+             ++index) {
+            widths[index] = std::max(
+                widths[index],
+                TrimMarkdownTableCell(row.cells[index]).size());
+        }
+    }
+
+    return widths;
+}
+
+std::string FormatMarkdownTableCell(
+    std::string_view cell,
+    std::size_t width,
+    bool right_aligned) {
+    const std::string trimmed =
+        TrimMarkdownTableCell(cell);
+
+    if (trimmed.size() > width) {
+        throw std::invalid_argument(
+            "markdown table cell exceeds computed width");
+    }
+
+    const std::size_t padding =
+        width - trimmed.size();
+
+    if (right_aligned) {
+        return std::string(padding, ' ') + trimmed;
+    }
+
+    return trimmed + std::string(padding, ' ');
+}
+
+std::string BuildMarkdownTableSeparator(
+    std::size_t width,
+    bool right_aligned) {
+    if (width < 3U) {
+        throw std::invalid_argument(
+            "markdown table separator width must be at least three");
+    }
+
+    if (right_aligned) {
+        return std::string(width - 1U, '-') + ":";
+    }
+
+    return ":" + std::string(width - 1U, '-');
+}
+
+std::string FormatMarkdownTable(
+    const std::vector<MarkdownTableColumn>& columns,
+    const std::vector<MarkdownTableRow>& rows) {
+    const std::vector<std::size_t> widths =
+        DetermineMarkdownColumnWidths(columns, rows);
+
+    std::ostringstream output;
+    output.imbue(std::locale::classic());
+
+    output << '|';
+
+    for (std::size_t index = 0U;
+         index < columns.size();
+         ++index) {
+        output << ' '
+               << FormatMarkdownTableCell(
+                      columns[index].header,
+                      widths[index],
+                      columns[index].right_aligned)
+               << " |";
+    }
+
+    output << '\n' << '|';
+
+    for (std::size_t index = 0U;
+         index < columns.size();
+         ++index) {
+        output << ' '
+               << BuildMarkdownTableSeparator(
+                      widths[index],
+                      columns[index].right_aligned)
+               << " |";
+    }
+
+    output << '\n';
+
+    for (const auto& row : rows) {
+        output << '|';
+
+        for (std::size_t index = 0U;
+             index < row.cells.size();
+             ++index) {
+            output << ' '
+                   << FormatMarkdownTableCell(
+                          row.cells[index],
+                          widths[index],
+                          columns[index].right_aligned)
+                   << " |";
+        }
+
+        output << '\n';
+    }
+
+    return output.str();
+}
+
+std::size_t CountMarkdownTableRows(
+    std::string_view table) {
+    std::size_t row_count = 0U;
+    std::size_t position = 0U;
+
+    while (position < table.size()) {
+        const std::size_t end =
+            table.find('\n', position);
+
+        const std::size_t length =
+            end == std::string_view::npos
+                ? table.size() - position
+                : end - position;
+
+        const std::string_view line =
+            table.substr(position, length);
+
+        if (!line.empty() &&
+            line.front() == '|' &&
+            line.back() == '|') {
+            ++row_count;
+        }
+
+        if (end == std::string_view::npos) {
+            break;
+        }
+
+        position = end + 1U;
+    }
+
+    return row_count;
+}
+
+bool IsMarkdownTableSeparatorLine(
+    std::string_view line) {
+    if (line.size() < 7U ||
+        line.front() != '|' ||
+        line.back() != '|') {
+        return false;
+    }
+
+    for (const char character : line) {
+        if (character != '|' &&
+            character != ' ' &&
+            character != ':' &&
+            character != '-') {
+            return false;
+        }
+    }
+
+    return line.find("---") != std::string_view::npos;
+}
+
+bool MarkdownTableColumnAlignerSelfTest() {
+    const std::vector<MarkdownTableColumn> columns{
+        {"Stage", false},
+        {"Status", false},
+        {"Score", true}
+    };
+
+    const std::vector<MarkdownTableRow> rows{
+        {{"private_heat", "pass", "0.900000"}},
+        {{"threat_containment", "fail", "0.000000"}}
+    };
+
+    const std::string table =
+        FormatMarkdownTable(columns, rows);
+
+    const std::string expected =
+        "| Stage              | Status |    Score |\n"
+        "| :----------------- | :----- | -------: |\n"
+        "| private_heat       | pass   | 0.900000 |\n"
+        "| threat_containment | fail   | 0.000000 |\n";
+
+    if (table != expected ||
+        CountMarkdownTableRows(table) != 4U) {
+        return false;
+    }
+
+    const std::size_t separator_start =
+        table.find('\n') + 1U;
+
+    const std::size_t separator_end =
+        table.find('\n', separator_start);
+
+    if (separator_start == std::string::npos ||
+        separator_end == std::string::npos ||
+        !IsMarkdownTableSeparatorLine(
+            std::string_view(table).substr(
+                separator_start,
+                separator_end - separator_start))) {
+        return false;
+    }
+
+    const std::vector<std::size_t> widths =
+        DetermineMarkdownColumnWidths(columns, rows);
+
+    if (widths.size() != 3U ||
+        widths[0] != 18U ||
+        widths[1] != 6U ||
+        widths[2] != 8U) {
+        return false;
+    }
+
+    const std::vector<MarkdownTableRow> invalid_rows{
+        {{"too", "few"}}
+    };
+
+    try {
+        static_cast<void>(
+            FormatMarkdownTable(columns, invalid_rows));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    const std::vector<MarkdownTableColumn> invalid_columns{
+        {"Invalid|Header", false}
+    };
+
+    try {
+        static_cast<void>(
+            FormatMarkdownTable(invalid_columns, {}));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    const std::vector<MarkdownTableRow> invalid_cell_rows{
+        {{"valid", "invalid|cell", "0.0"}}
+    };
+
+    try {
+        static_cast<void>(
+            FormatMarkdownTable(columns, invalid_cell_rows));
+        return false;
+    } catch (const std::invalid_argument&) {
+    }
+
+    return true;
+}
+
+}
