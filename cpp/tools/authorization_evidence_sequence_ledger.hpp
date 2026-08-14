@@ -1,9 +1,13 @@
 // File: cpp/tools/authorization_evidence_sequence_ledger.hpp
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
+
+namespace prometheus_praxis::foundation::authorization {
 
 struct AuthorizationSequenceLedgerEntry {
     std::uint64_t sequence{};
@@ -29,6 +33,10 @@ public:
 
     const std::vector<AuthorizationSequenceLedgerEntry>& Entries() const noexcept;
 
+    std::size_t Size() const noexcept;
+
+    std::optional<AuthorizationSequenceLedgerEntry> Latest() const;
+
 private:
     std::vector<AuthorizationSequenceLedgerEntry> entries_;
 };
@@ -42,4 +50,10 @@ std::string ExplainAuthorizationEvidenceSequenceLedger(
     const AuthorizationEvidenceSequenceLedger& ledger,
     const AuthorizationEvidenceSequenceLedgerAudit& audit);
 
+AuthorizationEvidenceSequenceLedger MergeLedgers(
+    const AuthorizationEvidenceSequenceLedger& left,
+    const AuthorizationEvidenceSequenceLedger& right);
+
 bool AuthorizationEvidenceSequenceLedgerSelfTest();
+
+}  // namespace prometheus_praxis::foundation::authorization
