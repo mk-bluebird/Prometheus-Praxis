@@ -4,7 +4,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
+
+namespace prometheus_praxis::foundation::authorization {
 
 struct AuthorizationEvidence {
     std::uint64_t sequence{};
@@ -37,7 +40,7 @@ struct ProofCheckedDispatchReplay {
 };
 
 ProofCheckedDispatchReplay ReplayProofCheckedDispatch(
-    const std::string& policy_identifier,
+    std::string_view policy_identifier,
     const std::vector<AuthorizationReplayRecord>& records);
 
 std::string DescribeAuthorizationReplayOutcome(
@@ -47,4 +50,9 @@ std::string DescribeAuthorizationReplayOutcome(
 std::string ExplainProofCheckedDispatchReplay(
     const ProofCheckedDispatchReplay& replay);
 
+bool IsReplayInternallyConsistent(
+    const ProofCheckedDispatchReplay& replay);
+
 bool ProofCheckedDispatchReplaySelfTest();
+
+}  // namespace prometheus_praxis::foundation::authorization
