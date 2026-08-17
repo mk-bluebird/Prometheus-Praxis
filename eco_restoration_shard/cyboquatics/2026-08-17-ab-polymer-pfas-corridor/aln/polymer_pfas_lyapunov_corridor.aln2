@@ -1,0 +1,130 @@
+aln2-spec "polymer-pfas-lyapunov-corridor-2026-08-17" {
+  version: 2
+  license: "MIT OR Apache-2.0"
+}
+
+did-root {
+  primary: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+}
+
+particle polymer.fragmentationScreen {
+  id: "PHX-POLY-FRAG-20260817"
+  did: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+
+  input:
+    materialId: string
+    kHydPerDay: float
+    kPhotoPerDay: float
+    kFragPerDay: float
+    surfaceErosionPerDay: float
+    alpha: float
+    coarseParticleCount: float
+    fineParticleCount: float
+
+  ker-axis {
+    knowledge: k in [0.0, 1.0]
+    ecoImpact: e in [0.0, 1.0]
+    risk: r in [0.0, 1.0]
+    kerScore: k * (e - r)
+  }
+
+  require:
+    kHydPerDay >= 0.0
+    kPhotoPerDay >= 0.0
+    kFragPerDay >= 0.0
+    surfaceErosionPerDay >= 0.0
+    alpha > 0.0
+    coarseParticleCount >= 0.0
+    fineParticleCount >= 0.0
+
+  rule fragmentation.sizeResolutionRequired {
+    require:
+      coarseParticleCount > 0.0 && fineParticleCount > 0.0
+
+    effect:
+      report:
+        status: "TWO_SIZE_CLASSES_OBSERVED"
+        reason: "A scalar particle-count equation alone cannot establish distribution bimodality"
+  }
+}
+
+particle pfas.firstOrderChainCorridor {
+  id: "PHX-PFAS-CORRIDOR-20260817"
+  did: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+
+  input:
+    canalNodeId: string
+    chainId: string
+    intervalIndex: integer
+    terminalRatePerDay: float
+    residualNorm: float
+    epsilon: float
+    lambdaPerInterval: float
+
+  ker-axis {
+    knowledge: k in [0.0, 1.0]
+    ecoImpact: e in [0.0, 1.0]
+    risk: r in [0.0, 1.0]
+    kerScore: k * (e - r)
+  }
+
+  require:
+    intervalIndex >= 0
+    terminalRatePerDay > 0.0
+    residualNorm >= 0.0
+    epsilon > 0.0
+    lambdaPerInterval > 0.0
+
+  invariant residual.contractive:
+    residualNorm <= epsilon * exp(-lambdaPerInterval * intervalIndex)
+
+  rule residual.rejectOutsideCorridor {
+    require:
+      residualNorm > epsilon * exp(-lambdaPerInterval * intervalIndex)
+
+    effect:
+      report:
+        status: "RESIDUAL_CORRIDOR_VIOLATION"
+        reason: "PFAS state prediction requires investigation; no remediation claim may be made"
+  }
+}
+
+particle microbiology.coldSurvivalPotential {
+  id: "PHX-COLD-VIABILITY-20260817"
+  did: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+
+  input:
+    canalNodeId: string
+    potentialV: float
+    previousPotentialV: float
+    lambdaPerDay: float
+    epsilonPerDay: float
+    thermalResidual: float
+
+  ker-axis {
+    knowledge: k in [0.0, 1.0]
+    ecoImpact: e in [0.0, 1.0]
+    risk: r in [0.0, 1.0]
+    kerScore: k * (e - r)
+  }
+
+  require:
+    potentialV >= 0.0
+    previousPotentialV >= 0.0
+    lambdaPerDay > 0.0
+    epsilonPerDay >= 0.0
+    thermalResidual >= 0.0
+
+  invariant viability.practicalBound:
+    potentialV <= (1.0 - lambdaPerDay) * previousPotentialV + epsilonPerDay + thermalResidual
+
+  rule viability.reviewWinterDisturbance {
+    require:
+      thermalResidual > epsilonPerDay
+
+    effect:
+      report:
+        status: "THERMAL_DISTURBANCE_REVIEW_REQUIRED"
+        reason: "Observed cold-cycle disturbance exceeds the assumed bounded error"
+  }
+}
