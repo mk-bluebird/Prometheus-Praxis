@@ -1,0 +1,112 @@
+aln2-spec "pfas-cold-fog-corridor-2026-08-17" {
+  version: 2
+  license: "MIT OR Apache-2.0"
+}
+
+did-root {
+  primary: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+}
+
+particle qpudatashard.pfasColdResidual {
+  id: "PHX-PFAS-COLD-20260817"
+  did: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+
+  input:
+    concentrationCMgL: float
+    sedimentStateSKgM3: float
+    removalRatePerDay: float
+    partitionRateM3KgDay: float
+    releaseRatePerDay: float
+    settlingRatePerDay: float
+    lambdaMaxReal: float
+    corridorLimit: float
+
+  ker-axis {
+    knowledge: k in [0.0, 1.0]
+    ecoImpact: e in [0.0, 1.0]
+    risk: r in [0.0, 1.0]
+    kerScore: k * (e - r)
+  }
+
+  require:
+    concentrationCMgL >= 0.0
+    sedimentStateSKgM3 >= 0.0
+    removalRatePerDay >= 0.0
+    partitionRateM3KgDay >= 0.0
+    releaseRatePerDay >= 0.0
+    settlingRatePerDay >= 0.0
+    corridorLimit > 0.0
+
+  rule corridor.contracting {
+    require:
+      lambdaMaxReal < 0.0
+
+    effect:
+      report:
+        status: "CONTRACTING"
+        reason: "All local Jacobian eigenvalues have negative real parts"
+  }
+
+  rule corridor.review {
+    require:
+      lambdaMaxReal >= 0.0
+
+    effect:
+      report:
+        status: "NO_AUTOMATED_CORRIDOR_DECISION"
+        reason: "Residual contraction is absent or marginal; obtain site-specific review"
+  }
+}
+
+particle fogRouter.unmodeledMedia {
+  id: "PHX-FOG-MIXED-MEDIA-20260817"
+  did: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+
+  input:
+    oilMgL: float
+    tssMgL: float
+    turbidityNtu: float
+    oilThresholdMgL: float
+    tssThresholdMgL: float
+    turbidityThresholdNtu: float
+    pFog: integer
+
+  ker-axis {
+    knowledge: k in [0.0, 1.0]
+    ecoImpact: e in [0.0, 1.0]
+    risk: r in [0.0, 1.0]
+    kerScore: k * (e - r)
+  }
+
+  require:
+    oilMgL >= 0.0
+    tssMgL >= 0.0
+    turbidityNtu >= 0.0
+    oilThresholdMgL > 0.0
+    tssThresholdMgL > 0.0
+    turbidityThresholdNtu > 0.0
+    pFog = 0 || pFog = 1
+
+  rule fog.mixedMedia {
+    require:
+      oilMgL > oilThresholdMgL
+      && tssMgL > tssThresholdMgL
+      && turbidityNtu > turbidityThresholdNtu
+      && pFog = 1
+
+    effect:
+      report:
+        status: "UNMODELED_MIXED_OIL_WATER_SEDIMENT"
+        reason: "No modeled-water assumption is allowed for this sample"
+  }
+
+  rule fog.contextReview {
+    require:
+      pFog = 0
+
+    effect:
+      report:
+        status: "RETAIN_FOR_SAMPLING_AND_CONTEXT_REVIEW"
+        reason: "The three-condition FOG trigger was not jointly met"
+  }
+}
