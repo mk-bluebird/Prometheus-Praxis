@@ -1,0 +1,89 @@
+aln2-spec "multilayer-drainagedecay-calibration-2026-08-17" {
+  version: 2
+  license: "MIT OR Apache-2.0"
+}
+
+did-root {
+  primary: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+}
+
+particle drainagedecay.layerStack {
+  id: "PHX-LAYERED-DRAINAGEDECAY-20260817"
+  did: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+
+  input:
+    trainId: string
+    layerPosition: integer
+    removalFraction: float
+    influentConcentrationMgL: float
+    outletConcentrationMgL: float
+
+  ker-axis {
+    knowledge: k in [0.0, 1.0]
+    ecoImpact: e in [0.0, 1.0]
+    risk: r in [0.0, 1.0]
+    kerScore: k * (e - r)
+  }
+
+  require:
+    layerPosition >= 1
+    removalFraction >= 0.0
+    removalFraction <= 1.0
+    influentConcentrationMgL >= 0.0
+    outletConcentrationMgL >= 0.0
+
+  rule layer.fullRemoval {
+    require:
+      removalFraction = 1.0
+
+    effect:
+      report:
+        status: "ZERO_OUTLET_FROM_THIS_MODEL"
+        reason: "A unit removal fraction yields a zero product term"
+  }
+}
+
+particle drainagedecay.onlineDecayCalibration {
+  id: "PHX-DECAY-RLS-20260817"
+  did: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+
+  input:
+    metricName: string
+    elapsedDays: float
+    concentrationMgL: float
+    referenceConcentrationMgL: float
+    flowM3S: float
+    flowDriftFraction: float
+    forgettingFactor: float
+    covariance: float
+    kPerDay: float
+
+  ker-axis {
+    knowledge: k in [0.0, 1.0]
+    ecoImpact: e in [0.0, 1.0]
+    risk: r in [0.0, 1.0]
+    kerScore: k * (e - r)
+  }
+
+  require:
+    metricName = "BOD_MG_L" || metricName = "TSS_MG_L" || metricName = "CEC_PROXY_MG_L"
+    elapsedDays > 0.0
+    concentrationMgL > 0.0
+    referenceConcentrationMgL > 0.0
+    flowM3S >= 0.0
+    flowDriftFraction >= 0.0
+    forgettingFactor > 0.0
+    forgettingFactor <= 1.0
+    covariance > 0.0
+    kPerDay >= 0.0
+
+  rule calibration.flowDrift {
+    require:
+      flowDriftFraction > 0.25
+
+    effect:
+      report:
+        status: "HOLD_FOR_HYDRAULIC_REVIEW"
+        reason: "Large flow drift can confound an effective first-order decay estimate"
+  }
+}
