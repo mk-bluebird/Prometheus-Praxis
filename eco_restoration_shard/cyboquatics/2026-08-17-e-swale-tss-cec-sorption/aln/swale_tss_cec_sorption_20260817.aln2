@@ -1,0 +1,98 @@
+aln2-spec "swale-tss-cec-sorption-2026-08-17" {
+  version: 2
+  license: "MIT OR Apache-2.0"
+}
+
+did-root {
+  primary: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+}
+
+particle drainagedecay.swaleTss {
+  id: "PHX-SWALE-TSS-20260817"
+  did: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+
+  input:
+    lengthM: float
+    velocityMPerH: float
+    slopeFraction: float
+    vegetationDensity: float
+    hydraulicLoadingMPerH: float
+    tssRemovalFraction: float
+    fittedKTssPerH: float
+
+  ker-axis {
+    knowledge: k in [0.0, 1.0]
+    ecoImpact: e in [0.0, 1.0]
+    risk: r in [0.0, 1.0]
+    kerScore: k * (e - r)
+  }
+
+  require:
+    lengthM > 0.0
+    velocityMPerH > 0.0
+    slopeFraction >= 0.0
+    slopeFraction <= 1.0
+    vegetationDensity >= 0.0
+    vegetationDensity <= 1.0
+    hydraulicLoadingMPerH >= 0.0
+    tssRemovalFraction >= 0.0
+    tssRemovalFraction <= 1.0
+    fittedKTssPerH >= 0.0
+
+  rule swale.reviewLowRemoval {
+    require:
+      tssRemovalFraction < 0.25
+
+    effect:
+      report:
+        status: "REVIEW_HYDRAULICS_OR_MEDIA"
+        reason: "Low observed removal requires review of velocity, vegetation, slope, sediment, and loading context"
+  }
+}
+
+particle drainagedecay.langmuirMedia {
+  id: "PHX-CEC-SORPTION-20260817"
+  did: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+
+  input:
+    mediaType: string
+    biocharMassFraction: float
+    cecCmolcPerKg: float
+    equilibriumConcentrationMgL: float
+    sorbedLoadingMgPerG: float
+    qmaxMgPerG: float
+    kLPerMg: float
+    ph: float
+    temperatureC: float
+
+  ker-axis {
+    knowledge: k in [0.0, 1.0]
+    ecoImpact: e in [0.0, 1.0]
+    risk: r in [0.0, 1.0]
+    kerScore: k * (e - r)
+  }
+
+  require:
+    mediaType = "BIOCHAR" || mediaType = "SAND" || mediaType = "BIOCHAR_SAND_BLEND"
+    biocharMassFraction >= 0.0
+    biocharMassFraction <= 1.0
+    cecCmolcPerKg >= 0.0
+    equilibriumConcentrationMgL >= 0.0
+    sorbedLoadingMgPerG >= 0.0
+    qmaxMgPerG > 0.0
+    kLPerMg > 0.0
+    ph >= 0.0
+    ph <= 14.0
+    temperatureC >= -5.0
+    temperatureC <= 60.0
+
+  rule media.lowEvidence {
+    require:
+      cecCmolcPerKg = 0.0
+
+    effect:
+      report:
+        status: "REVIEW_MEDIA_CHARACTERIZATION"
+        reason: "CEC and equilibrium test evidence are required before restoration-media selection"
+  }
+}
