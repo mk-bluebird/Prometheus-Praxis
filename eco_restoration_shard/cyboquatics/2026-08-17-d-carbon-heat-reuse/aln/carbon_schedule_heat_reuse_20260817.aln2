@@ -1,0 +1,101 @@
+aln2-spec "carbon-schedule-heat-reuse-2026-08-17" {
+  version: 2
+  license: "MIT OR Apache-2.0"
+}
+
+did-root {
+  primary: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+}
+
+particle cyboquatic.carbonNegativeSchedule {
+  id: "PHX-CARBON-SCHEDULE-20260817"
+  did: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+
+  input:
+    workloadId: string
+    energyreqJ: float
+    sequesteredKgCo2e: float
+    emittedKgCo2e: float
+    netCarbonKgCo2e: float
+    energyBudgetJ: float
+    scheduled: boolean
+
+  ker-axis {
+    knowledge: k in [0.0, 1.0]
+    ecoImpact: e in [0.0, 1.0]
+    risk: r in [0.0, 1.0]
+    kerScore: k * (e - r)
+  }
+
+  require:
+    energyreqJ > 0.0
+    sequesteredKgCo2e >= 0.0
+    emittedKgCo2e >= 0.0
+    netCarbonKgCo2e = sequesteredKgCo2e - emittedKgCo2e
+    energyBudgetJ >= 0.0
+
+  rule schedule.carbonPositive {
+    require:
+      scheduled = true
+      && netCarbonKgCo2e > 0.0
+      && energyreqJ <= energyBudgetJ
+
+    effect:
+      report:
+        status: "CARBON_POSITIVE_CANDIDATE"
+        reason: "The scheduled workload has positive estimated net carbon benefit within budget"
+  }
+}
+
+particle cyboquatic.heatReuse {
+  id: "PHX-HEAT-REUSE-20260817"
+  did: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+
+  input:
+    sinkType: string
+    aiEnergyJ: float
+    heatRecoveryEfficiency: float
+    reusableHeatJ: float
+    heatDemandJ: float
+    allocatedHeatJ: float
+    currentTemperatureC: float
+    targetMaxTemperatureC: float
+
+  ker-axis {
+    knowledge: k in [0.0, 1.0]
+    ecoImpact: e in [0.0, 1.0]
+    risk: r in [0.0, 1.0]
+    kerScore: k * (e - r)
+  }
+
+  require:
+    aiEnergyJ >= 0.0
+    heatRecoveryEfficiency >= 0.0
+    heatRecoveryEfficiency <= 1.0
+    reusableHeatJ = aiEnergyJ * heatRecoveryEfficiency
+    heatDemandJ >= 0.0
+    allocatedHeatJ >= 0.0
+    allocatedHeatJ <= reusableHeatJ
+    allocatedHeatJ <= heatDemandJ
+    currentTemperatureC <= targetMaxTemperatureC
+
+  rule heatReuse.excludeCanal {
+    require:
+      sinkType = "CANAL_WATER"
+
+    effect:
+      report:
+        status: "REJECT_CANAL_WATER_WARMING"
+        reason: "Automatic thermal discharge to canal water is excluded for habitat protection"
+  }
+
+  rule heatReuse.screenGreenhouseOrCompost {
+    require:
+      sinkType = "GREENHOUSE" || sinkType = "COMPOST"
+
+    effect:
+      report:
+        status: "ELIGIBLE_FOR_SITE_THERMAL_REVIEW"
+        reason: "Thermal reuse is constrained by demand, temperature, and local operating approval"
+  }
+}
