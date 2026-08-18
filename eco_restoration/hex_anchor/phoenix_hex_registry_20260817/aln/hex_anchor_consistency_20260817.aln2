@@ -1,0 +1,62 @@
+aln2-spec "phoenix-hex-anchor-consistency-2026-08-17" {
+  version: 2
+  license: "MIT OR Apache-2.0"
+}
+
+did-root {
+  primary: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+}
+
+particle phoenix.hexAnchor {
+  id: "PHX-HEX-ANCHOR-CONSISTENCY-20260817"
+  did: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+
+  input:
+    gridVersion: string
+    anchorCode: string
+    q: integer
+    r: integer
+    s: integer
+    neighborQ: integer
+    neighborR: integer
+    neighborS: integer
+    centerXMeters: float
+    centerYMeters: float
+    hexSideLengthMeters: float
+
+  ker-axis {
+    knowledge: k in [0.0, 1.0]
+    ecoImpact: e in [0.0, 1.0]
+    risk: r in [0.0, 1.0]
+    kerScore: k * (e - r)
+  }
+
+  require:
+    gridVersion != ""
+    anchorCode != ""
+    hexSideLengthMeters > 0.0
+    q + r + s = 0
+    neighborQ + neighborR + neighborS = 0
+
+  invariant:
+    s = -q - r
+    neighborS = -neighborQ - neighborR
+    q + r + s = 0
+    neighborQ + neighborR + neighborS = 0
+    abs(neighborQ - q) <= 1
+    abs(neighborR - r) <= 1
+    abs(neighborS - s) <= 1
+    abs(neighborQ - q) + abs(neighborR - r) + abs(neighborS - s) = 2
+
+  rule anchor.validNeighbor {
+    require:
+      q + r + s = 0
+      && neighborQ + neighborR + neighborS = 0
+      && abs(neighborQ - q) + abs(neighborR - r) + abs(neighborS - s) = 2
+
+    effect:
+      report:
+        status: "VALID_HEX_NEIGHBOR"
+        reason: "Anchor and adjacent anchor preserve cube-coordinate sum-zero and one-step adjacency"
+  }
+}
