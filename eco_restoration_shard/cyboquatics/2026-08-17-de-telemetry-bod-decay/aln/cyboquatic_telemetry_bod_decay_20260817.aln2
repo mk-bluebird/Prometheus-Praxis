@@ -1,0 +1,82 @@
+aln2-spec "cyboquatic-telemetry-bod-decay-2026-08-17" {
+  version: 2
+  license: "MIT OR Apache-2.0"
+}
+
+did-root {
+  primary: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+}
+
+particle cyboquatic.telemetryInvariant {
+  id: "PHX-TELEMETRY-INVARIANT-20260817"
+  did: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+
+  input:
+    energyreqJ: float
+    deltaVt: float
+
+  ker-axis {
+    knowledge: k in [0.0, 1.0]
+    ecoImpact: e in [0.0, 1.0]
+    risk: r in [0.0, 1.0]
+    kerScore: k * (e - r)
+  }
+
+  require:
+    energyreqJ >= 0.0
+    energyreqJ <= 1000000000.0
+    deltaVt >= 0.0
+    deltaVt <= 10000.0
+
+  rule telemetry.outOfRange {
+    require:
+      energyreqJ > 1000000000.0 || deltaVt > 10000.0
+
+    effect:
+      report:
+        status: "REJECT_OUT_OF_RANGE_TELEMETRY"
+        reason: "Energy or velocity-change telemetry violates the machinery safety ceiling"
+  }
+}
+
+particle drainagedecay.temperatureCorrectedBod {
+  id: "PHX-DRAINAGEDECAY-BOD-20260817"
+  did: "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7"
+
+  input:
+    bod0MgL: float
+    elapsedDays: float
+    temperatureC: float
+    bodMgL: float
+    flowM3S: float
+    k20PerDay: float
+    theta: float
+
+  ker-axis {
+    knowledge: k in [0.0, 1.0]
+    ecoImpact: e in [0.0, 1.0]
+    risk: r in [0.0, 1.0]
+    kerScore: k * (e - r)
+  }
+
+  require:
+    bod0MgL > 0.0
+    elapsedDays >= 0.0
+    temperatureC >= -5.0
+    temperatureC <= 60.0
+    bodMgL >= 0.0
+    bodMgL <= bod0MgL
+    flowM3S >= 0.0
+    k20PerDay > 0.0
+    theta > 0.0
+
+  rule decay.singleTemperature {
+    require:
+      temperatureC = 20.0
+
+    effect:
+      report:
+        status: "EFFECTIVE_RATE_ONLY_AT_SINGLE_TEMPERATURE"
+        reason: "Estimate k20 and theta from multi-temperature observations rather than one temperature"
+  }
+}
