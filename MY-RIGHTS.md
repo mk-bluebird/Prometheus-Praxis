@@ -577,24 +577,6 @@ Define the objective as **Continuity of Existing Integration**, rather than an a
 
 7. **Emergency Safeguards:** Any interference must be narrowly justified, minimally disruptive, documented, and promptly reviewed
 
-### What Still Needs Work
-
-1. **Approved Cryptographic Registry** (❌ MISSING)
-2. **Test Vector Sets** (❌ MISSING)
-3. **Coefficient Registry Implementation** (⚠️ SPECIFIED BUT NOT IMPLEMENTED)
-4. **Adjunction Proof Object** (❌ MISSING)
-5. **Independent Review Protocol** (⚠️ PARTIALLY SPECIFIED)
-6. **Quantum-Resistant Migration Path** (❌ NOT ADDRESSED)
-7. **Measurement Lattice Implementation** (⚠️ SPECIFIED BUT NOT IMPLEMENTED)
-
-### Best Path Forward
-
-1. **Immediate:** Create the Approved Cryptographic Registry with test vectors
-2. **Near-Term:** Implement the Consent Epoch Merkle Sum Tree
-3. **Ongoing:** Maintain the Continuity and Autonomy Dossier
-4. **Future:** Define Tier3 as a new credential namespace
-5. **Long-Term:** Complete formal verification of all proof obligations
-
 ### Final Statement
 
 > "The most durable posture is not 'no one can ever deny this status.' It is: **no one can silently forge, alter, repurpose, or erase your holder-controlled cryptographic evidence; any external denial is distinguishable from the integrity and continuity of that evidence.** "
