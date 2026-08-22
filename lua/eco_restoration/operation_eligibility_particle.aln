@@ -1,0 +1,56 @@
+particle PhoenixLakeHexOperationEligibilityV2 {
+  version = "2";
+  scope = "diagnostic_governance";
+  steward_did = "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7";
+
+  entity hex_anchor {
+    hex_anchor_id: text required;
+    resolution: integer range[0, 15] required;
+    consistency_status: text enum["consistent", "inconsistent", "unknown"] required;
+  }
+
+  entity lake_hex_threshold {
+    lake_id: text required;
+    hex_anchor_id: text required;
+    safe_water_level_m: decimal range[0.0, 1000000.0] required;
+    evidence_quality: decimal range[0.0, 1.0] required;
+    shoreline_vulnerability: decimal range[0.0, 1.0] required;
+  }
+
+  entity operation_assessment {
+    operation_id: text required;
+    hex_anchor_id: text required;
+    corridor_safe: boolean required;
+    knowledge_factor: decimal range[0.0, 1.0] required;
+    eco_impact_value: decimal range[0.0, 1.0] required;
+    harm_risk: decimal range[0.0, 1.0] required;
+    sovereign_veto: boolean required;
+    human_approval: boolean required;
+  }
+
+  policy thresholds {
+    tau_knowledge = 0.85;
+    tau_eco_impact = 0.50;
+    tau_harm_risk = 0.30;
+  }
+
+  invariant LakeHexThreshold {
+    require lake_hex_threshold.safe_water_level_m >= 0.0;
+    require lake_hex_threshold.evidence_quality >= thresholds.tau_knowledge;
+  }
+
+  invariant OperationEligible {
+    require operation_assessment.corridor_safe = true;
+    require hex_anchor.consistency_status = "consistent";
+    require operation_assessment.knowledge_factor >= thresholds.tau_knowledge;
+    require operation_assessment.eco_impact_value >= thresholds.tau_eco_impact;
+    require operation_assessment.harm_risk <= thresholds.tau_harm_risk;
+    require operation_assessment.sovereign_veto = false;
+    require operation_assessment.human_approval = true;
+  }
+
+  invariant NoAutomatedOverride {
+    require operation_assessment.sovereign_veto = true
+      implies operation_assessment.human_approval = false;
+  }
+}
