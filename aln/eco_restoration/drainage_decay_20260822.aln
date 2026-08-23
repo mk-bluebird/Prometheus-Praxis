@@ -1,0 +1,88 @@
+module DrainageDecay20260822
+
+type Scalar = Float
+type UnitInterval = Float
+
+record KER {
+  knowledge_factor: UnitInterval
+  eco_impact_value: UnitInterval
+  harm_risk: UnitInterval
+}
+
+record CanalNode {
+  canal_node_id: Text
+  maximum_bod_mg_l: Scalar
+  maximum_tss_mg_l: Scalar
+  minimum_cec_cmol_kg: Scalar
+  maximum_energyreq_j: Scalar
+  maximum_abs_delta_vt: Scalar
+}
+
+record FOGMedia {
+  fog_media_code: Text
+  modeled: Boolean
+  containment_required: Boolean
+  safe_discharge_allowed: Boolean
+}
+
+record DrainageFrame {
+  hours: Scalar
+  bod_mg_l: Scalar
+  tss_mg_l: Scalar
+  cec_cmol_kg: Scalar
+  energyreq_j: Scalar
+  delta_vt: Scalar
+  sample_completeness: UnitInterval
+  ker: KER
+}
+
+invariant UnitBound(value: Scalar) =
+  value >= 0.0 and value <= 1.0
+
+invariant ValidKER(value: KER) =
+  UnitBound(value.knowledge_factor) and
+  UnitBound(value.eco_impact_value) and
+  UnitBound(value.harm_risk)
+
+invariant ValidFrame(frame: DrainageFrame) =
+  frame.hours >= 0.0 and
+  frame.hours <= 8760.0 and
+  frame.bod_mg_l >= 0.0 and
+  frame.tss_mg_l >= 0.0 and
+  frame.cec_cmol_kg >= 0.0 and
+  frame.cec_cmol_kg <= 200.0 and
+  frame.energyreq_j >= 0.0 and
+  frame.delta_vt >= -1000.0 and
+  frame.delta_vt <= 1000.0 and
+  UnitBound(frame.sample_completeness) and
+  ValidKER(frame.ker)
+
+predicate NodeWithinLimits(node: CanalNode, frame: DrainageFrame) =
+  frame.bod_mg_l <= node.maximum_bod_mg_l and
+  frame.tss_mg_l <= node.maximum_tss_mg_l and
+  frame.cec_cmol_kg >= node.minimum_cec_cmol_kg and
+  frame.energyreq_j <= node.maximum_energyreq_j and
+  abs(frame.delta_vt) <= node.maximum_abs_delta_vt
+
+predicate FOGRestricted(media: FOGMedia) =
+  not media.modeled or media.containment_required
+
+predicate EligibleForSupervisedRestoration(
+  node: CanalNode,
+  media: FOGMedia,
+  frame: DrainageFrame
+) =
+  ValidFrame(frame) and
+  NodeWithinLimits(node, frame) and
+  not FOGRestricted(media) and
+  not media.safe_discharge_allowed == false and
+  frame.ker.knowledge_factor >= 0.70 and
+  frame.ker.eco_impact_value >= 0.70 and
+  frame.ker.harm_risk <= 0.25
+
+predicate RequiresManualContainmentReview(
+  media: FOGMedia,
+  frame: DrainageFrame
+) =
+  ValidFrame(frame) and
+  (FOGRestricted(media) or frame.ker.harm_risk > 0.50)
