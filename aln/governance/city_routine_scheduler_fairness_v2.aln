@@ -1,0 +1,52 @@
+particle prometheus_praxis.city_routine_scheduler_fairness.v2
+
+field candidate_id: text required
+field policy_id: text required
+field service_id: text required
+field area_id: text required
+field scheduled_at_epoch_seconds: integer required minimum 0
+field energy_joules: decimal required minimum 0
+field knowledge_factor: decimal required minimum 0 maximum 1
+field eco_impact_value: decimal required minimum 0 maximum 1
+field accessibility_risk: decimal required minimum 0 maximum 1
+field equity_floor_score: decimal required minimum 0 maximum 1
+field baseline_service_preserved: boolean required
+field supports_declared_cybernetic_host_need: boolean required
+field minimum_knowledge_factor: decimal required minimum 0 maximum 1
+field maximum_accessibility_risk: decimal required minimum 0 maximum 1
+field minimum_equity_floor: decimal required minimum 0 maximum 1
+field constraint_declared_voluntarily: boolean required
+field consent_active: boolean required
+field revocation_available: boolean required
+field identity_inference_used: boolean required
+
+derive EvidenceSufficient :=
+    knowledge_factor >= minimum_knowledge_factor
+
+derive AccessibilitySafe :=
+    accessibility_risk <= maximum_accessibility_risk
+
+derive EquityFloorSatisfied :=
+    equity_floor_score >= minimum_equity_floor
+
+derive BaselineServiceProtected :=
+    baseline_service_preserved == true
+
+derive ConstraintUsable :=
+    constraint_declared_voluntarily
+    AND consent_active
+    AND revocation_available
+    AND NOT identity_inference_used
+
+derive ScheduleAllowed :=
+    EvidenceSufficient
+    AND AccessibilitySafe
+    AND EquityFloorSatisfied
+    AND BaselineServiceProtected
+    AND supports_declared_cybernetic_host_need
+
+invariant NoBaselineServiceReduction := BaselineServiceProtected
+invariant CyberneticHostNeedsIncluded :=
+    supports_declared_cybernetic_host_need == true
+invariant NoIdentityInference := identity_inference_used == false
+invariant FairSchedule := ScheduleAllowed
