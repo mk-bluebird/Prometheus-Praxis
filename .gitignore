@@ -1,1 +1,39 @@
-Nothing needs to be added to .gitignore since the only change is adding a Python test file (.py), which is source code and should not be ignored.
+# Compiled and build artifacts
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.a
+*.out
+
+# Dependencies
+venv/
+.venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+target/
+.gradle/
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors
+.vscode/
+.idea/
+
+# Build and distribution
+build/
+dist/
+coverage/
+htmlcov/
+*.pyc
+*.class
