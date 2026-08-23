@@ -1,0 +1,38 @@
+particle prometheus_praxis.automatic_door_interlock.v2
+
+field event_id: text required
+field door_id: text required
+field observed_at_ms: integer required minimum 0
+field obstacle_detected: boolean required
+field forced_signal_detected: boolean required
+field resistance_newtons: decimal required minimum 0
+field resistance_threshold_newtons: decimal required minimum 0
+field sensor_evidence_sufficient: boolean required
+field requested_motion: enum[OPEN,HOLD_OPEN,REVERSE,CLOSE] required
+field no_biometric_classification_used: boolean required
+field equal_body_type_safety_required: boolean required
+field augmented_limb_or_device_protection_required: boolean required
+field knowledge_factor: decimal required minimum 0 maximum 1
+field eco_impact_value: decimal required minimum 0 maximum 1
+field harm_risk: decimal required minimum 0 maximum 1
+
+derive NoObstacle := obstacle_detected == false
+derive NoForcedSignal := forced_signal_detected == false
+derive NoResistanceAboveThreshold :=
+    resistance_newtons <= resistance_threshold_newtons
+
+derive SafeClose :=
+    NoObstacle
+    AND NoForcedSignal
+    AND NoResistanceAboveThreshold
+    AND sensor_evidence_sufficient
+
+derive CloseAllowed :=
+    requested_motion != CLOSE
+    OR SafeClose
+
+invariant DoorSafe := CloseAllowed
+invariant EqualSafety := equal_body_type_safety_required == true
+invariant NoBiometricDistinction := no_biometric_classification_used == true
+invariant AugmentedDeviceProtection :=
+    augmented_limb_or_device_protection_required == true
