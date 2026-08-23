@@ -2,6 +2,7 @@
 // Filename: cpp/eco_restoration/DrainageDecay20260822.cpp
 // Destination: cpp/eco_restoration/
 
+#include <algorithm>
 #include <cmath>
 #include <iomanip>
 #include <iostream>
