@@ -1,0 +1,21 @@
+Rank,Lake,County / Region,Basin Type,Primary Risk Drivers,Historical / Known Alerts,Priority Monitoring Lead,Baseline Vulnerability (0-1),Immediate Action if Worsening
+1,Alamo Lake,La Paz County,Shallow desert reservoir,Golden alga / low DO / high heat / rapid drawdown,Historical golden alga fish kills,AZGFD + ADEQ + USGS,0.92,Test DO at dawn; check pH; watch for golden water
+2,Bartlett Lake,Maricopa / Verde River,Narrow canyon reservoir,Summer oxygen sag / low inflow / warm coves,Past fish kills associated with low water,SRP + AZGFD,0.85,Measure temperature profile; check for fish piping
+3,Horseshoe Lake,Maricopa / Verde River,Very shallow reservoir,Extreme shallow depth / fast warming / low oxygen,Frequent low-water stress,SRP + AZGFD,0.88,Treat as high risk once surface temp > 28°C
+4,Patagonia Lake,Santa Cruz County,Small recreational lake,Nutrient loading / warm shallow basin / cyanobacteria,Occasional fish kills,AZGFD + ADEQ,0.80,Check chlorophyll-a and morning DO
+5,Parker Canyon Lake,Cochise County,Small montane lake,Stratification failure / summer oxygen loss,Localized fish kills in hot years,AZGFD,0.75,Monitor bottom DO if thermally stratified
+6,San Carlos Lake,Gila County,Shallow desert reservoir,Golden alga / rapid water-level decline,Recent lake-death event,AZGFD + USGS,0.90,Watch for recurrence; check tea-colored water
+7,Saguaro Lake,Maricopa / Salt River,Canyon reservoir with coves,Harmful algal bloom in shallow arms,Occasional cyanobacteria,SRP + AZGFD,0.70,Sample coves separately
+8,Lake Pleasant,Maricopa / Yavapai,Large desert reservoir,Localized HAB / heavy recreation / warm shallows,Cyanobacteria advisories possible,Bureau of Reclamation + ADEQ,0.65,Test near boat ramps and northern arms
+9,Tempe Town Lake,Maricopa County,Urban shallow lake,Urban heat / low flow / high nutrients,Past fish kills in extreme heat,City of Tempe + AZGFD,0.68,Check DO after hot nights
+10,Watson Lake,Yavapai / Prescott,Shallow urban lake,Cyanobacteria / nutrient-rich sediment,Occasional blue-green algae,City of Prescott + ADEQ,0.62,Test for cyanotoxins
+11,Willow Lake,Yavapai / Prescott,Shallow urban lake,Same as Watson Lake,Potential HAB,City of Prescott + ADEQ,0.60,Test for cyanotoxins
+12,Goldwater Lake,Yavapai / Prescott,Small forested lake,Thermal stratification / oxygen depletion,Possible summer fish stress,City of Prescott,0.55,Check bottom DO
+13,Show Low Lake,Navajo County,Small mountain lake,Warm shallow shoreline / nutrient input,Possible localized kills,AZGFD,0.52,Sample near inlet
+14,Fool Hollow Lake,Navajo County,Shallow shoreline areas,Summer oxygen sags,Occasional fish stress,AZGFD + ADEQ,0.50,Check DO near shore
+15,Woodland Lake,Navajo County,Urban lake,Warm / shallow / nutrient-rich,Potential cyanobacteria,Town of Pinetop-Lakeside + ADEQ,0.48,Monitor chlorophyll
+16,Canyon Lake,Maricopa / Salt River,Deep canyon reservoir,HAB in coves / low-oxygen pockets,Less frequent but possible,SRP + AZGFD,0.45,Sample quiet coves
+17,Apache Lake,Maricopa / Salt River,Long narrow reservoir,Warm shallow zones at low water,Historical golden alga concerns,SRP + AZGFD,0.50,Check near inlet
+18,Roosevelt Lake,Gila / Salt River,Large reservoir,Golden alga possible / upper-arm warming,Historical golden alga events,SRP + AZGFD,0.42,Watch for golden water in upper arms
+19,Lake Havasu,Mohave / Colorado River,Large regulated reservoir,HABs downstream of Lake Mead,Cyanobacteria advisories,Bureau of Reclamation + ADEQ,0.40,Check shallow backwaters
+20,Lake Mead,Mohave / Nevada,Very large reservoir,Persistent cyanobacteria in shallow basins,Long-term HAB advisories,NPS + Bureau of Reclamation + EPA CyAN,0.38,Use CyAN satellite for bloom extent
