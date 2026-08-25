@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Public Social Acceptance Dashboard | Augmented-Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.8/index.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    colors: {
+                        hub: {
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            200: '#99f6e4',
+                            300: '#5eead4',
+                            400: '#2dd4bf',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            700: '#0f766e',
+                            800: '#115e59',
+                            900: '#134e4a',
+                            950: '#042f2e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: #f8fafc;
+            color: #1e293b;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(226, 232, 240, 0.9);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+        }
+        .metric-ring {
+            transform: rotate(-90deg);
+        }
+        .metric-ring circle {
+            transition: stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .fade-in {
+            animation: fadeIn 0.8s ease-out forwards;
+            opacity: 0;
+        }
+        @keyframes fadeIn {
+            to { opacity: 1; transform: translateY(0); }
+            from { opacity: 0; transform: translateY(10px); }
+        }
+        .stagger-1 { animation-delay: 0.1s; }
+        .stagger-2 { animation-delay: 0.2s; }
+        .stagger-3 { animation-delay: 0.3s; }
+        .stagger-4 { animation-delay: 0.4s; }
+        
+        .alert-watch {
+            background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+            border-left: 4px solid #d97706;
+        }
+        .privacy-seal {
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+            border: 1px solid #6ee7b7;
+        }
+        
+        .tooltip-container {
+            position: relative;
+        }
+        .tooltip-container .tooltip-text {
+            visibility: hidden;
+            opacity: 0;
+            width: 220px;
+            background-color: #1e293b;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 8px 12px;
+            position: absolute;
+            z-index: 50;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -110px;
+            transition: opacity 0.3s;
+            font-size: 0.75rem;
+            line-height: 1.4;
+            pointer-events: none;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        .tooltip-container:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="min-h-screen text-slate-800">
+
+    <!-- Header -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 bg-hub-700 rounded-lg flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-bold text-slate-900 leading-tight">Public Social Acceptance Dashboard</h1>
+                        <p class="text-xs text-slate-500">Augmented-Hub • Phoenix-AZ Smart City Corridor</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="hidden md:flex items-center space-x-2 text-sm text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full">
+                        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        <span>2026-Q1 Reporting Period</span>
+                    </div>
+                    <div class="privacy-seal px-3 py-1.5 rounded-full flex items-center space-x-1.5">
+                        <svg class="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                        <span class="text-xs font-semibold text-emerald-800">Aggregate Only • Neuro-Rights Compliant</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- Alert Banner -->
+        <div class="alert-watch rounded-lg p-4 mb-8 fade-in stagger-1 flex items-start space-x-4">
+            <div class="flex-shrink-0 mt-0.5">
+                <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            </div>
+            <div class="flex-1">
+                <h3 class="text-sm font-bold text-amber-900">Alert Level: WATCH</h3>
+                <p class="text-sm text-amber-800 mt-1">Hostility score is 0.28 (Threshold: ≥ 0.20 and < 0.45). Review aggregate findings and invite accessible community feedback. Do not automate enforcement.</p>
+            </div>
+            <button class="flex-shrink-0 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold px-3 py-1.5 rounded-md transition-colors">
+                Initiate Review
+            </button>
+        </div>
+
+        <!-- Core Metrics Grid -->
+        <section class="mb-10">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-bold text-slate-900">Core Social Metrics</h2>
+                <span class="text-xs text-slate-500 font-medium">Snapshot ID: public-aggregate-period-reference</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" id="metrics-grid">
+                <!-- Metrics will be injected here -->
+            </div>
+        </section>
+
+        <!-- Infrastructure & Accessibility Metrics -->
+        <section class="mb-10 fade-in stagger-2">
+            <h2 class="text-xl font-bold text-slate-900 mb-6">Infrastructure & Accessibility Compliance</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="glass-card rounded-xl p-5 hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs font-semibold text-hub-700 uppercase tracking-wide">Gathering Hubs</span>
+                        <span class="w-8 h-8 bg-hub-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-4 h-4 text-hub-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                        </span>
+                    </div>
+                    <div class="text-3xl font-bold text-slate-900">0.82</div>
+                    <p class="text-xs text-slate-500 mt-1">Inclusive Design Score</p>
+                    <div class="mt-3 w-full bg-slate-100 rounded-full h-1.5">
+                        <div class="bg-hub-600 h-1.5 rounded-full" style="width: 82%"></div>
+                    </div>
+                    <p class="text-[10px] text-slate-400 mt-2">Quiet rooms, low-EMI zones, assistive compatibility verified.</p>
+                </div>
+
+                <div class="glass-card rounded-xl p-5 hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs font-semibold text-hub-700 uppercase tracking-wide">Corridors</span>
+                        <span class="w-8 h-8 bg-hub-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-4 h-4 text-hub-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg>
+                        </span>
+                    </div>
+                    <div class="text-3xl font-bold text-slate-900">0.91</div>
+                    <p class="text-xs text-slate-500 mt-1">Accessible Routing Compliance</p>
+                    <div class="mt-3 w-full bg-slate-100 rounded-full h-1.5">
+                        <div class="bg-hub-600 h-1.5 rounded-full" style="width: 91%"></div>
+                    </div>
+                    <p class="text-[10px] text-slate-400 mt-2">Curb ramps, tactile guidance, and surface quality verified.</p>
+                </div>
+
+                <div class="glass-card rounded-xl p-5 hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs font-semibold text-hub-700 uppercase tracking-wide">AT Bridge</span>
+                        <span class="w-8 h-8 bg-hub-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-4 h-4 text-hub-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        </span>
+                    </div>
+                    <div class="text-3xl font-bold text-slate-900">0.04</div>
+                    <p class="text-xs text-slate-500 mt-1">Assistive Fallback Rate</p>
+                    <div class="mt-3 w-full bg-slate-100 rounded-full h-1.5">
+                        <div class="bg-emerald-500 h-1.5 rounded-full" style="width: 4%"></div>
+                    </div>
+                    <p class="text-[10px] text-slate-400 mt-2">BCI/Switch reliability high. Context preserved during fallback.</p>
+                </div>
+
+                <div class="glass-card rounded-xl p-5 hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs font-semibold text-hub-700 uppercase tracking-wide">Social Bridge</span>
+                        <span class="w-8 h-8 bg-hub-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-4 h-4 text-hub-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                        </span>
+                    </div>
+                    <div class="text-3xl font-bold text-slate-900">100%</div>
+                    <p class="text-xs text-slate-500 mt-1">Anonymity Preserved</p>
+                    <div class="mt-3 w-full bg-slate-100 rounded-full h-1.5">
+                        <div class="bg-emerald-500 h-1.5 rounded-full" style="width: 100%"></div>
+                    </div>
+                    <p class="text-[10px] text-slate-400 mt-2">All community dialogue redacted. No raw identifiers disclosed.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Charts & Trends -->
+        <section class="mb-10 fade-in stagger-3">
+            <h2 class="text-xl font-bold text-slate-900 mb-6">Norm Diffusion & Sentiment Trends</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="glass-card rounded-xl p-6 lg:col-span-2">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-semibold text-slate-800">Aggregate Discourse Indicators</h3>
+                        <div class="flex space-x-2 text-xs">
+                            <span class="flex items-center"><span class="w-2.5 h-2.5 bg-hub-600 rounded-full mr-1.5"></span>Support</span>
+                            <span class="flex items-center"><span class="w-2.5 h-2.5 bg-rose-500 rounded-full mr-1.5"></span>Hostility</span>
+                            <span class="flex items-center"><span class="w-2.5 h-2.5 bg-amber-500 rounded-full mr-1.5"></span>Norm Diffusion</span>
+                        </div>
+                    </div>
+                    <div class="h-64">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                </div>
+                <div class="glass-card rounded-xl p-6">
+                    <h3 class="font-semibold text-slate-800 mb-4">Data Quality & Evidence</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between text-xs text-slate-600 mb-1">
+                                <span>Knowledge Factor</span>
+                                <span class="font-semibold text-slate-900">0.81</span>
+                            </div>
+                            <div class="w-full bg-slate-100 rounded-full h-2">
+                                <div class="bg-hub-600 h-2 rounded-full" style="width: 81%"></div>
+                            </div>
+                            <p class="text-[10px] text-slate-400 mt-1">Evidence completeness & sample sufficiency.</p>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs text-slate-600 mb-1">
+                                <span>Aggregate Sample Count</span>
+                                <span class="font-semibold text-slate-900">14,208</span>
+                            </div>
+                            <div class="w-full bg-slate-100 rounded-full h-2">
+                                <div class="bg-hub-600 h-2 rounded-full" style="width: 92%"></div>
+                            </div>
+                            <p class="text-[10px] text-slate-400 mt-1">Well above minimum threshold (25).</p>
+                        </div>
+                        <div class="pt-3 border-t border-slate-100">
+                            <p class="text-xs font-semibold text-slate-700 mb-2">Source Summary</p>
+                            <p class="text-[11px] text-slate-500 leading-relaxed">Aggregate source categories only; no author records or raw content. Includes community forums, public policy records, and redacted social posts.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Methodology & Privacy -->
+        <section class="mb-10 fade-in stagger-4">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Methodology -->
+                <div class="glass-card rounded-xl p-6">
+                    <h3 class="font-semibold text-slate-800 mb-4 flex items-center">
+                        <svg class="w-5 h-5 text-hub-700 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                        Methodology & Limitations
+                    </h3>
+                    <div class="space-y-3">
+                        <div class="flex items-start space-x-3">
+                            <span class="flex-shrink-0 w-1.5 h-1.5 bg-hub-600 rounded-full mt-2"></span>
+                            <div>
+                                <p class="text-xs font-semibold text-slate-700">Sentiment Method</p>
+                                <p class="text-xs text-slate-500">Aggregate lexicon analysis of redacted public discourse.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start space-x-3">
+                            <span class="flex-shrink-0 w-1.5 h-1.5 bg-hub-600 rounded-full mt-2"></span>
+                            <div>
+                                <p class="text-xs font-semibold text-slate-700">Policy Evaluation</p>
+                                <p class="text-xs text-slate-500">Documented inclusion commitment review (7 required commitments).</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start space-x-3">
+                            <span class="flex-shrink-0 w-1.5 h-1.5 bg-hub-600 rounded-full mt-2"></span>
+                            <div>
+                                <p class="text-xs font-semibold text-slate-700">Update Schedule</p>
+                                <p class="text-xs text-slate-500">Periodic, documented public reporting cycle (Quarterly).</p>
+                            </div>
+                        </div>
+                        <div class="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                            <p class="text-[11px] font-semibold text-slate-700 mb-1">Known Limitations</p>
+                            <ul class="text-[11px] text-slate-500 space-y-1 list-disc list-inside">
+                                <li>Sentiment indicators may not capture context, irony, or unreported experiences.</li>
+                                <li>Aggregate scores do not establish individual attitudes or legal conclusions.</li>
+                                <li>Low evidence coverage is shown explicitly, not hidden by scoring.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Privacy & Prohibited Uses -->
+                <div class="glass-card rounded-xl p-6 border-l-4 border-l-emerald-500">
+                    <h3 class="font-semibold text-slate-800 mb-4 flex items-center">
+                        <svg class="w-5 h-5 text-emerald-700 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                        Privacy & Neuro-Rights Compliance
+                    </h3>
+                    <div class="grid grid-cols-2 gap-3 mb-4">
+                        <div class="flex items-center space-x-2 text-xs text-slate-700">
+                            <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            <span>Aggregate Only</span>
+                        </div>
+                        <div class="flex items-center space-x-2 text-xs text-slate-700">
+                            <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            <span>No Individual Tracking</span>
+                        </div>
+                        <div class="flex items-center space-x-2 text-xs text-slate-700">
+                            <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            <span>No Raw Sentiment Text</span>
+                        </div>
+                        <div class="flex items-center space-x-2 text-xs text-slate-700">
+                            <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            <span>No Biometric Data</span>
+                        </div>
+                        <div class="flex items-center space-x-2 text-xs text-slate-700">
+                            <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            <span>No Device Identifiers</span>
+                        </div>
+                        <div class="flex items-center space-x-2 text-xs text-slate-700">
+                            <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            <span>No Precise Location</span>
+                        </div>
+                    </div>
+                    <div class="p-3 bg-rose-50 rounded-lg border border-rose-200">
+                        <p class="text-[11px] font-semibold text-rose-800 mb-1">Strictly Prohibited Uses</p>
+                        <ul class="text-[11px] text-rose-700 space-y-1 list-disc list-inside">
+                            <li>Individual profiling or identity resolution</li>
+                            <li>Automated service denial or predictive policing</li>
+                            <li>Targeted persuasion or publication of raw messages</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer Disclaimer -->
+        <footer class="text-center py-8 border-t border-slate-200">
+            <p class="text-xs text-slate-500 max-w-3xl mx-auto leading-relaxed mb-4">
+                <strong>Disclaimer:</strong> Metrics are aggregate decision-support indicators. They do not identify individuals, establish individual beliefs, or prove discrimination. 
+                This dashboard operates under the Neuro-Rights Charter and ALN.MIGRATION.CYBERCORE_AUTHORITY.v1 governance bindings.
+            </p>
+            <div class="flex items-center justify-center space-x-4 text-[10px] text-slate-400">
+                <span>Schema v1.0</span>
+                <span>•</span>
+                <span>Generated: 2026-03-31T23:59:59Z</span>
+                <span>•</span>
+                <span>ALN Authority: Cybercore</span>
+            </div>
+        </footer>
+    </main>
+
+    <script>
+        // Mock Data based on Schema and Conversation Context
+        const metricsData = [
+            { id: 'social_acceptance_index', label: 'Social Acceptance Index', value: 0.78, desc: 'Aggregate acceptance from sentiment, policy, and access evidence.', color: '#0d9488' },
+            { id: 'public_support_score', label: 'Public Support Score', value: 0.82, desc: 'Supportive-discourse indicator from privacy-preserving analysis.', color: '#0d9488' },
+            { id: 'hostility_score', label: 'Hostility Score', value: 0.28, desc: 'Exclusionary discourse indicator requiring contextual review.', color: '#d97706', isWarning: true },
+            { id: 'inclusion_policy_score', label: 'Inclusion Policy Score', value: 0.85, desc: 'Documented policy-inclusion for public services and events.', color: '#0d9488' },
+            { id: 'accessibility_score', label: 'Accessibility Score', value: 0.74, desc: 'Aggregate accessibility and assistive-accommodation score.', color: '#0d9488' },
+            { id: 'norm_diffusion_strength', label: 'Norm Diffusion Strength', value: 0.65, desc: 'Rate-and-strength estimate for acceptance-norm change.', color: '#0d9488' },
+            { id: 'knowledge_factor', label: 'Knowledge Factor', value: 0.81, desc: 'Evidence completeness and aggregate sample sufficiency.', color: '#0d9488' },
+            { id: 'eco_impact_value', label: 'Eco Impact Value', value: 0.50, desc: 'Evidence-backed ecological value (material component).', color: '#64748b' },
+            { id: 'harm_risk', label: 'Harm Risk', value: 0.32, desc: 'Potential risk of exclusion, hostility, or evidence insufficiency.', color: '#d97706', isWarning: true }
+        ];
+
+        // Render Metrics Grid
+        const grid = document.getElementById('metrics-grid');
+        metricsData.forEach((metric, index) => {
+            const percentage = Math.round(metric.value * 100);
+            const circumference = 2 * Math.PI * 36;
+            const offset = circumference - (metric.value * circumference);
+            
+            const card = document.createElement('div');
+            card.className = `glass-card rounded-xl p-5 hover:shadow-md transition-shadow fade-in stagger-${Math.min(index + 1, 4)} tooltip-container`;
+            card.innerHTML = `
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">${metric.label}</span>
+                    ${metric.isWarning ? '<span class="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>' : ''}
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="relative w-20 h-20 flex-shrink-0">
+                        <svg class="metric-ring w-20 h-20" viewBox="0 0 80 80">
+                            <circle cx="40" cy="40" r="36" fill="none" stroke="#e2e8f0" stroke-width="6"></circle>
+                            <circle cx="40" cy="40" r="36" fill="none" stroke="${metric.color}" stroke-width="6" stroke-linecap="round" 
+                                stroke-dasharray="${circumference}" stroke-dashoffset="${circumference}" 
+                                data-target="${offset}"></circle>
+                        </svg>
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <span class="text-lg font-bold text-slate-900">${percentage}%</span>
+                        </div>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs text-slate-500 leading-relaxed">${metric.desc}</p>
+                    </div>
+                </div>
+                <div class="tooltip-text">${metric.desc} (Raw: ${metric.value.toFixed(2)})</div>
+            `;
+            grid.appendChild(card);
+        });
+
+        // Animate Rings
+        setTimeout(() => {
+            document.querySelectorAll('.metric-ring circle[data-target]').forEach(circle => {
+                circle.style.strokeDashoffset = circle.getAttribute('data-target');
+            });
+        }, 300);
+
+        // Chart.js Setup
+        const ctx = document.getElementById('trendChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Q3 2025', 'Q4 2025', 'Q1 2026'],
+                datasets: [
+                    {
+                        label: 'Public Support',
+                        data: [0.70, 0.75, 0.82],
+                        borderColor: '#0d9488',
+                        backgroundColor: 'rgba(13, 148, 136, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#0d9488',
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    },
+                    {
+                        label: 'Hostility',
+                        data: [0.35, 0.30, 0.28],
+                        borderColor: '#f43f5e',
+                        backgroundColor: 'rgba(244, 63, 94, 0.05)',
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#f43f5e',
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    },
+                    {
+                        label: 'Norm Diffusion',
+                        data: [0.45, 0.55, 0.65],
+                        borderColor: '#d97706',
+                        backgroundColor: 'rgba(217, 119, 6, 0.05)',
+                        fill: true,
+                        tension: 0.4,
+                        borderDash: [5, 5],
+                        pointBackgroundColor: '#d97706',
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: '#1e293b',
+                        titleColor: '#fff',
+                        bodyColor: '#cbd5e1',
+                        padding: 12,
+                        cornerRadius: 8,
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.dataset.label}: ${(context.raw * 100).toFixed(0)}%`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        min: 0,
+                        max: 1,
+                        ticks: {
+                            callback: function(value) {
+                                return (value * 100) + '%';
+                            },
+                            color: '#64748b',
+                            font: { size: 11 }
+                        },
+                        grid: {
+                            color: '#f1f5f9'
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            color: '#64748b',
+                            font: { size: 11 }
+                        },
+                        grid: {
+                            display: false
+                        }
+                    }
+                },
+                interaction: {
+                    mode: 'nearest',
+                    axis: 'x',
+                    intersect: false
+                }
+            }
+        });
+    </script>
+</body>
+</html>
