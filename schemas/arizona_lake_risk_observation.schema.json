@@ -1,0 +1,278 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mk-bluebird.github.io/Augmented-Hub/schemas/arizona_lake_risk_observation.schema.json",
+  "title": "Arizona Lake Ecological Risk Observation",
+  "description": "A privacy-preserving, non-actuating observation record for ecological monitoring, bloom research, and fish-mortality risk research.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "observation_id",
+    "observed_at_utc",
+    "lake_id",
+    "lake_segment",
+    "method",
+    "measurements",
+    "data_quality",
+    "governance"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "observation_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{7,127}$"
+    },
+    "observed_at_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "lake_id": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 128
+    },
+    "lake_segment": {
+      "type": "string",
+      "enum": [
+        "inflow",
+        "main_basin",
+        "deep_channel",
+        "shallow_embayment",
+        "downwind_shoreline",
+        "outlet_or_dam",
+        "other_documented_segment"
+      ]
+    },
+    "spatial_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "precision_m",
+        "publication_precision_m"
+      ],
+      "properties": {
+        "latitude": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "longitude": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        "precision_m": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "publication_precision_m": {
+          "type": "number",
+          "minimum": 100,
+          "maximum": 10000
+        }
+      }
+    },
+    "method": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_version",
+        "observation_type"
+      ],
+      "properties": {
+        "protocol_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "observation_type": {
+          "type": "string",
+          "enum": [
+            "field_measurement",
+            "visual_screening",
+            "laboratory_result",
+            "agency_incident_record",
+            "remote_sensing_derivative"
+          ]
+        },
+        "instrument_class": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "calibration_status": {
+          "type": "string",
+          "enum": [
+            "verified_before_sampling",
+            "verified_after_sampling",
+            "not_applicable",
+            "unknown"
+          ]
+        }
+      }
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "depth_m": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "surface_temperature_c": {
+          "type": "number",
+          "minimum": -5,
+          "maximum": 60
+        },
+        "bottom_temperature_c": {
+          "type": "number",
+          "minimum": -5,
+          "maximum": 60
+        },
+        "dissolved_oxygen_surface_mg_l": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 30
+        },
+        "dissolved_oxygen_bottom_mg_l": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 30
+        },
+        "dissolved_oxygen_surface_percent_saturation": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 300
+        },
+        "ph": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 14
+        },
+        "specific_conductance_us_cm": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 200000
+        },
+        "secchi_depth_m": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "chlorophyll_a_ug_l": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "water_level_m": {
+          "type": "number",
+          "minimum": -1000,
+          "maximum": 10000
+        },
+        "water_color_screening": {
+          "type": "string",
+          "enum": [
+            "clear",
+            "green",
+            "brown",
+            "golden",
+            "tea_colored",
+            "gray",
+            "other",
+            "not_observed"
+          ]
+        },
+        "dead_fish_count_screening": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        }
+      }
+    },
+    "data_quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "quality_status",
+        "evidence_class",
+        "known_limitations"
+      ],
+      "properties": {
+        "quality_status": {
+          "type": "string",
+          "enum": [
+            "validated",
+            "provisional",
+            "screening_only",
+            "rejected"
+          ]
+        },
+        "evidence_class": {
+          "type": "string",
+          "enum": [
+            "instrument_measurement",
+            "laboratory_confirmation",
+            "agency_confirmation",
+            "visual_observation",
+            "remote_sensing_estimate"
+          ]
+        },
+        "known_limitations": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          }
+        }
+      }
+    },
+    "governance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "purpose",
+        "retention_class",
+        "non_actuating",
+        "individual_targeting_prohibited",
+        "review_status"
+      ],
+      "properties": {
+        "purpose": {
+          "type": "string",
+          "const": "ecological_monitoring_and_research"
+        },
+        "retention_class": {
+          "type": "string",
+          "enum": [
+            "research_record",
+            "agency_submitted_record",
+            "temporary_screening_record"
+          ]
+        },
+        "non_actuating": {
+          "type": "boolean",
+          "const": true
+        },
+        "individual_targeting_prohibited": {
+          "type": "boolean",
+          "const": true
+        },
+        "review_status": {
+          "type": "string",
+          "enum": [
+            "unreviewed",
+            "community_reviewed",
+            "technical_reviewed",
+            "agency_confirmed"
+          ]
+        }
+      }
+    }
+  }
+}
