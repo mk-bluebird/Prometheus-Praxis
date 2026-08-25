@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Augmented Bill of Rights | Phoenix Smart City 2028</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.8/index.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    colors: {
+                        augmented: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            200: '#bbf7d0',
+                            300: '#86efac',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            800: '#166534',
+                            900: '#14532d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .rights-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+        .scenario-card {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .scenario-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        .violation-detected {
+            animation: pulse-red 2s infinite;
+        }
+        @keyframes pulse-red {
+            0%, 100% { background-color: rgba(239, 68, 68, 0.1); }
+            50% { background-color: rgba(239, 68, 68, 0.2); }
+        }
+        .compliance-verified {
+            animation: pulse-green 2s infinite;
+        }
+        @keyframes pulse-green {
+            0%, 100% { background-color: rgba(34, 197, 94, 0.1); }
+            50% { background-color: rgba(34, 197, 94, 0.2); }
+        }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -8px;
+            top: 8px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #16a34a;
+            border: 3px solid white;
+            box-shadow: 0 0 0 2px #16a34a;
+        }
+        .scroll-smooth {
+            scroll-behavior: smooth;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-augmented-700 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-bold text-gray-900">Augmented Bill of Rights</h1>
+                        <p class="text-xs text-gray-500">Phoenix Smart City • 2028</p>
+                    </div>
+                </div>
+                <nav class="hidden md:flex space-x-6 text-sm">
+                    <a href="#rights" class="text-gray-600 hover:text-augmented-700">Rights</a>
+                    <a href="#scenarios" class="text-gray-600 hover:text-augmented-700">Scenarios</a>
+                    <a href="#enforcement" class="text-gray-600 hover:text-augmented-700">Enforcement</a>
+                    <a href="#constitution" class="text-gray-600 hover:text-augmented-700">Constitution</a>
+                    <a href="#grievance" class="text-gray-600 hover:text-augmented-700">Grievance</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="bg-gradient-to-br from-augmented-700 via-augmented-800 to-augmented-900 text-white py-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center">
+                <h2 class="text-5xl font-bold mb-6">The Augmented Bill of Rights</h2>
+                <p class="text-xl mb-8 text-augmented-100">40 Articles Protecting Cybernetic Hosts and Augmented Citizens</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
+                    <div class="glass-card rounded-xl p-6 text-gray-900">
+                        <div class="text-4xl font-bold text-augmented-700 mb-2">40</div>
+                        <div class="text-sm text-gray-600">Protected Rights</div>
+                    </div>
+                    <div class="glass-card rounded-xl p-6 text-gray-900">
+                        <div class="text-4xl font-bold text-augmented-700 mb-2">9</div>
+                        <div class="text-sm text-gray-600">Constitutional Amendments</div>
+                    </div>
+                    <div class="glass-card rounded-xl p-6 text-gray-900">
+                        <div class="text-4xl font-bold text-augmented-700 mb-2">2028</div>
+                        <div class="text-sm text-gray-600">Phoenix Implementation</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Rights Explorer -->
+    <section id="rights" class="py-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold text-gray-900 mb-8 text-center">Explore the 40 Articles</h2>
+            <div class="rights-grid" id="rightsGrid">
+                <!-- Rights will be populated by JavaScript -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Real-World Scenarios -->
+    <section id="scenarios" class="py-16 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold text-gray-900 mb-4 text-center">Real-World Scenarios</h2>
+            <p class="text-center text-gray-600 mb-12">See how the Augmented Bill of Rights protects citizens in everyday situations</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Healthcare Scenario -->
+                <div class="scenario-card glass-card rounded-xl p-6" onclick="showScenario('healthcare')">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center mr-4">
+                            <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900">Healthcare & Insurance</h3>
+                            <p class="text-sm text-gray-600">Article XXI Protection</p>
+                        </div>
+                    </div>
+                    <p class="text-gray-700 mb-4">A cybernetic host with neural implants seeks diagnostic imaging. The hospital must ensure compatibility with augmentations.</p>
+                    <div class="flex items-center text-sm text-augmented-700 font-semibold">
+                        <span>View Scenario</span>
+                        <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Employment Scenario -->
+                <div class="scenario-card glass-card rounded-xl p-6" onclick="showScenario('employment')">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
+                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900">Employment Discrimination</h3>
+                            <p class="text-sm text-gray-600">Article XXIV Protection</p>
+                        </div>
+                    </div>
+                    <p class="text-gray-700 mb-4">An augmented citizen applies for a job. The employer cannot discriminate based on augmentation status or require deactivation.</p>
+                    <div class="flex items-center text-sm text-augmented-700 font-semibold">
+                        <span>View Scenario</span>
+                        <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Smart City Scenario -->
+                <div class="scenario-card glass-card rounded-xl p-6" onclick="showScenario('smartcity')">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mr-4">
+                            <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900">Smart City Services</h3>
+                            <p class="text-sm text-gray-600">Article XXVII Protection</p>
+                        </div>
+                    </div>
+                    <p class="text-gray-700 mb-4">A cybernetic host uses public transit. The system must accommodate neural interfaces and preserve psych-continuity.</p>
+                    <div class="flex items-center text-sm text-augmented-700 font-semibold">
+                        <span>View Scenario</span>
+                        <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Privacy Scenario -->
+                <div class="scenario-card glass-card rounded-xl p-6" onclick="showScenario('privacy')">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center mr-4">
+                            <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900">Neural Privacy</h3>
+                            <p class="text-sm text-gray-600">Article III Protection</p>
+                        </div>
+                    </div>
+                    <p class="text-gray-700 mb-4">Law enforcement requests neural data. A warrant based on probable cause is required under the Fourth Amendment.</p>
+                    <div class="flex items-center text-sm text-augmented-700 font-semibold">
+                        <span>View Scenario</span>
+                        <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scenario Detail Modal -->
+            <div id="scenarioModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                <div class="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                    <div class="p-8">
+                        <div class="flex justify-between items-start mb-6">
+                            <h3 id="modalTitle" class="text-2xl font-bold text-gray-900"></h3>
+                            <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div id="modalContent"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Live Policy Enforcement Demo -->
+    <section id="enforcement" class="py-16 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold text-gray-900 mb-4 text-center">Live Policy Enforcement</h2>
+            <p class="text-center text-gray-600 mb-12">Interactive demonstration of Article XXI insurance discrimination prevention</p>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Input Panel -->
+                <div class="glass-card rounded-xl p-6">
+                    <h3 class="text-xl font-bold text-gray-900 mb-6">Insurance Decision Input</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Coverage Decision</label>
+                            <select id="coverageDecision" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-augmented-500">
+                                <option value="approved">Approved</option>
+                                <option value="denied">Denied</option>
+                                <option value="limited">Limited</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Augmentation Status</label>
+                            <select id="augmentationStatus" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-augmented-500">
+                                <option value="not_applicable">Not Applicable</option>
+                                <option value="present">Present</option>
+                                <option value="history">History</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="actuarialJustification" class="w-4 h-4 text-augmented-600 border-gray-300 rounded focus:ring-augmented-500">
+                                <span class="ml-2 text-sm text-gray-700">Actuarial Justification Provided</span>
+                            </label>
+                        </div>
+                        
+                        <div>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="requiresDeactivation" class="w-4 h-4 text-augmented-600 border-gray-300 rounded focus:ring-augmented-500">
+                                <span class="ml-2 text-sm text-gray-700">Requires Deactivation of Augmentations</span>
+                            </label>
+                        </div>
+                        
+                        <div>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="emergencyJustification" class="w-4 h-4 text-augmented-600 border-gray-300 rounded focus:ring-augmented-500">
+                                <span class="ml-2 text-sm text-gray-700">Emergency Justification</span>
+                            </label>
+                        </div>
+                        
+                        <button onclick="evaluateDecision()" class="w-full bg-augmented-700 text-white py-3 rounded-lg font-semibold hover:bg-augmented-800 transition-colors">
+                            Evaluate Decision
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Results Panel -->
+                <div class="glass-card rounded-xl p-6">
+                    <h3 class="text-xl font-bold text-gray-900 mb-6">Enforcement Results</h3>
+                    
+                    <div id="enforcementResults" class="space-y-4">
+                        <div class="text-center text-gray-500 py-12">
+                            <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <p>Click "Evaluate Decision" to see enforcement results</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Constitutional Mapping -->
+    <section id="constitution" class="py-16 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold text-gray-900 mb-4 text-center">Constitutional Foundation</h2>
+            <p class="text-center text-gray-600 mb-12">How the Augmented Bill of Rights connects to the U.S. Constitution</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="glass-card rounded-xl p-6">
+                    <div class="text-augmented-700 font-bold text-lg mb-2">Fourth Amendment</div>
+                    <p class="text-sm text-gray-600 mb-3">Unreasonable searches and seizures</p>
+                    <p class="text-sm text-gray-700">Protects neural data from warrantless government access. Establishes "neural expectation of privacy" test.</p>
+                    <div class="mt-4 text-xs text-augmented-700 font-semibold">Articles: III, XIII, XXVIII</div>
+                </div>
+                
+                <div class="glass-card rounded-xl p-6">
+                    <div class="text-augmented-700 font-bold text-lg mb-2">Ninth Amendment</div>
+                    <p class="text-sm text-gray-600 mb-3">Unenumerated rights retained by the people</p>
+                    <p class="text-sm text-gray-700">Foundation for cognitive liberty, bodily autonomy, psych-continuity, and self-determination rights.</p>
+                    <div class="mt-4 text-xs text-augmented-700 font-semibold">Articles: II, V, VI, VIII, IX, XX, XXXV, XXXVI</div>
+                </div>
+                
+                <div class="glass-card rounded-xl p-6">
+                    <div class="text-augmented-700 font-bold text-lg mb-2">Fourteenth Amendment</div>
+                    <p class="text-sm text-gray-600 mb-3">Equal Protection and Due Process</p>
+                    <p class="text-sm text-gray-700">Prohibits discrimination based on augmentation status. Requires due process before deprivation of augmentations.</p>
+                    <div class="mt-4 text-xs text-augmented-700 font-semibold">Articles: II, IV, V, VII, XIX, XXII, XXIII, XXIV, XXV, XXVII</div>
+                </div>
+                
+                <div class="glass-card rounded-xl p-6">
+                    <div class="text-augmented-700 font-bold text-lg mb-2">First Amendment</div>
+                    <p class="text-sm text-gray-600 mb-3">Freedom of thought and expression</p>
+                    <p class="text-sm text-gray-700">Protects cognitive liberty, cultural expression through augmentations, and freedom from coercive influence.</p>
+                    <div class="mt-4 text-xs text-augmented-700 font-semibold">Articles: IX, XII, XIV, XXII, XXXII</div>
+                </div>
+                
+                <div class="glass-card rounded-xl p-6">
+                    <div class="text-augmented-700 font-bold text-lg mb-2">Fifth Amendment</div>
+                    <p class="text-sm text-gray-600 mb-3">Due process and property rights</p>
+                    <p class="text-sm text-gray-700">Protects against compelled neural data disclosure. Establishes data ownership as property right.</p>
+                    <div class="mt-4 text-xs text-augmented-700 font-semibold">Articles: III, VIII, XVII, XIX, XXIX</div>
+                </div>
+                
+                <div class="glass-card rounded-xl p-6">
+                    <div class="text-augmented-700 font-bold text-lg mb-2">Commerce Clause</div>
+                    <p class="text-sm text-gray-600 mb-3">Federal regulation of interstate commerce</p>
+                    <p class="text-sm text-gray-700">Enables federal enforcement of augmented rights across state lines and in smart city infrastructure.</p>
+                    <div class="mt-4 text-xs text-augmented-700 font-semibold">Articles: VII, XI, XVIII, XXI, XXIV, XXVII, XXXIII, XXXIV</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Grievance Process -->
+    <section id="grievance" class="py-16 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold text-gray-900 mb-4 text-center">Accessible Grievance Process</h2>
+            <p class="text-center text-gray-600 mb-12">Article XV: Every citizen has the right to an accessible grievance process</p>
+            
+            <div class="max-w-4xl mx-auto">
+                <div class="glass-card rounded-xl p-8">
+                    <div class="space-y-6">
+                        <div class="relative pl-8 border-l-2 border-augmented-300 timeline-item">
+                            <h3 class="text-lg font-bold text-gray-900 mb-2">Step 1: File Complaint</h3>
+                            <p class="text-gray-700 mb-2">Submit complaint through accessible interface compatible with assistive technology</p>
+                            <div class="text-sm text-gray-500">• Neural interface compatible<br>• Voice input supported<br>• Text-based option available<br>• Privacy-preserving submission</div>
+                        </div>
+                        
+                        <div class="relative pl-8 border-l-2 border-augmented-300 timeline-item">
+                            <h3 class="text-lg font-bold text-gray-900 mb-2">Step 2: Initial Review</h3>
+                            <p class="text-gray-700 mb-2">OCAR reviews complaint within 30 days</p>
+                            <div class="text-sm text-gray-500">• Automated policy evaluation<br>• Rights violation detection<br>• Preliminary findings report<br>• Interim remedies if needed</div>
+                        </div>
+                        
+                        <div class="relative pl-8 border-l-2 border-augmented-300 timeline-item">
+                            <h3 class="text-lg font-bold text-gray-900 mb-2">Step 3: Investigation</h3>
+                            <p class="text-gray-700 mb-2">Full investigation with evidence collection</p>
+                            <div class="text-sm text-gray-500">• Privacy-preserving audit<br>• Witness statements (optional)<br>• Policy documentation review<br>• Expert consultation</div>
+                        </div>
+                        
+                        <div class="relative pl-8 border-l-2 border-augmented-300 timeline-item">
+                            <h3 class="text-lg font-bold text-gray-900 mb-2">Step 4: Decision</h3>
+                            <p class="text-gray-700 mb-2">Written decision with explanation</p>
+                            <div class="text-sm text-gray-500">• Findings of fact<br>• Legal analysis<br>• Remedies ordered<br>• Accessible format provided</div>
+                        </div>
+                        
+                        <div class="relative pl-8 border-l-2 border-augmented-300 timeline-item">
+                            <h3 class="text-lg font-bold text-gray-900 mb-2">Step 5: Remedies</h3>
+                            <p class="text-gray-700 mb-2">Effective remedies implemented</p>
+                            <div class="text-sm text-gray-500">• Injunctive relief<br>• Compensatory damages<br>• Policy changes<br>• Systemic improvements</div>
+                        </div>
+                        
+                        <div class="relative pl-8 border-l-2 border-augmented-300 timeline-item">
+                            <h3 class="text-lg font-bold text-gray-900 mb-2">Step 6: Appeal</h3>
+                            <p class="text-gray-700 mb-2">Right to independent review</p>
+                            <div class="text-sm text-gray-500">• Administrative appeal<br>• Judicial review available<br>• No exhaustion required<br>• Private right of action</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Phoenix Implementation Timeline -->
+    <section class="py-16 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold text-gray-900 mb-4 text-center">Phoenix Implementation Timeline</h2>
+            <p class="text-center text-gray-600 mb-12">Rolling out augmented rights in the Phoenix Smart City</p>
+            
+            <div class="max-w-4xl mx-auto">
+                <div class="space-y-8">
+                    <div class="flex">
+                        <div class="flex-shrink-0 w-24">
+                            <div class="text-2xl font-bold text-augmented-700">2026</div>
+                            <div class="text-sm text-gray-500">Q3-Q4</div>
+                        </div>
+                        <div class="ml-8 flex-1 glass-card rounded-xl p-6">
+                            <h3 class="text-lg font-bold text-gray-900 mb-2">Legislative Foundation</h3>
+                            <ul class="text-sm text-gray-700 space-y-2">
+                                <li>• Draft Augmented Citizen Rights Act (ACRA)</li>
+                                <li>• Establish Office of Cybernetic and Augmented Rights (OCAR)</li>
+                                <li>• Public comment period and stakeholder engagement</li>
+                                <li>• Develop enforcement mechanisms and remedies</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="flex">
+                        <div class="flex-shrink-0 w-24">
+                            <div class="text-2xl font-bold text-augmented-700">2027</div>
+                            <div class="text-sm text-gray-500">Q1-Q2</div>
+                        </div>
+                        <div class="ml-8 flex-1 glass-card rounded-xl p-6">
+                            <h3 class="text-lg font-bold text-gray-900 mb-2">Technical Infrastructure</h3>
+                            <ul class="text-sm text-gray-700 space-y-2">
+                                <li>• Deploy policy enforcement engines (Rego, Lua)</li>
+                                <li>• Integrate with Phoenix smart city systems</li>
+                                <li>• Establish audit and grievance platforms</li>
+                                <li>• Train government employees and service providers</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="flex">
+                        <div class="flex-shrink-0 w-24">
+                            <div class="text-2xl font-bold text-augmented-700">2027</div>
+                            <div class="text-sm text-gray-500">Q3-Q4</div>
+                        </div>
+                        <div class="ml-8 flex-1 glass-card rounded-xl p-6">
+                            <h3 class="text-lg font-bold text-gray-900 mb-2">Pilot Programs</h3>
+                            <ul class="text-sm text-gray-700 space-y-2">
+                                <li>• Healthcare system integration (Article XXI)</li>
+                                <li>• Public transit accessibility (Article XXVII)</li>
+                                <li>• Employment discrimination prevention (Article XXIV)</li>
+                                <li>• Neural privacy protections (Article III)</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="flex">
+                        <div class="flex-shrink-0 w-24">
+                            <div class="text-2xl font-bold text-augmented-700">2028</div>
+                            <div class="text-sm text-gray-500">Q1</div>
+                        </div>
+                        <div class="ml-8 flex-1 glass-card rounded-xl p-6 bg-augmented-50 border-2 border-augmented-500">
+                            <h3 class="text-lg font-bold text-gray-900 mb-2">Full Implementation</h3>
+                            <ul class="text-sm text-gray-700 space-y-2">
+                                <li>• All 40 articles in effect</li>
+                                <li>• OCAR fully operational</li>
+                                <li>• Private right of action available</li>
+                                <li>• Continuous monitoring and improvement</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                    <h3 class="text-lg font-bold mb-4">Augmented Bill of Rights</h3>
+                    <p class="text-sm text-gray-400">Protecting cybernetic hosts and augmented citizens in the Phoenix Smart City and beyond.</p>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold mb-4">Legal Framework</h3>
+                    <ul class="text-sm text-gray-400 space-y-2">
+                        <li>• U.S. Constitution</li>
+                        <li>• Americans with Disabilities Act</li>
+                        <li>• Convention on Rights of Persons with Disabilities</li>
+                        <li>• General Data Protection Regulation</li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold mb-4">Resources</h3>
+                    <ul class="text-sm text-gray-400 space-y-2">
+                        <li><a href="#" class="hover:text-augmented-400">Full Text of the Bill</a></li>
+                        <li><a href="#" class="hover:text-augmented-400">File a Grievance</a></li>
+                        <li><a href="#" class="hover:text-augmented-400">Contact OCAR</a></li>
+                        <li><a href="#" class="hover:text-augmented-400">Policy Documentation</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-400">
+                <p>© 2028 Phoenix Smart City • Augmented-Hub Platform • All Rights Reserved</p>
+                <p class="mt-2">This is a demonstration of how augmented rights could be implemented in a future smart city.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Rights data
+        const rights = [
+            { article: "I", title: "Definitions", icon: "📖", description: "Defines augmented citizen, assistive technology, neural data, and key terms" },
+            { article: "II", title: "Self-Asserted Identity", icon: "🆔", description: "Right to self-assert identity without third-party certification" },
+            { article: "III", title: "Neural Privacy", icon: "🧠", description: "Neural data is private; government access requires warrant" },
+            { article: "IV", title: "Assistive Technology as Necessity", icon: "🦾", description: "Assistive technology is essential, not optional" },
+            { article: "V", title: "Psych-Continuity", icon: "🔄", description: "Identity preserved across hardware/software changes" },
+            { article: "VI", title: "Pursue Augmentation", icon: "⬆️", description: "Liberty to seek augmentation and enhancement" },
+            { article: "VII", title: "Equal Access", icon: "⚖️", description: "No discrimination based on augmentation status" },
+            { article: "VIII", title: "Data Ownership", icon: "💾", description: "Individuals own their neural and biometric data" },
+            { article: "IX", title: "Cognitive Liberty", icon: "💭", description: "Right to control mental processes free from coercion" },
+            { article: "X", title: "Offline Existence", icon: "📴", description: "Right to disconnect without losing services" },
+            { article: "XI", title: "Interoperability", icon: "🔌", description: "Assistive tech must work with public systems" },
+            { article: "XII", title: "Repair and Modification", icon: "🔧", description: "Right to repair and modify own devices" },
+            { article: "XIII", title: "Protection from Neuro-Interference", icon: "🛡️", description: "Shielding from harmful electromagnetic interference" },
+            { article: "XIV", title: "Democratic Participation", icon: "🗳️", description: "Right to vote and hold office using accessible tech" },
+            { article: "XV", title: "Accessible Grievance", icon: "📝", description: "Right to accessible grievance and review process" },
+            { article: "XVI", title: "Freedom from Coercion", icon: "🚫", description: "No coercive design or manipulative interfaces" },
+            { article: "XVII", title: "Explanation and Transparency", icon: "🔍", description: "AI decisions must be explainable" },
+            { article: "XVIII", title: "Ecological Responsibility", icon: "🌱", description: "Minimize ecological harm from augmentation tech" },
+            { article: "XIX", title: "Bodily Integrity", icon: "🏥", description: "Body cannot be modified without consent" },
+            { article: "XX", title: "Memory Continuity", icon: "🧩", description: "Right to preserve memories across changes" },
+            { article: "XXI", title: "Insurance & Healthcare", icon: "🏥", description: "No discrimination in insurance or healthcare" },
+            { article: "XXII", title: "Community Participation", icon: "👥", description: "Right to participate in community life" },
+            { article: "XXIII", title: "Education Accommodation", icon: "🎓", description: "Reasonable accommodation in education" },
+            { article: "XXIV", title: "Employment", icon: "💼", description: "Equal employment opportunities" },
+            { article: "XXV", title: "Accessible Justice", icon: "⚖️", description: "Right to accessible justice system" },
+            { article: "XXVI", title: "Development & Enhancement", icon: "🚀", description: "Right to access new technologies" },
+            { article: "XXVII", title: "Smart City Fair Treatment", icon: "🏙️", description: "Fair treatment in smart city systems" },
+            { article: "XXVIII", title: "Privacy in Public Spaces", icon: "👁️", description: "Protection from unauthorized surveillance" },
+            { article: "XXIX", title: "Informed Consent", icon: "✅", description: "Right to informed consent for all procedures" },
+            { article: "XXX", title: "Maintenance & Support", icon: "🛠️", description: "Right to maintenance for assistive tech" },
+            { article: "XXXI", title: "Intergenerational Continuity", icon: "👨‍👩‍👧‍👦", description: "Right to pass augmentations to descendants" },
+            { article: "XXXII", title: "Cultural Identity", icon: "🎭", description: "Right to cultural expression through augmentations" },
+            { article: "XXXIII", title: "Scientific Progress", icon: "🔬", description: "Right to benefit from technological progress" },
+            { article: "XXXIV", title: "Non-Discrimination in Research", icon: "🧪", description: "Inclusion in research and development" },
+            { article: "XXXV", title: "Autonomous Decision-Making", icon: "🎯", description: "Right to make decisions about own body" },
+            { article: "XXXVI", title: "Mental Integrity", icon: "🧠", description: "Right to maintain cognitive function" },
+            { article: "XXXVII", title: "Future Generations", icon: "🌟", description: "Right to consider future generations" },
+            { article: "XXXVIII", title: "Dignity and Respect", icon: "👑", description: "Right to dignity and respect" },
+            { article: "XXXIX", title: "Existence and Recognition", icon: "✨", description: "Right to exist and be recognized as person" },
+            { article: "XL", title: "Self-Determination", icon: "🎪", description: "Right to define own identity and future" }
+        ];
+
+        // Populate rights grid
+        const rightsGrid = document.getElementById('rightsGrid');
+        rights.forEach(right => {
+            const card = document.createElement('div');
+            card.className = 'glass-card rounded-xl p-6 hover:shadow-lg transition-shadow cursor-pointer';
+            card.innerHTML = `
+                <div class="text-4xl mb-3">${right.icon}</div>
+                <div class="text-sm text-augmented-700 font-semibold mb-1">Article ${right.article}</div>
+                <h3 class="text-lg font-bold text-gray-900 mb-2">${right.title}</h3>
+                <p class="text-sm text-gray-600">${right.description}</p>
+            `;
+            rightsGrid.appendChild(card);
+        });
+
+        // Scenario data
+        const scenarios = {
+            healthcare: {
+                title: "Healthcare & Insurance Scenario",
+                content: `
+                    <div class="space-y-6">
+                        <div class="bg-blue-50 border-l-4 border-blue-500 p-4">
+                            <p class="text-blue-700"><strong>Scenario:</strong> Maria, a cybernetic host with neural implants, needs an MRI for a medical condition.</p>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-bold text-gray-900 mb-2">Protected Rights</h4>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>• Article XXI: No discrimination in healthcare based on augmentation status</li>
+                                <li>• Article IV: Assistive technology as necessity</li>
+                                <li>• Article XXIX: Informed consent for procedures</li>
+                            </ul>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-bold text-gray-900 mb-2">Hospital Obligations</h4>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>• Ensure MRI equipment is compatible with neural implants</li>
+                                <li>• Cannot require deactivation of augmentations without emergency justification</li>
+                                <li>• Must provide accessible informed consent process</li>
+                                <li>• Cannot deny coverage based on augmentation status</li>
+                            </ul>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-bold text-gray-900 mb-2">Insurance Provider Obligations</h4>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>• Cannot deny coverage based on augmentation status</li>
+                                <li>• Cannot charge higher premiums without actuarial justification</li>
+                                <li>• Must cover augmentation-related medical needs</li>
+                                <li>• Cannot require removal of augmentations as condition of coverage</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="bg-green-50 border-l-4 border-green-500 p-4">
+                            <p class="text-green-700"><strong>Outcome:</strong> Maria receives the MRI with accommodations for her neural implants. Her insurance covers the procedure without discrimination.</p>
+                        </div>
+                    </div>
+                `
+            },
+            employment: {
+                title: "Employment Discrimination Scenario",
+                content: `
+                    <div class="space-y-6">
+                        <div class="bg-blue-50 border-l-4 border-blue-500 p-4">
+                            <p class="text-blue-700"><strong>Scenario:</strong> Alex, an augmented citizen with cognitive enhancement implants, applies for a software engineering position.</p>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-bold text-gray-900 mb-2">Protected Rights</h4>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>• Article XXIV: Equal employment opportunities</li>
+                                <li>• Article VII: No discrimination based on augmentation status</li>
+                                <li>• Article XXXV: Autonomous decision-making</li>
+                            </ul>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-bold text-gray-900 mb-2">Employer Obligations</h4>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>• Cannot discriminate in hiring based on augmentation status</li>
+                                <li>• Cannot require deactivation of augmentations as condition of employment</li>
+                                <li>• Must provide reasonable workplace accommodations</li>
+                                <li>• Cannot penalize assistive technology use</li>
+                                <li>• Must protect from augmentation-related harassment</li>
+                            </ul>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-bold text-gray-900 mb-2">Prohibited Actions</h4>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>• ❌ "We don't hire augmented citizens"</li>
+                                <li>❌ "You must deactivate your implants during work"</li>
+                                <li>❌ "Your augmentations make you a security risk"</li>
+                                <li>❌ "We only hire non-augmented candidates"</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="bg-green-50 border-l-4 border-green-500 p-4">
+                            <p class="text-green-700"><strong>Outcome:</strong> Alex is hired based on qualifications. The employer provides workspace modifications for Alex's assistive technology.</p>
+                        </div>
+                    </div>
+                `
+            },
+            smartcity: {
+                title: "Smart City Services Scenario",
+                content: `
+                    <div class="space-y-6">
+                        <div class="bg-blue-50 border-l-4 border-blue-500 p-4">
+                            <p class="text-blue-700"><strong>Scenario:</strong> Jordan, a cybernetic host with a neural interface, uses Phoenix public transit to commute to work.</p>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-bold text-gray-900 mb-2">Protected Rights</h4>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>• Article XXVII: Fair treatment in smart city systems</li>
+                                <li>• Article V: Psych-continuity across interface changes</li>
+                                <li>• Article XI: Interoperability with public systems</li>
+                                <li>• Article III: Neural privacy in public spaces</li>
+                            </ul>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-bold text-gray-900 mb-2">Smart City Obligations</h4>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>• Transit system must be compatible with neural interfaces</li>
+                                <li>• Cannot collect neural data without explicit consent</li>
+                                <li>• Must preserve task context during system interruptions</li>
+                                <li>• Cannot profile based on augmentation status</li>
+                                <li>• Must provide equivalent offline access</li>
+                            </ul>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-bold text-gray-900 mb-2">Privacy Protections</h4>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>• Neural data cannot be accessed without warrant</li>
+                                <li>• No augmentation-based profiling in public spaces</li>
+                                <li>• Right to disconnect from real-time monitoring</li>
+                                <li>• Data minimization in smart city systems</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="bg-green-50 border-l-4 border-green-500 p-4">
+                            <p class="text-green-700"><strong>Outcome:</strong> Jordan uses neural interface to pay fare and navigate transit. System preserves context during a brief network interruption. No neural data is collected without consent.</p>
+                        </div>
+                    </div>
+                `
+            },
+            privacy: {
+                title: "Neural Privacy Scenario",
+                content: `
+                    <div class="space-y-6">
+                        <div class="bg-blue-50 border-l-4 border-blue-500 p-4">
+                            <p class="text-blue-700"><strong>Scenario:</strong> Law enforcement investigates a crime and requests neural data from a cybernetic host's brain-computer interface.</p>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-bold text-gray-900 mb-2">Protected Rights</h4>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>• Article III: Neural privacy</li>
+                                <li>• Article XXVIII: Privacy in public spaces</li>
+                                <li>• Fourth Amendment: Protection from unreasonable searches</li>
+                                <li>• Fifth Amendment: Protection against self-incrimination</li>
+                            </ul>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-bold text-gray-900 mb-2">Law Enforcement Requirements</h4>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>• Must obtain warrant based on probable cause</li>
+                                <li>• Warrant must particularly describe data to be seized</li>
+                                <li>• Cannot compel decryption of neural data (Fifth Amendment)</li>
+                                <li>• Must minimize collection to scope of warrant</li>
+                            </ul>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-bold text-gray-900 mb-2">"Neural Expectation of Privacy" Test</h4>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>• Does individual have subjective expectation of privacy?</li>
+                                <li>• Is society willing to recognize that expectation as reasonable?</li>
+                                <li>• Neural data receives highest level of protection</li>
+                                <li>• Contents of mind are protected from government access</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="bg-green-50 border-l-4 border-green-500 p-4">
+                            <p class="text-green-700"><strong>Outcome:</strong> Police obtain warrant with probable cause and particularity. Neural data is accessed only within scope of warrant. Individual cannot be compelled to decrypt neural data.</p>
+                        </div>
+                    </div>
+                `
+            }
+        };
+
+        // Show scenario modal
+        function showScenario(scenarioKey) {
+            const scenario = scenarios[scenarioKey];
+            document.getElementById('modalTitle').textContent = scenario.title;
+            document.getElementById('modalContent').innerHTML = scenario.content;
+            document.getElementById('scenarioModal').classList.remove('hidden');
+        }
+
+        // Close modal
+        function closeModal() {
+            document.getElementById('scenarioModal').classList.add('hidden');
+        }
+
+        // Policy enforcement evaluation
+        function evaluateDecision() {
+            const coverageDecision = document.getElementById('coverageDecision').value;
+            const augmentationStatus = document.getElementById('augmentationStatus').value;
+            const actuarialJustification = document.getElementById('actuarialJustification').checked;
+            const requiresDeactivation = document.getElementById('requiresDeactivation').checked;
+            const emergencyJustification = document.getElementById('emergencyJustification').checked;
+
+            let violations = [];
+            let findings = [];
+            let remedies = [];
+
+            // Check Article 21.1: Discrimination
+            if (augmentationStatus !== 'not_applicable') {
+                if (coverageDecision === 'denied' && !actuarialJustification) {
+                    violations.push('coverage_denied_based_on_status');
+                    findings.push('Coverage denied based on augmentation status without actuarial justification');
+                    remedies.push('Provide coverage based on actuarial risk, not augmentation status');
+                }
+                
+                if (coverageDecision === 'limited' && !actuarialJustification) {
+                    violations.push('coverage_limited_based_on_status');
+                    findings.push('Coverage limited based on augmentation status without actuarial justification');
+                    remedies.push('Provide coverage based on actuarial risk, not augmentation status');
+                }
+            }
+
+            // Check Article 21.4: Forced deactivation
+            if (requiresDeactivation && !emergencyJustification) {
+                violations.push('forced_deactivation_detected');
+                findings.push('Requires deactivation of augmentations without emergency justification');
+                remedies.push('Do not require deactivation of augmentations as condition of coverage');
+            }
+
+            const allowed = violations.length === 0;
+            const violationCount = violations.length;
+
+            // Display results
+            const resultsDiv = document.getElementById('enforcementResults');
+            
+            if (allowed) {
+                resultsDiv.innerHTML = `
+                    <div class="compliance-verified rounded-lg p-6 border-2 border-green-500">
+                        <div class="flex items-center mb-4">
+                            <svg class="w-12 h-12 text-green-600 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <div>
+                                <h4 class="text-xl font-bold text-green-900">Decision Compliant</h4>
+                                <p class="text-sm text-green-700">No Article XXI violations detected</p>
+                            </div>
+                        </div>
+                        <div class="mt-4 text-sm text-gray-700">
+                            <p><strong>Violation Count:</strong> 0</p>
+                            <p><strong>Knowledge Factor:</strong> 0.90</p>
+                            <p><strong>Harm Risk:</strong> 0.05</p>
+                        </div>
+                    </div>
+                `;
+            } else {
+                resultsDiv.innerHTML = `
+                    <div class="violation-detected rounded-lg p-6 border-2 border-red-500">
+                        <div class="flex items-center mb-4">
+                            <svg class="w-12 h-12 text-red-600 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12
