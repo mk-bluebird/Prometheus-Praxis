@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1b5e20">
+  <link rel="manifest" href="manifest.webmanifest">
+  <title>Community Heat Report</title>
+</head>
+<body>
+  <main>
+    <h1>Community Heat Report</h1>
+    <p id="connection-status" role="status" aria-live="polite"></p>
+
+    <section aria-labelledby="privacy-heading">
+      <h2 id="privacy-heading">Privacy</h2>
+      <p>
+        Reporting works offline. Location is optional, encrypted on this device,
+        and never required to view heat-safety information.
+      </p>
+    </section>
+
+    <section aria-labelledby="report-heading">
+      <h2 id="report-heading">Report a heat condition</h2>
+
+      <form id="heat-report-form">
+        <label for="condition">
+          Condition observed
+          <select id="condition" name="condition" required>
+            <option value="no-shade">No usable shade</option>
+            <option value="hot-transit-stop">Hot transit stop</option>
+            <option value="water-access-issue">Water access issue</option>
+            <option value="heat-risk">Heat-risk condition</option>
+            <option value="accessibility-barrier">Accessibility barrier</option>
+          </select>
+        </label>
+
+        <label for="details">
+          Optional details
+          <textarea id="details" name="details" maxlength="500"></textarea>
+        </label>
+
+        <label for="location">
+          Optional approximate location
+          <input id="location" name="location" inputmode="text" maxlength="160">
+        </label>
+
+        <button type="submit">Save encrypted report</button>
+      </form>
+    </section>
+
+    <section aria-labelledby="queue-heading">
+      <h2 id="queue-heading">Saved reports</h2>
+      <p id="queue-count" aria-live="polite">No reports saved.</p>
+      <button id="send-button" type="button">Send saved reports when connected</button>
+      <button id="delete-button" type="button">Delete saved reports</button>
+    </section>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
